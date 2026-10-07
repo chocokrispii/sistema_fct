@@ -1,3 +1,7 @@
+-- CREACIÓN Y SELECCIÓN DE LA BASE DE DATOS (Añadir al inicio del archivo)
+CREATE DATABASE IF NOT EXISTS sistema_fct CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE sistema_fct;
+
 -- 1. CREAR TABLA DE USUARIOS
 CREATE TABLE usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
