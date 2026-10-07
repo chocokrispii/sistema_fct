@@ -1,0 +1,23 @@
+:root {
+  /* Brand Colors */
+  --color-primary: #004085;
+  --color-primary-hover: #002B59;
+  --color-secondary: #00A8E8;
+  --color-accent: #FF6B35;
+
+  /* Neutrals */
+  --color-text-main: #212529;
+  --color-text-muted: #6C757D;
+  --color-bg-main: #F8F9FA;
+  --color-bg-card: #FFFFFF;
+  --color-border: #DEE2E6;
+
+  /* System Feedback */
+  --color-success: #28A745;
+  --color-warning: #FFC107;
+  --color-danger: #DC3545;
+}
+
+body {
+    background-color:red
+}
