@@ -1,0 +1,95 @@
+/* =========================
+   VARIABLES
+   ========================= */
+
+:root {
+    --color-primary: #004085;
+    --color-primary-hover: #002B59;
+    --color-secondary: #00A8E8;
+    --color-accent: #FF6B35;
+
+    --color-text-main: #212529;
+    --color-text-muted: #6C757D;
+
+    --color-bg-main: #F8F9FA;
+    --color-bg-card: #FFFFFF;
+    --color-border: #DEE2E6;
+
+    --color-success: #28A745;
+    --color-warning: #FFC107;
+    --color-danger: #DC3545;
+}
+
+
+/* =========================
+   GENERAL
+   ========================= */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: var(--color-bg-main);
+    color: var(--color-text-main);
+}
+
+
+/* =========================
+   HEADER
+   ========================= */
+
+header {
+    background-color: var(--color-primary);
+    color: white;
+    padding: 20px;
+}
+
+header h1 {
+    margin: 0 0 15px 0;
+}
+
+nav {
+    display: flex;
+    gap: 20px;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+}
+
+nav a:hover {
+    color: var(--color-secondary);
+}
+
+
+/* =========================
+   MAIN
+   ========================= */
+
+main {
+    padding: 40px;
+    min-height: 500px;
+}
+
+main h2 {
+    color: var(--color-primary);
+}
+
+
+/* =========================
+   FOOTER
+   ========================= */
+
+footer {
+    background-color: var(--color-primary-hover);
+    color: white;
+    padding: 20px 40px;
+}
+
+footer p {
+    margin: 0;
+}
