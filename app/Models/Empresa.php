@@ -10,21 +10,38 @@ class Empresa {
         $this->db = getPDOConnection();
     }
 
-    public function crear(int $usuarioId, string $cif, string $nombreComercial, string $telefono, string $direccion, string $personaContacto): int {
+    public function crear(
+        int $usuarioId,
+        string $cif,
+        string $nombreEmpresa,
+        string $telefono,
+        string $direccion,
+        string $personaContacto
+    ): int {
         try {
             $stmt = $this->db->prepare(
-                "INSERT INTO empresas (usuario_id, cif, nombre_comercial, telefono, direccion, persona_contacto) 
-                 VALUES (:usuario_id, :cif, :nombre, :telefono, :direccion, :contacto)"
+                'INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto)
+                 VALUES (:usuario_id, :nombre, :cif, :contacto)'
             );
             $stmt->execute([
                 'usuario_id' => $usuarioId,
                 'cif'        => $cif,
-                'nombre'     => $nombreComercial,
-                'telefono'   => $telefono,
-                'direccion'  => $direccion,
-                'contacto'   => $personaContacto
+                'nombre'     => $nombreEmpresa,
+                'contacto'   => $personaContacto,
             ]);
-            return (int)$this->db->lastInsertId();
+
+            $empresaId = (int)$this->db->lastInsertId();
+            $contacto = $this->db->prepare(
+                'INSERT INTO direcciones_telefonos (empresa_id, telefono, direccion_completa)
+                 VALUES (:empresa_id, :telefono, :direccion)'
+            );
+            $contacto->execute([
+                'empresa_id' => $empresaId,
+                'telefono' => $telefono,
+                'direccion' => $direccion,
+            ]);
+
+            return $empresaId;
         } catch (PDOException $e) {
             error_log("Error al crear empresa: " . $e->getMessage());
             return 0;

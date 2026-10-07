@@ -22,7 +22,7 @@ class AuthController {
 
             $usuario = $this->usuarioModel->obtenerPorEmail($email);
 
-            if ($usuario && password_verify($password, $usuario['password'])) {
+            if ($usuario && password_verify($password, $usuario['password_hash'])) {
                 if (session_status() === PHP_SESSION_NONE) {
                     session_start();
                 }
