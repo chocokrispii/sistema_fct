@@ -23,8 +23,11 @@ app/
     consultas/
 config/               Configuración de la aplicación y MySQL
 database/
-  migrations/         Esquema y cambios de la base de datos
-  seeds/              Datos iniciales, como roles y permisos
+  migrations/
+    001_create_fct_schema.sql  Esquema inicial de MySQL
+  seeds/
+    001_sample_data.sql        Datos de ejemplo para el esquema
+config/               Configuración de la aplicación y MySQL
 public/               Única raíz accesible desde el servidor web
   assets/
     css/
@@ -53,5 +56,10 @@ tests/
 - En la ficha del alumno, exige los datos del tutor legal cuando se indique que
   el alumno es menor de edad.
 
-La estructura crea las carpetas de organización; la lógica de negocio, las rutas
-y el esquema de MySQL se implementarán posteriormente.
+Importa primero `database/migrations/001_create_fct_schema.sql` para crear la
+base de datos y sus tablas. `database/seeds/001_sample_data.sql` contiene datos
+de ejemplo que se cargan después del esquema. La configuración de conexión PHP
+está en `config/database.php`.
+
+La aplicación, sus rutas y la lógica de negocio MVC todavía están pendientes de
+implementación.
