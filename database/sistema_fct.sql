@@ -374,3 +374,13 @@ COMMIT;
 
 INSERT INTO direcciones_telefonos (empresa_id, alumno_id, tutor_id, telefono, direccion_completa, es_principal)
 VALUES (NULL, 3, NULL, '600112233', 'Calle Ejemplo 123, Madrid', 1);
+
+ALTER TABLE `alumnos`
+  ADD CONSTRAINT `uk_alumnos_dni` UNIQUE (`dni`),
+  ADD CONSTRAINT `uk_alumnos_nss` UNIQUE (`numero_seguridad_social`);
+
+  ALTER TABLE `usuarios`
+  MODIFY COLUMN `password_hash` VARCHAR(255) NOT NULL;
+
+  ALTER TABLE `usuarios`
+  ADD COLUMN `fecha_actualizacion` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP;
