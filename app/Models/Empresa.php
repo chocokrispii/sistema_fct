@@ -6,8 +6,8 @@ require_once __DIR__ . '/../../config/database.php';
 class Empresa {
     private PDO $db;
 
-    public function __construct() {
-        $this->db = getPDOConnection();
+    public function __construct(?PDO $db = null) {
+        $this->db = $db ?? getPDOConnection();
     }
 
     public function crear(
@@ -45,6 +45,18 @@ class Empresa {
         } catch (PDOException $e) {
             error_log("Error al crear empresa: " . $e->getMessage());
             return 0;
+        }
+    }
+
+    public function obtenerPorUsuarioId(int $usuarioId): ?array {
+        try {
+            $stmt = $this->db->prepare('SELECT * FROM empresas WHERE usuario_id = :usuario_id LIMIT 1');
+            $stmt->execute(['usuario_id' => $usuarioId]);
+            $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $empresa ?: null;
+        } catch (PDOException $e) {
+            error_log("Error al buscar empresa: " . $e->getMessage());
+            return null;
         }
     }
 }

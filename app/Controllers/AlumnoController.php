@@ -2,47 +2,27 @@
 
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/Alumno.php';
+require_once __DIR__ . '/../Models/Especialidad.php';
 
 class AlumnoController
 {
+    private PDO $db;
     private Usuario $usuarioModel;
     private Alumno $alumnoModel;
+    private Especialidad $especialidadModel;
 
-    public function __construct()
+    public function __construct(?PDO $db = null)
     {
-        $this->usuarioModel = new Usuario();
-        $this->alumnoModel = new Alumno();
+        $this->db = $db ?? getPDOConnection();
+        $this->usuarioModel = new Usuario($this->db);
+        $this->alumnoModel = new Alumno($this->db);
+        $this->especialidadModel = new Especialidad($this->db);
     }
 
     public function registrar(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            echo '
-            <h2>Registro de alumno</h2>
-            <form method="POST" action="index.php?action=registro-alumno">
-                <input type="text" name="nombre" placeholder="Nombre" required>
-                <input type="text" name="apellidos" placeholder="Apellidos" required>
-                <input type="text" name="dni" placeholder="DNI/NIE" required>
-                <input type="email" name="email" placeholder="Correo" required>
-                <input type="password" name="password" placeholder="Contraseña" required>
-                <input type="text" name="nss" placeholder="Nº Seguridad Social" required>
-                <input type="text" name="telefono" placeholder="Teléfono" required>
-                <input type="text" name="direccion" placeholder="Dirección" required>
-                <label>Fecha de nacimiento:</label>
-                <input type="date" name="fecha_nacimiento" required>
-                <label>Identificador del ciclo formativo:</label>
-                <input type="number" name="especialidad_id" min="1" required>
-
-                <h3>Datos del tutor (obligatorios si el alumno es menor de 18 años)</h3>
-                <input type="text" name="tutor_nombre" placeholder="Nombre completo del tutor">
-                <input type="text" name="tutor_dni" placeholder="DNI/NIE del tutor">
-                <input type="text" name="tutor_nss" placeholder="Nº Seguridad Social del tutor">
-                <input type="email" name="tutor_correo" placeholder="Correo del tutor">
-                <input type="text" name="tutor_direccion" placeholder="Dirección del tutor">
-                <input type="text" name="tutor_telefono" placeholder="Teléfono del tutor">
-
-                <button type="submit">Registrar alumno</button>
-            </form>';
+            $this->mostrarFormulario();
             return;
         }
 
@@ -67,13 +47,13 @@ class AlumnoController
             !$fechaNacimientoObj
             || ($fechaErrores !== false && ($fechaErrores['warning_count'] > 0 || $fechaErrores['error_count'] > 0))
         ) {
-            echo '<p style="color:red;">La fecha de nacimiento no es válida.</p>';
+            $this->mostrarFormulario('La fecha de nacimiento no es válida.');
             return;
         }
 
         $hoy = new DateTimeImmutable('today');
         if ($fechaNacimientoObj > $hoy) {
-            echo '<p style="color:red;">La fecha de nacimiento no puede ser futura.</p>';
+            $this->mostrarFormulario('La fecha de nacimiento no puede ser futura.');
             return;
         }
 
@@ -88,7 +68,12 @@ class AlumnoController
             || $direccion === ''
             || $especialidadId === false
         ) {
-            echo '<p style="color:red;">Completa correctamente todos los campos obligatorios.</p>';
+            $this->mostrarFormulario('Completa correctamente todos los campos obligatorios.');
+            return;
+        }
+
+        if (!$this->especialidadModel->existe($especialidadId)) {
+            $this->mostrarFormulario('La especialidad seleccionada no existe.');
             return;
         }
 
@@ -103,7 +88,7 @@ class AlumnoController
         ];
 
         if ($edad < 16) {
-            echo '<p style="color:red;">El alumno debe tener al menos 16 años.</p>';
+            $this->mostrarFormulario('El alumno debe tener al menos 16 años.');
             return;
         }
 
@@ -118,13 +103,12 @@ class AlumnoController
                 || $tutor['telefono'] === ''
             )
         ) {
-            echo '<p style="color:red;">Para menores de 18 años, completa todos los datos del tutor legal.</p>';
+            $this->mostrarFormulario('Para menores de 18 años, completa todos los datos del tutor legal.');
             return;
         }
 
-        $db = getPDOConnection();
         try {
-            $db->beginTransaction();
+            $this->db->beginTransaction();
 
             $usuarioId = $this->usuarioModel->crear($email, $password, 'Alumno');
             if ($usuarioId < 1) {
@@ -143,6 +127,9 @@ class AlumnoController
                 $direccion,
                 $especialidadId
             );
+            if ($alumnoId < 1) {
+                throw new RuntimeException('No se pudo crear el perfil del alumno.');
+            }
 
             if ($edad < 18 && !$this->alumnoModel->registrarTutor(
                 $alumnoId,
@@ -156,14 +143,50 @@ class AlumnoController
                 throw new RuntimeException('No se pudieron guardar los datos del tutor legal.');
             }
 
-            $db->commit();
-            echo '<p style="color:green;">Alumno registrado correctamente.</p>';
+            $this->db->commit();
+            echo '<p style="color:green;">Alumno registrado correctamente. <a href="index.php?action=login">Inicia sesión</a>.</p>';
         } catch (Throwable $e) {
-            if ($db->inTransaction()) {
-                $db->rollBack();
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
             }
             error_log('Error al registrar alumno: ' . $e->getMessage());
-            echo '<p style="color:red;">No se pudo completar el registro del alumno.</p>';
+            $this->mostrarFormulario('No se pudo completar el registro del alumno.');
         }
+    }
+
+    private function mostrarFormulario(string $error = ''): void
+    {
+        if ($error !== '') {
+            echo '<p style="color:red;">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</p>';
+        }
+
+        $especialidades = $this->especialidadModel->obtenerTodas();
+        ?>
+        <h2>Registro de alumno</h2>
+        <form method="POST" action="index.php?action=registro-alumno">
+            <input type="text" name="nombre" placeholder="Nombre" required>
+            <input type="text" name="apellidos" placeholder="Apellidos" required>
+            <input type="text" name="dni" placeholder="DNI/NIE" required>
+            <input type="email" name="email" placeholder="Correo" required>
+            <input type="password" name="password" placeholder="Contraseña" required>
+            <input type="text" name="nss" placeholder="Nº Seguridad Social" required>
+            <input type="text" name="telefono" placeholder="Teléfono" required>
+            <input type="text" name="direccion" placeholder="Dirección" required>
+            <label>Fecha de nacimiento:</label>
+            <input type="date" name="fecha_nacimiento" required>
+            <label>Ciclo formativo:</label>
+            <?php require __DIR__ . '/../Views/partials/select_especialidades.php'; ?>
+
+            <h3>Datos del tutor (obligatorios si el alumno es menor de 18 años)</h3>
+            <input type="text" name="tutor_nombre" placeholder="Nombre completo del tutor">
+            <input type="text" name="tutor_dni" placeholder="DNI/NIE del tutor">
+            <input type="text" name="tutor_nss" placeholder="Nº Seguridad Social del tutor">
+            <input type="email" name="tutor_correo" placeholder="Correo del tutor">
+            <input type="text" name="tutor_direccion" placeholder="Dirección del tutor">
+            <input type="text" name="tutor_telefono" placeholder="Teléfono del tutor">
+
+            <button type="submit">Registrar alumno</button>
+        </form>
+        <?php
     }
 }
