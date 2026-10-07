@@ -93,3 +93,111 @@ footer {
 footer p {
     margin: 0;
 }
+/* ==========================================================
+   ESTILOS COMPLEMENTARIOS PARA LA GESTIÓN DE ALUMNOS 
+   ========================================================== */
+
+.form-section {
+    background: var(--color-bg-card, #ffffff);
+    padding: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border, #dee2e8);
+    margin-bottom: 30px;
+}
+
+.form-group-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--color-primary, #004085);
+    margin: 20px 0 10px 0;
+    border-bottom: 1px solid var(--color-border, #dee2e8);
+    padding-bottom: 5px;
+}
+
+/* Distribución inteligente en columnas (Evita que se estiren verticalmente) */
+.grid-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.input-box {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.input-box label {
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.input-box input, .input-box select {
+    padding: 8px 12px;
+    border: 1px solid var(--color-border, #dee2e8);
+    border-radius: 4px;
+    font-size: 0.95rem;
+}
+
+/* Estructura para ocultar el tutor legal */
+.conditional-field {
+    display: none;
+    margin-top: 10px;
+}
+
+.checkbox-container {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 15px 0;
+    border: 1px solid var(--color-border, #dee2e8);
+}
+
+/* Formato para la tabla de horarios */
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.custom-table th, .custom-table td {
+    border: 1px solid var(--color-border, #dee2e8);
+    padding: 10px;
+    text-align: left;
+}
+
+.custom-table th {
+    background-color: var(--color-bg-main, #f8f9fa);
+    color: var(--color-primary, #004085);
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+.text-muted {
+    color: var(--color-text-muted, #6c757d);
+}
+
+.btn-submit {
+    background-color: var(--color-primary, #004085);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.btn-submit:hover {
+    background-color: var(--color-primary-hover, #002b59);
+}
+
+.btn-back {
+    color: white !important;
+    text-decoration: none;
+    font-weight: bold;
+}
