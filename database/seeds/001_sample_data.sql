@@ -1,5 +1,7 @@
+USE sistema_fct;
+
 -- 1. INSERTAR ESPECIALIDADES DE EJEMPLO
-INSERT INTO especialidades (nombre_specialidad) VALUES
+INSERT INTO especialidades (nombre_especialidad) VALUES
 ('Desarrollo de Aplicaciones Web (DAW)'),
 ('Desarrollo de Aplicaciones Multiplataforma (DAM)'),
 ('Sistemas Microinformáticos y Redes (SMR)');
