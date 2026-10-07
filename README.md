@@ -11,9 +11,9 @@ app/
                      alumnos, ofertas, asignaciones y consultas
   Core/              Componentes comunes: enrutamiento, vistas y base de datos
   Middleware/        Autenticación y permisos por rol
-  Models/             Modelos y acceso a datos
+  Models/            Modelos y acceso a datos
   Views/
-    layouts/          Plantillas compartidas
+    layouts/         Plantillas compartidas
     auth/
     empresas/
     convenios/
@@ -21,16 +21,18 @@ app/
     ofertas/
     asignaciones/
     consultas/
-config/               Configuración de la aplicación y MySQL
+config/              Configuración de la aplicación y MySQL
 database/
-  migrations/         Esquema y cambios de la base de datos
-  seeds/              Datos iniciales, como roles y permisos
-public/               Única raíz accesible desde el servidor web
+  sistema_fct.sql    Esquema inicial y creación de la base de datos
+  migrations/        Cambios futuros del esquema
+  seeds/
+    001_sample_data.sql  Datos de ejemplo para el esquema
+public/              Única raíz accesible desde el servidor web
   assets/
     css/
     img/
     js/
-routes/               Definición de rutas de la aplicación
+routes/              Definición de rutas de la aplicación
 storage/
   logs/
   uploads/
@@ -53,5 +55,19 @@ tests/
 - En la ficha del alumno, exige los datos del tutor legal cuando se indique que
   el alumno es menor de edad.
 
-La estructura crea las carpetas de organización; la lógica de negocio, las rutas
-y el esquema de MySQL se implementarán posteriormente.
+## Base de datos
+
+Importa primero `database/sistema_fct.sql` para crear la base de datos y sus
+tablas. Después, selecciona `sistema_fct` en phpMyAdmin e importa
+`database/seeds/001_sample_data.sql` para cargar los datos de ejemplo.
+
+Las cuentas de ejemplo usan la contraseña `password123`; el archivo almacena
+su hash, no la contraseña en texto plano. La configuración de conexión PHP está
+en `config/database.php`; por defecto usa MySQL de XAMPP (`localhost`, usuario
+`root`, contraseña vacía y base `sistema_fct`). Puedes sobrescribir esos valores
+con las variables de entorno `FCT_DB_HOST`, `FCT_DB_USER`, `FCT_DB_PASS` y
+`FCT_DB_NAME`.
+
+Las carpetas `database/migrations/` y `database/seeds/` quedan disponibles para
+cambios de esquema posteriores y datos iniciales adicionales. La aplicación,
+sus rutas y parte de la lógica MVC todavía están pendientes de implementación.
