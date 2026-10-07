@@ -14,7 +14,7 @@ class Usuario {
         try {
             $passwordHash = password_hash($password, PASSWORD_BCRYPT);
             $stmt = $this->db->prepare(
-                "INSERT INTO usuarios (email, password, rol) VALUES (:email, :password, :rol)"
+                "INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :password, :rol)"
             );
             $stmt->execute([
                 'email'    => $email,

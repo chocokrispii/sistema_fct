@@ -1,7 +1,6 @@
 <?php
-// models/Alumno.php
 
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 
 class Alumno {
     private PDO $db;
@@ -10,32 +9,68 @@ class Alumno {
         $this->db = getPDOConnection();
     }
 
-    public function crear(int $usuarioId, string $nss, string $telefono, string $direccion, string $fechaNac, int $especialidadId): int {
+    public function crear(
+        int $usuarioId,
+        string $nombre,
+        string $apellidos,
+        string $fechaNacimiento,
+        string $dni,
+        string $nss,
+        string $email,
+        string $telefono,
+        string $direccion,
+        int $especialidadId
+    ): int {
         $stmt = $this->db->prepare(
-            "INSERT INTO alumnos (usuario_id, num_seguridad_social, telefono, direccion, fecha_nacimiento, especialidad_id) 
-             VALUES (:usuario_id, :nss, :telefono, :direccion, :fecha_nac, :especialidad_id)"
+            'INSERT INTO alumnos (usuario_id, nombre, apellidos, fecha_nacimiento, dni, numero_seguridad_social, correo, especialidad_id)
+             VALUES (:usuario_id, :nombre, :apellidos, :fecha_nacimiento, :dni, :nss, :correo, :especialidad_id)'
         );
         $stmt->execute([
-            'usuario_id'     => $usuarioId,
-            'nss'            => $nss,
-            'telefono'       => $telefono,
-            'direccion'      => $direccion,
-            'fecha_nac'      => $fechaNac,
-            'especialidad_id'=> $especialidadId
+            'usuario_id' => $usuarioId,
+            'nombre' => $nombre,
+            'apellidos' => $apellidos,
+            'fecha_nacimiento' => $fechaNacimiento,
+            'dni' => $dni,
+            'nss' => $nss,
+            'correo' => $email,
+            'especialidad_id' => $especialidadId,
         ]);
-        return (int)$this->db->lastInsertId();
+
+        $alumnoId = (int)$this->db->lastInsertId();
+        $contacto = $this->db->prepare(
+            'INSERT INTO direcciones_telefonos (alumno_id, telefono, direccion_completa)
+             VALUES (:alumno_id, :telefono, :direccion)'
+        );
+        $contacto->execute([
+            'alumno_id' => $alumnoId,
+            'telefono' => $telefono,
+            'direccion' => $direccion,
+        ]);
+
+        return $alumnoId;
     }
 
-    public function registrarTutor(int $alumnoId, string $nombreTutor, string $telefonoTutor, string $dniTutor): bool {
+    public function registrarTutor(
+        int $alumnoId,
+        string $nombreTutor,
+        string $dniTutor,
+        string $nssTutor,
+        string $direccionTutor,
+        string $telefonoTutor,
+        string $correoTutor
+    ): bool {
         $stmt = $this->db->prepare(
-            "INSERT INTO tutores_alumnos (alumno_id, nombre_completo, telefono, dni_nie) 
-             VALUES (:alumno_id, :nombre, :telefono, :dni)"
+            'INSERT INTO tutores_legales (alumno_id, nombre_completo, dni, numero_seguridad_social, direccion, telefono, correo)
+             VALUES (:alumno_id, :nombre, :dni, :nss, :direccion, :telefono, :correo)'
         );
         return $stmt->execute([
             'alumno_id' => $alumnoId,
             'nombre'    => $nombreTutor,
+            'dni'       => $dniTutor,
+            'nss'       => $nssTutor,
+            'direccion' => $direccionTutor,
             'telefono'  => $telefonoTutor,
-            'dni'       => $dniTutor
+            'correo'    => $correoTutor,
         ]);
     }
 }

@@ -23,25 +23,47 @@ class EmpresaController {
             $direccion       = trim($_POST['direccion'] ?? '');
             $contacto        = trim($_POST['persona_contacto'] ?? '');
 
-            if (empty($email) || empty($password) || empty($cif) || empty($nombreComercial)) {
+            if (
+                !filter_var($email, FILTER_VALIDATE_EMAIL)
+                || $password === ''
+                || $cif === ''
+                || $nombreComercial === ''
+                || $direccion === ''
+            ) {
                 echo "<p style='color:red;'>Error: Todos los campos obligatorios deben completarse.</p>";
                 return;
             }
 
-            // 1. Crear usuario con rol 'empresa'
-            $usuarioId = $this->usuarioModel->crear($email, $password, 'empresa');
+            $db = getPDOConnection();
+            try {
+                $db->beginTransaction();
 
-            if ($usuarioId > 0) {
-                // 2. Crear datos especificos de la empresa
-                $empresaId = $this->empresaModel->crear($usuarioId, $cif, $nombreComercial, $telefono, $direccion, $contacto);
-                
-                if ($empresaId > 0) {
-                    echo "<p style='color:green;'>Empresa registrada con éxito.</p>";
-                    return;
+                $usuarioId = $this->usuarioModel->crear($email, $password, 'Empresa');
+                if ($usuarioId < 1) {
+                    throw new RuntimeException('No se pudo crear el usuario de la empresa.');
                 }
-            }
 
-            echo "<p style='color:red;'>Error al procesar el registro de la empresa.</p>";
+                $empresaId = $this->empresaModel->crear(
+                    $usuarioId,
+                    $cif,
+                    $nombreComercial,
+                    $telefono,
+                    $direccion,
+                    $contacto
+                );
+                if ($empresaId < 1) {
+                    throw new RuntimeException('No se pudo crear el perfil de la empresa.');
+                }
+
+                $db->commit();
+                echo "<p style='color:green;'>Empresa registrada con éxito.</p>";
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                error_log('Error al registrar empresa: ' . $e->getMessage());
+                echo "<p style='color:red;'>No se pudo completar el registro de la empresa.</p>";
+            }
         }
     }
 }
