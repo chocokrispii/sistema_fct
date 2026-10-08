@@ -18,35 +18,22 @@ function toggleTutor() {
     }
 }
 
-/**
- * Persistencia automática en LocalStorage al navegar
- */
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Cargar los datos guardados al iniciar la página
     document.querySelectorAll('.persist').forEach(el => {
-        const saved = localStorage.getItem(el.id);
-        if (saved !== null) {
-            if (el.type === 'checkbox') el.checked = saved === 'true';
-            else el.value = saved;
+        try {
+            localStorage.removeItem(el.id);
+        } catch (error) {
+            console.warn('No se pudo eliminar un dato heredado del formulario.', error);
         }
     });
-    
-    // Chequeo inicial del tutor legal
+
     toggleTutor();
 
-    // 2. Guardar cambios en el almacenamiento sobre la marcha al escribir
-    document.querySelectorAll('.persist').forEach(el => {
-        el.addEventListener('input', () => {
-            localStorage.setItem(el.id, el.type === 'checkbox' ? el.checked : el.value);
-        });
-    });
-
-    // 3. Captura del envío del formulario completo
     const formGeneral = document.getElementById('form-general-alumno');
     if (formGeneral) {
         formGeneral.addEventListener('submit', (e) => {
             e.preventDefault();
-            alert('¡Portal actualizado y guardado correctamente en tu navegador de forma segura!');
+            alert('Este formulario heredado es solo una maqueta: no envía ni guarda datos. Usa el registro oficial del sistema.');
         });
     }
 });

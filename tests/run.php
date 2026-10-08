@@ -17,6 +17,7 @@ require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
 require_once __DIR__ . '/../app/Models/Oferta.php';
 require_once __DIR__ . '/../app/Models/Asignacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
+require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
 
 function assertTrue(bool $condition, string $message): void
 {
@@ -24,6 +25,8 @@ function assertTrue(bool $condition, string $message): void
         throw new RuntimeException($message);
     }
 }
+
+require_once __DIR__ . '/file_security.php';
 
 $db = getPDOConnection();
 $actualDatabase = $db->query('SELECT DATABASE()')->fetchColumn();
@@ -50,6 +53,7 @@ $required = [
     'persona_contacto' => ['table' => 'empresas', 'column' => 'persona_contacto'],
     'fecha_nacimiento' => ['table' => 'alumnos', 'column' => 'fecha_nacimiento'],
     'turno' => ['table' => 'empresa_especialidades_plazas', 'column' => 'turno'],
+    'especialidad_id' => ['table' => 'convenios', 'column' => 'especialidad_id'],
 ];
 foreach ($required as $name => $definition) {
     $stmt = $db->prepare(
@@ -90,6 +94,26 @@ try {
     $createdUsers[] = (int)$db->lastInsertId();
     $addUser->execute(['email' => $emails[3], 'hash' => $roleHash, 'role' => 'Coordinador']);
     $createdUsers[] = (int)$db->lastInsertId();
+
+    $_SESSION = ['usuario_id' => $createdUsers[3], 'rol' => 'Observador'];
+    $_GET = [];
+    http_response_code(200);
+    $observerDenied = false;
+    try {
+        (new ConvenioController($db))->descargar();
+    } catch (RuntimeException) {
+        $observerDenied = http_response_code() === 403;
+    }
+    assertTrue($observerDenied, 'Un observador no debe descargar convenios aunque invoque el controlador directamente.');
+    $deniedDownload = $db->prepare(
+        "SELECT COUNT(*) FROM auditoria
+         WHERE usuario_id = :usuario AND evento = 'convenio.descarga.denegada'
+           AND detalle = 'motivo=rol_no_autorizado'"
+    );
+    $deniedDownload->execute(['usuario' => $createdUsers[3]]);
+    assertTrue((int)$deniedDownload->fetchColumn() === 1, 'La denegación directa a un observador debe quedar auditada.');
+    $_SESSION = [];
+    http_response_code(200);
 
     $cycleId = (int)$db->query('SELECT id FROM especialidades ORDER BY id LIMIT 1')->fetchColumn();
     if ($cycleId === 0) {
@@ -139,15 +163,52 @@ try {
     }
 
     $agreement = $db->prepare(
-        "INSERT INTO convenios (empresa_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path, estado)
-         VALUES (:empresa, :numero, '2026-01-01', '2027-01-01', '2027-12-31', 'test-placeholder.pdf', 'Pendiente')"
+        "INSERT INTO convenios (empresa_id, especialidad_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path, estado)
+         VALUES (:empresa, :especialidad, :numero, '2026-01-01', '2027-01-01', '2027-12-31', 'test-placeholder.pdf', 'Pendiente')"
     );
-    $agreement->execute(['empresa' => $createdCompany, 'numero' => "AG-$fixture"]);
+    $agreement->execute([
+        'empresa' => $createdCompany,
+        'especialidad' => $cycleId,
+        'numero' => "AG-$fixture",
+    ]);
     $agreementId = (int)$db->lastInsertId();
     assertTrue(
         (new Convenio($db))->resolver($agreementId, 'Aprobado', '', $createdUsers[3]),
         'Un convenio pendiente debe poder aprobarse.'
     );
+    $companyModel = new Empresa($db);
+    assertTrue(
+        $companyModel->tieneConvenioParaFechas($createdCompany, $cycleId, '2027-03-15', '2027-06-15'),
+        'Un convenio aprobado del mismo ciclo y periodo debe cubrir la oferta.'
+    );
+    $duplicateAgreementRejected = false;
+    try {
+        $duplicate = $db->prepare(
+            "INSERT INTO convenios
+                (empresa_id, especialidad_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path)
+             VALUES (:empresa, :especialidad, :numero, '2026-01-01', '2027-01-01', '2027-12-31', 'duplicate-placeholder.pdf')"
+        );
+        $duplicate->execute([
+            'empresa' => $createdCompany,
+            'especialidad' => $cycleId,
+            'numero' => "AG-DUP-$fixture",
+        ]);
+    } catch (PDOException $e) {
+        $duplicateAgreementRejected = $e->getCode() === '23000';
+    }
+    assertTrue(
+        $duplicateAgreementRejected,
+        'La base debe impedir más de un convenio para la misma empresa y ciclo.'
+    );
+    $otherCycleId = (int)$db->query(
+        'SELECT id FROM especialidades WHERE id <> ' . $cycleId . ' ORDER BY id LIMIT 1'
+    )->fetchColumn();
+    if ($otherCycleId > 0) {
+        assertTrue(
+            !$companyModel->tieneConvenioParaFechas($createdCompany, $otherCycleId, '2027-03-15', '2027-06-15'),
+            'Un convenio de otro ciclo no debe cubrir la oferta.'
+        );
+    }
 
     $site = $db->prepare(
         'INSERT INTO empresa_sedes (empresa_id, nombre, direccion) VALUES (:empresa, :nombre, :direccion)'
@@ -205,7 +266,7 @@ try {
     }
     assertTrue($csrfRejected, 'Un token CSRF incorrecto debe rechazarse.');
 
-    echo "OK: migraciones, revisión de convenios/ofertas, matching, capacidad, cierre de prácticas y CSRF.\n";
+    echo "OK: migraciones, cobertura de convenios por ciclo, revisión de ofertas, matching, capacidad, cierre de prácticas y CSRF.\n";
 } finally {
     if ($createdOffer !== null) {
         $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');

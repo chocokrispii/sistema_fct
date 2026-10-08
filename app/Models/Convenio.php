@@ -10,6 +10,7 @@ class Convenio
 
     public function crear(
         int $empresaId,
+        int $especialidadId,
         ?int $sedeId,
         string $numero,
         string $firma,
@@ -18,11 +19,12 @@ class Convenio
         string $ruta
     ): int {
         $stmt = $this->db->prepare(
-            'INSERT INTO convenios (empresa_id, sede_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path)
-             VALUES (:empresa, :sede, :numero, :firma, :inicio, :fin, :ruta)'
+            'INSERT INTO convenios (empresa_id, especialidad_id, sede_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path)
+             VALUES (:empresa, :especialidad, :sede, :numero, :firma, :inicio, :fin, :ruta)'
         );
         $stmt->execute([
             'empresa' => $empresaId,
+            'especialidad' => $especialidadId,
             'sede' => $sedeId,
             'numero' => $numero,
             'firma' => $firma,
@@ -35,10 +37,12 @@ class Convenio
 
     public function listar(?int $empresaId = null, ?string $estado = null): array
     {
-        $sql = 'SELECT c.*, e.nombre_empresa, s.nombre AS nombre_sede
+        $sql = 'SELECT c.*, e.nombre_empresa, s.nombre AS nombre_sede,
+                       es.nombre_especialidad
                 FROM convenios c
                 INNER JOIN empresas e ON e.id = c.empresa_id
-                LEFT JOIN empresa_sedes s ON s.id = c.sede_id';
+                LEFT JOIN empresa_sedes s ON s.id = c.sede_id
+                LEFT JOIN especialidades es ON es.id = c.especialidad_id';
         $where = [];
         $params = [];
         if ($empresaId !== null) {
