@@ -53,6 +53,7 @@ $required = [
     'persona_contacto' => ['table' => 'empresas', 'column' => 'persona_contacto'],
     'fecha_nacimiento' => ['table' => 'alumnos', 'column' => 'fecha_nacimiento'],
     'turno' => ['table' => 'empresa_especialidades_plazas', 'column' => 'turno'],
+    'especialidad_id' => ['table' => 'convenios', 'column' => 'especialidad_id'],
 ];
 foreach ($required as $name => $definition) {
     $stmt = $db->prepare(
@@ -162,15 +163,52 @@ try {
     }
 
     $agreement = $db->prepare(
-        "INSERT INTO convenios (empresa_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path, estado)
-         VALUES (:empresa, :numero, '2026-01-01', '2027-01-01', '2027-12-31', 'test-placeholder.pdf', 'Pendiente')"
+        "INSERT INTO convenios (empresa_id, especialidad_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path, estado)
+         VALUES (:empresa, :especialidad, :numero, '2026-01-01', '2027-01-01', '2027-12-31', 'test-placeholder.pdf', 'Pendiente')"
     );
-    $agreement->execute(['empresa' => $createdCompany, 'numero' => "AG-$fixture"]);
+    $agreement->execute([
+        'empresa' => $createdCompany,
+        'especialidad' => $cycleId,
+        'numero' => "AG-$fixture",
+    ]);
     $agreementId = (int)$db->lastInsertId();
     assertTrue(
         (new Convenio($db))->resolver($agreementId, 'Aprobado', '', $createdUsers[3]),
         'Un convenio pendiente debe poder aprobarse.'
     );
+    $companyModel = new Empresa($db);
+    assertTrue(
+        $companyModel->tieneConvenioParaFechas($createdCompany, $cycleId, '2027-03-15', '2027-06-15'),
+        'Un convenio aprobado del mismo ciclo y periodo debe cubrir la oferta.'
+    );
+    $duplicateAgreementRejected = false;
+    try {
+        $duplicate = $db->prepare(
+            "INSERT INTO convenios
+                (empresa_id, especialidad_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path)
+             VALUES (:empresa, :especialidad, :numero, '2026-01-01', '2027-01-01', '2027-12-31', 'duplicate-placeholder.pdf')"
+        );
+        $duplicate->execute([
+            'empresa' => $createdCompany,
+            'especialidad' => $cycleId,
+            'numero' => "AG-DUP-$fixture",
+        ]);
+    } catch (PDOException $e) {
+        $duplicateAgreementRejected = $e->getCode() === '23000';
+    }
+    assertTrue(
+        $duplicateAgreementRejected,
+        'La base debe impedir más de un convenio para la misma empresa y ciclo.'
+    );
+    $otherCycleId = (int)$db->query(
+        'SELECT id FROM especialidades WHERE id <> ' . $cycleId . ' ORDER BY id LIMIT 1'
+    )->fetchColumn();
+    if ($otherCycleId > 0) {
+        assertTrue(
+            !$companyModel->tieneConvenioParaFechas($createdCompany, $otherCycleId, '2027-03-15', '2027-06-15'),
+            'Un convenio de otro ciclo no debe cubrir la oferta.'
+        );
+    }
 
     $site = $db->prepare(
         'INSERT INTO empresa_sedes (empresa_id, nombre, direccion) VALUES (:empresa, :nombre, :direccion)'
@@ -228,7 +266,7 @@ try {
     }
     assertTrue($csrfRejected, 'Un token CSRF incorrecto debe rechazarse.');
 
-    echo "OK: migraciones, revisión de convenios/ofertas, matching, capacidad, cierre de prácticas y CSRF.\n";
+    echo "OK: migraciones, cobertura de convenios por ciclo, revisión de ofertas, matching, capacidad, cierre de prácticas y CSRF.\n";
 } finally {
     if ($createdOffer !== null) {
         $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');

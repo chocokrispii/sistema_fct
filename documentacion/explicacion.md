@@ -84,15 +84,18 @@ storage/
   logs/              Espacio reservado para logs.
 tests/               Prueba de integración PHP.
 README.md            Puesta en marcha y estructura resumida.
-explicacion.md       Esta guía funcional y técnica.
+documentacion/       Guías funcionales y de pruebas.
 ```
 
 Los archivos `.gitkeep` mantienen en Git carpetas que aún están vacías. No
-contienen lógica de aplicación. `app/Views/layouts/index.html`,
-`app/Views/alumnos/alumnos.html` y `app/Views/asignaciones/asignaciones.html`
-son maquetas heredadas, no rutas de la aplicación; Apache debe mantener
-`app/` fuera de la raíz web. Las páginas activas se renderizan mediante
-`app/Views/layouts/main.php`.
+contienen lógica de aplicación. Las páginas activas se renderizan mediante
+`app/Views/layouts/main.php`. Los archivos HTML antiguos no implementan rutas
+ni operaciones de escritura: `app/Views/layouts/index.html` y
+`app/Views/alumnos/alumnos.html` redirigen al front controller; la página
+heredada de asignaciones es informativa y enlaza a las rutas oficiales, que
+aplican autenticación y permisos. Apache debe exponer únicamente `public/` como
+raíz web y mantener `app/`, `config/`, `database/` y `storage/` fuera del acceso
+web directo.
 
 ## 5. Ciclo de una petición web
 
@@ -195,12 +198,17 @@ empresa al que escribir.
 
 ### 7.4 Convenios
 
-La empresa registra número, fechas, sede opcional y archivo. El servidor
+La empresa registra número, ciclo formativo, fechas, sede opcional y archivo.
+Solo se admite un convenio por empresa y ciclo formativo. El servidor
 comprueba que las fechas sean válidas y estén en orden, que la sede pertenezca
 a esa empresa, y que el archivo cargado sea un PDF de hasta 10 MB. El nombre
 guardado es aleatorio y el fichero se ubica en `storage/uploads/convenios/`,
 fuera del directorio público. La base conserva ese nombre de almacenamiento,
 no una ruta proporcionada por el navegador.
+
+Los convenios creados antes de la migración `004` conservan el ciclo como
+`NULL`; no habilitan ofertas hasta que el centro les asigne manualmente la
+especialidad correcta.
 
 El registro del convenio y su evento de auditoría se confirman en una
 transacción. Si falla esa fase, se revierte la base y se intenta borrar el
@@ -223,7 +231,8 @@ inicio. Se exige un convenio aprobado que abarque el periodo entero.
 Las nuevas ofertas empiezan en estado `Pendiente`. Un administrador o
 coordinador puede aprobarlas o rechazarlas; un rechazo necesita observación. La
 aprobación vuelve a comprobar, dentro de una transacción y bloqueando la oferta,
-que un convenio aprobado cubra todas las fechas. La decisión queda auditada.
+que un convenio aprobado de la misma empresa y ciclo cubra todas las fechas. La
+decisión queda auditada.
 
 La tabla pública filtra por `Aprobada` y por `fecha_fin >= CURDATE()`. No limita
 explícitamente `fecha_inicio <= CURDATE()`: por tanto también puede listar una
@@ -362,7 +371,7 @@ también aceptan conexión opcional y, de otro modo, llaman al singleton de PDO.
 - [app/Views/empresas/sedes.php](app/Views/empresas/sedes.php): formulario y
   lista de sedes.
 - [app/Views/convenios/empresa.php](app/Views/convenios/empresa.php): carga de
-  PDF, fechas, sede y tabla histórica de convenios.
+  PDF, ciclo, fechas, sede y tabla histórica de convenios.
 - [app/Views/convenios/revisar.php](app/Views/convenios/revisar.php): documento,
   datos del convenio y controles aprobar/rechazar.
 - [app/Views/ofertas/listado.php](app/Views/ofertas/listado.php): tabla pública

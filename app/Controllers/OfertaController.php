@@ -83,7 +83,7 @@ class OfertaController {
         try {
             if ($decision === 'Aprobada') {
                 $stmt = $this->db->prepare(
-                    'SELECT empresa_id, fecha_inicio, fecha_fin
+                    'SELECT empresa_id, especialidad_id, fecha_inicio, fecha_fin
                      FROM empresa_especialidades_plazas WHERE id = :id FOR UPDATE'
                 );
                 $stmt->execute(['id' => $id]);
@@ -92,18 +92,20 @@ class OfertaController {
                 if ($offer) {
                     $agreement = $this->db->prepare(
                         "SELECT 1 FROM convenios
-                         WHERE empresa_id = :empresa_id AND estado = 'Aprobado'
+                         WHERE empresa_id = :empresa_id AND especialidad_id = :especialidad_id
+                           AND estado = 'Aprobado'
                            AND fecha_inicio <= :inicio AND fecha_fin >= :fin
                          LIMIT 1 FOR UPDATE"
                     );
                     $agreement->execute([
                         'empresa_id' => $offer['empresa_id'],
+                        'especialidad_id' => $offer['especialidad_id'],
                         'inicio' => $offer['fecha_inicio'],
                         'fin' => $offer['fecha_fin'],
                     ]);
                 }
                 if (!$offer || !$agreement->fetchColumn()) {
-                    throw new RuntimeException('No se puede aprobar una oferta sin convenio aprobado vigente durante todo el periodo.');
+                    throw new RuntimeException('No se puede aprobar una oferta sin un convenio aprobado para su ciclo que cubra todo el periodo.');
                 }
             }
             if (!$this->ofertaModel->resolver((int)$id, $decision, $motivo, (int)$_SESSION['usuario_id'])) {
@@ -161,10 +163,11 @@ class OfertaController {
         }
         if (!$this->empresaModel->tieneConvenioParaFechas(
             $empresaId,
+            $especialidadId,
             $fechaInicio->format('Y-m-d'),
             $fechaFin->format('Y-m-d')
         )) {
-            return 'Necesitas un convenio aprobado y vigente durante todo el periodo de la oferta.';
+            return 'Necesitas un convenio aprobado para ese ciclo y vigente durante todo el periodo de la oferta.';
         }
 
         $this->db->beginTransaction();

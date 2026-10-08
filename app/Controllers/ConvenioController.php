@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../Models/Convenio.php';
 require_once __DIR__ . '/../Models/Empresa.php';
+require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/FileScanner.php';
 require_once __DIR__ . '/../Core/PhpIni.php';
@@ -12,12 +13,14 @@ class ConvenioController
     private PDO $db;
     private Convenio $convenioModel;
     private Empresa $empresaModel;
+    private Especialidad $especialidadModel;
 
     public function __construct(?PDO $db = null)
     {
         $this->db = $db ?? getPDOConnection();
         $this->convenioModel = new Convenio($this->db);
         $this->empresaModel = new Empresa($this->db);
+        $this->especialidadModel = new Especialidad($this->db);
     }
 
     public function gestionarEmpresa(): void
@@ -46,6 +49,7 @@ class ConvenioController
         View::render('convenios/empresa', [
             'empresa' => $empresa,
             'sedes' => $this->empresaModel->obtenerSedes((int)$empresa['id']),
+            'especialidades' => $this->especialidadModel->obtenerTodas(),
             'convenios' => $this->convenioModel->listar((int)$empresa['id']),
             'error' => $error,
         ]);
@@ -61,6 +65,11 @@ class ConvenioController
         $this->validarLimitesCarga();
 
         $numeroRaw = $_POST['numero_convenio'] ?? '';
+        $especialidadId = filter_var(
+            $_POST['especialidad_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
         $sedeRaw = $_POST['sede_id'] ?? '';
         $firmaRaw = $_POST['fecha_firma'] ?? '';
         $inicioRaw = $_POST['fecha_inicio'] ?? '';
@@ -75,6 +84,9 @@ class ConvenioController
             throw new InvalidArgumentException('Los datos del convenio no tienen un formato válido.');
         }
         $numero = trim($numeroRaw);
+        if ($especialidadId === false || !$this->especialidadModel->existe($especialidadId)) {
+            throw new InvalidArgumentException('Selecciona un ciclo formativo válido.');
+        }
         $sede = $sedeRaw === ''
             ? null
             : filter_var($sedeRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
@@ -98,6 +110,16 @@ class ConvenioController
             if (!$belongs->fetchColumn()) {
                 throw new InvalidArgumentException('La sede seleccionada no pertenece a tu empresa.');
             }
+        }
+        $existingAgreement = $this->db->prepare(
+            'SELECT 1 FROM convenios WHERE empresa_id = :empresa AND especialidad_id = :especialidad LIMIT 1'
+        );
+        $existingAgreement->execute([
+            'empresa' => $empresaId,
+            'especialidad' => $especialidadId,
+        ]);
+        if ($existingAgreement->fetchColumn()) {
+            throw new InvalidArgumentException('Ya existe un convenio registrado para ese ciclo formativo.');
         }
 
         if (!is_array($upload) || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
@@ -153,6 +175,7 @@ class ConvenioController
         try {
             $convenioId = $this->convenioModel->crear(
                 $empresaId,
+                $especialidadId,
                 $sede === null ? null : (int)$sede,
                 $numero,
                 $firma->format('Y-m-d'),
@@ -174,6 +197,9 @@ class ConvenioController
             }
             if (is_file($destination) && !unlink($destination)) {
                 error_log('No se pudo retirar un archivo de convenio tras fallar su registro.');
+            }
+            if ($e instanceof PDOException && (int)($e->errorInfo[1] ?? 0) === 1062) {
+                throw new InvalidArgumentException('Ya existe un convenio registrado para ese ciclo formativo.', 0, $e);
             }
             throw $e;
         }

@@ -55,16 +55,18 @@ class Empresa {
         return $empresa ?: null;
     }
 
-    public function tieneConvenioParaFechas(int $empresaId, string $inicio, string $fin): bool
+    public function tieneConvenioParaFechas(int $empresaId, int $especialidadId, string $inicio, string $fin): bool
     {
         $stmt = $this->db->prepare(
             "SELECT 1 FROM convenios
-             WHERE empresa_id = :empresa_id AND estado = 'Aprobado'
+             WHERE empresa_id = :empresa_id AND especialidad_id = :especialidad_id
+               AND estado = 'Aprobado'
                AND fecha_inicio <= :inicio AND fecha_fin >= :fin
              LIMIT 1"
         );
         $stmt->execute([
             'empresa_id' => $empresaId,
+            'especialidad_id' => $especialidadId,
             'inicio' => $inicio,
             'fin' => $fin,
         ]);

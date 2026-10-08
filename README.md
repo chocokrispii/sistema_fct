@@ -30,13 +30,13 @@ Para una prueba local rápida con la configuración habitual de XAMPP, también
 se puede abrir:
 
 ```text
-http://localhost/proyecto-practicas/Practicas_Desarrollo/public/
+http://localhost/proyecto-practicas/public/
 ```
 
 Este modo es solo para desarrollo local. No expongas la raíz del repositorio en
 Internet ni uses esta configuración como despliegue productivo. Apache debe
 permitir `AllowOverride AuthConfig Options` en la raíz del proyecto y
-`AllowOverride AuthConfig Limit Options` en `public/` para procesar las
+`AllowOverride AuthConfig FileInfo Limit Options` en `public/` para procesar las
 denegaciones, la concesión exclusiva de `public/`, el límite de cuerpo de
 petición y la desactivación del listado de directorios.
 `storage/.htaccess` deniega además el acceso directo cuando el proyecto se
@@ -49,15 +49,15 @@ Configura en Apache `FCT_STORAGE_PATH`, `FCT_CLAMSCAN` y
 `FCT_CLAMAV_DATABASE`, por ejemplo:
 
 ```apache
-DocumentRoot "C:/xampp/htdocs/proyecto-practicas/Practicas_Desarrollo/public"
-<Directory "C:/xampp/htdocs/proyecto-practicas/Practicas_Desarrollo">
+DocumentRoot "C:/xampp/htdocs/proyecto-practicas/public"
+<Directory "C:/xampp/htdocs/proyecto-practicas">
     Require all denied
     AllowOverride AuthConfig Options
     Options -Indexes
 </Directory>
-<Directory "C:/xampp/htdocs/proyecto-practicas/Practicas_Desarrollo/public">
+<Directory "C:/xampp/htdocs/proyecto-practicas/public">
     Require all granted
-    AllowOverride AuthConfig Limit Options
+    AllowOverride AuthConfig FileInfo Limit Options
     Options -Indexes
     LimitRequestBody 12582912
 </Directory>
@@ -146,10 +146,17 @@ elimínalo según la política del centro.
    disponibilidad, asignaciones y auditoría. La migración omite columnas,
    índices y tablas ya existentes, para admitir volcados que incluyan parte de
    esos cambios.
-6. Comprueba que ambas migraciones terminen sin error. La migración `001` no es
+6. Ejecuta `database/migrations/003_login_y_recuperacion.sql` para añadir el
+   control de intentos y las solicitudes de recuperación de cuentas.
+7. Ejecuta `database/migrations/004_convenios_por_especialidad.sql` para asociar
+   cada convenio a un ciclo formativo y limitarlo a uno por empresa y ciclo.
+   Los convenios preexistentes quedan sin clasificar (`especialidad_id = NULL`)
+   y no cubren ofertas; hay que asignarles manualmente el ciclo correcto antes
+   de volver a usarlos.
+8. Comprueba que las migraciones terminen sin error. La migración `001` no es
    idempotente: omítela si la columna ya se llama `nombre_especialidad`. La
-   migración `002` sí puede volver a ejecutarse para completar un esquema
-   parcial.
+   migración `002` y `004` pueden volver a ejecutarse para completar un esquema
+   parcial. Ejecuta la migración `003` una sola vez.
 
 El volcado no selecciona la base con `USE`; elige explícitamente la base destino
 antes de importarlo. Las migraciones tampoco seleccionan una base. El dump
@@ -199,7 +206,8 @@ de la oferta antes de aprobarla.
   actualización de disponibilidad por periodo y turno; consulta de prácticas
   propias.
 - **Empresa:** registro, gestión de sedes, carga de convenios PDF y publicación
-  de ofertas asociadas al perfil autenticado.
+  de ofertas asociadas al perfil autenticado. Se registra como máximo un
+  convenio por ciclo formativo, y solo cubre ofertas del mismo ciclo.
 - **Revisión del centro:** Administradores y Coordinadores revisan convenios y
   ofertas. Una oferta solo puede aprobarse cuando un convenio aprobado cubre
   todo su periodo.
@@ -296,13 +304,16 @@ rutas en `routes/web.php`. Las vistas se renderizan con el layout común de
 `app/Views/layouts/main.php`. La conexión se obtiene desde
 `config/database.php`.
 
-`public/assets/js/alumnos_js.js`, `app/Views/alumnos/alumnos.html` y
-`app/Views/asignaciones/asignaciones.html` son recursos heredados separados del
-flujo MVC actual. Las maquetas de alumno y asignaciones no envían ni conservan
-datos personales; la de alumno elimina al abrirse las claves de sus campos que
-hubiera guardado una versión anterior en `localStorage`. El registro activo está
-en `app/Views/alumnos/registro.php`; las asignaciones se gestionan en las rutas
-de `public/index.php`.
+Las páginas HTML heredadas de portada, registro de alumno y asignaciones no
+crean rutas ni guardan datos directamente. La portada y el registro redirigen
+al front controller; la página de asignaciones ofrece enlaces a sus rutas
+oficiales. El registro activo está en `app/Views/alumnos/registro.php`, y las
+asignaciones se gestionan mediante las rutas de `public/index.php`.
+
+`public/assets/js/alumnos_js.js` es un recurso heredado, separado de las vistas
+MVC actuales. La maqueta de alumno no envía ni conserva datos personales y el
+script elimina del navegador las claves antiguas de sus campos en
+`localStorage`; no debe usarse como flujo de registro.
 
 ## Dump y seed: diferencia
 
@@ -316,8 +327,10 @@ de `public/index.php`.
 
 ## Documentación relacionada
 
-- [explicacion.md](explicacion.md): descripción extensa de arquitectura,
+- [documentacion/explicacion.md](documentacion/explicacion.md): descripción extensa de arquitectura,
   comportamiento de módulos, tablas, seguridad y limitaciones conocidas.
+- [documentacion/Guía Exhaustiva de Pruebas - Sistema FCT.pdf](documentacion/Guía%20Exhaustiva%20de%20Pruebas%20-%20Sistema%20FCT.pdf):
+  guía detallada de pruebas funcionales y técnicas.
 - [docs/informe_jornada_2026-10-07.md](docs/informe_jornada_2026-10-07.md):
   informe de trabajo con notas históricas; algunas secciones describen fases
   anteriores y no deben tomarse como estado actual del proyecto.
