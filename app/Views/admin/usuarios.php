@@ -3,7 +3,8 @@
 <form method="POST" action="index.php?action=usuarios">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
     <label>Correo <input type="email" name="email" required></label>
-    <label>Contraseña inicial (12-72 caracteres) <input type="password" name="password" minlength="12" maxlength="72" required></label>
+    <label>Contraseña inicial (12-72 caracteres) <input type="password" name="password" minlength="12" maxlength="72" aria-describedby="staff-password-help" required></label>
+    <small id="staff-password-help">Debe tener entre 12 y 72 caracteres. Los espacios cuentan.</small>
     <label>Nombre (para coordinador) <input type="text" name="nombre"></label>
     <label>Apellidos (para coordinador) <input type="text" name="apellidos"></label>
     <label>Rol
