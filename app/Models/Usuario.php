@@ -29,15 +29,10 @@ class Usuario {
     }
 
     public function obtenerPorEmail(string $email): ?array {
-        try {
-            $stmt = $this->db->prepare("SELECT * FROM usuarios WHERE email = :email LIMIT 1");
-            $stmt->execute(['email' => $email]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $user ?: null;
-        } catch (PDOException $e) {
-            error_log("Error al buscar usuario: " . $e->getMessage());
-            return null;
-        }
+        $stmt = $this->db->prepare("SELECT * FROM usuarios WHERE email = :email LIMIT 1");
+        $stmt->execute(['email' => $email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $user ?: null;
     }
 
     public function obtenerTodos(): array

@@ -17,6 +17,7 @@ require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
 require_once __DIR__ . '/../app/Models/Oferta.php';
 require_once __DIR__ . '/../app/Models/Asignacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
+require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
 
 function assertTrue(bool $condition, string $message): void
 {
@@ -24,6 +25,8 @@ function assertTrue(bool $condition, string $message): void
         throw new RuntimeException($message);
     }
 }
+
+require_once __DIR__ . '/file_security.php';
 
 $db = getPDOConnection();
 $actualDatabase = $db->query('SELECT DATABASE()')->fetchColumn();
@@ -90,6 +93,26 @@ try {
     $createdUsers[] = (int)$db->lastInsertId();
     $addUser->execute(['email' => $emails[3], 'hash' => $roleHash, 'role' => 'Coordinador']);
     $createdUsers[] = (int)$db->lastInsertId();
+
+    $_SESSION = ['usuario_id' => $createdUsers[3], 'rol' => 'Observador'];
+    $_GET = [];
+    http_response_code(200);
+    $observerDenied = false;
+    try {
+        (new ConvenioController($db))->descargar();
+    } catch (RuntimeException) {
+        $observerDenied = http_response_code() === 403;
+    }
+    assertTrue($observerDenied, 'Un observador no debe descargar convenios aunque invoque el controlador directamente.');
+    $deniedDownload = $db->prepare(
+        "SELECT COUNT(*) FROM auditoria
+         WHERE usuario_id = :usuario AND evento = 'convenio.descarga.denegada'
+           AND detalle = 'motivo=rol_no_autorizado'"
+    );
+    $deniedDownload->execute(['usuario' => $createdUsers[3]]);
+    assertTrue((int)$deniedDownload->fetchColumn() === 1, 'La denegación directa a un observador debe quedar auditada.');
+    $_SESSION = [];
+    http_response_code(200);
 
     $cycleId = (int)$db->query('SELECT id FROM especialidades ORDER BY id LIMIT 1')->fetchColumn();
     if ($cycleId === 0) {

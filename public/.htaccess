@@ -1,0 +1,11 @@
+Options -Indexes
+Require all granted
+LimitRequestBody 12582912
+SetEnv FCT_STORAGE_PATH "C:/xampp/private/sistema-fct"
+SetEnv FCT_CLAMSCAN "C:/Program Files/ClamAV/clamscan.exe"
+SetEnv FCT_CLAMAV_DATABASE "C:/ProgramData/ClamAV/db"
+php_value upload_max_filesize 10M
+php_value post_max_size 12M
+php_value max_file_uploads 1
+php_value max_input_time 60
+php_flag display_errors Off
