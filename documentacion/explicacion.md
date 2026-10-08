@@ -83,13 +83,14 @@ storage/
   logs/              Espacio reservado para logs.
 tests/               Prueba de integración PHP.
 README.md            Puesta en marcha y estructura resumida.
-explicacion.md       Esta guía funcional y técnica.
+documentacion/       Guías funcionales y de pruebas.
 ```
 
 Los archivos `.gitkeep` mantienen en Git carpetas que aún están vacías. No
-contienen lógica de aplicación. La vista estática `app/Views/layouts/index.html`
-ya no forma parte del árbol actual; las páginas se renderizan mediante
-`app/Views/layouts/main.php`.
+contienen lógica de aplicación. Las páginas MVC se renderizan mediante
+`app/Views/layouts/main.php`. Las antiguas direcciones HTML de portada, registro
+de alumno y asignaciones se mantienen únicamente como redirecciones hacia las
+rutas del front controller; no contienen flujos alternativos de escritura.
 
 ## 5. Ciclo de una petición web
 
@@ -594,4 +595,3 @@ confirmarse antes de alterar el modelo.
   estructura de carpetas en Git, sin lógica ejecutable.
 - [storage/.htaccess](storage/.htaccess): directiva de Apache que niega acceso
   web directo al árbol de almacenamiento.
-
