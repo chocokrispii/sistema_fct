@@ -34,6 +34,14 @@
                         <input type="text" id="dni" class="persist" placeholder="Ej: 12345678X" required>
                     </div>
                     <div class="input-box">
+                        <label for="fecha_nacimiento">Fecha de nacimiento *</label>
+                        <input type="text" id="fecha_nacimiento" class="persist" placeholder="Ej: 1990-01-01" required>
+                    </div>
+                    <div class="input-box">
+                        <label for="Edad">Edad *</label>
+                        <input type="text" id="Edad" class="persist" placeholder="Ej: 30" required>
+                    </div>
+                    <div class="input-box">
                         <label for="nombre">Nombre *</label>
                         <input type="text" id="nombre" class="persist" required>
                     </div>
@@ -42,9 +50,14 @@
                         <input type="text" id="apellidos" class="persist" required>
                     </div>
                     <div class="input-box">
-                        <label for="contacto">Contacto (Teléfono / Email) *</label>
-                        <input type="text" id="contacto" class="persist" placeholder="Ej: 600123456 / alumno@correo.com" required>
+                        <label for="telefono">Teléfono *</label>
+                        <input type="text" id="telefono" class="persist" placeholder="Ej: 600123456" required>
                     </div>
+                    <div class="input-box">
+                        <label for="email">Email) *</label>
+                        <input type="text" id="email" class="persist" placeholder="Ej: alumno@correo.com" required>
+                    </div>
+                    
                 </div>
 
                 <div class="form-group-title">Datos Administrativos</div>
@@ -120,32 +133,31 @@
                             <th class="text-center">Miércoles</th>
                             <th class="text-center">Jueves</th>
                             <th class="text-center">Viernes</th>
+                            <th class="text-center">Sábado</th>
+                            <th class="text-center">Domingo</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>Mañana Temprano (08:00 - 11:00)</td>
+                            <td>Mañana </td>
                             <td class="text-center"><input type="checkbox" class="persist" id="m-l1"></td>
                             <td class="text-center"><input type="checkbox" class="persist" id="m-m1"></td>
                             <td class="text-center"><input type="checkbox" class="persist" id="m-x1"></td>
                             <td class="text-center"><input type="checkbox" class="persist" id="m-j1"></td>
                             <td class="text-center"><input type="checkbox" class="persist" id="m-v1"></td>
+                            <td class="text-center"><input type="checkbox" class="persist" id="m-s1"></td>
+                            <td class="text-center"><input type="checkbox" class="persist" id="m-d1"></td>
                         </tr>
+                        
                         <tr>
-                            <td>Mañana Tardía (11:00 - 14:00)</td>
-                            <td class="text-center"><input type="checkbox" class="persist" id="m-l2"></td>
-                            <td class="text-center"><input type="checkbox" class="persist" id="m-m2"></td>
-                            <td class="text-center"><input type="checkbox" class="persist" id="m-x2"></td>
-                            <td class="text-center"><input type="checkbox" class="persist" id="m-j2"></td>
-                            <td class="text-center"><input type="checkbox" class="persist" id="m-v2"></td>
-                        </tr>
-                        <tr>
-                            <td>Tarde Temprano (15:00 - 18:00)</td>
+                            <td>Tarde </td>
                             <td class="text-center"><input type="checkbox" class="persist" id="t-l1"></td>
                             <td class="text-center"><input type="checkbox" class="persist" id="t-m1"></td>
                             <td class="text-center"><input type="checkbox" class="persist" id="t-x1"></td>
                             <td class="text-center"><input type="checkbox" class="persist" id="t-j1"></td>
                             <td class="text-center"><input type="checkbox" class="persist" id="t-v1"></td>
+                            <td class="text-center"><input type="checkbox" class="persist" id="t-s1"></td>
+                            <td class="text-center"><input type="checkbox" class="persist" id="t-d1"></td>
                         </tr>
                     </tbody>
                 </table>
