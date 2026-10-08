@@ -38,7 +38,8 @@ class AlumnoController
                 $this->mostrarFormulario('Los datos del registro deben ser valores de texto válidos.');
                 return;
             }
-            $input[$field] = trim($value);
+            // La contraseña no se recorta: los espacios cuentan.
+            $input[$field] = $field === 'password' ? $value : trim($value);
         }
         $email = $input['email'];
         $password = $input['password'];
@@ -76,6 +77,7 @@ class AlumnoController
             || strlen($email) > 100
             || strlen($password) < 12
             || strlen($password) > 72
+            || trim($password) === ''
             || $nombre === ''
             || mb_strlen($nombre) > 50
             || $apellidos === ''

@@ -2,8 +2,12 @@
 // app/Controllers/AuthController.php
 
 require_once __DIR__ . '/../Models/Usuario.php';
+require_once __DIR__ . '/../Models/IntentoLogin.php';
 
 class AuthController {
+    /** Mismo coste que password_hash por defecto: el correo inexistente tarda igual que uno real. */
+    private const HASH_FICTICIO = '$2y$10$VIVNueDI3jrUbHmTwaNXk.ESaHwieDE0R6ob.kpP.SqhQQO/pgOiO';
+
     private Usuario $usuarioModel;
 
     public function __construct(?Usuario $usuarioModel = null) {
@@ -24,17 +28,34 @@ class AuthController {
         }
         $email = trim($emailRaw);
 
-        if ($email === '' || $password === '' || strlen($password) > 72) {
+        if ($email === '' || $password === '') {
             $this->mostrarFormulario('Por favor completa todos los campos.');
             return;
         }
 
-        $usuario = $this->usuarioModel->obtenerPorEmail($email);
+        $intentos = new IntentoLogin();
+        $ip = is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
+        $ahora = new DateTimeImmutable();
+        if ($intentos->estaBloqueado($email, $ip, $ahora)) {
+            http_response_code(429);
+            $this->mostrarFormulario('Demasiados intentos fallidos. Espera ' . IntentoLogin::VENTANA_MINUTOS . ' minutos y vuelve a intentarlo.');
+            return;
+        }
+        if (strlen($password) > 72) {
+            $intentos->registrarFallo($email, $ip, $ahora);
+            $this->mostrarFormulario('La contraseña no puede superar 72 caracteres.');
+            return;
+        }
 
-        if (!$usuario || !password_verify($password, $usuario['password_hash'])) {
+        $usuario = $this->usuarioModel->obtenerPorEmail($email);
+        $correcta = password_verify($password, $usuario['password_hash'] ?? self::HASH_FICTICIO);
+
+        if (!$usuario || !$correcta) {
+            $intentos->registrarFallo($email, $ip, $ahora);
             $this->mostrarFormulario('Credenciales incorrectas.');
             return;
         }
+        $intentos->limpiar($email);
         if (isset($usuario['activo']) && (int)$usuario['activo'] !== 1) {
             $this->mostrarFormulario('La cuenta está desactivada. Contacta con el centro educativo.');
             return;

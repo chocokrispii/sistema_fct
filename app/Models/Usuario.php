@@ -65,10 +65,19 @@ class Usuario {
         return (int)$this->db->lastInsertId();
     }
 
+    public function cambiarContrasena(int $id, string $password): void
+    {
+        $stmt = $this->db->prepare('UPDATE usuarios SET password_hash = :hash WHERE id = :id');
+        $stmt->execute(['hash' => $this->hashPassword($password), 'id' => $id]);
+    }
+
     private function hashPassword(string $password): string
     {
+        if (trim($password) === '') {
+            throw new InvalidArgumentException('La contraseña no puede estar formada solo por espacios.');
+        }
         if (strlen($password) < 12 || strlen($password) > 72) {
-            throw new InvalidArgumentException('La contraseña debe tener entre 12 y 72 bytes.');
+            throw new InvalidArgumentException('La contraseña debe tener entre 12 y 72 caracteres.');
         }
         return password_hash($password, PASSWORD_DEFAULT);
     }

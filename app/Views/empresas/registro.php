@@ -25,7 +25,7 @@
                 <div class="company-registration__field">
                     <label for="company-password">Contraseña <span aria-hidden="true">*</span></label>
                     <input id="company-password" type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" aria-describedby="company-password-help" placeholder="Mínimo 12 caracteres" required>
-                    <small id="company-password-help">Debe tener entre 12 y 72 caracteres.</small>
+                    <small id="company-password-help">Debe tener entre 12 y 72 caracteres. Los espacios cuentan.</small>
                 </div>
             </div>
         </fieldset>
