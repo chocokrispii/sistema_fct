@@ -31,7 +31,7 @@ class UsuarioAdminController
                 || strlen($password) < 12
                 || strlen($password) > 72
             ) {
-                $error = 'Indica un correo válido y una contraseña de 12 a 72 bytes.';
+                $error = 'Indica un correo válido y una contraseña de 12 a 72 caracteres.';
             } else {
                 try {
                     $this->db->beginTransaction();
