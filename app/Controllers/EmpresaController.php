@@ -21,23 +21,39 @@ class EmpresaController {
             return;
         }
 
-        $email           = trim($_POST['email'] ?? '');
-        $password        = $_POST['password'] ?? '';
-        $cif             = trim($_POST['cif'] ?? '');
-        $nombreComercial = trim($_POST['nombre_comercial'] ?? '');
-        $telefono        = trim($_POST['telefono'] ?? '');
-        $direccion       = trim($_POST['direccion'] ?? '');
-        $contacto        = trim($_POST['persona_contacto'] ?? '');
+        $fields = ['email', 'password', 'cif', 'nombre_comercial', 'telefono', 'direccion', 'persona_contacto'];
+        $input = [];
+        foreach ($fields as $field) {
+            $value = $_POST[$field] ?? '';
+            if (!is_string($value)) {
+                $this->mostrarFormulario('Los datos del registro deben ser valores de texto válidos.');
+                return;
+            }
+            $input[$field] = trim($value);
+        }
+        $email = $input['email'];
+        $password = $input['password'];
+        $cif = $input['cif'];
+        $nombreComercial = $input['nombre_comercial'];
+        $telefono = $input['telefono'];
+        $direccion = $input['direccion'];
+        $contacto = $input['persona_contacto'];
 
         if (
             !filter_var($email, FILTER_VALIDATE_EMAIL)
-            || $password === ''
+            || strlen($email) > 100
+            || strlen($password) < 12
+            || strlen($password) > 72
             || $cif === ''
+            || mb_strlen($cif) > 20
             || $nombreComercial === ''
+            || mb_strlen($nombreComercial) > 150
+            || mb_strlen($contacto) > 150
+            || mb_strlen($telefono) > 20
             || $direccion === ''
+            || mb_strlen($direccion) > 255
         ) {
-            echo "<p style='color:red;'>Error: Todos los campos obligatorios deben completarse.</p>";
-            $this->mostrarFormulario();
+            $this->mostrarFormulario('Completa correctamente todos los campos obligatorios.');
             return;
         }
 
@@ -62,29 +78,59 @@ class EmpresaController {
             }
 
             $this->db->commit();
-            echo "<p style='color:green;'>Empresa registrada con éxito. <a href='index.php?action=login'>Inicia sesión</a> para publicar ofertas.</p>";
+            header('Location: index.php?action=login&registrada=1');
+            exit;
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
             error_log('Error al registrar empresa: ' . $e->getMessage());
-            echo "<p style='color:red;'>No se pudo completar el registro de la empresa.</p>";
-            $this->mostrarFormulario();
+            $this->mostrarFormulario('No se pudo completar el registro. Comprueba que el correo y el CIF no estén ya registrados.');
         }
     }
 
-    private function mostrarFormulario(): void {
-        echo '
-        <h2>Registro de empresa</h2>
-        <form method="POST" action="index.php?action=registro-empresa">
-            <input type="email" name="email" placeholder="Correo de acceso" required>
-            <input type="password" name="password" placeholder="Contraseña" required>
-            <input type="text" name="nombre_comercial" placeholder="Nombre de la empresa" required>
-            <input type="text" name="cif" placeholder="CIF" required>
-            <input type="text" name="persona_contacto" placeholder="Persona de contacto">
-            <input type="text" name="telefono" placeholder="Teléfono">
-            <input type="text" name="direccion" placeholder="Dirección" required>
-            <button type="submit">Registrar empresa</button>
-        </form>';
+    private function mostrarFormulario(string $error = ''): void {
+        View::render('empresas/registro', ['error' => $error]);
+    }
+
+    public function sedes(): void
+    {
+        $empresa = $this->empresaModel->obtenerPorUsuarioId((int)$_SESSION['usuario_id']);
+        if ($empresa === null) {
+            throw new RuntimeException('No se encontró el perfil de empresa.');
+        }
+
+        $error = '';
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $nombre = $_POST['nombre'] ?? '';
+            $direccion = $_POST['direccion'] ?? '';
+            $telefono = $_POST['telefono'] ?? '';
+            if (!is_string($nombre) || !is_string($direccion) || !is_string($telefono)) {
+                $error = 'Los datos de la sede deben ser valores de texto válidos.';
+            } elseif (
+                trim($nombre) === ''
+                || trim($direccion) === ''
+                || mb_strlen(trim($nombre)) > 150
+                || mb_strlen(trim($direccion)) > 255
+                || mb_strlen(trim($telefono)) > 20
+            ) {
+                $error = 'Indica un nombre y una dirección de sede dentro de los límites permitidos.';
+            } else {
+                $this->empresaModel->crearSede(
+                    (int)$empresa['id'],
+                    trim($nombre),
+                    trim($direccion),
+                    trim($telefono)
+                );
+                header('Location: index.php?action=sedes');
+                exit;
+            }
+        }
+
+        View::render('empresas/sedes', [
+            'empresa' => $empresa,
+            'sedes' => $this->empresaModel->obtenerSedes((int)$empresa['id']),
+            'error' => $error,
+        ]);
     }
 }

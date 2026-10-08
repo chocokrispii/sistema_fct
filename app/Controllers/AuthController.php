@@ -11,19 +11,20 @@ class AuthController {
     }
 
     public function login(): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->mostrarFormulario();
             return;
         }
 
-        $email    = trim($_POST['email'] ?? '');
+        $emailRaw = $_POST['email'] ?? '';
         $password = $_POST['password'] ?? '';
+        if (!is_string($emailRaw) || !is_string($password)) {
+            $this->mostrarFormulario('Los datos de acceso no tienen un formato válido.');
+            return;
+        }
+        $email = trim($emailRaw);
 
-        if ($email === '' || $password === '') {
+        if ($email === '' || $password === '' || strlen($password) > 72) {
             $this->mostrarFormulario('Por favor completa todos los campos.');
             return;
         }
@@ -34,8 +35,13 @@ class AuthController {
             $this->mostrarFormulario('Credenciales incorrectas.');
             return;
         }
+        if (isset($usuario['activo']) && (int)$usuario['activo'] !== 1) {
+            $this->mostrarFormulario('La cuenta está desactivada. Contacta con el centro educativo.');
+            return;
+        }
 
         session_regenerate_id(true);
+        unset($_SESSION['csrf_token']);
         $_SESSION['usuario_id'] = (int)$usuario['id'];
         $_SESSION['email']      = $usuario['email'];
         $_SESSION['rol']        = $usuario['rol'];
@@ -46,10 +52,6 @@ class AuthController {
     }
 
     public function logout(): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
@@ -62,15 +64,6 @@ class AuthController {
     }
 
     private function mostrarFormulario(string $error = ''): void {
-        if ($error !== '') {
-            echo '<p style="color:red;">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</p>';
-        }
-        echo '
-        <h2>Iniciar sesión</h2>
-        <form method="POST" action="index.php?action=login">
-            <input type="email" name="email" placeholder="Correo" required>
-            <input type="password" name="password" placeholder="Contraseña" required>
-            <button type="submit">Entrar</button>
-        </form>';
+        View::render('auth/login', ['error' => $error]);
     }
 }

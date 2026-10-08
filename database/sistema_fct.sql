@@ -199,11 +199,11 @@ CREATE TABLE `usuarios` (
 --
 
 INSERT INTO `usuarios` (`id`, `email`, `password_hash`, `rol`, `fecha_creacion`) VALUES
-(1, 'admin@centro.com', 'password123', 'Administrador', '2026-10-07 10:33:53'),
-(2, 'coordinador@centro.com', 'password123', 'Coordinador', '2026-10-07 10:33:53'),
-(3, 'empresa.tech@gmail.com', 'password123', 'Empresa', '2026-10-07 10:33:53'),
-(4, 'alumno.menor@alumno.com', 'password123', 'Alumno', '2026-10-07 10:33:53'),
-(5, 'alumno.mayor@alumno.com', 'password123', 'Alumno', '2026-10-07 10:33:53');
+(1, 'admin@centro.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Administrador', '2026-10-07 10:33:53'),
+(2, 'coordinador@centro.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Coordinador', '2026-10-07 10:33:53'),
+(3, 'empresa.tech@gmail.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Empresa', '2026-10-07 10:33:53'),
+(4, 'alumno.menor@alumno.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Alumno', '2026-10-07 10:33:53'),
+(5, 'alumno.mayor@alumno.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Alumno', '2026-10-07 10:33:53');
 
 --
 -- Índices para tablas volcadas
@@ -371,9 +371,6 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-
-INSERT INTO direcciones_telefonos (empresa_id, alumno_id, tutor_id, telefono, direccion_completa, es_principal)
-VALUES (NULL, 3, NULL, '600112233', 'Calle Ejemplo 123, Madrid', 1);
 
 ALTER TABLE `alumnos`
   ADD CONSTRAINT `uk_alumnos_dni` UNIQUE (`dni`),

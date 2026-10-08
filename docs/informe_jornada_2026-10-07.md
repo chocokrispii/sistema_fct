@@ -345,3 +345,68 @@ Estado en git: cambios **sin commit** en la rama `jefferson`.
    tabla), consultas, panel de coordinador/administrador.
 7. Eliminar `app/Views/layouts/index.html`, sustituido por `main.php`.
 8. Hacer commit de los cambios y abrir un Pull Request para revisión del equipo.
+
+---
+
+## 11. Ampliación funcional y de seguridad (estado posterior)
+
+Esta sección actualiza las secciones anteriores, que documentaban una fase
+previa. En particular, los apartados 7, 8, 9 y 10 describen las pruebas,
+inventarios y pendientes de aquel momento; no representan el estado actual.
+
+### Funcionalidad incorporada
+
+- Enrutamiento centralizado con comprobación del método HTTP y middleware de
+  sesión y rol; todas las peticiones POST pasan por validación CSRF.
+- Sesiones con cookie `HttpOnly` y `SameSite=Lax`, regeneración del identificador
+  al iniciar sesión y comprobación de que la cuenta continúa activa en cada ruta
+  protegida.
+- Cuentas de personal gestionadas por Administrador, perfil de Coordinador,
+  activación/desactivación auditada y protección contra la desactivación de la
+  propia cuenta o del último administrador.
+- Gestión de sedes y documentos de convenio PDF en almacenamiento privado, con
+  descarga autenticada y autorización de empresa por titularidad.
+- Revisión de convenios y ofertas; una oferta solo puede aprobarse si existe un
+  convenio aprobado que cubra todo su periodo.
+- Disponibilidad por turno y periodo, selección de candidatos por ciclo y
+  compatibilidad, control transaccional de plazas y cierre auditado de prácticas.
+- Consultas con filtros de ciclo, estado y fechas; los filtros inválidos producen
+  un mensaje explícito y el resultado se limita a 500 filas.
+- Vistas por módulo y navegación por rol. Los errores internos se registran en
+  el log del servidor y no se muestran al usuario.
+
+### Base de datos y restricción del volcado
+
+Se añadió `database/migrations/002_fct_workflows.sql` como migración aditiva.
+Debe ejecutarse una vez, después de la migración `001` cuando la base aún tenga
+la columna `nombre_specialidad`. Las migraciones ya no seleccionan una base fija:
+hay que elegir la base destino antes de aplicarlas en phpMyAdmin o en el cliente
+MySQL.
+
+Por petición expresa, `database/sistema_fct.sql` no se modificó. Mantiene el
+esquema anterior y contiene una fila de dirección que referencia al alumno 3,
+aunque el volcado solo crea alumnos 1 y 2; una importación nueva puede fallar en
+esa clave foránea. La migración `002` añade las columnas requeridas por el código,
+pero no corrige esa fila. El orden de instalación y esta limitación están
+documentados en `README.md`. No se debe considerar válida una importación hasta
+comprobar en phpMyAdmin que terminó correctamente.
+
+### Validación ejecutada en esta ampliación
+
+- `php -l` sobre todos los archivos PHP de la aplicación, configuración, entrada
+  pública y pruebas; todos pasaron tras corregir errores de llaves detectados
+  durante la validación.
+- Prueba de integración en una base `fct_test_` desechable: se clonó solo la
+  estructura de la base local, se aplicaron las migraciones `001` y `002` y se
+  ejecutó `tests/run.php`. Resultado: OK para revisión de convenios/ofertas,
+  matching, límite de plazas, cierre de asignación y CSRF.
+- La prueba encontró una incompatibilidad de collation al comparar turnos del
+  esquema legado y la tabla nueva; se corrigió comparando las etiquetas de turno
+  como valores binarios y se repitió la prueba con resultado satisfactorio.
+- La base temporal y el volcado de estructura se eliminaron al terminar. No se
+  ejecutaron migraciones sobre `sistema_fct` ni se alteró `database/sistema_fct.sql`.
+
+No se hizo commit ni push. Antes de integrar en una rama compartida quedan por
+revisar el tratamiento de la fila huérfana del volcado (en un cambio autorizado),
+la configuración de Apache para servir únicamente `public/`, pruebas HTTP desde
+el navegador y la revisión del equipo sobre los flujos y roles.
