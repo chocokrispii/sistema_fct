@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../app/Core/PhpIni.php';
 require_once __DIR__ . '/../app/Core/View.php';
 require_once __DIR__ . '/../app/Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
@@ -16,6 +17,18 @@ require_once __DIR__ . '/../app/Controllers/AsignacionController.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
 require_once __DIR__ . '/../app/Controllers/UsuarioAdminController.php';
 require_once __DIR__ . '/../app/Controllers/ConsultaController.php';
+
+$contentLength = $_SERVER['CONTENT_LENGTH'] ?? null;
+if (
+    strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+    && is_string($contentLength)
+    && ctype_digit($contentLength)
+    && (int)$contentLength > PhpIni::sizeToBytes((string)ini_get('post_max_size'))
+) {
+    http_response_code(413);
+    header('Content-Type: text/plain; charset=UTF-8');
+    exit('La solicitud supera el límite configurado.');
+}
 
 ini_set('session.use_strict_mode', '1');
 session_set_cookie_params([
@@ -50,7 +63,7 @@ try {
             View::render('errors/405');
         } else {
             if ($route['roles'] !== []) {
-                AuthMiddleware::requireRoles($route['roles']);
+                AuthMiddleware::requireRoles($route['roles'], $action);
             }
             if ($method === 'POST') {
                 CsrfMiddleware::verify();

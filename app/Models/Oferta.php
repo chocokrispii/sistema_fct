@@ -47,26 +47,16 @@ class Oferta {
     }
 
     public function obtenerPorEmpresa(int $empresaId): array {
-        try {
-            $stmt = $this->db->prepare(self::SELECT_BASE . ' WHERE p.empresa_id = :empresa_id ORDER BY p.fecha_inicio DESC');
-            $stmt->execute(['empresa_id' => $empresaId]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error al listar ofertas de la empresa: " . $e->getMessage());
-            return [];
-        }
+        $stmt = $this->db->prepare(self::SELECT_BASE . ' WHERE p.empresa_id = :empresa_id ORDER BY p.fecha_inicio DESC');
+        $stmt->execute(['empresa_id' => $empresaId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function obtenerTodas(bool $soloVigentes = false): array {
-        try {
-            $sql = self::SELECT_BASE
-                . ($soloVigentes ? " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '')
-                . ' ORDER BY p.fecha_inicio';
-            return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error al listar ofertas: " . $e->getMessage());
-            return [];
-        }
+        $sql = self::SELECT_BASE
+            . ($soloVigentes ? " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '')
+            . ' ORDER BY p.fecha_inicio';
+        return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function obtenerPendientes(): array

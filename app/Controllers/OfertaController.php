@@ -51,10 +51,8 @@ class OfertaController {
             $error = '';
         }
 
-        $convenioAprobado = $this->empresaModel->tieneConvenioVigente($empresaId);
         View::render('ofertas/publicar', [
             'empresa' => $empresa,
-            'convenioAprobado' => $convenioAprobado,
             'error' => $error,
             'ofertas' => $this->ofertaModel->obtenerPorEmpresa($empresaId),
             'especialidades' => $this->especialidadModel->obtenerTodas(),

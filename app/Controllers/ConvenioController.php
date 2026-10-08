@@ -3,6 +3,9 @@
 require_once __DIR__ . '/../Models/Convenio.php';
 require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
+require_once __DIR__ . '/../Core/FileScanner.php';
+require_once __DIR__ . '/../Core/PhpIni.php';
+require_once __DIR__ . '/../../config/storage.php';
 
 class ConvenioController
 {
@@ -34,7 +37,9 @@ class ConvenioController
                 error_log('Error al registrar convenio: ' . $e->getMessage());
                 $error = $e instanceof InvalidArgumentException
                     ? $e->getMessage()
-                    : 'No se pudo registrar el convenio. Comprueba el número y los datos enviados.';
+                    : ($e instanceof FileScannerUnavailableException || $e instanceof FileUploadConfigurationException
+                        ? 'La carga segura de documentos no está disponible. Contacta con el administrador.'
+                        : 'No se pudo registrar el convenio. Comprueba el número y los datos enviados.');
             }
         }
 
@@ -48,6 +53,13 @@ class ConvenioController
 
     private function guardarConvenio(int $empresaId): void
     {
+        $contentLength = $_SERVER['CONTENT_LENGTH'] ?? null;
+        $postLimit = PhpIni::sizeToBytes((string)ini_get('post_max_size'));
+        if (is_string($contentLength) && ctype_digit($contentLength) && (int)$contentLength > $postLimit) {
+            throw new InvalidArgumentException('La solicitud supera el límite de carga configurado por PHP.');
+        }
+        $this->validarLimitesCarga();
+
         $numeroRaw = $_POST['numero_convenio'] ?? '';
         $sedeRaw = $_POST['sede_id'] ?? '';
         $firmaRaw = $_POST['fecha_firma'] ?? '';
@@ -89,6 +101,9 @@ class ConvenioController
         }
 
         if (!is_array($upload) || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            if (is_array($upload) && in_array($upload['error'] ?? null, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                throw new InvalidArgumentException('El archivo supera el límite de carga configurado en el servidor.');
+            }
             throw new InvalidArgumentException('Selecciona un PDF válido de hasta 10 MB.');
         }
         if (
@@ -106,14 +121,32 @@ class ConvenioController
             throw new InvalidArgumentException('El documento debe ser un archivo PDF.');
         }
 
-        $directory = dirname(__DIR__, 2) . '/storage/uploads/convenios';
-        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+        FileScanner::scan($upload['tmp_name']);
+
+        $storageRoot = fctStoragePath();
+        $uploadRoot = $storageRoot . DIRECTORY_SEPARATOR . 'uploads';
+        $directory = $uploadRoot . DIRECTORY_SEPARATOR . 'convenios';
+        foreach ([$storageRoot, $uploadRoot, $directory] as $privateDirectory) {
+            if (!is_dir($privateDirectory) && !mkdir($privateDirectory, 0700) && !is_dir($privateDirectory)) {
+                throw new RuntimeException('No se pudo preparar el almacenamiento privado de convenios.');
+            }
+            if (is_link($privateDirectory) || !chmod($privateDirectory, 0700)) {
+                throw new RuntimeException('No se pudieron establecer los permisos privados de almacenamiento.');
+            }
+        }
+        if (!is_dir($directory)) {
             throw new RuntimeException('No se pudo preparar el almacenamiento privado de convenios.');
         }
         $storedName = bin2hex(random_bytes(24)) . '.pdf';
-        $destination = $directory . '/' . $storedName;
+        $destination = $directory . DIRECTORY_SEPARATOR . $storedName;
         if (!move_uploaded_file($upload['tmp_name'], $destination)) {
             throw new RuntimeException('No se pudo guardar el archivo del convenio.');
+        }
+        if (!chmod($destination, 0600)) {
+            if (!unlink($destination)) {
+                error_log('No se pudo retirar un archivo de convenio sin permisos privados.');
+            }
+            throw new RuntimeException('No se pudieron establecer los permisos privados del convenio.');
         }
 
         $this->db->beginTransaction();
@@ -139,8 +172,8 @@ class ConvenioController
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
-            if (is_file($destination)) {
-                unlink($destination);
+            if (is_file($destination) && !unlink($destination)) {
+                error_log('No se pudo retirar un archivo de convenio tras fallar su registro.');
             }
             throw $e;
         }
@@ -191,34 +224,114 @@ class ConvenioController
 
     public function descargar(): void
     {
+        if (!in_array($_SESSION['rol'] ?? null, ['Administrador', 'Coordinador', 'Empresa'], true)) {
+            $userId = filter_var($_SESSION['usuario_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            (new Auditoria($this->db))->registrar(
+                $userId === false ? null : (int)$userId,
+                'convenio.descarga.denegada',
+                'convenios',
+                null,
+                'motivo=rol_no_autorizado'
+            );
+            http_response_code(403);
+            throw new RuntimeException('No tienes permiso para descargar convenios.');
+        }
+
         $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $convenio = $id === false ? null : $this->convenioModel->obtener((int)$id);
         if ($convenio === null) {
+            (new Auditoria($this->db))->registrar(
+                (int)$_SESSION['usuario_id'],
+                'convenio.descarga.denegada',
+                'convenios',
+                $id === false ? null : (int)$id,
+                'motivo=no_encontrado'
+            );
             http_response_code(404);
             throw new RuntimeException('El documento solicitado no existe.');
         }
         if ($_SESSION['rol'] === 'Empresa') {
             $empresa = $this->empresaModel->obtenerPorUsuarioId((int)$_SESSION['usuario_id']);
             if ($empresa === null || (int)$empresa['id'] !== (int)$convenio['empresa_id']) {
+                (new Auditoria($this->db))->registrar(
+                    (int)$_SESSION['usuario_id'],
+                    'convenio.descarga.denegada',
+                    'convenios',
+                    (int)$id,
+                    'motivo=empresa_sin_titularidad'
+                );
                 http_response_code(403);
                 throw new RuntimeException('No tienes permiso para descargar este documento.');
             }
         }
 
-        $base = realpath(dirname(__DIR__, 2) . '/storage/uploads/convenios');
-        $file = $base === false ? false : realpath($base . DIRECTORY_SEPARATOR . basename($convenio['archivo_path']));
-        if ($base === false || $file === false || dirname($file) !== $base || !is_file($file)) {
+        $storedName = $convenio['archivo_path'];
+        $base = realpath(fctStoragePath() . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'convenios');
+        $candidate = is_string($storedName) && preg_match('/\A[a-f0-9]{48}\.pdf\z/', $storedName) === 1
+            ? ($base === false ? false : $base . DIRECTORY_SEPARATOR . $storedName)
+            : false;
+        $file = $candidate === false ? false : realpath($candidate);
+        if (
+            $base === false
+            || $candidate === false
+            || is_link($candidate)
+            || $file === false
+            || dirname($file) !== $base
+            || !is_file($file)
+        ) {
+            (new Auditoria($this->db))->registrar(
+                (int)$_SESSION['usuario_id'],
+                'convenio.descarga.denegada',
+                'convenios',
+                (int)$id,
+                'motivo=archivo_no_disponible'
+            );
             throw new RuntimeException('No se encontró el archivo del convenio.');
         }
+
+        $handle = fopen($file, 'rb');
+        $size = filesize($file);
+        if ($handle === false || $size === false) {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            (new Auditoria($this->db))->registrar(
+                (int)$_SESSION['usuario_id'],
+                'convenio.descarga.denegada',
+                'convenios',
+                (int)$id,
+                'motivo=archivo_no_legible'
+            );
+            throw new RuntimeException('No se pudo abrir el archivo del convenio.');
+        }
+        (new Auditoria($this->db))->registrar(
+            (int)$_SESSION['usuario_id'],
+            'convenio.descarga',
+            'convenios',
+            (int)$id,
+            'resultado=autorizada'
+        );
 
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
         header('Content-Type: application/pdf');
-        header('Content-Length: ' . filesize($file));
+        header('Content-Length: ' . $size);
         header('Content-Disposition: attachment; filename="convenio-' . (int)$convenio['id'] . '.pdf"');
-        readfile($file);
+        fpassthru($handle);
+        fclose($handle);
         exit;
+    }
+
+    private function validarLimitesCarga(): void
+    {
+        if (
+            PhpIni::sizeToBytes((string)ini_get('upload_max_filesize')) < 10 * 1024 * 1024
+            || PhpIni::sizeToBytes((string)ini_get('post_max_size')) < 12 * 1024 * 1024
+            || (int)ini_get('max_file_uploads') < 1
+        ) {
+            throw new FileUploadConfigurationException('Los límites de carga de PHP no cumplen la configuración requerida.');
+        }
     }
 
     private function parseDate(string $value): ?DateTimeImmutable

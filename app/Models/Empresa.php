@@ -49,27 +49,10 @@ class Empresa {
     }
 
     public function obtenerPorUsuarioId(int $usuarioId): ?array {
-        try {
-            $stmt = $this->db->prepare('SELECT * FROM empresas WHERE usuario_id = :usuario_id LIMIT 1');
-            $stmt->execute(['usuario_id' => $usuarioId]);
-            $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $empresa ?: null;
-        } catch (PDOException $e) {
-            error_log("Error al buscar empresa: " . $e->getMessage());
-            return null;
-        }
-    }
-
-    public function tieneConvenioVigente(int $empresaId): bool
-    {
-        $stmt = $this->db->prepare(
-            "SELECT 1 FROM convenios
-             WHERE empresa_id = :empresa_id AND estado = 'Aprobado'
-               AND fecha_inicio <= CURDATE() AND fecha_fin >= CURDATE()
-             LIMIT 1"
-        );
-        $stmt->execute(['empresa_id' => $empresaId]);
-        return (bool)$stmt->fetchColumn();
+        $stmt = $this->db->prepare('SELECT * FROM empresas WHERE usuario_id = :usuario_id LIMIT 1');
+        $stmt->execute(['usuario_id' => $usuarioId]);
+        $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $empresa ?: null;
     }
 
     public function tieneConvenioParaFechas(int $empresaId, string $inicio, string $fin): bool

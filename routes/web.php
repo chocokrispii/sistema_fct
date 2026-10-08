@@ -24,7 +24,7 @@ return [
     'convenios' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => ConvenioController::class, 'action' => 'gestionarEmpresa'],
     'revisar-convenios' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador'], 'controller' => ConvenioController::class, 'action' => 'revisar'],
     'resolver-convenio' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => ConvenioController::class, 'action' => 'resolver'],
-    'descargar-convenio' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador', 'Empresa'], 'controller' => ConvenioController::class, 'action' => 'descargar'],
+    'descargar-convenio' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Empresa'], 'controller' => ConvenioController::class, 'action' => 'descargar'],
     'usuarios' => ['method' => ['GET', 'POST'], 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'gestionar'],
     'estado-usuario' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'cambiarEstado'],
     'consultas' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador'], 'controller' => ConsultaController::class, 'action' => 'buscar'],
