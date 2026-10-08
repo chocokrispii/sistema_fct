@@ -26,15 +26,29 @@ class AlumnoController
             return;
         }
 
-        $email = trim($_POST['email'] ?? '');
-        $password = $_POST['password'] ?? '';
-        $nombre = trim($_POST['nombre'] ?? '');
-        $apellidos = trim($_POST['apellidos'] ?? '');
-        $dni = trim($_POST['dni'] ?? '');
-        $nss = trim($_POST['nss'] ?? '');
-        $telefono = trim($_POST['telefono'] ?? '');
-        $direccion = trim($_POST['direccion'] ?? '');
-        $fechaNacimiento = trim($_POST['fecha_nacimiento'] ?? '');
+        $fields = [
+            'email', 'password', 'nombre', 'apellidos', 'dni', 'nss', 'telefono', 'direccion',
+            'fecha_nacimiento', 'tutor_nombre', 'tutor_dni', 'tutor_nss', 'tutor_correo',
+            'tutor_direccion', 'tutor_telefono',
+        ];
+        $input = [];
+        foreach ($fields as $field) {
+            $value = $_POST[$field] ?? '';
+            if (!is_string($value)) {
+                $this->mostrarFormulario('Los datos del registro deben ser valores de texto válidos.');
+                return;
+            }
+            $input[$field] = trim($value);
+        }
+        $email = $input['email'];
+        $password = $input['password'];
+        $nombre = $input['nombre'];
+        $apellidos = $input['apellidos'];
+        $dni = $input['dni'];
+        $nss = $input['nss'];
+        $telefono = $input['telefono'];
+        $direccion = $input['direccion'];
+        $fechaNacimiento = $input['fecha_nacimiento'];
         $especialidadId = filter_var(
             $_POST['especialidad_id'] ?? null,
             FILTER_VALIDATE_INT,
@@ -59,13 +73,21 @@ class AlumnoController
 
         if (
             !filter_var($email, FILTER_VALIDATE_EMAIL)
-            || $password === ''
+            || strlen($email) > 100
+            || strlen($password) < 12
+            || strlen($password) > 72
             || $nombre === ''
+            || mb_strlen($nombre) > 50
             || $apellidos === ''
+            || mb_strlen($apellidos) > 100
             || $dni === ''
+            || mb_strlen($dni) > 20
             || $nss === ''
+            || mb_strlen($nss) > 20
             || $telefono === ''
+            || mb_strlen($telefono) > 20
             || $direccion === ''
+            || mb_strlen($direccion) > 255
             || $especialidadId === false
         ) {
             $this->mostrarFormulario('Completa correctamente todos los campos obligatorios.');
@@ -79,13 +101,24 @@ class AlumnoController
 
         $edad = $fechaNacimientoObj->diff($hoy)->y;
         $tutor = [
-            'nombre' => trim($_POST['tutor_nombre'] ?? ''),
-            'dni' => trim($_POST['tutor_dni'] ?? ''),
-            'nss' => trim($_POST['tutor_nss'] ?? ''),
-            'correo' => trim($_POST['tutor_correo'] ?? ''),
-            'direccion' => trim($_POST['tutor_direccion'] ?? ''),
-            'telefono' => trim($_POST['tutor_telefono'] ?? ''),
+            'nombre' => $input['tutor_nombre'],
+            'dni' => $input['tutor_dni'],
+            'nss' => $input['tutor_nss'],
+            'correo' => $input['tutor_correo'],
+            'direccion' => $input['tutor_direccion'],
+            'telefono' => $input['tutor_telefono'],
         ];
+        if (
+            mb_strlen($tutor['nombre']) > 100
+            || mb_strlen($tutor['dni']) > 20
+            || mb_strlen($tutor['nss']) > 20
+            || strlen($tutor['correo']) > 100
+            || mb_strlen($tutor['direccion']) > 255
+            || mb_strlen($tutor['telefono']) > 20
+        ) {
+            $this->mostrarFormulario('Uno o varios datos del tutor superan el límite permitido.');
+            return;
+        }
 
         if ($edad < 16) {
             $this->mostrarFormulario('El alumno debe tener al menos 16 años.');
@@ -144,7 +177,8 @@ class AlumnoController
             }
 
             $this->db->commit();
-            echo '<p style="color:green;">Alumno registrado correctamente. <a href="index.php?action=login">Inicia sesión</a>.</p>';
+            header('Location: index.php?action=login&registrado=1');
+            exit;
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
@@ -156,37 +190,7 @@ class AlumnoController
 
     private function mostrarFormulario(string $error = ''): void
     {
-        if ($error !== '') {
-            echo '<p style="color:red;">' . htmlspecialchars($error, ENT_QUOTES, 'UTF-8') . '</p>';
-        }
-
         $especialidades = $this->especialidadModel->obtenerTodas();
-        ?>
-        <h2>Registro de alumno</h2>
-        <form method="POST" action="index.php?action=registro-alumno">
-            <input type="text" name="nombre" placeholder="Nombre" required>
-            <input type="text" name="apellidos" placeholder="Apellidos" required>
-            <input type="text" name="dni" placeholder="DNI/NIE" required>
-            <input type="email" name="email" placeholder="Correo" required>
-            <input type="password" name="password" placeholder="Contraseña" required>
-            <input type="text" name="nss" placeholder="Nº Seguridad Social" required>
-            <input type="text" name="telefono" placeholder="Teléfono" required>
-            <input type="text" name="direccion" placeholder="Dirección" required>
-            <label>Fecha de nacimiento:</label>
-            <input type="date" name="fecha_nacimiento" required>
-            <label>Ciclo formativo:</label>
-            <?php require __DIR__ . '/../Views/partials/select_especialidades.php'; ?>
-
-            <h3>Datos del tutor (obligatorios si el alumno es menor de 18 años)</h3>
-            <input type="text" name="tutor_nombre" placeholder="Nombre completo del tutor">
-            <input type="text" name="tutor_dni" placeholder="DNI/NIE del tutor">
-            <input type="text" name="tutor_nss" placeholder="Nº Seguridad Social del tutor">
-            <input type="email" name="tutor_correo" placeholder="Correo del tutor">
-            <input type="text" name="tutor_direccion" placeholder="Dirección del tutor">
-            <input type="text" name="tutor_telefono" placeholder="Teléfono del tutor">
-
-            <button type="submit">Registrar alumno</button>
-        </form>
-        <?php
+        View::render('alumnos/registro', ['error' => $error, 'especialidades' => $especialidades]);
     }
 }

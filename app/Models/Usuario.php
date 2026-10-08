@@ -12,7 +12,7 @@ class Usuario {
 
     public function crear(string $email, string $password, string $rol): int {
         try {
-            $passwordHash = password_hash($password, PASSWORD_BCRYPT);
+            $passwordHash = $this->hashPassword($password);
             $stmt = $this->db->prepare(
                 "INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :password, :rol)"
             );
@@ -38,5 +38,45 @@ class Usuario {
             error_log("Error al buscar usuario: " . $e->getMessage());
             return null;
         }
+    }
+
+    public function obtenerTodos(): array
+    {
+        $stmt = $this->db->query(
+            'SELECT id, email, rol, activo, fecha_creacion FROM usuarios ORDER BY rol, email'
+        );
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function crearCuentaStaff(string $email, string $password, string $rol): int
+    {
+        if (!in_array($rol, ['Administrador', 'Coordinador', 'Observador'], true)) {
+            throw new InvalidArgumentException('Solo se pueden crear cuentas de personal del centro.');
+        }
+        $passwordHash = $this->hashPassword($password);
+        $stmt = $this->db->prepare(
+            'INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :hash, :rol)'
+        );
+        $stmt->execute([
+            'email' => $email,
+            'hash' => $passwordHash,
+            'rol' => $rol,
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+
+    private function hashPassword(string $password): string
+    {
+        if (strlen($password) < 12 || strlen($password) > 72) {
+            throw new InvalidArgumentException('La contraseña debe tener entre 12 y 72 bytes.');
+        }
+        return password_hash($password, PASSWORD_DEFAULT);
+    }
+
+    public function cambiarActivo(int $id, bool $activo): bool
+    {
+        $stmt = $this->db->prepare('UPDATE usuarios SET activo = :activo WHERE id = :id AND activo <> :estado');
+        $stmt->execute(['activo' => $activo ? 1 : 0, 'estado' => $activo ? 1 : 0, 'id' => $id]);
+        return $stmt->rowCount() === 1;
     }
 }
