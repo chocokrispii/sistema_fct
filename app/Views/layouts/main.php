@@ -32,6 +32,7 @@ $usuarioAutenticado = $rolActual !== null;
                 <a href="index.php?action=emparejar">Emparejar alumnos</a>
                 <a href="index.php?action=asignaciones">Asignaciones</a>
                 <a href="index.php?action=consultas">Consultas</a>
+                <a href="index.php?action=recuperaciones">Recuperaciones</a>
                 <?php if ($rolActual === 'Administrador'): ?><a href="index.php?action=usuarios">Usuarios</a><?php endif; ?>
             <?php elseif ($rolActual === 'Observador'): ?>
                 <a href="index.php?action=asignaciones">Consulta de asignaciones</a>

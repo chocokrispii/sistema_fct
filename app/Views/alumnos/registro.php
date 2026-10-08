@@ -8,7 +8,8 @@
     <label>Apellidos <input type="text" name="apellidos" required></label>
     <label>DNI/NIE <input type="text" name="dni" required></label>
     <label>Correo <input type="email" name="email" required></label>
-    <label>Contraseña (12-72 caracteres) <input type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" required></label>
+    <label>Contraseña (12-72 caracteres) <input type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" aria-describedby="alumno-password-help" required></label>
+    <small id="alumno-password-help">Debe tener entre 12 y 72 caracteres. Los espacios cuentan.</small>
     <label>Número de Seguridad Social <input type="text" name="nss" required></label>
     <label>Teléfono <input type="text" name="telefono" required></label>
     <label>Dirección <input type="text" name="direccion" required></label>
