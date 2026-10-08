@@ -171,11 +171,16 @@ rutas en `routes/web.php`. Las vistas se renderizan con el layout común de
 `app/Views/layouts/main.php`. La conexión se obtiene desde
 `config/database.php`.
 
-`public/assets/js/alumnos_js.js` y `app/Views/alumnos/alumnos.html` son recursos
-heredados separados del flujo MVC actual de registro de alumnos; el formulario
-de registro utilizado por las rutas está en `app/Views/alumnos/registro.php`.
-El JavaScript heredado guarda valores en `localStorage` y no envía un registro
-al servidor.
+Las direcciones antiguas `app/Views/layouts/index.html`,
+`app/Views/alumnos/alumnos.html` y `app/Views/asignaciones/asignaciones.html`
+se conservan como redirecciones a las páginas correspondientes del front
+controller. No contienen formularios funcionales ni crean rutas nuevas. El
+registro real de alumnado usa `registro-alumno`, y el flujo de asignación usa
+`emparejar`.
+
+`public/assets/js/alumnos_js.js` es un recurso JavaScript heredado, no utilizado
+por las vistas MVC actuales. Su comportamiento de `localStorage` no guarda
+información en el servidor y no debe usarse como flujo de registro.
 
 ## Dump y seed: diferencia
 
@@ -189,8 +194,10 @@ al servidor.
 
 ## Documentación relacionada
 
-- [explicacion.md](explicacion.md): descripción extensa de arquitectura,
+- [documentacion/explicacion.md](documentacion/explicacion.md): descripción extensa de arquitectura,
   comportamiento de módulos, tablas, seguridad y limitaciones conocidas.
+- [documentacion/Guía Exhaustiva de Pruebas - Sistema FCT.pdf](documentacion/Guía%20Exhaustiva%20de%20Pruebas%20-%20Sistema%20FCT.pdf):
+  guía detallada de pruebas funcionales y técnicas.
 - [docs/informe_jornada_2026-10-07.md](docs/informe_jornada_2026-10-07.md):
   informe de trabajo con notas históricas; algunas secciones describen fases
   anteriores y no deben tomarse como estado actual del proyecto.
