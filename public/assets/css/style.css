@@ -71,7 +71,10 @@ nav a:hover {
    ========================= */
 
 main {
-    padding: 40px;
+    width: 95%;              /* CORREGIDO: Permite expandirse en pantalla */
+    max-width: 1250px;       /* CORREGIDO: Ancho adecuado centrado */
+    margin: 0 auto;          /* CORREGIDO: Centra la vista general */
+    padding: 30px 20px;
     min-height: 500px;
 }
 
@@ -97,7 +100,7 @@ footer p {
 form {
     display: grid;
     gap: 12px;
-    max-width: 680px;
+    width: 100%;             /* CORREGIDO: Cambiado de max-width: 680px a 100% para no comprimir */
     margin: 18px 0;
 }
 
@@ -176,7 +179,8 @@ fieldset {
     }
 
     main {
-        padding: 20px;
+        width: 100%;
+        padding: 15px;
     }
 
     table {
@@ -190,6 +194,7 @@ fieldset {
    ========================================================== */
 
 .form-section {
+    width: 100%;              /* CORREGIDO: Asegura ancho completo del contenedor */
     background: var(--color-bg-card, #ffffff);
     padding: 30px;
     border-radius: 6px;
@@ -209,7 +214,7 @@ fieldset {
 /* Distribución inteligente en columnas (Evita que se estiren verticalmente) */
 .grid-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); /* CORREGIDO: Ajuste de minmax para mejor espacio */
     gap: 15px;
     margin-bottom: 15px;
 }
