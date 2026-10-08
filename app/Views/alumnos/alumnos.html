@@ -54,7 +54,7 @@
                         <input type="text" id="telefono" class="persist" placeholder="Ej: 600123456" required>
                     </div>
                     <div class="input-box">
-                        <label for="email">Email) *</label>
+                        <label for="email">Email *</label>
                         <input type="text" id="email" class="persist" placeholder="Ej: alumno@correo.com" required>
                     </div>
                     
@@ -104,18 +104,39 @@
                     </div>
                 </div>
 
-                <div class="checkbox-container">
-                    <label style="cursor: pointer; display: block; margin-bottom: 5px;">
-                        <input type="checkbox" id="chk-menor" class="persist" onchange="toggleTutor()">
-                        <strong>Protección de Menores:</strong> Marcar si el alumno es menor de edad.
-                    </label>
-                    
-                    <div id="campo-tutor" class="conditional-field">
-                        <div class="input-box">
-                            <label for="tutor">Nombre Completo y DNI del Tutor Legal *</label>
-                            <input type="text" id="tutor" class="persist" placeholder="Ej: Juan Pérez Gómez - 00000000T">
-                        </div>
-                    </div>
+                <!-- Sección Protección de Menores y Tutor Legal -->
+<div class="checkbox-container">
+    <label style="display: flex; align-items: center; gap: 8px; font-weight: bold; margin-bottom: 15px;">
+        <input type="checkbox" id="es_menor" name="es_menor">
+        <span>Protección de Menores:</span>
+        <span style="font-weight: normal; color: var(--color-text-muted);">Marcar si el alumno es menor de edad.</span>
+    </label>
+
+    <!-- Bloque visible con los Datos del Tutor Legal -->
+    <div class="form-group-title">Datos del Padre / Madre / Tutor Legal</div>
+    
+    <div class="grid-layout">
+        <div class="input-box">
+            <label for="tutor_dni">DNI / NIE Tutor *</label>
+            <input type="text" id="tutor_dni" name="tutor_dni" placeholder="Ej: 12345678X">
+        </div>
+
+        <div class="input-box">
+            <label for="tutor_nombre">Nombre Completo *</label>
+            <input type="text" id="tutor_nombre" name="tutor_nombre" placeholder="Nombre y apellidos del tutor">
+        </div>
+
+        <div class="input-box">
+            <label for="tutor_telefono">Teléfono *</label>
+            <input type="tel" id="tutor_telefono" name="tutor_telefono" placeholder="Ej: 600123456">
+        </div>
+
+        <div class="input-box">
+            <label for="tutor_direccion">Dirección *</label>
+            <input type="text" id="tutor_direccion" name="tutor_direccion" placeholder="Calle, número, piso, puerta, localidad">
+        </div>
+    </div>
+</div>
                 </div>
             </section>
 
