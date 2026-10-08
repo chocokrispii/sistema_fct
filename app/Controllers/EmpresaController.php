@@ -29,7 +29,8 @@ class EmpresaController {
                 $this->mostrarFormulario('Los datos del registro deben ser valores de texto válidos.');
                 return;
             }
-            $input[$field] = trim($value);
+            // La contraseña no se recorta: los espacios cuentan.
+            $input[$field] = $field === 'password' ? $value : trim($value);
         }
         $email = $input['email'];
         $password = $input['password'];
@@ -44,6 +45,7 @@ class EmpresaController {
             || strlen($email) > 100
             || strlen($password) < 12
             || strlen($password) > 72
+            || trim($password) === ''
             || $cif === ''
             || mb_strlen($cif) > 20
             || $nombreComercial === ''

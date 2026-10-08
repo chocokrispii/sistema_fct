@@ -30,6 +30,7 @@ class UsuarioAdminController
                 || strlen($email) > 100
                 || strlen($password) < 12
                 || strlen($password) > 72
+                || trim($password) === ''
             ) {
                 $error = 'Indica un correo válido y una contraseña de 12 a 72 caracteres.';
             } else {

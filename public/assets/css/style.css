@@ -1,17 +1,20 @@
 /* =========================
-   VARIABLES
+   VARIABLES CORPORATIVAS
    ========================= */
 
 :root {
     --color-primary: #004085;
     --color-primary-hover: #002B59;
     --color-secondary: #00A8E8;
-    --color-accent: #FF6B35;
+    --color-accent: #FF6B35;        /* Naranja / Amarillo corporativo Dipaweb */
 
     --color-text-main: #212529;
     --color-text-muted: #6C757D;
+    --color-text-light: #F8F9FA;
 
-    --color-bg-main: #F8F9FA;
+    --color-bg-main: #F4F5F7;
+    --color-bg-header: #EAEAEA;      /* Gris neutro claro (estilo Dipaweb) */
+    --color-bg-footer: #2D2D2D;      /* Antracita / Gris oscuro (estilo Dipaweb) */
     --color-bg-card: #FFFFFF;
     --color-border: #DEE2E6;
 
@@ -34,35 +37,49 @@ body {
     font-family: Arial, sans-serif;
     background-color: var(--color-bg-main);
     color: var(--color-text-main);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 
 
 /* =========================
-   HEADER
+   HEADER & NAVEGACIÓN (Estilo Dipaweb)
    ========================= */
 
 header {
-    background-color: var(--color-primary);
-    color: white;
-    padding: 20px;
+    background-color: var(--color-bg-header);
+    border-bottom: 1px solid var(--color-border);
+    padding: 18px 40px;
+    text-align: center;
 }
 
 header h1 {
     margin: 0 0 15px 0;
+    color: var(--color-primary);
+    font-size: 1.8rem;
+    font-weight: bold;
 }
 
 nav {
     display: flex;
-    gap: 20px;
+    justify-content: center;
+    align-items: center;
+    gap: 22px;
+    flex-wrap: wrap;
 }
 
 nav a {
-    color: white;
+    color: var(--color-text-main);
     text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: color 0.2s ease;
 }
 
-nav a:hover {
-    color: var(--color-secondary);
+nav a:hover,
+nav a.active {
+    color: var(--color-accent);    /* Resaltado corporativo */
 }
 
 
@@ -71,36 +88,56 @@ nav a:hover {
    ========================= */
 
 main {
-    width: 95%;              /* CORREGIDO: Permite expandirse en pantalla */
-    max-width: 1250px;       /* CORREGIDO: Ancho adecuado centrado */
-    margin: 0 auto;          /* CORREGIDO: Centra la vista general */
-    padding: 30px 20px;
-    min-height: 500px;
+    flex: 1;
+    width: 95%;
+    max-width: 1250px;
+    margin: 30px auto;
+    padding: 20px;
 }
 
 main h2 {
     color: var(--color-primary);
+    margin-top: 0;
 }
 
 
 /* =========================
-   FOOTER
+   FOOTER (Estilo Dipaweb Oscuro)
    ========================= */
 
 footer {
-    background-color: var(--color-primary-hover);
-    color: white;
-    padding: 20px 40px;
+    background-color: var(--color-bg-footer);
+    color: var(--color-text-light);
+    padding: 35px 20px 20px 20px;
+    margin-top: auto;
+    text-align: center;
 }
 
 footer p {
     margin: 0;
+    color: #CCCCCC;
+    font-size: 0.9rem;
 }
+
+footer a {
+    color: var(--color-text-light);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+footer a:hover {
+    color: var(--color-accent);
+}
+
+
+/* =========================
+   FORMULARIOS GENERALES Y TABLAS
+   ========================= */
 
 form {
     display: grid;
     gap: 12px;
-    width: 100%;             /* CORREGIDO: Cambiado de max-width: 680px a 100% para no comprimir */
+    width: 100%;
     margin: 18px 0;
 }
 
@@ -123,6 +160,7 @@ button {
     background: var(--color-primary);
     color: white;
     cursor: pointer;
+    transition: background 0.2s;
 }
 
 button:hover {
@@ -141,6 +179,11 @@ td {
     padding: 10px;
     border: 1px solid var(--color-border);
     text-align: left;
+}
+
+th {
+    background-color: var(--color-bg-header);
+    color: var(--color-primary);
 }
 
 .review-card,
@@ -172,49 +215,32 @@ fieldset {
     margin: 0;
 }
 
-@media (max-width: 760px) {
-    nav {
-        flex-wrap: wrap;
-        gap: 12px;
-    }
-
-    main {
-        width: 100%;
-        padding: 15px;
-    }
-
-    table {
-        display: block;
-        overflow-x: auto;
-    }
-}
 
 /* ==========================================================
    ESTILOS COMPLEMENTARIOS PARA LA GESTIÓN DE ALUMNOS 
    ========================================================== */
 
 .form-section {
-    width: 100%;              /* CORREGIDO: Asegura ancho completo del contenedor */
-    background: var(--color-bg-card, #ffffff);
+    width: 100%;
+    background: var(--color-bg-card);
     padding: 30px;
     border-radius: 6px;
-    border: 1px solid var(--color-border, #dee2e8);
+    border: 1px solid var(--color-border);
     margin-bottom: 30px;
 }
 
 .form-group-title {
     font-size: 1.1rem;
     font-weight: bold;
-    color: var(--color-primary, #004085);
+    color: var(--color-primary);
     margin: 20px 0 10px 0;
-    border-bottom: 1px solid var(--color-border, #dee2e8);
+    border-bottom: 1px solid var(--color-border);
     padding-bottom: 5px;
 }
 
-/* Distribución inteligente en columnas (Evita que se estiren verticalmente) */
 .grid-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); /* CORREGIDO: Ajuste de minmax para mejor espacio */
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 15px;
     margin-bottom: 15px;
 }
@@ -230,43 +256,43 @@ fieldset {
     font-weight: bold;
 }
 
-.input-box input, .input-box select {
+.input-box input, 
+.input-box select {
     padding: 8px 12px;
-    border: 1px solid var(--color-border, #dee2e8);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
     font-size: 0.95rem;
 }
 
-/* Estructura para ocultar el tutor legal */
 .conditional-field {
     display: none;
     margin-top: 10px;
 }
 
 .checkbox-container {
-    background-color: #f8f9fa;
+    background-color: var(--color-bg-main);
     padding: 15px;
     border-radius: 4px;
     margin: 15px 0;
-    border: 1px solid var(--color-border, #dee2e8);
+    border: 1px solid var(--color-border);
 }
 
-/* Formato para la tabla de horarios */
 .custom-table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 15px;
 }
 
-.custom-table th, .custom-table td {
-    border: 1px solid var(--color-border, #dee2e8);
+.custom-table th, 
+.custom-table td {
+    border: 1px solid var(--color-border);
     padding: 10px;
     text-align: left;
 }
 
 .custom-table th {
-    background-color: var(--color-bg-main, #f8f9fa);
-    color: var(--color-primary, #004085);
+    background-color: var(--color-bg-header);
+    color: var(--color-primary);
 }
 
 .text-center {
@@ -274,11 +300,11 @@ fieldset {
 }
 
 .text-muted {
-    color: var(--color-text-muted, #6c757d);
+    color: var(--color-text-muted);
 }
 
 .btn-submit {
-    background-color: var(--color-primary, #004085);
+    background-color: var(--color-primary);
     color: white;
     border: none;
     padding: 12px 24px;
@@ -290,7 +316,7 @@ fieldset {
 }
 
 .btn-submit:hover {
-    background-color: var(--color-primary-hover, #002b59);
+    background-color: var(--color-primary-hover);
 }
 
 .btn-back {
@@ -298,6 +324,7 @@ fieldset {
     text-decoration: none;
     font-weight: bold;
 }
+
 
 /* =========================
    REGISTRO DE EMPRESAS
@@ -472,6 +499,28 @@ fieldset {
 
 .company-registration__login a:hover {
     color: var(--color-primary-hover);
+}
+
+
+/* =========================
+   RESPONSIVE
+   ========================= */
+
+@media (max-width: 760px) {
+    nav {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    main {
+        width: 100%;
+        padding: 15px;
+    }
+
+    table {
+        display: block;
+        overflow-x: auto;
+    }
 }
 
 @media (max-width: 600px) {

@@ -3,6 +3,10 @@
 return [
     'inicio' => ['method' => 'GET', 'roles' => [], 'controller' => null, 'action' => null],
     'login' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => AuthController::class, 'action' => 'login'],
+    'recuperar' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => RecuperacionController::class, 'action' => 'solicitar'],
+    'restablecer' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => RecuperacionController::class, 'action' => 'restablecer'],
+    'recuperaciones' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador'], 'controller' => RecuperacionController::class, 'action' => 'listar'],
+    'verificar-recuperacion' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => RecuperacionController::class, 'action' => 'verificar'],
     'logout' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador', 'Observador', 'Empresa', 'Alumno'], 'controller' => AuthController::class, 'action' => 'logout'],
     'registro-alumno' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => AlumnoController::class, 'action' => 'registrar'],
     'registro-empresa' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => EmpresaController::class, 'action' => 'registrar'],
