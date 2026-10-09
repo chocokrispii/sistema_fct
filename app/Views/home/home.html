@@ -1,51 +1,170 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inicio - Sistema FCT</title>
-    <!-- CSS separado en public/assets/css/ -->
-    <link rel="stylesheet" href="../../../public/assets/css/style.css?v=2026">
+    
+    <!-- Hojas de estilo unificadas del proyecto -->
+    <link rel="stylesheet" href="/Practicas_Desarrollo/public/assets/css/style.css?v=2026">
+    <link rel="stylesheet" href="/Practicas_Desarrollo/public/assets/css/home_custom.css?v=2026">
 </head>
+
 <body>
 
     <header>
         <h1>Sistema FCT</h1>
+
         <nav>
-           <a href="/Practicas_Desarrollo/app/Views/home/home.html">Home</a>
+            <a href="/Practicas_Desarrollo/app/Views/home/home.html" class="active">Home</a>
             <a href="/Practicas_Desarrollo/app/Views/empresas/empresas.html">Empresas</a>
             <a href="/Practicas_Desarrollo/app/Views/convenios/convenios.html">Convenios</a>
-            
-            
             <a href="/Practicas_Desarrollo/app/Views/alumnos/alumnos.html">Gestión de Alumnos</a>
-            
-            <a href="/Practicas_Desarrollo/app/Views/ofertas/ofertas.html" class="active">Ofertas</a>
-            <a href="/Practicas_Desarrollo/app/Views/consultas/consultas.html" class="active">Consultas</a>
+            <a href="/Practicas_Desarrollo/app/Views/ofertas/ofertas.html">Ofertas</a>
+            <a href="/Practicas_Desarrollo/app/Views/consultas/consultas.html">Consultas</a>
             <a href="/Practicas_Desarrollo/app/Views/asignaciones/asignaciones.html">Asignaciones</a>
-            <a href="/Practicas_Desarrollo/app/Views/autorizaciones/autorizaciones.html" class="active">Autorizaciones</a>
+            <a href="/Practicas_Desarrollo/app/Views/autorizaciones/autorizaciones.html">Autorizaciones</a>
         </nav>
     </header>
 
-    <main>
-        <h2>Bienvenido a la Página de Inicio</h2>
-        <p class="text-muted">Esta es la página de inicio de nuestra aplicación.</p>
-
-        <section class="form-section" style="margin-top: 20px;">
-            <div class="form-group-title">
-                🏢 Quiénes somos
+    <main class="animate-fade">
+        
+        <!-- Hero Banner Principal -->
+        <section class="hero-banner">
+            <h2>Plataforma de Formación en Centros de Trabajo</h2>
+            <p>
+                Gestión inteligente y centralizada para la intermediación de prácticas profesionales. Optimiza la comunicación entre centro educativo, alumnos matriculados y entidades colaboradoras.
+            </p>
+            <div>
+                <a href="/Practicas_Desarrollo/app/Views/alumnos/alumnos.html" class="btn-card btn-accent" style="width: auto; padding: 12px 24px;">
+                    Gestión de Alumnos &rarr;
+                </a>
             </div>
-            <p>Somos una empresa dedicada a la gestión de prácticas en centros de trabajo (FCT).</p>
-            <p>Ofrecemos servicios de intermediación entre empresas y alumnos para facilitar la realización de prácticas profesionales.</p>
-            <p>Nuestra misión es proporcionar oportunidades de aprendizaje y desarrollo profesional a los estudiantes, al mismo tiempo que ayudamos a las empresas a encontrar talento joven y capacitado.</p>
         </section>
+
+        <!-- Bloque de Indicadores Clave (KPIs) -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-number">72</div>
+                <div class="kpi-label">Alumnos Matriculados</div>
+            </div>
+            <div class="kpi-card accent">
+                <div class="kpi-number">43</div>
+                <div class="kpi-label">Ofertas Activas</div>
+            </div>
+            <div class="kpi-card secondary">
+                <div class="kpi-number">38</div>
+                <div class="kpi-label">Empresas Conveniadas</div>
+            </div>
+            <div class="kpi-card success">
+                <div class="kpi-number">94%</div>
+                <div class="kpi-label">Asignación Completada</div>
+            </div>
+        </div>
+
+        <!-- Accesos Destacados a los Módulos del Sistema -->
+        <div class="form-group-title">Módulos de Gestión Integrada</div>
+
+        <div class="feature-grid">
+            
+            <div class="feature-card">
+                <div>
+                    <div class="feature-icon">&#127891;</div>
+                    <h3>Expedientes de Alumnos</h3>
+                    <p>
+                        Registro de datos personales, preferencias de turno, protección de menores y cuadrante de disponibilidad horaria por franjas.
+                    </p>
+                </div>
+                <a href="/Practicas_Desarrollo/app/Views/alumnos/alumnos.html" class="btn-card">Administrar Alumnos</a>
+            </div>
+
+            <div class="feature-card">
+                <div>
+                    <div class="feature-icon">&#127970;</div>
+                    <h3>Empresas y Convenios</h3>
+                    <p>
+                        Control de empresas formadoras, gestión de convenios de colaboración y sedes habilitadas para prácticas FCT.
+                    </p>
+                </div>
+                <a href="/Practicas_Desarrollo/app/Views/convenios/convenios.html" class="btn-card">Gestión de Convenios</a>
+            </div>
+
+            <div class="feature-card">
+                <div>
+                    <div class="feature-icon">&#128081;</div>
+                    <h3>Ofertas y Vacantes</h3>
+                    <p>
+                        Publicación de puestos ofertados, revisión de requisitos y filtros por familias profesionales y periodos.
+                    </p>
+                </div>
+                <a href="/Practicas_Desarrollo/app/Views/ofertas/ofertas.html" class="btn-card">Explorar Ofertas</a>
+            </div>
+
+            <div class="feature-card">
+                <div>
+                    <div class="feature-icon">&#128269;</div>
+                    <h3>Consultas y Seguimiento</h3>
+                    <p>
+                        Supervisión del estado de las prácticas en tiempo real, histórico de asignaciones e informes consolidados.
+                    </p>
+                </div>
+                <a href="/Practicas_Desarrollo/app/Views/consultas/consultas.html" class="btn-card">Ver Seguimiento</a>
+            </div>
+
+        </div>
+
+        <!-- Tabla Informativa de Estado por Ciclo Formativo -->
+        <section class="form-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin:0; color: var(--color-primary);">Estado por Ciclo Formativo (Curso 2026)</h3>
+                <span class="badge badge-success">Actualizado</span>
+            </div>
+
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Familia / Ciclo Formativo</th>
+                        <th>Coordinador</th>
+                        <th class="text-center">Alumnos</th>
+                        <th class="text-center">Prácticas En Curso</th>
+                        <th class="text-center">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>DAW</strong> - Desarrollo de Aplicaciones Web</td>
+                        <td>Dpto. Informática</td>
+                        <td class="text-center">28</td>
+                        <td class="text-center">12</td>
+                        <td class="text-center"><span class="badge badge-info">En proceso</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>DAM</strong> - Desarrollo de Aplicaciones Multiplataforma</td>
+                        <td>Dpto. Informática</td>
+                        <td class="text-center">24</td>
+                        <td class="text-center">14</td>
+                        <td class="text-center"><span class="badge badge-success">Completado</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>ASIR</strong> - Administración de Sistemas Informáticos en Red</td>
+                        <td>Dpto. Informática</td>
+                        <td class="text-center">20</td>
+                        <td class="text-center">8</td>
+                        <td class="text-center"><span class="badge badge-warning">Pendiente</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
     </main>
 
     <footer>
         <p>&copy; 2026 Sistema FCT - Dipaweb</p>
     </footer>
 
-    <!-- Scripts JavaScript separados en public/assets/js/ -->
-    <script src="../../../public/assets/js/auth.js"></script>
-    <script src="../../../public/assets/js/inicio.js"></script>
+    <!-- Script de soporte global reutilizado -->
+    <script src="/Practicas_Desarrollo/public/assets/js/alumnos_js.js"></script>
 </body>
+
 </html>
