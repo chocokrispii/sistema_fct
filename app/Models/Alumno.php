@@ -10,6 +10,32 @@ class Alumno {
         $this->db = $db ?? getPDOConnection();
     }
 
+    public function obtenerPorUsuario(int $usuarioId): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT a.id, a.nombre, a.apellidos, a.fecha_nacimiento, a.dni, a.correo,
+                    es.nombre_especialidad,
+                    (SELECT dt.telefono
+                     FROM direcciones_telefonos dt
+                     WHERE dt.alumno_id = a.id
+                     ORDER BY dt.es_principal DESC, dt.id
+                     LIMIT 1) AS telefono,
+                    (SELECT dt.direccion_completa
+                     FROM direcciones_telefonos dt
+                     WHERE dt.alumno_id = a.id
+                     ORDER BY dt.es_principal DESC, dt.id
+                     LIMIT 1) AS direccion
+             FROM alumnos a
+             LEFT JOIN especialidades es ON es.id = a.especialidad_id
+             WHERE a.usuario_id = :usuario_id
+             LIMIT 1'
+        );
+        $stmt->execute(['usuario_id' => $usuarioId]);
+        $alumno = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $alumno ?: null;
+    }
+
     public function crear(
         int $usuarioId,
         string $nombre,

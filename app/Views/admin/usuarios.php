@@ -1,6 +1,6 @@
 <?php if ($error !== ''): ?><p class="message message-error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <h2>Gestión de cuentas</h2>
-<form method="POST" action="index.php?action=usuarios">
+<form class="page-form page-form--narrow" method="POST" action="index.php?action=usuarios">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
     <label>Correo <input type="email" name="email" required></label>
     <label>Contraseña inicial (12-72 caracteres) <input type="password" name="password" minlength="12" maxlength="72" aria-describedby="staff-password-help" required></label>
@@ -23,7 +23,7 @@
             <td><?= htmlspecialchars($usuario['email'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= htmlspecialchars($usuario['rol'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= (int)$usuario['activo'] === 1 ? 'Activo' : 'Desactivado' ?></td>
-            <td><form method="POST" action="index.php?action=estado-usuario">
+            <td><form class="action-form" method="POST" action="index.php?action=estado-usuario">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="usuario_id" value="<?= (int)$usuario['id'] ?>">
                 <input type="hidden" name="activo" value="<?= (int)$usuario['activo'] === 1 ? '0' : '1' ?>">

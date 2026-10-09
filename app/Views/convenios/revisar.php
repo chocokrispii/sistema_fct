@@ -1,4 +1,5 @@
 <h2>Convenios pendientes de revisión</h2>
+<p>Comprueba el documento y que el convenio corresponda al ciclo indicado antes de decidir.</p>
 <?php if ($convenios === []): ?><p>No hay convenios pendientes.</p>
 <?php else: foreach ($convenios as $item): ?>
     <section class="review-card">
@@ -8,7 +9,7 @@
             <?php if ($item['nombre_sede']): ?> · Sede <?= htmlspecialchars($item['nombre_sede'], ENT_QUOTES, 'UTF-8') ?><?php endif; ?>
         </p>
         <a href="index.php?action=descargar-convenio&id=<?= (int)$item['id'] ?>">Revisar documento PDF</a>
-        <form method="POST" action="index.php?action=resolver-convenio">
+        <form class="review-decision" method="POST" action="index.php?action=resolver-convenio">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="convenio_id" value="<?= (int)$item['id'] ?>">
             <label>Motivo/observación <input name="motivo" maxlength="500"></label>

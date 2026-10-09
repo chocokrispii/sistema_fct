@@ -3,6 +3,9 @@
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/Alumno.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
+require_once __DIR__ . '/../Models/Disponibilidad.php';
+require_once __DIR__ . '/../Models/Asignacion.php';
+require_once __DIR__ . '/../Models/Calificacion.php';
 
 class AlumnoController
 {
@@ -188,6 +191,28 @@ class AlumnoController
             error_log('Error al registrar alumno: ' . $e->getMessage());
             $this->mostrarFormulario('No se pudo completar el registro del alumno.');
         }
+    }
+
+    public function portal(): void
+    {
+        $usuarioId = (int)$_SESSION['usuario_id'];
+        $alumno = $this->alumnoModel->obtenerPorUsuario($usuarioId);
+
+        View::render('alumnos/portal', [
+            'alumno' => $alumno,
+            'disponibilidades' => $alumno
+                ? (new Disponibilidad($this->db))->obtenerPorUsuario($usuarioId)
+                : [],
+            'horarioSemanal' => $alumno
+                ? (new Disponibilidad($this->db))->obtenerHorarioSemanalPorUsuario($usuarioId)
+                : [],
+            'asignaciones' => $alumno
+                ? (new Asignacion($this->db))->listar(true, $usuarioId)
+                : [],
+            'calificaciones' => $alumno
+                ? (new Calificacion($this->db))->listar(true, $usuarioId)
+                : [],
+        ]);
     }
 
     private function mostrarFormulario(string $error = ''): void

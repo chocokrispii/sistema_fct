@@ -153,10 +153,13 @@ elimínalo según la política del centro.
    Los convenios preexistentes quedan sin clasificar (`especialidad_id = NULL`)
    y no cubren ofertas; hay que asignarles manualmente el ciclo correcto antes
    de volver a usarlos.
-8. Comprueba que las migraciones terminen sin error. La migración `001` no es
+8. Ejecuta `database/migrations/005_horarios_y_calificaciones.sql` para guardar
+   franjas semanales (día y horas) y notas finales asociadas a prácticas
+   cerradas.
+9. Comprueba que las migraciones terminen sin error. La migración `001` no es
    idempotente: omítela si la columna ya se llama `nombre_especialidad`. La
-   migración `002` y `004` pueden volver a ejecutarse para completar un esquema
-   parcial. Ejecuta la migración `003` una sola vez.
+   migración `002`, `004` y `005` pueden volver a ejecutarse para completar un
+   esquema parcial. Ejecuta la migración `003` una sola vez.
 
 El volcado no selecciona la base con `USE`; elige explícitamente la base destino
 antes de importarlo. Las migraciones tampoco seleccionan una base. El dump
@@ -198,13 +201,36 @@ tiene estado aprobado hasta que se gestione conforme al esquema migrado. Para
 probar el flujo de empresa, registra y aprueba un convenio que cubra las fechas
 de la oferta antes de aprobarla.
 
+El dump base no trae una cuenta Observador y las contraseñas de las cuentas
+antiguas pueden no coincidir con el hash importado. Para crear cuentas locales
+operativas para los cinco roles, ejecuta desde PowerShell después de aplicar
+todas las migraciones:
+
+```powershell
+$env:FCT_ENABLE_DEMO_SEED = "1"
+& "C:\xampp\php\php.exe" scripts\crear_cuentas_demo.php
+Remove-Item Env:FCT_ENABLE_DEMO_SEED
+```
+
+El script solo funciona con PHP CLI y la base `sistema_fct` en `localhost`.
+Crea perfiles de prueba para Coordinador, Empresa y Alumno; imprime una
+contraseña aleatoria una sola vez por cada cuenta nueva y no cambia cuentas ya
+existentes. Guarda las contraseñas cuando se impriman. No lo ejecutes en una
+instalación publicada y elimina o cambia estas cuentas antes de desplegar.
+Al iniciar sesión, cada rol aterriza en un módulo propio; el menú ofrece el
+resto de pantallas autorizadas. El alumnado puede gestionar su horario semanal
+y consultar las notas de prácticas finalizadas; Administradores y Coordinadores
+registran o actualizan notas de 0 a 10 tras cerrar una práctica; Observadores
+solo las consultan.
+
 ## Funcionalidades y flujos
 
 - **Acceso y seguridad:** login/logout, sesiones, control por rol y token CSRF
   en todas las peticiones POST.
 - **Alumno:** registro con expediente y tutor legal para menores de edad;
-  actualización de disponibilidad por periodo y turno; consulta de prácticas
-  propias.
+  portal privado con sus datos de expediente, disponibilidad y prácticas;
+  actualización de disponibilidad por periodo, turno y franja semanal por día;
+  consulta de prácticas propias y sus calificaciones finales.
 - **Empresa:** registro, gestión de sedes, carga de convenios PDF y publicación
   de ofertas asociadas al perfil autenticado. Se registra como máximo un
   convenio por ciclo formativo, y solo cubre ofertas del mismo ciclo.
@@ -212,8 +238,13 @@ de la oferta antes de aprobarla.
   ofertas. Una oferta solo puede aprobarse cuando un convenio aprobado cubre
   todo su periodo.
 - **Matching y asignaciones:** búsqueda de alumnos compatibles por ciclo,
-  fechas, disponibilidad y turno; asignación transaccional con control de
-  plazas; cierre de prácticas.
+  fechas, turno y horario semanal compatible; asignación transaccional con control de
+  plazas; cierre de prácticas. Las pantallas heredadas de asignaciones y
+  portada redirigen a sus equivalentes MVC; no guardan ni muestran datos de
+  ejemplo.
+- **Calificaciones:** calificación final de prácticas cerradas con nota de
+  0–10, observaciones y auditoría del usuario evaluador; acceso de lectura para
+  el propio alumno y para el Observador.
 - **Administración:** gestión de cuentas internas y activación/desactivación.
   No se permite desactivar la propia cuenta ni dejar el sistema sin un
   Administrador activo.
@@ -235,14 +266,20 @@ interfaz no conceden permisos. Las rutas de descarga se autorizan así:
 | Observador | Sin acceso a convenios |
 | Alumno | Sin acceso a convenios |
 
-Observador conserva únicamente el acceso de lectura establecido para consultas
-y asignaciones. Las denegaciones y descargas autorizadas de convenios se anotan
+Observador conserva únicamente el acceso de lectura establecido para consultas,
+asignaciones y calificaciones. Las denegaciones y descargas autorizadas de convenios se anotan
 en `auditoria` con el usuario, convenio y resultado; no se guardan rutas físicas
 ni contenido del documento en el detalle.
 
 Los PDFs se guardan fuera de `public/` y se sirven como adjuntos desde la ruta
 autenticada; no se exponen rutas ni nombres físicos. El proyecto no implementa
-cargas de documentos de expedientes ni recuperación de contraseñas.
+cargas de documentos de expedientes. La recuperación de contraseñas requiere
+verificación manual del centro y no envía correos automáticamente.
+
+La disponibilidad semanal se persiste por día con una franja horaria por día,
+vinculada al periodo y turno de disponibilidad. La calificación final solo se
+puede registrar para una práctica cerrada; se persisten la nota, observaciones,
+evaluador y marcas de tiempo.
 
 ## Prueba de integración
 

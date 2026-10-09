@@ -13,9 +13,16 @@ if (getenv('FCT_DB_NAME') !== $testDatabase) {
 }
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../app/Core/View.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
+require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
+require_once __DIR__ . '/../app/Controllers/CalificacionController.php';
+require_once __DIR__ . '/../app/Controllers/DisponibilidadController.php';
 require_once __DIR__ . '/../app/Models/Oferta.php';
 require_once __DIR__ . '/../app/Models/Asignacion.php';
+require_once __DIR__ . '/../app/Models/Alumno.php';
+require_once __DIR__ . '/../app/Models/Disponibilidad.php';
+require_once __DIR__ . '/../app/Models/Calificacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
 
@@ -54,6 +61,8 @@ $required = [
     'fecha_nacimiento' => ['table' => 'alumnos', 'column' => 'fecha_nacimiento'],
     'turno' => ['table' => 'empresa_especialidades_plazas', 'column' => 'turno'],
     'especialidad_id' => ['table' => 'convenios', 'column' => 'especialidad_id'],
+    'dia_semana' => ['table' => 'alumno_disponibilidad_semanal', 'column' => 'dia_semana'],
+    'nota' => ['table' => 'calificaciones_fct', 'column' => 'nota'],
 ];
 foreach ($required as $name => $definition) {
     $stmt = $db->prepare(
@@ -81,6 +90,7 @@ $createdUsers = [];
 $createdCompany = null;
 $createdStudents = [];
 $createdOffer = null;
+$createdAssignmentId = null;
 $createdCycleId = null;
 
 try {
@@ -153,14 +163,65 @@ try {
         ]);
         $createdStudents[] = (int)$db->lastInsertId();
     }
+    $studentProfile = (new Alumno($db))->obtenerPorUsuario($createdUsers[1]);
+    assertTrue(
+        $studentProfile !== null
+            && $studentProfile['apellidos'] === "Prueba $fixture 1"
+            && $studentProfile['nombre_especialidad'] !== null,
+        'El portal debe recuperar el expediente y ciclo del alumno autenticado.'
+    );
+    $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno'];
+    ob_start();
+    (new AlumnoController($db))->portal();
+    $portalHtml = ob_get_clean();
+    assertTrue(
+        is_string($portalHtml)
+            && str_contains($portalHtml, "Prueba $fixture 1")
+            && str_contains($portalHtml, 'Disponibilidad')
+            && str_contains($portalHtml, 'Mis prácticas'),
+        'El portal debe mostrar las secciones alimentadas por el expediente del alumno.'
+    );
 
     $availability = $db->prepare(
         "INSERT INTO alumno_disponibilidad (alumno_id, fecha_inicio, fecha_fin, turno)
          VALUES (:alumno, '2027-03-01', '2027-06-30', 'Indiferente')"
     );
-    foreach ($createdStudents as $studentId) {
+    $weeklySchedule = $db->prepare(
+        "INSERT INTO alumno_disponibilidad_semanal
+            (disponibilidad_id, dia_semana, hora_inicio, hora_fin)
+         VALUES (:periodo, :dia_semana, :hora_inicio, :hora_fin)"
+    );
+    foreach ($createdStudents as $index => $studentId) {
         $availability->execute(['alumno' => $studentId]);
+        $weeklySchedule->execute([
+            'periodo' => (int)$db->lastInsertId(),
+            'dia_semana' => $index + 1,
+            'hora_inicio' => $index === 0 ? '08:00:00' : '15:00:00',
+            'hora_fin' => $index === 0 ? '14:00:00' : '19:00:00',
+        ]);
     }
+    $availabilityModel = new Disponibilidad($db);
+    assertTrue(
+        count($availabilityModel->obtenerPorUsuario($createdUsers[1])) === 1,
+        'El portal debe cargar la disponibilidad real del alumno autenticado.'
+    );
+    assertTrue(
+        count($availabilityModel->obtenerHorarioSemanalPorUsuario($createdUsers[1])) === 1,
+        'El portal debe cargar las franjas semanales persistidas.'
+    );
+    $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno'];
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_GET = [];
+    ob_start();
+    (new DisponibilidadController($db))->gestionar();
+    $availabilityHtml = ob_get_clean();
+    assertTrue(
+        is_string($availabilityHtml)
+            && str_contains($availabilityHtml, 'Disponibilidad semanal')
+            && str_contains($availabilityHtml, 'Lunes')
+            && str_contains($availabilityHtml, '08:00'),
+        'El formulario de disponibilidad debe mostrar los días y franjas guardados.'
+    );
 
     $agreement = $db->prepare(
         "INSERT INTO convenios (empresa_id, especialidad_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path, estado)
@@ -222,7 +283,7 @@ try {
     $offer = $db->prepare(
         "INSERT INTO empresa_especialidades_plazas
             (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno, estado)
-         VALUES (:empresa, :ciclo, 1, '2027-03-15', '2027-06-15', 'M', 'Pendiente')"
+         VALUES (:empresa, :ciclo, 1, '2027-03-15', '2027-03-15', 'M', 'Pendiente')"
     );
     $offer->execute(['empresa' => $createdCompany, 'ciclo' => $cycleId]);
     $createdOffer = (int)$db->lastInsertId();
@@ -233,11 +294,35 @@ try {
         'Una oferta pendiente debe poder aprobarse.'
     );
     $candidates = $matching->obtenerCandidatos($createdOffer);
-    assertTrue(count($candidates) === 2, 'El motor de compatibilidad debe encontrar los dos candidatos.');
+    assertTrue(
+        count($candidates) === 1 && (int)$candidates[0]['alumno_id'] === $createdStudents[0],
+        'El motor de compatibilidad debe excluir alumnos cuyo horario semanal no coincide con el turno.'
+    );
 
     $assignments = new Asignacion($db);
     $assignments->crear($createdOffer, $createdStudents[0], $createdUsers[3], 'Tutor de empresa');
-    assertTrue(count($matching->obtenerCandidatos($createdOffer)) === 1, 'Un alumno asignado no debe seguir siendo candidato.');
+    $assignmentId = (int)$db->query(
+        'SELECT id FROM asignaciones_fct WHERE oferta_id = ' . $createdOffer . ' AND alumno_id = ' . $createdStudents[0]
+    )->fetchColumn();
+    $createdAssignmentId = $assignmentId;
+    assertTrue(count($matching->obtenerCandidatos($createdOffer)) === 0, 'Un alumno asignado no debe seguir siendo candidato.');
+    $availabilityModel->reemplazar(
+        $createdUsers[1],
+        '2027-04-01',
+        '2027-06-30',
+        'T',
+        [['dia_semana' => 2, 'hora_inicio' => '15:00:00', 'hora_fin' => '19:00:00']]
+    );
+    $updatedAvailability = $availabilityModel->obtenerPorUsuario($createdUsers[1]);
+    $updatedWeekly = $availabilityModel->obtenerHorarioSemanalPorUsuario($createdUsers[1]);
+    assertTrue(
+        count($updatedAvailability) === 1
+            && $updatedAvailability[0]['fecha_inicio'] === '2027-04-01'
+            && $updatedAvailability[0]['turno'] === 'T'
+            && count($updatedWeekly) === 1
+            && (int)$updatedWeekly[0]['dia_semana'] === 2,
+        'La edición de disponibilidad debe persistir el periodo, turno y horario semanal.'
+    );
 
     $capacityRejected = false;
     try {
@@ -247,11 +332,63 @@ try {
     }
     assertTrue($capacityRejected, 'El sistema debe impedir superar el cupo de plazas.');
 
-    $assignmentId = (int)$db->query(
-        'SELECT id FROM asignaciones_fct WHERE oferta_id = ' . $createdOffer . ' AND alumno_id = ' . $createdStudents[0]
-    )->fetchColumn();
+    $gradeModel = new Calificacion($db);
+    $gradeBeforeCloseRejected = false;
+    try {
+        $gradeModel->guardar((int)$createdAssignmentId, $createdUsers[3], 8.5, 'Prueba');
+    } catch (DomainException $exception) {
+        $gradeBeforeCloseRejected = str_contains($exception->getMessage(), 'cerradas');
+    }
+    assertTrue($gradeBeforeCloseRejected, 'No se debe calificar una práctica que siga activa.');
+
     assertTrue($assignments->cerrar($assignmentId, $createdUsers[3]), 'Una asignación activa debe poder cerrarse.');
     assertTrue(!$assignments->cerrar($assignmentId, $createdUsers[3]), 'Una asignación cerrada no debe cerrarse dos veces.');
+    $gradeModel->guardar($assignmentId, $createdUsers[3], 8.5, 'Buen desempeño.');
+    $ownGrades = $gradeModel->listar(true, $createdUsers[1]);
+    assertTrue(
+        count($ownGrades) === 1
+            && (float)$ownGrades[0]['nota'] === 8.5
+            && $ownGrades[0]['observaciones'] === 'Buen desempeño.',
+        'El alumno debe poder consultar su calificación final persistida.'
+    );
+    $gradeModel->guardar($assignmentId, $createdUsers[3], 9.25, 'Nota revisada.');
+    assertTrue(
+        count($gradeModel->listar()) === 1
+            && (float)$gradeModel->listar()[0]['nota'] === 9.25,
+        'La edición de una nota debe actualizar la misma calificación, sin duplicarla.'
+    );
+    $_SESSION = ['usuario_id' => $createdUsers[3], 'rol' => 'Coordinador'];
+    ob_start();
+    (new CalificacionController($db))->listar();
+    $staffGradesHtml = ob_get_clean();
+    assertTrue(
+        is_string($staffGradesHtml)
+            && str_contains($staffGradesHtml, 'Actualizar nota')
+            && str_contains($staffGradesHtml, 'Nota revisada.'),
+        'El personal autorizado debe poder consultar y actualizar la nota de una práctica cerrada.'
+    );
+    $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno'];
+    ob_start();
+    (new CalificacionController($db))->misCalificaciones();
+    $studentGradesHtml = ob_get_clean();
+    assertTrue(
+        is_string($studentGradesHtml)
+            && str_contains($studentGradesHtml, 'Mis calificaciones de FCT')
+            && str_contains($studentGradesHtml, '9,25 / 10')
+            && str_contains($studentGradesHtml, 'Nota revisada.'),
+        'La vista del alumno debe presentar solo sus notas y observaciones persistidas.'
+    );
+    $_SESSION = ['usuario_id' => $createdUsers[3], 'rol' => 'Observador'];
+    ob_start();
+    (new CalificacionController($db))->listar();
+    $observerGradesHtml = ob_get_clean();
+    assertTrue(
+        is_string($observerGradesHtml)
+            && str_contains($observerGradesHtml, 'Calificaciones de prácticas')
+            && !str_contains($observerGradesHtml, 'Guardar nota')
+            && !str_contains($observerGradesHtml, 'Actualizar nota'),
+        'La vista Observador debe permitir consulta de notas sin formularios de escritura.'
+    );
 
     $_SESSION = [];
     $token = CsrfMiddleware::token();

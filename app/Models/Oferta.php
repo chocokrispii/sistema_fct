@@ -97,6 +97,21 @@ class Oferta {
                     AND d.fecha_fin >= p.fecha_fin
                     AND (d.turno = 'Indiferente' OR p.turno = 'Indiferente'
                          OR CAST(d.turno AS BINARY) = CAST(p.turno AS BINARY))
+                    AND EXISTS (
+                        SELECT 1
+                        FROM alumno_disponibilidad_semanal ds
+                        WHERE ds.disponibilidad_id = d.id
+                            AND (
+                                DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
+                                OR MOD(ds.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
+                                    <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
+                            )
+                            AND (
+                                p.turno = 'Indiferente'
+                                OR (p.turno = 'M' AND ds.hora_inicio < '14:00:00' AND ds.hora_fin > '06:00:00')
+                                OR (p.turno = 'T' AND ds.hora_inicio < '23:59:59' AND ds.hora_fin > '14:00:00')
+                            )
+                    )
                 WHERE p.id = :oferta_id
                     AND p.estado = 'Aprobada'
                     AND NOT EXISTS (

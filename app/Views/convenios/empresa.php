@@ -1,7 +1,7 @@
 <?php if ($error !== ''): ?><p class="message message-error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if (isset($_GET['enviado'])): ?><p class="message message-success">Convenio enviado a revisión.</p><?php endif; ?>
 <h2>Convenios de <?= htmlspecialchars($empresa['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></h2>
-<form method="POST" enctype="multipart/form-data" action="index.php?action=convenios">
+<form class="page-form" method="POST" enctype="multipart/form-data" action="index.php?action=convenios">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
     <label>Número de convenio <input type="text" name="numero_convenio" maxlength="100" required></label>
     <label>Ciclo formativo

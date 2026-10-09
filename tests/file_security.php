@@ -18,6 +18,16 @@ assertFileSecurity(
     $routes['descargar-convenio']['roles'] === ['Administrador', 'Coordinador', 'Empresa'],
     'La matriz de acceso a convenios concede acceso a un rol no autorizado.'
 );
+assertFileSecurity(
+    $routes['portal-alumno']['roles'] === ['Alumno'],
+    'El portal del expediente debe estar limitado al rol Alumno.'
+);
+assertFileSecurity(
+    $routes['mis-calificaciones']['roles'] === ['Alumno']
+        && $routes['calificaciones']['roles'] === ['Administrador', 'Coordinador', 'Observador']
+        && $routes['guardar-calificacion']['roles'] === ['Administrador', 'Coordinador'],
+    'La matriz de acceso a calificaciones no coincide con los permisos previstos.'
+);
 assertFileSecurity(PhpIni::sizeToBytes('12M') === 12 * 1024 * 1024, 'No se interpretó el límite PHP de 12 MiB.');
 assertFileSecurity(PhpIni::sizeToBytes('512K') === 512 * 1024, 'No se interpretó un límite PHP en KiB.');
 assertFileSecurity(PhpIni::sizeToBytes('0') === PHP_INT_MAX, 'El límite PHP 0 debe representar tamaño ilimitado.');
