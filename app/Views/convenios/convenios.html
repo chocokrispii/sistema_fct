@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Programa de Convenios - Cursos DAW, DAM y Programación</title>
+    <link rel="stylesheet" href="/Practicas_Desarrollo/public/assets/css/style.css">
+</head>
+<body>
+
+    <!-- CABECERA PRINCIPAL -->
+    <header>
+        <h1>Convenios de Formación en Tecnologías y Programación</h1>
+        
+          <nav>
+            <a href="/Practicas_Desarrollo/app/Views/home/home.html">Home</a>
+            <a href="/Practicas_Desarrollo/app/Views/empresas/empresas.html">Empresas</a>
+            <a href="/Practicas_Desarrollo/app/Views/convenios/convenios.html">Convenios</a>
+            
+            <!-- Tu enlace del portal de alumnos -->
+            <a href="/Practicas_Desarrollo/app/Views/alumnos/alumnos.html">Gestión de Alumnos</a>
+            
+            <a href="/Practicas_Desarrollo/app/Views/ofertas/ofertas.html">Ofertas</a>
+            <a href="/Practicas_Desarrollo/app/Views/consultas/consultas.html">Consultas</a>
+            <a href="/Practicas_Desarrollo/app/Views/asignaciones/asignaciones.html">Asignaciones</a>
+            <!-- Mantenemos tu sección de Autorización de la rama Roberto-Perez -->
+            <a href="/Practicas_Desarrollo/app/Views/autorizaciones/autorizaciones.html">Autorizacion</a>
+        </nav>
+    </header>
+
+    <main>
+        <!-- PROPUESTA DE VALOR / VENTAJAS -->
+        <section>
+            <h2>¿Por qué firmar un convenio con nosotros?</h2>
+            <div>
+                <article>
+                    <h3>El valor que ofrecemos</h3>
+                    <p>Impulsa el talento de tu empresa u organización. Ofrecemos condiciones exclusivas en nuestros cursos de DAW, DAM y desarrollo de software.</p></article>
+                <article>
+                    <h3>Descuentos Exclusivos</h3>
+                    <p>Acceso a tarifas especiales, becas colectivas y bonificaciones para todos los empleados o miembros de tu entidad.</p>
+                </article>
+
+                <article>
+                    <h3>Contenido Actualizado</h3>
+                    <p>Programas diseñados según los conocimientos más demandados por el mercado laboral tecnológico actual.</p>
+                </article>
+
+                <article>
+                    <h3>Gestión Ágil</h3>
+                    <p>Formalización sencilla del acuerdo sin ningún tipo de coste de mantenimiento ni compromisos de permanencia.</p>
+                </article>
+            </div>
+        </section>
+
+        <!-- OFERTA FORMATIVA -->
+        <section>
+            <h2>Cursos Incluidos en el Convenio</h2>
+            <div>
+                <article>
+                    <h3>DAW (Desarrollo de Aplicaciones Web)</h3>
+                    <p>HTML5, CSS3, JavaScript, frameworks modernos (React, Angular), backend (Node.js/PHP) y bases de datos.</p>
+                </article>
+
+                <article>
+                    <h3>DAM (Desarrollo de Aplicaciones Multiplataforma)</h3>
+                    <p>Programación orientada a objetos (Java, Kotlin), apps móviles iOS/Android y desarrollo de escritorio.</p>
+                </article>
+
+                <article>
+                    <h3>Especializaciones y Bootcamps</h3>
+                    <p>Cursos intensivos en Python, Java Full Stack, C# y Arquitectura Cloud.</p>
+                </article>
+            </div>
+        </section>
+
+        <!-- PASO A PASO -->
+        <section>
+            <h2>Pasos para Formalizar el Convenio</h2>
+            <ol>
+                <li>
+                    <h3>Solicitud</h3>
+                    <p>Rellena el formulario con los datos clave de tu organización para ponernos en contacto.</p>
+                </li>
+                <li>
+                    <h3>Propuesta</h3>
+                    <p>Diseñamos un plan adaptado al volumen y necesidades de formación de tu entidad.</p>
+                </li>
+                <li>
+                    <h3>Activación</h3>
+                    <p>Firmamos el acuerdo digitalmente y activamos los códigos de descuento o matrículas organizativas.</p>
+                </li>
+            </ol>
+        </section>
+
+        <!-- FORMULARIO DE CONTACTO -->
+        <section id="contacto">
+            <h2>Solicita tu Convenio de Colaboración</h2>
+            <form action="#" method="POST">
+                
+                <div>
+                    <label for="empresa">Nombre de la Empresa u Organización *</label>
+                    <input type="text" id="empresa" name="empresa" required placeholder="Ej. TecnoSoluciones S.L.">
+                </div>
+
+                <div>
+                    <label for="nombre">Persona de Contacto *</label>
+                    <input type="text" id="nombre" name="nombre" required placeholder="Tu nombre y apellidos">
+                </div>
+
+                <div>
+                    <label for="email">Correo Corporativo *</label>
+                    <input type="email" id="email" name="email" required placeholder="nombre@empresa.com">
+                </div>
+
+                <div>
+                    <label for="telefono">Teléfono *</label>
+                    <input type="tel" id="telefono" name="telefono" required placeholder="600 000 000">
+                </div>
+
+                <div>
+                    <label for="tipo_convenio">Objetivo Principal del Convenio</label>
+                    <select id="tipo_convenio" name="tipo_convenio">
+                        <option value="empleados">Formación/Upskilling para Empleados</option>
+                        <option value="practicas">Acoger alumnos en Prácticas (FCT)</option>
+                        <option value="colectivo">Descuentos para Asociados / Afiliados</option>
+                        <option value="otro">Otro tipo de colaboración</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="mensaje">Comentarios o Preguntas</label>
+                    <textarea id="mensaje" name="mensaje" rows="4" placeholder="Indícanos cuántos alumnos/empleados estimas o cualquier duda..."></textarea>
+                </div>
+
+                <button type="submit">Enviar Solicitud de Convenio</button>
+            </form>
+        </section>
+    </main>
+
+    <!-- PIE DE PÁGINA -->
+  <footer>
+        <p>&copy; 2026 Sistema FCT - Dipaweb</p>
+    </footer>
+
+</body>
+</html>
