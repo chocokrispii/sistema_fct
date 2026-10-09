@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autorizaciones de Convenios - Sistema FCT</title>
+    <link rel="stylesheet" href="/Practicas_Desarrollo/public/assets/css/style.css">
+</head>
+<body>
+
+    <!-- CABECERA PRINCIPAL -->
+    <header>
+        <h1>Gestión de Autorizaciones de Convenios (DAM, DAW y SMR)</h1>
+        
+        <!-- NAVEGACIÓN -->
+        <nav>
+            <a href="/Practicas_Desarrollo/app/Views/home/home.html">Home</a>
+            <a href="/Practicas_Desarrollo/app/Views/empresas/empresas.html">Empresas</a>
+            <a href="/Practicas_Desarrollo/app/Views/convenios/convenios.html">Convenios</a>
+            <a href="/Practicas_Desarrollo/app/Views/alumnos/alumnos.html">Gestión de Alumnos</a>
+            <a href="/Practicas_Desarrollo/app/Views/ofertas/ofertas.html">Ofertas</a>
+            <a href="/Practicas_Desarrollo/app/Views/consultas/consultas.html">Consultas</a>
+            <a href="/Practicas_Desarrollo/app/Views/asignaciones/asignaciones.html">Asignaciones</a>
+            <a href="/Practicas_Desarrollo/app/Views/autorizaciones/autorizaciones.html" class="active">Autorizacion</a>
+        </nav>
+    </header>
+
+    <main>
+        <!-- BÚSQUEDA Y FILTROS DE AUTORIZACIONES -->
+        <section class="form-section">
+            <h2>Control y Firma de Autorizaciones</h2>
+            <p class="text-muted">Consulta el estado de aprobación de las solicitudes de convenio y valida los permisos pendientes.</p>
+
+            <form action="#" method="GET" class="inline-form">
+                <div class="grid-layout">
+                    <div class="input-box">
+                        <label for="buscar_empresa">Empresa / Convenio</label>
+                        <input type="text" id="buscar_empresa" name="buscar_empresa" placeholder="Buscar por CIF o Nombre...">
+                    </div>
+
+                    <div class="input-box">
+                        <label for="filtro_ciclo">Ciclo Formativo</label>
+                        <select id="filtro_ciclo" name="filtro_ciclo">
+                            <option value="">Todos los ciclos</option>
+                            <option value="DAW">DAW (Desarrollo Web)</option>
+                            <option value="DAM">DAM (Multiplataforma)</option>
+                            <option value="SMR">SMR (Sistemas y Redes)</option>
+                        </select>
+                    </div>
+
+                    <div class="input-box">
+                        <label for="filtro_estado">Estado de Autorización</label>
+                        <select id="filtro_estado" name="filtro_estado">
+                            <option value="">Todos los estados</option>
+                            <option value="pendiente">Pendiente de Firma</option>
+                            <option value="aprobado">Autorizado / Aprobado</option>
+                            <option value="rechazado">Rechazado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <button type="submit" class="btn-submit">Filtrar Solicitudes</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- TABLA DE ESTADOS DE AUTORIZACIÓN -->
+        <section class="form-section">
+            <h2>Listado de Autorizaciones</h2>
+            
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Código Solicitud</th>
+                        <th>Empresa / Entidad</th>
+                        <th>Ciclo</th>
+                        <th>Fecha Solicitud</th>
+                        <th>Estado Tutoría</th>
+                        <th>Estado Dirección</th>
+                        <th>Acción / Gestión</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>AUT-2026-001</strong></td>
+                        <td>TecnoSoluciones S.L.</td>
+                        <td><span style="background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: bold;">DAW</span></td>
+                        <td>02/10/2026</td>
+                        <td><span style="color: #28a745; font-weight: bold;">✓ Firmado</span></td>
+                        <td><span style="color: #ffc107; font-weight: bold;">⏳ Pendiente</span></td>
+                        <td>
+                            <button type="button" class="btn-submit" style="padding: 6px 12px; font-size: 0.85rem;">Autorizar</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>AUT-2026-002</strong></td>
+                        <td>Sistemas y Redes Madrid S.A.</td>
+                        <td><span style="background: #fef3c7; color: #b45309; padding: 3px 8px; border-radius: 4px; font-weight: bold;">SMR</span></td>
+                        <td>05/10/2026</td>
+                        <td><span style="color: #28a745; font-weight: bold;">✓ Firmado</span></td>
+                        <td><span style="color: #28a745; font-weight: bold;">✓ Aprobado</span></td>
+                        <td>
+                            <span style="color: #6c757d; font-size: 0.85rem; font-weight: bold;">Completado</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>AUT-2026-003</strong></td>
+                        <td>AppMobile Devs S.L.</td>
+                        <td><span style="background: #fce7f3; color: #be185d; padding: 3px 8px; border-radius: 4px; font-weight: bold;">DAM</span></td>
+                        <td>08/10/2026</td>
+                        <td><span style="color: #dc3545; font-weight: bold;">✕ Rechazado</span></td>
+                        <td><span style="color: #dc3545; font-weight: bold;">✕ Rechazado</span></td>
+                        <td>
+                            <button type="button" class="btn-submit" style="background-color: #6c757d; padding: 6px 12px; font-size: 0.85rem;">Ver Motivo</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- FORMULARIO DE FIRMA DIGITAL Y VALIDACIÓN DIRECTA -->
+        <section class="form-section">
+            <div class="review-card">
+                <h3>Validar / Autorizar Solicitud Manualmente</h3>
+                <form action="#" method="POST" class="convenio-form">
+                    <div class="grid-layout">
+                        <div class="input-box">
+                            <label for="id_autorizacion">Código de Autorización *</label>
+                            <input type="text" id="id_autorizacion" name="id_autorizacion" placeholder="Ej. AUT-2026-001" required>
+                        </div>
+
+                        <div class="input-box">
+                            <label for="resolucion">Dictamen / Resolución *</label>
+                            <select id="resolucion" name="resolucion" required>
+                                <option value="" disabled selected>Selecciona una opción...</option>
+                                <option value="autorizar">Aprobar y Conceder Autorización</option>
+                                <option value="requerir">Requerir Subsanación de Documentos</option>
+                                <option value="rechazar">Denegar Autorización</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-box" style="margin-top: 15px;">
+                        <label for="observaciones_autorizacion">Observaciones o Notas de Dirección</label>
+                        <textarea id="observaciones_autorizacion" name="observaciones_autorizacion" rows="3" placeholder="Añade anotaciones sobre la validación del seguro o idoneidad de la empresa..."></textarea>
+                    </div>
+
+                    <div style="margin-top: 20px; text-align: right;">
+                        <button type="submit" class="btn-submit">Registrar Firma de Autorización</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <!-- PIE DE PÁGINA -->
+    <footer>
+        <p>&copy; 2026 Sistema FCT - Dipaweb</p>
+    </footer>
+
+</body>
+</html>
