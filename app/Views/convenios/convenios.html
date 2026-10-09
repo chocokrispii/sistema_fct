@@ -3,140 +3,195 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Programa de Convenios - Cursos DAW, DAM y Programación</title>
+    <title>Programa de Convenios - DAM, DAW y SMR</title>
     <link rel="stylesheet" href="/Practicas_Desarrollo/public/assets/css/style.css">
 </head>
 <body>
 
     <!-- CABECERA PRINCIPAL -->
     <header>
-        <h1>Convenios de Formación en Tecnologías y Programación</h1>
-        <p>Impulsa el talento de tu empresa u organización. Ofrecemos condiciones exclusivas en nuestros cursos de DAW, DAM y desarrollo de software.</p>
-        <a href="/Practicas_Desarrollo/app/Views/home/home.html">Home</a>
+        <h1>Convenios de Formación en Tecnologías (DAM, DAW y SMR)</h1>
+        
+        <!-- NAVEGACIÓN -->
+        <nav>
+            <a href="/Practicas_Desarrollo/app/Views/home/home.html">Home</a>
             <a href="/Practicas_Desarrollo/app/Views/empresas/empresas.html">Empresas</a>
-            <a href="/Practicas_Desarrollo/app/Views/convenios/convenios.html">Convenios</a>
-            
-            
+            <a href="/Practicas_Desarrollo/app/Views/convenios/convenios.html" class="active">Convenios</a>
             <a href="/Practicas_Desarrollo/app/Views/alumnos/alumnos.html">Gestión de Alumnos</a>
-            
-            <a href="/Practicas_Desarrollo/app/Views/ofertas/ofertas.html" class="active">Ofertas</a>
+            <a href="/Practicas_Desarrollo/app/Views/ofertas/ofertas.html">Ofertas</a>
             <a href="/Practicas_Desarrollo/app/Views/consultas/consultas.html">Consultas</a>
             <a href="/Practicas_Desarrollo/app/Views/asignaciones/asignaciones.html">Asignaciones</a>
             <a href="/Practicas_Desarrollo/app/Views/autorizaciones/autorizaciones.html">Autorizacion</a>
+        </nav>
     </header>
 
     <main>
         <!-- PROPUESTA DE VALOR / VENTAJAS -->
         <section>
-            <h2>¿Por qué firmar un convenio con nosotros?</h2>
+            <h2>¿Por qué firmar un convenio de prácticas FCT con nosotros?</h2>
             <div>
                 <article>
-                    <h3>El valor que ofrecemos</h3>
-                    <p>Impulsa el talento de tu empresa u organización. Ofrecemos condiciones exclusivas en nuestros cursos de DAW, DAM y desarrollo de software.</p></article>
-                <article>
-                    <h3>Descuentos Exclusivos</h3>
-                    <p>Acceso a tarifas especiales, becas colectivas y bonificaciones para todos los empleados o miembros de tu entidad.</p>
+                    <h3>Captación de Talento Técnico</h3>
+                    <p>Accede a estudiantes de DAW, DAM y SMR preparados en las tecnologías y herramientas más demandadas del sector.</p>
                 </article>
 
                 <article>
-                    <h3>Contenido Actualizado</h3>
-                    <p>Programas diseñados según los conocimientos más demandados por el mercado laboral tecnológico actual.</p>
+                    <h3>Formación Adaptada</h3>
+                    <p>Nuestros alumnos cuentan con competencias prácticas en desarrollo web, aplicaciones móviles, bases de datos, redes y montaje de sistemas.</p>
                 </article>
 
                 <article>
-                    <h3>Gestión Ágil</h3>
-                    <p>Formalización sencilla del acuerdo sin ningún tipo de coste de mantenimiento ni compromisos de permanencia.</p>
+                    <h3>Tutoría y Seguimiento</h3>
+                    <p>Acompañamiento continuo por parte de nuestros tutores docentes para garantizar el correcto desarrollo del plan formativo.</p>
+                </article>
+
+                <article>
+                    <h3>Sin Costes Directos</h3>
+                    <p>La tramitación del convenio de prácticas (FCT) es totalmente gratuita para la empresa u organización.</p>
                 </article>
             </div>
         </section>
 
-        <!-- OFERTA FORMATIVA -->
+        <!-- OFERTA FORMATIVA POR CICLO -->
         <section>
-            <h2>Cursos Incluidos en el Convenio</h2>
+            <h2>Perfiles Profesionales Disponibles</h2>
             <div>
                 <article>
                     <h3>DAW (Desarrollo de Aplicaciones Web)</h3>
-                    <p>HTML5, CSS3, JavaScript, frameworks modernos (React, Angular), backend (Node.js/PHP) y bases de datos.</p>
+                    <p>HTML5, CSS3, JavaScript (React, Angular), PHP/Node.js, desarrollo backend, desplegado web y bases de datos relacionales y NoSQL.</p>
                 </article>
 
                 <article>
                     <h3>DAM (Desarrollo de Aplicaciones Multiplataforma)</h3>
-                    <p>Programación orientada a objetos (Java, Kotlin), apps móviles iOS/Android y desarrollo de escritorio.</p>
+                    <p>Programación orientada a objetos (Java, Kotlin), desarrollo de apps Android e iOS, sistemas ERP-CRM y gestión de interfaces de usuario.</p>
                 </article>
 
                 <article>
-                    <h3>Especializaciones y Bootcamps</h3>
-                    <p>Cursos intensivos en Python, Java Full Stack, C# y Arquitectura Cloud.</p>
+                    <h3>SMR (Sistemas Microinformáticos y Redes)</h3>
+                    <p>Montaje y mantenimiento de equipos, instalación de sistemas operativos (Windows Server, Linux), redes locales, seguridad informática y soporte técnico.</p>
                 </article>
             </div>
         </section>
 
-        <!-- PASO A PASO -->
-        <section>
-            <h2>Pasos para Formalizar el Convenio</h2>
-            <ol>
-                <li>
-                    <h3>Solicitud</h3>
-                    <p>Rellena el formulario con los datos clave de tu organización para ponernos en contacto.</p>
-                </li>
-                <li>
-                    <h3>Propuesta</h3>
-                    <p>Diseñamos un plan adaptado al volumen y necesidades de formación de tu entidad.</p>
-                </li>
-                <li>
-                    <h3>Activación</h3>
-                    <p>Firmamos el acuerdo digitalmente y activamos los códigos de descuento o matrículas organizativas.</p>
-                </li>
-            </ol>
-        </section>
+        <!-- FORMULARIO DE CREACIÓN DE CONVENIO -->
+        <section id="contacto" class="form-section">
+            <h2>Solicitud de Creación / Tramitación de Convenio</h2>
+            <p class="text-muted">Rellena el formulario para iniciar la colaboración para alumnos de DAM, DAW y SMR.</p>
 
-        <!-- FORMULARIO DE CONTACTO -->
-        <section id="contacto">
-            <h2>Solicita tu Convenio de Colaboración</h2>
-            <form action="#" method="POST">
+            <form action="#" method="POST" class="convenio-form">
                 
-                <div>
-                    <label for="empresa">Nombre de la Empresa u Organización *</label>
-                    <input type="text" id="empresa" name="empresa" required placeholder="Ej. TecnoSoluciones S.L.">
+                <!-- DATOS DE LA EMPRESA / ENTIDAD -->
+                <fieldset class="form-group-fieldset">
+                    <legend class="form-group-title">1. Datos de la Entidad o Empresa</legend>
+                    <div class="grid-layout">
+                        <div class="input-box">
+                            <label for="empresa">Razón Social / Empresa *</label>
+                            <input type="text" id="empresa" name="empresa" required placeholder="Ej. TecnoSoluciones S.L.">
+                        </div>
+
+                        <div class="input-box">
+                            <label for="cif">CIF / NIF *</label>
+                            <input type="text" id="cif" name="cif" required placeholder="Ej. B12345678" pattern="[a-zA-Z0-9]{9}">
+                        </div>
+
+                        <div class="input-box">
+                            <label for="nombre">Persona de Contacto / Tutor Legal *</label>
+                            <input type="text" id="nombre" name="nombre" required placeholder="Nombre y Apellidos">
+                        </div>
+
+                        <div class="input-box">
+                            <label for="cargo">Cargo del Responsable</label>
+                            <input type="text" id="cargo" name="cargo" placeholder="Ej. Responsable de RRHH / CTO">
+                        </div>
+
+                        <div class="input-box">
+                            <label for="email">Correo Corporativo *</label>
+                            <input type="email" id="email" name="email" required placeholder="contacto@empresa.com">
+                        </div>
+
+                        <div class="input-box">
+                            <label for="telefono">Teléfono de Contacto *</label>
+                            <input type="tel" id="telefono" name="telefono" required placeholder="600000000">
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- CICLOS Y PERFILES REQUERIDOS -->
+                <fieldset class="form-group-fieldset">
+                    <legend class="form-group-title">2. Perfiles y Ciclos Solicitados</legend>
+                    
+                    <p style="margin-bottom: 10px; font-weight: bold;">Selecciona los ciclos de interés:</p>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" name="ciclos[]" value="DAW">
+                            <span><strong>DAW</strong> (Desarrollo Web)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" name="ciclos[]" value="DAM">
+                            <span><strong>DAM</strong> (Desarrollo Multiplataforma)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" name="ciclos[]" value="SMR">
+                            <span><strong>SMR</strong> (Sistemas y Redes)</span>
+                        </label>
+                    </div>
+
+                    <div class="grid-layout">
+                        <div class="input-box">
+                            <label for="tipo_convenio">Modalidad del Convenio *</label>
+                            <select id="tipo_convenio" name="tipo_convenio" required>
+                                <option value="" disabled selected>Selecciona una opción...</option>
+                                <option value="fct">Prácticas FCT (Formativo obligatorio)</option>
+                                <option value="dual">Formación FP Dual</option>
+                                <option value="empleados">Capacitación / Formación para Empleados</option>
+                                <option value="becas">Convenio de Becas / Descuentos Colectivos</option>
+                            </select>
+                        </div>
+
+                        <div class="input-box">
+                            <label for="num_alumnos">Nº de Plazas Estimadas</label>
+                            <input type="number" id="num_alumnos" name="num_alumnos" min="1" max="50" placeholder="Ej. 3">
+                        </div>
+
+                        <div class="input-box">
+                            <label for="fecha_inicio">Fecha Estimada de Incorporación</label>
+                            <input type="date" id="fecha_inicio" name="fecha_inicio">
+                        </div>
+
+                        <div class="input-box">
+                            <label for="modalidad">Modalidad de Trabajo</label>
+                            <select id="modalidad" name="modalidad">
+                                <option value="presencial">Presencial</option>
+                                <option value="hibrido">Híbrido / Mixto</option>
+                                <option value="remoto">Teletrabajo / Remoto</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-box" style="margin-top: 15px;">
+                        <label for="mensaje">Tareas Previstas o Requisitos Específicos</label>
+                        <textarea id="mensaje" name="mensaje" rows="4" placeholder="Indica el stack tecnológico que usáis (ej. React, Java, Linux Server), tareas principales o cualquier detalle de la vacante..."></textarea>
+                    </div>
+                </fieldset>
+
+                <!-- ACEPTACIÓN Y ENVÍO -->
+                <div class="checkbox-container">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="acepto_terminos" name="acepto_terminos" required>
+                        <span>Acepto la política de protección de datos para la gestión y formalización del convenio FCT.</span>
+                    </label>
                 </div>
 
-                <div>
-                    <label for="nombre">Persona de Contacto *</label>
-                    <input type="text" id="nombre" name="nombre" required placeholder="Tu nombre y apellidos">
+                <div style="text-align: right; margin-top: 20px;">
+                    <button type="submit" class="btn-submit">Enviar Solicitud de Convenio</button>
                 </div>
 
-                <div>
-                    <label for="email">Correo Corporativo *</label>
-                    <input type="email" id="email" name="email" required placeholder="nombre@empresa.com">
-                </div>
-
-                <div>
-                    <label for="telefono">Teléfono *</label>
-                    <input type="tel" id="telefono" name="telefono" required placeholder="600 000 000">
-                </div>
-
-                <div>
-                    <label for="tipo_convenio">Objetivo Principal del Convenio</label>
-                    <select id="tipo_convenio" name="tipo_convenio">
-                        <option value="empleados">Formación/Upskilling para Empleados</option>
-                        <option value="practicas">Acoger alumnos en Prácticas (FCT)</option>
-                        <option value="colectivo">Descuentos para Asociados / Afiliados</option>
-                        <option value="otro">Otro tipo de colaboración</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label for="mensaje">Comentarios o Preguntas</label>
-                    <textarea id="mensaje" name="mensaje" rows="4" placeholder="Indícanos cuántos alumnos/empleados estimas o cualquier duda..."></textarea>
-                </div>
-
-                <button type="submit">Enviar Solicitud de Convenio</button>
             </form>
         </section>
     </main>
 
     <!-- PIE DE PÁGINA -->
-  <footer>
+    <footer>
         <p>&copy; 2026 Sistema FCT - Dipaweb</p>
     </footer>
 
