@@ -73,8 +73,31 @@ class UsuarioAdminController
 
         View::render('admin/usuarios', [
             'usuarios' => $this->model->obtenerTodos(),
-            'error' => $error,
+            'error' => $error !== '' ? $error : (is_string($_GET['error'] ?? null) ? $_GET['error'] : ''),
+            'eliminado' => isset($_GET['eliminado']),
         ]);
+    }
+
+    public function eliminar(): void
+    {
+        $id = filter_var($_POST['usuario_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($id === false) {
+            $this->redirectWithError('Selecciona una cuenta válida para eliminar.');
+        }
+        try {
+            $this->model->eliminarPermanentemente((int)$id, (int)$_SESSION['usuario_id']);
+        } catch (DomainException $exception) {
+            $this->redirectWithError($exception->getMessage());
+        } catch (PDOException $exception) {
+            error_log('Error al eliminar cuenta: ' . $exception->getMessage());
+            $this->redirectWithError('La base de datos conserva referencias que impiden eliminar esta cuenta. Desactívala para mantener la trazabilidad.');
+        } catch (Throwable $exception) {
+            error_log('Error inesperado al eliminar cuenta: ' . $exception->getMessage());
+            $this->redirectWithError('No se pudo eliminar la cuenta. No se realizaron cambios.');
+        }
+
+        header('Location: index.php?action=usuarios&eliminado=1');
+        exit;
     }
 
     public function cambiarEstado(): void
@@ -130,5 +153,11 @@ class UsuarioAdminController
             $entityId,
             $detail
         );
+    }
+
+    private function redirectWithError(string $message): never
+    {
+        header('Location: index.php?action=usuarios&error=' . rawurlencode($message));
+        exit;
     }
 }

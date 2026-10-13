@@ -32,14 +32,19 @@ $usuarioAutenticado = $rolActual !== null;
                 <a href="index.php?action=emparejar">Emparejar alumnos</a>
                 <a href="index.php?action=asignaciones">Asignaciones</a>
                 <a href="index.php?action=consultas">Consultas</a>
+                <a href="index.php?action=calificaciones">Calificaciones</a>
                 <a href="index.php?action=recuperaciones">Recuperaciones</a>
                 <?php if ($rolActual === 'Administrador'): ?><a href="index.php?action=usuarios">Usuarios</a><?php endif; ?>
             <?php elseif ($rolActual === 'Observador'): ?>
                 <a href="index.php?action=asignaciones">Consulta de asignaciones</a>
                 <a href="index.php?action=consultas">Consultas</a>
+                <a href="index.php?action=calificaciones">Calificaciones</a>
             <?php elseif ($rolActual === 'Alumno'): ?>
+                <a href="index.php?action=portal-alumno">Mi expediente</a>
+                <a href="index.php?action=perfil-alumno">Editar perfil</a>
                 <a href="index.php?action=disponibilidad">Mi disponibilidad</a>
                 <a href="index.php?action=mis-asignaciones">Mis prácticas</a>
+                <a href="index.php?action=mis-calificaciones">Mis calificaciones</a>
             <?php endif; ?>
             <?php if (!$usuarioAutenticado): ?>
                 <a href="index.php?action=registro-alumno">Registro alumno</a>

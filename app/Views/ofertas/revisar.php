@@ -1,4 +1,6 @@
 <h2>Ofertas pendientes de revisión</h2>
+<p>Aprueba solo las ofertas cuyo periodo esté cubierto por un convenio aprobado del mismo ciclo formativo.</p>
+<?php if ($error !== ''): ?><p class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if ($ofertas === []): ?>
     <p>No hay ofertas pendientes.</p>
 <?php else: ?>
@@ -7,7 +9,7 @@
             <h3><?= htmlspecialchars($oferta['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?> — <?= htmlspecialchars($oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></h3>
             <p><?= (int)$oferta['plazas_cuantas'] ?> plazas · Turno <?= htmlspecialchars($oferta['turno'], ENT_QUOTES, 'UTF-8') ?> ·
                 <?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></p>
-            <form method="POST" action="index.php?action=revisar-oferta">
+            <form class="review-decision" method="POST" action="index.php?action=revisar-oferta">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="oferta_id" value="<?= (int)$oferta['id'] ?>">
                 <label>Motivo u observación <input type="text" name="motivo" maxlength="500"></label>

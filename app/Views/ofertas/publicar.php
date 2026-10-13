@@ -4,7 +4,7 @@
 <?php if (isset($_GET['publicada'])): ?><p class="message message-success">Oferta enviada a revisión.</p><?php endif; ?>
 <h2>Publicar plazas — <?= htmlspecialchars($empresa['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></h2>
 <p>La oferta solo se enviará si un convenio aprobado cubre todo el periodo indicado.</p>
-<form method="POST" action="index.php?action=publicar-oferta">
+<form class="page-form page-form--narrow" method="POST" action="index.php?action=publicar-oferta">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
     <label>Ciclo formativo</label>
     <?php require __DIR__ . '/../partials/select_especialidades.php'; ?>
