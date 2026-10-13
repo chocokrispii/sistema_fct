@@ -281,9 +281,92 @@ try {
         $studentModel->obtenerPorUsuario($createdUsers[1])['dni'] === '12345678Z',
         'Un DNI/NIE inválido no debe modificar el expediente.'
     );
+    $db->prepare('UPDATE alumnos SET fecha_nacimiento = :nacimiento WHERE id = :id')
+        ->execute(['nacimiento' => '2010-01-01', 'id' => $createdStudents[1]]);
+    $legacyGuardian = $db->prepare(
+        'INSERT INTO tutores_legales
+            (alumno_id, nombre_completo, direccion, telefono, dni, numero_seguridad_social, correo)
+         VALUES (:alumno, :nombre, :direccion, :telefono, NULL, NULL, NULL)'
+    );
+    $legacyGuardian->execute([
+        'alumno' => $createdStudents[1],
+        'nombre' => 'Tutor legado',
+        'direccion' => 'Calle Antigua 1',
+        'telefono' => '600123456',
+    ]);
+    $_SESSION = ['usuario_id' => $createdUsers[2], 'rol' => 'Alumno'];
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_POST = [];
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $legacyProfileHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($legacyProfileHtml, 'name="tutor_dni"')
+            && str_contains($legacyProfileHtml, 'value="Tutor legado"')
+            && str_contains($legacyProfileHtml, 'name="tutor_correo"'),
+        'El formulario debe permitir completar los datos de un tutor legado incompleto.'
+    );
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_POST = [
+        'email' => $emails[2],
+        'nombre' => 'Alumno',
+        'apellidos' => 'Apellidos Legado',
+        'fecha_nacimiento' => '2010-01-01',
+        'dni' => '87654321X',
+        'nss' => "NSS-$fixture-2",
+        'telefono' => '612345679',
+        'direccion' => 'Calle Nueva 2',
+        'codigo_postal' => '28013',
+    ];
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $incompleteGuardianHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($incompleteGuardianHtml, 'Completa los datos del tutor legal'),
+        'Un tutor incompleto debe producir un error corregible desde el propio formulario. '
+            . trim(preg_replace('/\s+/', ' ', strip_tags($incompleteGuardianHtml)) ?? '')
+    );
+    assertTrue(
+        str_contains($incompleteGuardianHtml, 'name="tutor_dni"'),
+        'El formulario debe conservar acceso a la corrección de los datos del tutor legal.'
+    );
+    $studentModel->actualizarPerfil(
+        $createdUsers[2],
+        $emails[2],
+        'Alumno',
+        'Apellidos Legado',
+        '2010-01-01',
+        '87654321X',
+        "NSS-$fixture-2",
+        '612345679',
+        'Calle Nueva 2',
+        '28013',
+        [
+            'nombre' => 'Tutor legado',
+            'dni' => '12345678Z',
+            'nss' => '12345-67890',
+            'direccion' => 'Calle Tutor 2',
+            'telefono' => '612345670',
+            'correo' => 'tutor@example.test',
+        ]
+    );
+    $guardianCheck = $db->prepare(
+        'SELECT nombre_completo, dni, numero_seguridad_social, direccion, telefono, correo
+         FROM tutores_legales WHERE alumno_id = :alumno_id'
+    );
+    $guardianCheck->execute(['alumno_id' => $createdStudents[1]]);
+    $updatedGuardian = $guardianCheck->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        $updatedGuardian !== false
+            && $updatedGuardian['dni'] === '12345678Z'
+            && $updatedGuardian['numero_seguridad_social'] === '12345-67890'
+            && $updatedGuardian['correo'] === 'tutor@example.test',
+        'Guardar el perfil del menor debe completar el tutor legado dentro de la misma operación.'
+    );
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_POST = [];
     $_GET = [];
+    $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno'];
     ob_start();
     (new AlumnoController($db))->portal();
     $portalHtml = ob_get_clean();
