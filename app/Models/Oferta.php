@@ -47,26 +47,16 @@ class Oferta {
     }
 
     public function obtenerPorEmpresa(int $empresaId): array {
-        try {
-            $stmt = $this->db->prepare(self::SELECT_BASE . ' WHERE p.empresa_id = :empresa_id ORDER BY p.fecha_inicio DESC');
-            $stmt->execute(['empresa_id' => $empresaId]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error al listar ofertas de la empresa: " . $e->getMessage());
-            return [];
-        }
+        $stmt = $this->db->prepare(self::SELECT_BASE . ' WHERE p.empresa_id = :empresa_id ORDER BY p.fecha_inicio DESC');
+        $stmt->execute(['empresa_id' => $empresaId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function obtenerTodas(bool $soloVigentes = false): array {
-        try {
-            $sql = self::SELECT_BASE
-                . ($soloVigentes ? " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '')
-                . ' ORDER BY p.fecha_inicio';
-            return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error al listar ofertas: " . $e->getMessage());
-            return [];
-        }
+        $sql = self::SELECT_BASE
+            . ($soloVigentes ? " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '')
+            . ' ORDER BY p.fecha_inicio';
+        return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function obtenerPendientes(): array
@@ -107,6 +97,21 @@ class Oferta {
                     AND d.fecha_fin >= p.fecha_fin
                     AND (d.turno = 'Indiferente' OR p.turno = 'Indiferente'
                          OR CAST(d.turno AS BINARY) = CAST(p.turno AS BINARY))
+                    AND EXISTS (
+                        SELECT 1
+                        FROM alumno_disponibilidad_semanal ds
+                        WHERE ds.disponibilidad_id = d.id
+                            AND (
+                                DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
+                                OR MOD(ds.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
+                                    <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
+                            )
+                            AND (
+                                p.turno = 'Indiferente'
+                                OR (p.turno = 'M' AND ds.hora_inicio < '14:00:00' AND ds.hora_fin > '06:00:00')
+                                OR (p.turno = 'T' AND ds.hora_inicio < '23:59:59' AND ds.hora_fin > '14:00:00')
+                            )
+                    )
                 WHERE p.id = :oferta_id
                     AND p.estado = 'Aprobada'
                     AND NOT EXISTS (

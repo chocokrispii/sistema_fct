@@ -21,7 +21,21 @@ class Disponibilidad
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function reemplazar(int $usuarioId, string $inicio, string $fin, string $turno): void
+    public function obtenerHorarioSemanalPorUsuario(int $usuarioId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT s.dia_semana, s.hora_inicio, s.hora_fin
+             FROM alumno_disponibilidad_semanal s
+             INNER JOIN alumno_disponibilidad d ON d.id = s.disponibilidad_id
+             INNER JOIN alumnos a ON a.id = d.alumno_id
+             WHERE a.usuario_id = :usuario_id
+             ORDER BY s.dia_semana'
+        );
+        $stmt->execute(['usuario_id' => $usuarioId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function reemplazar(int $usuarioId, string $inicio, string $fin, string $turno, array $horarios = []): void
     {
         $this->db->beginTransaction();
         try {
@@ -45,6 +59,21 @@ class Disponibilidad
                 'fin' => $fin,
                 'turno' => $turno,
             ]);
+            $disponibilidadId = (int)$this->db->lastInsertId();
+
+            $insertHorario = $this->db->prepare(
+                'INSERT INTO alumno_disponibilidad_semanal
+                    (disponibilidad_id, dia_semana, hora_inicio, hora_fin)
+                 VALUES (:disponibilidad_id, :dia_semana, :hora_inicio, :hora_fin)'
+            );
+            foreach ($horarios as $horario) {
+                $insertHorario->execute([
+                    'disponibilidad_id' => $disponibilidadId,
+                    'dia_semana' => $horario['dia_semana'],
+                    'hora_inicio' => $horario['hora_inicio'],
+                    'hora_fin' => $horario['hora_fin'],
+                ]);
+            }
 
             $this->db->commit();
         } catch (Throwable $e) {

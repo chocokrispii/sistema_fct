@@ -3,6 +3,10 @@
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/Alumno.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
+require_once __DIR__ . '/../Models/Disponibilidad.php';
+require_once __DIR__ . '/../Models/Asignacion.php';
+require_once __DIR__ . '/../Models/Calificacion.php';
+require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 
 class AlumnoController
 {
@@ -27,7 +31,7 @@ class AlumnoController
         }
 
         $fields = [
-            'email', 'password', 'nombre', 'apellidos', 'dni', 'nss', 'telefono', 'direccion',
+            'email', 'password', 'nombre', 'apellidos', 'dni', 'nss', 'telefono', 'direccion', 'codigo_postal',
             'fecha_nacimiento', 'tutor_nombre', 'tutor_dni', 'tutor_nss', 'tutor_correo',
             'tutor_direccion', 'tutor_telefono',
         ];
@@ -49,6 +53,7 @@ class AlumnoController
         $nss = $input['nss'];
         $telefono = $input['telefono'];
         $direccion = $input['direccion'];
+        $codigoPostal = $input['codigo_postal'];
         $fechaNacimiento = $input['fecha_nacimiento'];
         $especialidadId = filter_var(
             $_POST['especialidad_id'] ?? null,
@@ -79,20 +84,23 @@ class AlumnoController
             || strlen($password) > 72
             || trim($password) === ''
             || $nombre === ''
-            || mb_strlen($nombre) > 50
+            || !SpanishDataValidator::isPersonName($nombre, 50)
             || $apellidos === ''
-            || mb_strlen($apellidos) > 100
+            || !SpanishDataValidator::isPersonName($apellidos, 100)
             || $dni === ''
             || mb_strlen($dni) > 20
+            || !SpanishDataValidator::isDniNie($dni)
             || $nss === ''
-            || mb_strlen($nss) > 20
+            || preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $nss) !== 1
             || $telefono === ''
-            || mb_strlen($telefono) > 20
+            || !SpanishDataValidator::isSpanishPhone($telefono)
             || $direccion === ''
             || mb_strlen($direccion) > 255
+            || !SpanishDataValidator::isSpanishPostcode($codigoPostal)
+            || preg_match('/[\p{Cc}]/u', $direccion) === 1
             || $especialidadId === false
         ) {
-            $this->mostrarFormulario('Completa correctamente todos los campos obligatorios.');
+            $this->mostrarFormulario('Completa correctamente todos los campos. Comprueba el DNI/NIE, teléfono y código postal.');
             return;
         }
 
@@ -120,6 +128,22 @@ class AlumnoController
         ) {
             $this->mostrarFormulario('Uno o varios datos del tutor superan el límite permitido.');
             return;
+        }
+        if (
+            ($tutor['dni'] !== '' && !SpanishDataValidator::isDniNie($tutor['dni']))
+            || ($tutor['telefono'] !== '' && !SpanishDataValidator::isSpanishPhone($tutor['telefono']))
+            || ($tutor['correo'] !== '' && !SpanishDataValidator::isEmail($tutor['correo']))
+        ) {
+            $this->mostrarFormulario('Comprueba el DNI/NIE, teléfono y correo electrónico del tutor.');
+            return;
+        }
+        $dni = SpanishDataValidator::normalizeDniNie($dni);
+        $telefono = SpanishDataValidator::normalizePhone($telefono);
+        if ($tutor['dni'] !== '') {
+            $tutor['dni'] = SpanishDataValidator::normalizeDniNie($tutor['dni']);
+        }
+        if ($tutor['telefono'] !== '') {
+            $tutor['telefono'] = SpanishDataValidator::normalizePhone($tutor['telefono']);
         }
 
         if ($edad < 16) {
@@ -160,7 +184,8 @@ class AlumnoController
                 $email,
                 $telefono,
                 $direccion,
-                $especialidadId
+                $especialidadId,
+                $codigoPostal
             );
             if ($alumnoId < 1) {
                 throw new RuntimeException('No se pudo crear el perfil del alumno.');
@@ -190,9 +215,187 @@ class AlumnoController
         }
     }
 
+    public function portal(): void
+    {
+        $usuarioId = (int)$_SESSION['usuario_id'];
+        $alumno = $this->alumnoModel->obtenerPorUsuario($usuarioId);
+
+        View::render('alumnos/portal', [
+            'alumno' => $alumno,
+            'disponibilidades' => $alumno
+                ? (new Disponibilidad($this->db))->obtenerPorUsuario($usuarioId)
+                : [],
+            'horarioSemanal' => $alumno
+                ? (new Disponibilidad($this->db))->obtenerHorarioSemanalPorUsuario($usuarioId)
+                : [],
+            'asignaciones' => $alumno
+                ? (new Asignacion($this->db))->listar(true, $usuarioId)
+                : [],
+            'calificaciones' => $alumno
+                ? (new Calificacion($this->db))->listar(true, $usuarioId)
+                : [],
+        ]);
+    }
+
+    public function editarPerfil(): void
+    {
+        $usuarioId = (int)$_SESSION['usuario_id'];
+        $alumno = $this->alumnoModel->obtenerPorUsuario($usuarioId);
+        if ($alumno === null) {
+            throw new DomainException('No se encontró el expediente del alumno.');
+        }
+
+        $values = [
+            'email' => $alumno['correo'],
+            'nombre' => $alumno['nombre'],
+            'apellidos' => $alumno['apellidos'],
+            'fecha_nacimiento' => $alumno['fecha_nacimiento'] ?? '',
+            'dni' => $alumno['dni'],
+            'nss' => $alumno['numero_seguridad_social'],
+            'telefono' => $alumno['telefono'] ?? '',
+            'direccion' => $alumno['direccion'] ?? '',
+            'codigo_postal' => $alumno['codigo_postal'] ?? '',
+        ];
+        $error = '';
+        $fieldErrors = [];
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            foreach ($values as $field => $_value) {
+                $posted = $_POST[$field] ?? '';
+                if (!is_string($posted)) {
+                    $error = 'Revisa los datos del formulario; todos los campos deben ser texto válido.';
+                    break;
+                }
+                $values[$field] = trim($posted);
+            }
+            $values['dni'] = SpanishDataValidator::normalizeDniNie($values['dni']);
+            $values['telefono'] = SpanishDataValidator::normalizePhone($values['telefono']);
+
+            $birthDate = DateTimeImmutable::createFromFormat('!Y-m-d', $values['fecha_nacimiento']);
+            $dateErrors = DateTimeImmutable::getLastErrors();
+            $birthDateValid = $birthDate !== false
+                && ($dateErrors === false || ($dateErrors['warning_count'] === 0 && $dateErrors['error_count'] === 0));
+            $email = SpanishDataValidator::isEmail($values['email']);
+            $name = SpanishDataValidator::isPersonName($values['nombre'], 50);
+            $surname = SpanishDataValidator::isPersonName($values['apellidos'], 100);
+            $dni = SpanishDataValidator::isDniNie($values['dni']);
+            $nss = preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $values['nss']) === 1;
+            $phone = SpanishDataValidator::isSpanishPhone($values['telefono']);
+            $address = $values['direccion'] !== ''
+                && mb_strlen($values['direccion']) <= 255
+                && preg_match('/[\p{Cc}]/u', $values['direccion']) !== 1;
+            $postcode = SpanishDataValidator::isSpanishPostcode($values['codigo_postal']);
+            if (!$email) {
+                $fieldErrors['email'] = 'Introduce un correo electrónico válido (máximo 100 caracteres).';
+            }
+            if (!$name) {
+                $fieldErrors['nombre'] = 'Introduce un nombre de hasta 50 letras, espacios, apóstrofos, puntos o guiones.';
+            }
+            if (!$surname) {
+                $fieldErrors['apellidos'] = 'Introduce apellidos válidos de hasta 100 caracteres.';
+            }
+            if (!$dni) {
+                $fieldErrors['dni'] = 'Introduce un DNI/NIE con una letra de control válida.';
+            }
+            if (!$nss) {
+                $fieldErrors['nss'] = 'Introduce entre 5 y 20 caracteres alfanuméricos, espacios, puntos o guiones.';
+            }
+            if (!$phone) {
+                $fieldErrors['telefono'] = 'Introduce un teléfono español válido de nueve cifras, con o sin prefijo +34.';
+            }
+            if (!$address) {
+                $fieldErrors['direccion'] = 'La dirección es obligatoria, no puede superar 255 caracteres ni contener controles.';
+            }
+            if (!$postcode) {
+                $fieldErrors['codigo_postal'] = 'Introduce un código postal español válido de cinco cifras (provincias 01–52).';
+            }
+            if (!$birthDateValid) {
+                $fieldErrors['fecha_nacimiento'] = 'Introduce una fecha de nacimiento válida.';
+            }
+            if ($error === '' && $birthDateValid && $birthDate > new DateTimeImmutable('today')) {
+                $fieldErrors['fecha_nacimiento'] = 'La fecha no puede ser futura.';
+                $error = 'La fecha de nacimiento no puede ser futura.';
+            } elseif ($error === '' && $birthDateValid && $birthDate->diff(new DateTimeImmutable('today'))->y < 16) {
+                $fieldErrors['fecha_nacimiento'] = 'El alumno debe tener al menos 16 años.';
+                $error = 'El alumno debe tener al menos 16 años.';
+            }
+            if ($error === '' && $fieldErrors !== []) {
+                $error = 'Revisa los campos indicados y vuelve a intentarlo.';
+            }
+
+            if ($error === '' && $birthDate->diff(new DateTimeImmutable('today'))->y < 18) {
+                $guardian = $this->db->prepare(
+                    'SELECT nombre_completo, dni, numero_seguridad_social, direccion, telefono, correo
+                     FROM tutores_legales WHERE alumno_id = :alumno_id LIMIT 1'
+                );
+                $guardian->execute(['alumno_id' => (int)$alumno['id']]);
+                $guardianData = $guardian->fetch(PDO::FETCH_ASSOC);
+                if (
+                    !$guardianData
+                    || trim((string)$guardianData['nombre_completo']) === ''
+                    || !SpanishDataValidator::isDniNie((string)($guardianData['dni'] ?? ''))
+                    || trim((string)($guardianData['numero_seguridad_social'] ?? '')) === ''
+                    || trim((string)($guardianData['direccion'] ?? '')) === ''
+                    || !SpanishDataValidator::isSpanishPhone((string)($guardianData['telefono'] ?? ''))
+                    || !SpanishDataValidator::isEmail((string)($guardianData['correo'] ?? ''))
+                ) {
+                    $error = 'Para un expediente de menor de edad debe constar un tutor legal completo y válido. Contacta con el centro para actualizarlo.';
+                }
+            }
+
+            if ($error === '') {
+                try {
+                    $this->alumnoModel->actualizarPerfil(
+                        $usuarioId,
+                        $values['email'],
+                        $values['nombre'],
+                        $values['apellidos'],
+                        $birthDate->format('Y-m-d'),
+                        $values['dni'],
+                        $values['nss'],
+                        $values['telefono'],
+                        $values['direccion'],
+                        $values['codigo_postal']
+                    );
+                    $_SESSION['email'] = $values['email'];
+                    header('Location: index.php?action=perfil-alumno&guardado=1');
+                    exit;
+                } catch (PDOException $exception) {
+                    if ((string)$exception->getCode() === '23000') {
+                        $error = 'El correo o DNI/NIE indicado ya está asociado a otra cuenta.';
+                    } else {
+                        error_log('Error al actualizar perfil de alumno: ' . $exception->getMessage());
+                        $error = 'No se pudo guardar el expediente. Inténtalo de nuevo o contacta con el centro.';
+                    }
+                }
+            }
+        }
+
+        View::render('alumnos/perfil', [
+            'values' => $values,
+            'fieldErrors' => $fieldErrors,
+            'error' => $error,
+            'guardado' => isset($_GET['guardado']),
+        ]);
+    }
+
     private function mostrarFormulario(string $error = ''): void
     {
         $especialidades = $this->especialidadModel->obtenerTodas();
-        View::render('alumnos/registro', ['error' => $error, 'especialidades' => $especialidades]);
+        $values = [];
+        foreach ([
+            'email', 'nombre', 'apellidos', 'dni', 'nss', 'telefono', 'direccion', 'codigo_postal',
+            'fecha_nacimiento', 'especialidad_id', 'tutor_nombre', 'tutor_dni', 'tutor_nss',
+            'tutor_correo', 'tutor_direccion', 'tutor_telefono',
+        ] as $field) {
+            if (isset($_POST[$field]) && is_string($_POST[$field])) {
+                $values[$field] = $_POST[$field];
+            }
+        }
+        View::render('alumnos/registro', [
+            'error' => $error,
+            'especialidades' => $especialidades,
+            'values' => $values,
+        ]);
     }
 }

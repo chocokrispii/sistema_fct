@@ -67,7 +67,12 @@ class AuthController {
         $_SESSION['email']      = $usuario['email'];
         $_SESSION['rol']        = $usuario['rol'];
 
-        $destino = $usuario['rol'] === 'Empresa' ? 'publicar-oferta' : 'ofertas';
+        $destino = match ($usuario['rol']) {
+            'Empresa' => 'publicar-oferta',
+            'Alumno' => 'portal-alumno',
+            'Observador' => 'asignaciones',
+            default => 'inicio',
+        };
         header('Location: index.php?action=' . $destino);
         exit;
     }

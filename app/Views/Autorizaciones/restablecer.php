@@ -3,7 +3,7 @@
 <?php endif; ?>
 <h2>Nueva contraseña</h2>
 <?php if ($token !== ''): ?>
-<form method="POST" action="index.php?action=restablecer">
+<form class="page-form page-form--narrow" method="POST" action="index.php?action=restablecer">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
     <input type="hidden" name="token" value="<?= htmlspecialchars($token, ENT_QUOTES, 'UTF-8') ?>">
     <label for="nueva-password">Contraseña (12-72 caracteres)</label>

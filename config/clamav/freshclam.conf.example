@@ -1,0 +1,8 @@
+DatabaseDirectory "C:/ProgramData/ClamAV/db"
+DatabaseMirror database.clamav.net
+ConnectTimeout 30
+ReceiveTimeout 60
+Checks 12
+UpdateLogFile "C:/ProgramData/ClamAV/freshclam.log"
+LogTime yes
+LogRotate yes
