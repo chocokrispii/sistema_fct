@@ -76,12 +76,33 @@ directorio y el límite de Apache, siempre que esté habilitado `mod_php` y las
 opciones `AllowOverride` indicadas. La configuración comprobada para Apache
 queda limitada a esta aplicación.
 
-Para ClamAV, copia `config/clamav/freshclam.conf.example` a la ubicación de
-configuración del equipo, crea la base en `C:\ProgramData\ClamAV\db`, actualiza
-las firmas con
-`"C:\Program Files\ClamAV\freshclam.exe" --config-file="C:\ProgramData\ClamAV\freshclam.conf"`
-y configura una tarea periódica de actualización. `FileScanner` rechaza cargas
-si el análisis falla o las firmas tienen más de tres días.
+En Windows, instala la distribución oficial de Cisco Talos desde WinGet:
+
+```powershell
+winget install --id Cisco.ClamAV --exact --source winget
+New-Item -ItemType Directory -Force -Path "C:\ProgramData\ClamAV\db"
+Copy-Item config\clamav\freshclam.conf.example "C:\ProgramData\ClamAV\freshclam.conf"
+& "C:\Program Files\ClamAV\freshclam.exe" --config-file="C:\ProgramData\ClamAV\freshclam.conf"
+```
+
+El `public/.htaccess` de desarrollo ya apunta a `clamscan.exe` y a ese
+directorio de firmas. Mantén el almacenamiento privado con permisos de
+modificación solo para la identidad que ejecuta Apache, y lectura restringida;
+no concedas escritura a `Usuarios autentificados`. Programa `freshclam` para
+actualizar las firmas al menos cada dos horas. En la instalación local se usa
+una tarea del usuario que ejecuta Apache, con actualización disponible al
+iniciar sesión:
+
+```powershell
+$action = New-ScheduledTaskAction -Execute "C:\Program Files\ClamAV\freshclam.exe" -Argument '--config-file="C:\ProgramData\ClamAV\freshclam.conf"' -WorkingDirectory "C:\ProgramData\ClamAV"
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddHours(2) -RepetitionInterval (New-TimeSpan -Hours 2) -RepetitionDuration (New-TimeSpan -Days 3650)
+$principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 20)
+Register-ScheduledTask -TaskName "FCT-ClamAV-Freshclam" -Action $action -Trigger $trigger -Principal $principal -Settings $settings
+```
+
+`FileScanner` rechaza cargas si el análisis falla o las firmas tienen más de
+tres días; no desactives esta protección para resolver problemas de instalación.
 
 ### Límites y permisos de archivos
 
@@ -156,10 +177,13 @@ elimínalo según la política del centro.
 8. Ejecuta `database/migrations/005_horarios_y_calificaciones.sql` para guardar
    franjas semanales (día y horas) y notas finales asociadas a prácticas
    cerradas.
-9. Comprueba que las migraciones terminen sin error. La migración `001` no es
+9. Ejecuta `database/migrations/006_alumno_codigo_postal.sql` para incorporar
+   el código postal necesario para editar y validar los datos personales del
+   alumnado.
+10. Comprueba que las migraciones terminen sin error. La migración `001` no es
    idempotente: omítela si la columna ya se llama `nombre_especialidad`. La
-   migración `002`, `004` y `005` pueden volver a ejecutarse para completar un
-   esquema parcial. Ejecuta la migración `003` una sola vez.
+   migración `002`, `004`, `005` y `006` pueden volver a ejecutarse para
+   completar un esquema parcial. Ejecuta la migración `003` una sola vez.
 
 El volcado no selecciona la base con `USE`; elige explícitamente la base destino
 antes de importarlo. Las migraciones tampoco seleccionan una base. El dump
@@ -223,13 +247,24 @@ y consultar las notas de prácticas finalizadas; Administradores y Coordinadores
 registran o actualizan notas de 0 a 10 tras cerrar una práctica; Observadores
 solo las consultan.
 
+Las cuentas `admin@centro.com`, `coordinador@centro.com`,
+`empresa.tech@gmail.com`, `alumno.mayor@alumno.com` y
+`alumno.menor@alumno.com` pertenecen al conjunto heredado del dump, no a las
+cuentas `demo.*@fct.local`. No las borres automáticamente ni ejecutes el seed
+de ejemplo sobre una base que ya contiene datos: las cuentas antiguas pueden
+tener ofertas, asignaciones u otras referencias históricas. Desactiva cuentas
+que no deban iniciar sesión; usa el borrado permanente solo para cuentas sin
+historial y conserva el registro de auditoría.
+
 ## Funcionalidades y flujos
 
 - **Acceso y seguridad:** login/logout, sesiones, control por rol y token CSRF
   en todas las peticiones POST.
 - **Alumno:** registro con expediente y tutor legal para menores de edad;
   portal privado con sus datos de expediente, disponibilidad y prácticas;
-  actualización de disponibilidad por periodo, turno y franja semanal por día;
+  edición del perfil con validación de DNI/NIE, teléfono, correo y código postal;
+  actualización de disponibilidad por periodo, turno y franja semanal por día
+  en intervalos de diez minutos;
   consulta de prácticas propias y sus calificaciones finales.
 - **Empresa:** registro, gestión de sedes, carga de convenios PDF y publicación
   de ofertas asociadas al perfil autenticado. Se registra como máximo un
@@ -245,9 +280,10 @@ solo las consultan.
 - **Calificaciones:** calificación final de prácticas cerradas con nota de
   0–10, observaciones y auditoría del usuario evaluador; acceso de lectura para
   el propio alumno y para el Observador.
-- **Administración:** gestión de cuentas internas y activación/desactivación.
-  No se permite desactivar la propia cuenta ni dejar el sistema sin un
-  Administrador activo.
+- **Administración:** gestión de cuentas internas, activación/desactivación y
+  borrado permanente con confirmación. Se impide borrar la propia cuenta, las
+  cuentas con historial operativo y las referencias que la base de datos deba
+  conservar; cada borrado se registra en auditoría.
 - **Consultas:** filtros por ciclo, estado y fechas, con un máximo de 500 filas.
   El rol Observador dispone de acceso de lectura a las consultas y asignaciones.
 - **Auditoría:** registro de operaciones de revisión, asignación,
@@ -296,9 +332,10 @@ empiece por `fct_test_`. **No la ejecutes contra `sistema_fct` ni contra una
 base con datos que quieras conservar.**
 
 Una forma sencilla de prepararla es crear `fct_test_local` en phpMyAdmin,
-importar en ella el dump base y aplicar las migraciones `001` y `002` en ese
-orden. Al importar el dump, selecciona explícitamente `fct_test_local`. Después,
-desde PowerShell, ejecuta:
+importar en ella el dump base y aplicar las migraciones `001` a `006` en orden,
+teniendo en cuenta que la `001` solo se ejecuta si la columna conserva el nombre
+antiguo y la `003` se ejecuta una sola vez. Al importar el dump, selecciona
+explícitamente `fct_test_local`. Después, desde PowerShell, ejecuta:
 
 ```powershell
 $env:FCT_TEST_DB_NAME = "fct_test_local"
