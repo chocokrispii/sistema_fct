@@ -42,7 +42,7 @@ guardan en volúmenes Docker.
    el seed explícitamente y guarda las contraseñas aleatorias que imprima:
 
    ```powershell
-   docker compose exec -e FCT_ENABLE_DEMO_SEED=1 app php scripts/crear_cuentas_demo.php
+   docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/crear_cuentas_demo.php
    docker compose ps
    docker compose exec app php -v
    ```
@@ -50,6 +50,14 @@ guardan en volúmenes Docker.
    Espera a que `db` y `clamav` estén saludables; en el primer arranque, ClamAV
    puede tardar en descargar sus firmas. El dump base y las migraciones 001–006
    se importan una sola vez al inicializar un volumen de base de datos vacío.
+   El seed crea cuentas ausentes con contraseñas aleatorias. Para establecer
+   contraseñas elegidas explícitamente, pásalas mediante las variables
+   `FCT_DEMO_PASSWORD_ADMINISTRADOR`, `FCT_DEMO_PASSWORD_COORDINADOR`,
+   `FCT_DEMO_PASSWORD_OBSERVADOR`, `FCT_DEMO_PASSWORD_EMPRESA` y
+   `FCT_DEMO_PASSWORD_ALUMNO`; para reemplazar contraseñas de cuentas demo ya
+   existentes, habilita además `FCT_DEMO_SEED_RESET_PASSWORDS=1`. Las
+   contraseñas proporcionadas por entorno nunca se imprimen. No guardes estos
+   valores en archivos versionados.
    Abre `http://localhost:8080` (o el puerto definido por `APP_PORT` en `.env`).
    Las contraseñas de desarrollo son configurables en `.env`; no reutilices
    esos valores fuera del entorno local.
@@ -279,11 +287,14 @@ $env:FCT_ENABLE_DEMO_SEED = "1"
 Remove-Item Env:FCT_ENABLE_DEMO_SEED
 ```
 
-El script solo funciona con PHP CLI y la base `sistema_fct` en `localhost`.
-Crea perfiles de prueba para Coordinador, Empresa y Alumno; imprime una
-contraseña aleatoria una sola vez por cada cuenta nueva y no cambia cuentas ya
-existentes. Guarda las contraseñas cuando se impriman. No lo ejecutes en una
-instalación publicada y elimina o cambia estas cuentas antes de desplegar.
+El script solo funciona con PHP CLI y la base `sistema_fct` en `localhost`; en
+Docker requiere la confirmación adicional `FCT_DEMO_SEED_ALLOW_DOCKER=1` y solo
+admite el host de servicio `db`. Crea perfiles de prueba para Coordinador,
+Empresa y Alumno; imprime las contraseñas aleatorias de las cuentas nuevas una
+sola vez y no cambia cuentas ya existentes, salvo que se habilite
+explícitamente `FCT_DEMO_SEED_RESET_PASSWORDS=1` y se pase una nueva contraseña
+por variable de entorno. No lo ejecutes en una instalación publicada y elimina
+o cambia estas cuentas antes de desplegar.
 Al iniciar sesión, cada rol aterriza en un módulo propio; el menú ofrece el
 resto de pantallas autorizadas. El alumnado puede gestionar su horario semanal
 y consultar las notas de prácticas finalizadas; Administradores y Coordinadores

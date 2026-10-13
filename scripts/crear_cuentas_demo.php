@@ -12,8 +12,12 @@ if (getenv('FCT_ENABLE_DEMO_SEED') !== '1') {
 }
 $dbHost = getenv('FCT_DB_HOST') ?: 'localhost';
 $dbName = getenv('FCT_DB_NAME') ?: 'sistema_fct';
-if (!in_array($dbHost, ['localhost', '127.0.0.1'], true) || $dbName !== 'sistema_fct') {
-    fwrite(STDERR, "Por seguridad, las cuentas demo solo se crean en sistema_fct alojada en localhost.\n");
+if (
+    $dbName !== 'sistema_fct'
+    || (!in_array($dbHost, ['localhost', '127.0.0.1'], true)
+        && !($dbHost === 'db' && getenv('FCT_DEMO_SEED_ALLOW_DOCKER') === '1'))
+) {
+    fwrite(STDERR, "Por seguridad, limita las cuentas demo a sistema_fct local o habilita explícitamente el servicio Docker db.\n");
     exit(2);
 }
 
@@ -47,20 +51,46 @@ $definitions = [
 ];
 $created = [];
 $existing = [];
+$resetPasswords = getenv('FCT_DEMO_SEED_RESET_PASSWORDS') === '1';
 $db->beginTransaction();
 try {
-    $find = $db->prepare('SELECT id FROM usuarios WHERE email = :email LIMIT 1');
+    $find = $db->prepare('SELECT id, rol FROM usuarios WHERE email = :email LIMIT 1');
     $insertUser = $db->prepare(
         'INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :hash, :rol)'
     );
+    $updatePassword = $db->prepare('UPDATE usuarios SET password_hash = :hash WHERE id = :id');
     foreach ($definitions as $definition) {
         $find->execute(['email' => $definition['email']]);
-        if ($find->fetchColumn() !== false) {
-            $existing[] = $definition['email'];
+        $existingUser = $find->fetch(PDO::FETCH_ASSOC);
+        $passwordEnvironmentKey = 'FCT_DEMO_PASSWORD_' . strtoupper($definition['role']);
+        $configuredPassword = getenv($passwordEnvironmentKey);
+        if (
+            is_string($configuredPassword)
+            && $configuredPassword !== ''
+            && (strlen($configuredPassword) < 12 || strlen($configuredPassword) > 72)
+        ) {
+            throw new RuntimeException("$passwordEnvironmentKey debe contener entre 12 y 72 caracteres.");
+        }
+
+        if ($existingUser !== false) {
+            if ($existingUser['rol'] !== $definition['role']) {
+                throw new RuntimeException('El rol de una cuenta demo existente no coincide con la definición esperada.');
+            }
+            if ($resetPasswords && is_string($configuredPassword) && $configuredPassword !== '') {
+                $updatePassword->execute([
+                    'hash' => password_hash($configuredPassword, PASSWORD_DEFAULT),
+                    'id' => $existingUser['id'],
+                ]);
+                $created[] = ['email' => $definition['email'], 'role' => $definition['role'], 'password' => null];
+            } else {
+                $existing[] = $definition['email'];
+            }
             continue;
         }
 
-        $password = 'Fct-' . bin2hex(random_bytes(12)) . '!';
+        $password = is_string($configuredPassword) && $configuredPassword !== ''
+            ? $configuredPassword
+            : 'Fct-' . bin2hex(random_bytes(12)) . '!';
         $insertUser->execute([
             'email' => $definition['email'],
             'hash' => password_hash($password, PASSWORD_DEFAULT),
@@ -116,7 +146,11 @@ try {
                 'direccion' => 'Calle Demo, 1, Madrid',
             ]);
         }
-        $created[] = ['email' => $definition['email'], 'role' => $definition['role'], 'password' => $password];
+        $created[] = [
+            'email' => $definition['email'],
+            'role' => $definition['role'],
+            'password' => is_string($configuredPassword) && $configuredPassword !== '' ? null : $password,
+        ];
     }
     $db->commit();
 } catch (Throwable $exception) {
@@ -129,12 +163,16 @@ try {
 }
 
 if ($created !== []) {
-    echo "Cuentas locales creadas. Guarda estas contraseñas: no se vuelven a mostrar ni se persisten en texto claro.\n";
+    echo "Cuentas demo creadas o contraseñas actualizadas. Las contraseñas proporcionadas por entorno no se muestran.\n";
     foreach ($created as $account) {
-        echo $account['role'] . "\t" . $account['email'] . "\t" . $account['password'] . "\n";
+        echo $account['role'] . "\t" . $account['email'];
+        if (is_string($account['password'])) {
+            echo "\t" . $account['password'];
+        }
+        echo "\n";
     }
 }
 if ($existing !== []) {
     echo "Cuentas ya existentes (no se cambió su contraseña): " . implode(', ', $existing) . "\n";
 }
-echo "Solo para localhost/desarrollo. Elimina estas cuentas o cambia sus contraseñas antes de cualquier despliegue.\n";
+echo "Solo para desarrollo local. Elimina estas cuentas o cambia sus contraseñas antes de cualquier despliegue.\n";
