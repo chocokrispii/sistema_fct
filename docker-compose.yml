@@ -1,0 +1,82 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+    environment:
+      FCT_DB_HOST: db
+      FCT_DB_NAME: ${FCT_DB_NAME:-sistema_fct}
+      FCT_DB_USER: ${FCT_DB_USER:-fct}
+      FCT_DB_PASS: ${FCT_DB_PASS:-fct_local_dev}
+      FCT_STORAGE_PATH: /var/lib/fct/storage
+      FCT_CLAMD_HOST: clamav
+      FCT_CLAMD_PORT: 3310
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - fct_storage:/var/lib/fct/storage
+    healthcheck:
+      test:
+        - CMD
+        - php
+        - -r
+        - "$$s = @fsockopen('127.0.0.1', 80); if (!$$s) exit(1); fclose($$s);"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  db:
+    image: mariadb:10.4.32
+    environment:
+      MARIADB_DATABASE: ${FCT_DB_NAME:-sistema_fct}
+      MARIADB_USER: ${FCT_DB_USER:-fct}
+      MARIADB_PASSWORD: ${FCT_DB_PASS:-fct_local_dev}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-root_local_dev}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/sistema_fct.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+      - ./database/migrations/001_renombrar_nombre_especialidad.sql:/docker-entrypoint-initdb.d/002-migration.sql:ro
+      - ./database/migrations/002_fct_workflows.sql:/docker-entrypoint-initdb.d/003-migration.sql:ro
+      - ./database/migrations/003_login_y_recuperacion.sql:/docker-entrypoint-initdb.d/004-migration.sql:ro
+      - ./database/migrations/004_convenios_por_especialidad.sql:/docker-entrypoint-initdb.d/005-migration.sql:ro
+      - ./database/migrations/005_horarios_y_calificaciones.sql:/docker-entrypoint-initdb.d/006-migration.sql:ro
+      - ./database/migrations/006_alumno_codigo_postal.sql:/docker-entrypoint-initdb.d/007-migration.sql:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mariadb-admin ping --host=127.0.0.1 --user=root --password="$${MARIADB_ROOT_PASSWORD}" --silent
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  clamav:
+    image: clamav/clamav:1.5.4
+    environment:
+      TZ: UTC
+      CLAMD_CONF_TCPAddr: 0.0.0.0
+      CLAMD_CONF_TCPSocket: 3310
+    expose:
+      - "3310"
+    volumes:
+      - clamav_db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping=1:1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30m
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  clamav_db:
+  fct_storage:
