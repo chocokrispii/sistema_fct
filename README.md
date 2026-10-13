@@ -306,6 +306,8 @@ historial y conserva el registro de auditoría.
 - **Alumno:** registro con expediente y tutor legal para menores de edad;
   portal privado con sus datos de expediente, disponibilidad y prácticas;
   edición del perfil con validación de DNI/NIE, teléfono, correo y código postal;
+  el perfil permite completar o corregir los datos del tutor legal de menores,
+  incluso en expedientes heredados incompletos;
   actualización de disponibilidad por periodo, turno y franja semanal por día
   en intervalos de diez minutos;
   consulta de prácticas propias y sus calificaciones finales.

@@ -256,8 +256,24 @@ class AlumnoController
             'direccion' => $alumno['direccion'] ?? '',
             'codigo_postal' => $alumno['codigo_postal'] ?? '',
         ];
+        $guardian = $this->db->prepare(
+            'SELECT nombre_completo, dni, numero_seguridad_social, direccion, telefono, correo
+             FROM tutores_legales
+             WHERE alumno_id = :alumno_id
+             ORDER BY id
+             LIMIT 1'
+        );
+        $guardian->execute(['alumno_id' => (int)$alumno['id']]);
+        $guardianData = $guardian->fetch(PDO::FETCH_ASSOC) ?: [];
+        $values['tutor_nombre'] = $guardianData['nombre_completo'] ?? '';
+        $values['tutor_dni'] = $guardianData['dni'] ?? '';
+        $values['tutor_nss'] = $guardianData['numero_seguridad_social'] ?? '';
+        $values['tutor_direccion'] = $guardianData['direccion'] ?? '';
+        $values['tutor_telefono'] = $guardianData['telefono'] ?? '';
+        $values['tutor_correo'] = $guardianData['correo'] ?? '';
         $error = '';
         $fieldErrors = [];
+        $tutorData = null;
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($values as $field => $_value) {
@@ -324,22 +340,25 @@ class AlumnoController
             }
 
             if ($error === '' && $birthDate->diff(new DateTimeImmutable('today'))->y < 18) {
-                $guardian = $this->db->prepare(
-                    'SELECT nombre_completo, dni, numero_seguridad_social, direccion, telefono, correo
-                     FROM tutores_legales WHERE alumno_id = :alumno_id LIMIT 1'
-                );
-                $guardian->execute(['alumno_id' => (int)$alumno['id']]);
-                $guardianData = $guardian->fetch(PDO::FETCH_ASSOC);
+                $tutorData = [
+                    'nombre' => $values['tutor_nombre'],
+                    'dni' => SpanishDataValidator::normalizeDniNie($values['tutor_dni']),
+                    'nss' => $values['tutor_nss'],
+                    'direccion' => $values['tutor_direccion'],
+                    'telefono' => SpanishDataValidator::normalizePhone($values['tutor_telefono']),
+                    'correo' => $values['tutor_correo'],
+                ];
                 if (
-                    !$guardianData
-                    || trim((string)$guardianData['nombre_completo']) === ''
-                    || !SpanishDataValidator::isDniNie((string)($guardianData['dni'] ?? ''))
-                    || trim((string)($guardianData['numero_seguridad_social'] ?? '')) === ''
-                    || trim((string)($guardianData['direccion'] ?? '')) === ''
-                    || !SpanishDataValidator::isSpanishPhone((string)($guardianData['telefono'] ?? ''))
-                    || !SpanishDataValidator::isEmail((string)($guardianData['correo'] ?? ''))
+                    !SpanishDataValidator::isPersonName($tutorData['nombre'], 100)
+                    || !SpanishDataValidator::isDniNie($tutorData['dni'])
+                    || preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $tutorData['nss']) !== 1
+                    || $tutorData['direccion'] === ''
+                    || mb_strlen($tutorData['direccion']) > 255
+                    || preg_match('/[\p{Cc}]/u', $tutorData['direccion']) === 1
+                    || !SpanishDataValidator::isSpanishPhone($tutorData['telefono'])
+                    || !SpanishDataValidator::isEmail($tutorData['correo'])
                 ) {
-                    $error = 'Para un expediente de menor de edad debe constar un tutor legal completo y válido. Contacta con el centro para actualizarlo.';
+                    $error = 'Completa los datos del tutor legal con información válida para guardar el expediente de un menor.';
                 }
             }
 
@@ -355,7 +374,8 @@ class AlumnoController
                         $values['nss'],
                         $values['telefono'],
                         $values['direccion'],
-                        $values['codigo_postal']
+                        $values['codigo_postal'],
+                        $tutorData
                     );
                     $_SESSION['email'] = $values['email'];
                     header('Location: index.php?action=perfil-alumno&guardado=1');
