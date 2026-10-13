@@ -22,8 +22,9 @@ convenios, publicar y revisar ofertas de prácticas, registrar disponibilidad,
 proponer candidatos, asignar plazas y consultar el estado de las prácticas.
 
 La aplicación usa PHP 8.2, PDO, MariaDB/MySQL compatible con MariaDB 10.4 y
-XAMPP. No hay framework PHP, Composer, dependencias de npm ni JavaScript propio
-implementado en este estado. La interfaz se compone de vistas PHP y CSS.
+XAMPP. No hay framework PHP, Composer ni dependencias de npm. El árbol conserva
+una maqueta HTML heredada y su JavaScript auxiliar, pero las rutas actuales usan
+vistas PHP y no dependen de esos archivos.
 
 Los roles reconocidos por la base de datos son:
 
@@ -75,7 +76,7 @@ public/
   index.php          Entrada web pública.
   assets/css/        Hoja de estilo.
   assets/img/        Espacio reservado para imágenes.
-  assets/js/         Espacio reservado para JavaScript.
+  assets/js/         Script heredado de maquetas; no se usa en las rutas actuales.
 routes/              Catálogo de acciones, métodos y roles.
 storage/
   uploads/convenios/ PDFs de convenio recibidos.
@@ -83,13 +84,18 @@ storage/
   logs/              Espacio reservado para logs.
 tests/               Prueba de integración PHP.
 README.md            Puesta en marcha y estructura resumida.
-explicacion.md       Esta guía funcional y técnica.
+documentacion/       Guías funcionales y de pruebas.
 ```
 
 Los archivos `.gitkeep` mantienen en Git carpetas que aún están vacías. No
-contienen lógica de aplicación. La vista estática `app/Views/layouts/index.html`
-ya no forma parte del árbol actual; las páginas se renderizan mediante
-`app/Views/layouts/main.php`.
+contienen lógica de aplicación. Las páginas activas se renderizan mediante
+`app/Views/layouts/main.php`. Los archivos HTML antiguos no implementan rutas
+ni operaciones de escritura: `app/Views/layouts/index.html` y
+`app/Views/alumnos/alumnos.html` redirigen al front controller; la página
+heredada de asignaciones es informativa y enlaza a las rutas oficiales, que
+aplican autenticación y permisos. Apache debe exponer únicamente `public/` como
+raíz web y mantener `app/`, `config/`, `database/` y `storage/` fuera del acceso
+web directo.
 
 ## 5. Ciclo de una petición web
 
@@ -137,7 +143,7 @@ un nombre de archivo de vista o una consulta SQL.
 | `convenios` | GET, POST | Empresa | Registra un convenio y consulta el historial propio. |
 | `revisar-convenios` | GET | Administrador, Coordinador | Lista convenios pendientes. |
 | `resolver-convenio` | POST | Administrador, Coordinador | Aprueba o rechaza un convenio. |
-| `descargar-convenio` | GET | Administrador, Coordinador, Observador, Empresa | Descarga el PDF; la empresa solo puede descargar el suyo. |
+| `descargar-convenio` | GET | Administrador, Coordinador, Empresa | Descarga auditada; la empresa solo puede descargar el suyo. |
 | `usuarios` | GET, POST | Administrador | Lista usuarios internos y crea cuentas de personal. |
 | `estado-usuario` | POST | Administrador | Activa o desactiva una cuenta con restricciones. |
 | `consultas` | GET | Administrador, Coordinador, Observador | Filtra ofertas y asignaciones relacionadas. |
@@ -192,12 +198,17 @@ empresa al que escribir.
 
 ### 7.4 Convenios
 
-La empresa registra número, fechas, sede opcional y archivo. El servidor
+La empresa registra número, ciclo formativo, fechas, sede opcional y archivo.
+Solo se admite un convenio por empresa y ciclo formativo. El servidor
 comprueba que las fechas sean válidas y estén en orden, que la sede pertenezca
 a esa empresa, y que el archivo cargado sea un PDF de hasta 10 MB. El nombre
 guardado es aleatorio y el fichero se ubica en `storage/uploads/convenios/`,
 fuera del directorio público. La base conserva ese nombre de almacenamiento,
 no una ruta proporcionada por el navegador.
+
+Los convenios creados antes de la migración `004` conservan el ciclo como
+`NULL`; no habilitan ofertas hasta que el centro les asigne manualmente la
+especialidad correcta.
 
 El registro del convenio y su evento de auditoría se confirman en una
 transacción. Si falla esa fase, se revierte la base y se intenta borrar el
@@ -220,13 +231,13 @@ inicio. Se exige un convenio aprobado que abarque el periodo entero.
 Las nuevas ofertas empiezan en estado `Pendiente`. Un administrador o
 coordinador puede aprobarlas o rechazarlas; un rechazo necesita observación. La
 aprobación vuelve a comprobar, dentro de una transacción y bloqueando la oferta,
-que un convenio aprobado cubra todas las fechas. La decisión queda auditada.
+que un convenio aprobado de la misma empresa y ciclo cubra todas las fechas. La
+decisión queda auditada.
 
 La tabla pública filtra por `Aprobada` y por `fecha_fin >= CURDATE()`. No limita
 explícitamente `fecha_inicio <= CURDATE()`: por tanto también puede listar una
-oferta futura aprobada. El formulario de empresa muestra la creación si hay un
-convenio aprobado vigente hoy; la validación final al enviar comprueba el
-periodo específico de la oferta.
+oferta futura aprobada. El formulario permite proponer un periodo futuro; al
+enviarlo, el servidor comprueba que un convenio aprobado cubra todo el periodo.
 
 ### 7.6 Disponibilidad y matching
 
@@ -360,7 +371,7 @@ también aceptan conexión opcional y, de otro modo, llaman al singleton de PDO.
 - [app/Views/empresas/sedes.php](app/Views/empresas/sedes.php): formulario y
   lista de sedes.
 - [app/Views/convenios/empresa.php](app/Views/convenios/empresa.php): carga de
-  PDF, fechas, sede y tabla histórica de convenios.
+  PDF, ciclo, fechas, sede y tabla histórica de convenios.
 - [app/Views/convenios/revisar.php](app/Views/convenios/revisar.php): documento,
   datos del convenio y controles aprobar/rechazar.
 - [app/Views/ofertas/listado.php](app/Views/ofertas/listado.php): tabla pública
@@ -462,6 +473,13 @@ interviene en los flujos actuales.
 - Se envían cabeceras `X-Content-Type-Options`, `X-Frame-Options`,
   `Referrer-Policy`, `Cache-Control` y una Content Security Policy básica.
 - Toda ruta POST exige CSRF; las rutas de gestión requieren rol y cuenta activa.
+- Los convenios se almacenan fuera de `public/`, con permisos privados, y la
+  descarga audita accesos permitidos y denegados. Administradores y
+  Coordinadores pueden leer cualquier convenio; Empresa solo los propios;
+  Observador y Alumno no pueden descargarlos.
+- La carga comprueba límites efectivos de PHP, el límite de cuerpo de Apache,
+  MIME/extensión y un análisis ClamAV obligatorio antes de guardar. Un fallo,
+  timeout o base de firmas con más de tres días impide la carga.
 - Las vistas escapan los datos dinámicos con `htmlspecialchars()`; IDs y
   recuentos numéricos se convierten a enteros.
 - La subida limita tamaño, MIME y extensión, valida que PHP la haya recibido y
@@ -474,8 +492,10 @@ interviene en los flujos actuales.
 
 La base contiene datos personales (identificación, correo, dirección,
 teléfono y, en algunos formularios, números de seguridad social) y convenios.
-El repositorio está configurado para ejemplos y desarrollo; antes de usarlo con
-datos reales hacen falta controles de despliegue, permisos de archivos,
+El repositorio está configurado para ejemplos y desarrollo. Para desplegarlo,
+sirve únicamente `public/`, configura límites de Apache/PHP y establece la ACL
+del directorio externo definido por `FCT_STORAGE_PATH`. Configura `FCT_CLAMSCAN`
+con un antivirus disponible y firmas actualizadas. También se requieren
 protección de copias de seguridad, política de retención y revisión de
 privacidad.
 
@@ -537,13 +557,14 @@ pendientes.
    conserva la afirmación antigua de que el dump no se modificó y que la fila
    inválida sigue ahí. Debe leerse como registro histórico, no como inventario
    infalible del árbol actual.
-3. **Configuración Apache.** El repositorio no incluye un VirtualHost ni
-   instrucciones para todos los sistemas operativos. Hay que garantizar que
-   `public/` sea la raíz accesible y comprobar el comportamiento de `.htaccess`
-   del almacenamiento según el servidor usado.
-4. **JavaScript, imágenes y expedientes.** Existen directorios reservados, pero
-   no hay código JS o interfaz de imágenes en uso. La carpeta de expedientes no
-   tiene un flujo para cargar/descargar archivos.
+3. **Configuración Apache.** El repositorio no incluye un VirtualHost listo para
+   cada entorno. Sus `.htaccess` bloquean el árbol privado y habilitan `public/`;
+   el despliegue debe servir solo `public/`, permitir las directivas necesarias
+   y verificar la configuración efectiva del servidor.
+4. **JavaScript, imágenes y expedientes.** El JavaScript solo sirve a maquetas
+   heredadas, limpia claves antiguas de `localStorage` y no participa en las
+   rutas MVC. Hay directorios reservados y no existe un flujo de carga de
+   expedientes ni interfaz de imágenes.
 5. **Sedes.** El código puede listarlas y añadirlas, pero no incluye editar,
    eliminar ni desactivar sedes desde la interfaz.
 6. **Disponibilidad.** La interfaz conserva una única ventana continua porque
@@ -552,21 +573,19 @@ pendientes.
 7. **Cierre y reutilización de alumnos.** La asignación cerrada consume plaza en
    su oferta pero no excluye al alumno de ofertas posteriores. Confirmar si se
    permite cursar más de una práctica.
-8. **Cobertura de convenios.** La página de publicación muestra el formulario
-   según un convenio vigente hoy, mientras que el alta y la revisión comprueban
-   si el convenio cubre fechas futuras concretas. Confirmar el criterio de
-   vigencia esperado para ofertas futuras.
+8. **Cobertura de convenios.** El formulario permite indicar fechas futuras;
+   el servidor valida al enviarlo que un convenio aprobado cubra el periodo
+   completo. No se confía en una comprobación de vigencia del lado del cliente.
 9. **Consultas.** Los filtros de fecha se aplican a fechas de inicio/fin como
    cotas de contenido, no mediante solapamiento de periodos. El listado puede
    repetir una oferta si hay más de una asignación.
 10. **Errores.** `storage/logs/` es un directorio placeholder; el proyecto usa
     `error_log()` pero no configura explícitamente que PHP escriba ahí. El
     destino depende de la configuración de PHP/XAMPP.
-11. **Servicios de revisión y permisos.** El código actual deja que
-    Administrador y Coordinador revisen convenios/ofertas; el rol Observador
-    puede consultar asignaciones, ver consultas y descargar documentos. Hay
-    que validar con el equipo que esa amplitud de acceso a datos sensibles sea
-    la deseada.
+11. **Servicios de revisión y permisos.** Administrador y Coordinador revisan
+    convenios/ofertas y pueden descargar cualquier convenio. Empresa solo
+    descarga documentos de su propio perfil; Observador y Alumno no acceden a
+    convenios. Las descargas permitidas y denegadas quedan auditadas.
 12. **Despliegue productivo.** Aún no se documentan HTTPS obligatorio,
     credenciales de base dedicadas, backups, rotación de logs, límites de
     `php.ini` para carga, recuperación de contraseña ni política formal de
@@ -594,4 +613,3 @@ confirmarse antes de alterar el modelo.
   estructura de carpetas en Git, sin lógica ejecutable.
 - [storage/.htaccess](storage/.htaccess): directiva de Apache que niega acceso
   web directo al árbol de almacenamiento.
-

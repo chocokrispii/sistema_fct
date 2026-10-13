@@ -46,7 +46,10 @@ class AsignacionController
             );
             $stmt->execute(['id' => $oferta['id']]);
             $oferta['asignadas'] = (int)$stmt->fetchColumn();
-            $oferta['candidatos'] = $ofertaModel->obtenerCandidatos((int)$oferta['id']);
+            $oferta['plazas_disponibles'] = max(0, (int)$oferta['plazas_cuantas'] - $oferta['asignadas']);
+            $oferta['candidatos'] = $oferta['plazas_disponibles'] > 0
+                ? $ofertaModel->obtenerCandidatos((int)$oferta['id'])
+                : [];
         }
         unset($oferta);
 

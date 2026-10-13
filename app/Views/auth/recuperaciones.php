@@ -1,10 +1,11 @@
 <?php if (isset($_GET['error'])): ?>
-    <p class="message message-error">Esa solicitud ya no está pendiente.</p>
+    <p class="message message-error" role="alert">Esa solicitud ya no está pendiente.</p>
 <?php endif; ?>
 <?php if ($token !== ''): ?>
-    <p class="message message-success">Identidad verificada. Enlace de un solo uso, válido <?= RecuperacionCuenta::VALIDEZ_MINUTOS ?> minutos: index.php?action=restablecer&amp;token=<?= htmlspecialchars($token, ENT_QUOTES, 'UTF-8') ?></p>
+    <p class="message message-success" role="status">Identidad verificada. Envía a la persona el enlace de un solo uso, válido <?= RecuperacionCuenta::VALIDEZ_MINUTOS ?> minutos: <a href="index.php?action=restablecer&amp;token=<?= rawurlencode($token) ?>">Abrir enlace de recuperación</a></p>
 <?php endif; ?>
 <h2>Recuperaciones pendientes de verificar</h2>
+<p>Verifica la identidad de la persona solicitante antes de emitir el enlace. No se envía correo automáticamente.</p>
 <?php if ($recuperaciones === []): ?>
     <p>No hay solicitudes.</p>
 <?php else: ?>

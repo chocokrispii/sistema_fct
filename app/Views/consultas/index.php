@@ -1,6 +1,6 @@
 <h2>Consultas y seguimiento</h2>
 <?php if ($error !== ''): ?><p class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
-<form method="GET" action="index.php">
+<form class="page-form" method="GET" action="index.php">
     <input type="hidden" name="action" value="consultas">
     <label>Ciclo
         <select name="especialidad_id">

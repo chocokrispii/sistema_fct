@@ -1,0 +1,9 @@
+.git
+.env
+.env.*
+!.env.docker.example
+storage/*
+!storage/.htaccess
+tests
+docs
+documentacion
