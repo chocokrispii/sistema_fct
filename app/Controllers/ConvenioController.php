@@ -38,11 +38,15 @@ class ConvenioController
                 exit;
             } catch (Throwable $e) {
                 error_log('Error al registrar convenio: ' . $e->getMessage());
-                $error = $e instanceof InvalidArgumentException
-                    ? $e->getMessage()
-                    : ($e instanceof FileScannerUnavailableException || $e instanceof FileUploadConfigurationException
-                        ? 'La carga segura de documentos no está disponible. Contacta con el administrador.'
-                        : 'No se pudo registrar el convenio. Comprueba el número y los datos enviados.');
+                if ($e instanceof InvalidArgumentException) {
+                    $error = $e->getMessage();
+                } elseif ($e instanceof FileScannerUnavailableException) {
+                    $error = 'El análisis antivirus no está instalado o configurado. El convenio no se ha guardado; contacta con el administrador.';
+                } elseif ($e instanceof FileUploadConfigurationException) {
+                    $error = 'Los límites de carga de PHP no permiten recibir el PDF de forma segura. Contacta con el administrador.';
+                } else {
+                    $error = 'No se pudo registrar el convenio. Comprueba el número y los datos enviados.';
+                }
             }
         }
 

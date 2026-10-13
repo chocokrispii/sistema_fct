@@ -61,7 +61,10 @@ class OfertaController {
 
     public function revisar(): void
     {
-        View::render('ofertas/revisar', ['ofertas' => $this->ofertaModel->obtenerPendientes()]);
+        View::render('ofertas/revisar', [
+            'ofertas' => $this->ofertaModel->obtenerPendientes(),
+            'error' => is_string($_GET['error'] ?? null) ? $_GET['error'] : '',
+        ]);
     }
 
     public function resolverRevision(): void
@@ -84,7 +87,9 @@ class OfertaController {
             if ($decision === 'Aprobada') {
                 $stmt = $this->db->prepare(
                     'SELECT empresa_id, especialidad_id, fecha_inicio, fecha_fin
-                     FROM empresa_especialidades_plazas WHERE id = :id FOR UPDATE'
+                     FROM empresa_especialidades_plazas
+                     WHERE id = :id AND estado = \'Pendiente\'
+                     FOR UPDATE'
                 );
                 $stmt->execute(['id' => $id]);
                 $offer = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -105,11 +110,13 @@ class OfertaController {
                     ]);
                 }
                 if (!$offer || !$agreement->fetchColumn()) {
-                    throw new RuntimeException('No se puede aprobar una oferta sin un convenio aprobado para su ciclo que cubra todo el periodo.');
+                    throw new DomainException($offer
+                        ? 'No se puede aprobar: falta un convenio aprobado para el mismo ciclo y que cubra todo el periodo.'
+                        : 'La oferta no existe o ya fue revisada.');
                 }
             }
             if (!$this->ofertaModel->resolver((int)$id, $decision, $motivo, (int)$_SESSION['usuario_id'])) {
-                throw new RuntimeException('La oferta ya fue revisada o no existe.');
+                throw new DomainException('La oferta ya fue revisada o no existe.');
             }
             (new Auditoria($this->db))->registrar(
                 (int)$_SESSION['usuario_id'],
@@ -119,6 +126,12 @@ class OfertaController {
                 'estado=' . $decision
             );
             $this->db->commit();
+        } catch (DomainException $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            header('Location: index.php?action=revisar-ofertas&error=' . rawurlencode($e->getMessage()));
+            exit;
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();

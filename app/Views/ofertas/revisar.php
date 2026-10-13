@@ -1,5 +1,6 @@
 <h2>Ofertas pendientes de revisión</h2>
 <p>Aprueba solo las ofertas cuyo periodo esté cubierto por un convenio aprobado del mismo ciclo formativo.</p>
+<?php if ($error !== ''): ?><p class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if ($ofertas === []): ?>
     <p>No hay ofertas pendientes.</p>
 <?php else: ?>
