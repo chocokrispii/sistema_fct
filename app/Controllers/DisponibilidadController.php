@@ -75,8 +75,8 @@ class DisponibilidadController
                         continue;
                     }
                     if (
-                        !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $horaInicio)
-                        || !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $horaFin)
+                        !preg_match('/^(?:[01]\d|2[0-3]):(?:00|10|20|30|40|50)$/', $horaInicio)
+                        || !preg_match('/^(?:[01]\d|2[0-3]):(?:00|10|20|30|40|50)$/', $horaFin)
                         || $horaFin <= $horaInicio
                     ) {
                         $error = 'Cada día seleccionado necesita una franja horaria válida.';

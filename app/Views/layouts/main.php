@@ -41,6 +41,7 @@ $usuarioAutenticado = $rolActual !== null;
                 <a href="index.php?action=calificaciones">Calificaciones</a>
             <?php elseif ($rolActual === 'Alumno'): ?>
                 <a href="index.php?action=portal-alumno">Mi expediente</a>
+                <a href="index.php?action=perfil-alumno">Editar perfil</a>
                 <a href="index.php?action=disponibilidad">Mi disponibilidad</a>
                 <a href="index.php?action=mis-asignaciones">Mis prácticas</a>
                 <a href="index.php?action=mis-calificaciones">Mis calificaciones</a>

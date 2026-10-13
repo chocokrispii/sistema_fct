@@ -14,7 +14,10 @@
                     <h3 id="student-portal-profile"><?= htmlspecialchars($alumno['nombre'] . ' ' . $alumno['apellidos'], ENT_QUOTES, 'UTF-8') ?></h3>
                     <p>Expediente académico</p>
                 </div>
-                <a class="student-portal__action" href="index.php?action=disponibilidad">Gestionar disponibilidad</a>
+                <div class="student-portal__profile-actions">
+                    <a class="student-portal__action" href="index.php?action=perfil-alumno">Editar datos personales</a>
+                    <a class="student-portal__action" href="index.php?action=disponibilidad">Gestionar disponibilidad</a>
+                </div>
             </div>
             <dl class="student-portal__details">
                 <div><dt>Correo electrónico</dt><dd><?= htmlspecialchars($alumno['correo'], ENT_QUOTES, 'UTF-8') ?></dd></div>

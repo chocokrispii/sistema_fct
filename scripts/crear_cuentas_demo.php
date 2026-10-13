@@ -86,21 +86,34 @@ try {
                 'contacto' => 'Contacto de prueba',
             ]);
         } elseif ($definition['role'] === 'Alumno') {
+            $dniNumber = random_int(0, 99999999);
+            $dni = str_pad((string)$dniNumber, 8, '0', STR_PAD_LEFT)
+                . 'TRWAGMYFPDXBNJZSQVHLCKE'[$dniNumber % 23];
             $profile = $db->prepare(
                 'INSERT INTO alumnos
                     (usuario_id, nombre, apellidos, fecha_nacimiento, dni,
-                     numero_seguridad_social, correo, especialidad_id)
-                 VALUES (:usuario, :nombre, :apellidos, :nacimiento, :dni, :nss, :correo, :ciclo)'
+                     numero_seguridad_social, codigo_postal, correo, especialidad_id)
+                 VALUES (:usuario, :nombre, :apellidos, :nacimiento, :dni, :nss, :codigo_postal, :correo, :ciclo)'
             );
             $profile->execute([
                 'usuario' => $userId,
                 'nombre' => 'Alumno',
                 'apellidos' => 'Demo Local',
                 'nacimiento' => '2000-01-01',
-                'dni' => 'D' . strtoupper(bin2hex(random_bytes(5))),
+                'dni' => $dni,
                 'nss' => 'D' . strtoupper(bin2hex(random_bytes(5))),
+                'codigo_postal' => '28013',
                 'correo' => $definition['email'],
                 'ciclo' => $cycleId,
+            ]);
+            $contact = $db->prepare(
+                'INSERT INTO direcciones_telefonos (alumno_id, telefono, direccion_completa)
+                 VALUES (:alumno, :telefono, :direccion)'
+            );
+            $contact->execute([
+                'alumno' => (int)$db->lastInsertId(),
+                'telefono' => '612345678',
+                'direccion' => 'Calle Demo, 1, Madrid',
             ]);
         }
         $created[] = ['email' => $definition['email'], 'role' => $definition['role'], 'password' => $password];

@@ -10,6 +10,7 @@ return [
     'logout' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador', 'Observador', 'Empresa', 'Alumno'], 'controller' => AuthController::class, 'action' => 'logout'],
     'registro-alumno' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => AlumnoController::class, 'action' => 'registrar'],
     'portal-alumno' => ['method' => 'GET', 'roles' => ['Alumno'], 'controller' => AlumnoController::class, 'action' => 'portal'],
+    'perfil-alumno' => ['method' => ['GET', 'POST'], 'roles' => ['Alumno'], 'controller' => AlumnoController::class, 'action' => 'editarPerfil'],
     'registro-empresa' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => EmpresaController::class, 'action' => 'registrar'],
     'ofertas' => ['method' => 'GET', 'roles' => [], 'controller' => OfertaController::class, 'action' => 'listar'],
     'publicar-oferta' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => OfertaController::class, 'action' => 'publicar'],
@@ -31,5 +32,6 @@ return [
     'descargar-convenio' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Empresa'], 'controller' => ConvenioController::class, 'action' => 'descargar'],
     'usuarios' => ['method' => ['GET', 'POST'], 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'gestionar'],
     'estado-usuario' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'cambiarEstado'],
+    'eliminar-usuario' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'eliminar'],
     'consultas' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador'], 'controller' => ConsultaController::class, 'action' => 'buscar'],
 ];

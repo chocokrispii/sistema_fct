@@ -19,8 +19,8 @@
                         <tr>
                             <th scope="row"><?= htmlspecialchars($nombreDia, ENT_QUOTES, 'UTF-8') ?></th>
                             <td><input type="checkbox" name="horarios[<?= (int)$dia ?>][activo]" value="1" aria-label="<?= htmlspecialchars($nombreDia, ENT_QUOTES, 'UTF-8') ?>" <?= $horario['activo'] ? 'checked' : '' ?>></td>
-                            <td><input type="time" name="horarios[<?= (int)$dia ?>][hora_inicio]" value="<?= htmlspecialchars($horario['hora_inicio'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($nombreDia . ', hora de inicio', ENT_QUOTES, 'UTF-8') ?>"></td>
-                            <td><input type="time" name="horarios[<?= (int)$dia ?>][hora_fin]" value="<?= htmlspecialchars($horario['hora_fin'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($nombreDia . ', hora de fin', ENT_QUOTES, 'UTF-8') ?>"></td>
+                            <td><input type="time" step="600" name="horarios[<?= (int)$dia ?>][hora_inicio]" value="<?= htmlspecialchars($horario['hora_inicio'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($nombreDia . ', hora de inicio', ENT_QUOTES, 'UTF-8') ?>"></td>
+                            <td><input type="time" step="600" name="horarios[<?= (int)$dia ?>][hora_fin]" value="<?= htmlspecialchars($horario['hora_fin'], ENT_QUOTES, 'UTF-8') ?>" aria-label="<?= htmlspecialchars($nombreDia . ', hora de fin', ENT_QUOTES, 'UTF-8') ?>"></td>
                         </tr>
                     <?php endforeach; ?></tbody>
                 </table>
