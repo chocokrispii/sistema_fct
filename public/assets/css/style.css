@@ -737,6 +737,75 @@ fieldset {
     min-height: 40px;
 }
 
+.student-portal__profile-actions,
+.user-actions,
+.user-delete-dialog__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-delete-trigger,
+.user-delete-dialog__confirm,
+.user-delete-dialog__cancel {
+    min-height: 40px;
+    padding: 8px 13px;
+    border: 0;
+    border-radius: 6px;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.user-delete-trigger,
+.user-delete-dialog__confirm {
+    background: #b42318;
+    color: #fff;
+}
+
+.user-delete-trigger:hover,
+.user-delete-dialog__confirm:hover {
+    background: #8f1c13;
+}
+
+.user-delete-dialog__cancel {
+    background: #1769aa;
+    color: #fff;
+}
+
+.user-delete-dialog__cancel:hover {
+    background: #12558a;
+}
+
+.user-delete-dialog {
+    width: min(92vw, 460px);
+    padding: 26px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    color: var(--color-text-main);
+    box-shadow: 0 24px 80px rgb(0 0 0 / 25%);
+}
+
+.user-delete-dialog::backdrop {
+    background: rgb(17 24 39 / 58%);
+}
+
+.user-delete-dialog h3 {
+    margin-top: 0;
+    font-size: 1.4rem;
+}
+
+.user-delete-dialog p {
+    margin-bottom: 22px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.user-delete-dialog__actions {
+    justify-content: flex-end;
+}
+
 .status-badge {
     display: inline-block;
     padding: 5px 9px;
@@ -1288,10 +1357,19 @@ fieldset {
     box-shadow: 0 0 0 3px rgb(0 168 232 / 18%);
 }
 
+.student-registration__field input[aria-invalid="true"] {
+    border-color: var(--color-danger);
+}
+
 .student-registration__field small {
     color: var(--color-text-muted);
     font-size: 0.82rem;
     line-height: 1.4;
+}
+
+.student-registration__field small[data-field-error]:not(:empty) {
+    color: var(--color-danger);
+    font-weight: 600;
 }
 
 .student-registration__field--full {
