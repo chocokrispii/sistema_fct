@@ -1,4 +1,4 @@
-<?php if ($error !== ''): ?><p class="message message-error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+<?php if ($error !== ''): ?><p class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if ($eliminado): ?><p class="message message-success" role="status">Usuario eliminado permanentemente.</p><?php endif; ?>
 <h2>Gestión de cuentas</h2>
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=usuarios">
@@ -44,8 +44,10 @@
         <a href="index.php?action=usuarios">Limpiar filtros</a>
     <?php endif; ?>
 </form>
+<?php if ($usuarios !== []): ?>
 <table>
-    <thead><tr><th>Correo</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+    <caption>Cuentas de usuario</caption>
+    <thead><tr><th scope="col">Correo</th><th scope="col">Nombre</th><th scope="col">Rol</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead>
     <tbody><?php foreach ($usuarios as $usuario): ?>
         <tr>
             <td><?= htmlspecialchars($usuario['email'], ENT_QUOTES, 'UTF-8') ?></td>
@@ -66,6 +68,9 @@
         </tr>
     <?php endforeach; ?></tbody>
 </table>
+<?php else: ?>
+    <p role="status">No hay cuentas que coincidan con los filtros actuales.</p>
+<?php endif; ?>
 <dialog class="user-delete-dialog" data-user-delete-dialog aria-labelledby="user-delete-title" aria-describedby="user-delete-description">
     <form method="POST" action="index.php?action=eliminar-usuario">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
