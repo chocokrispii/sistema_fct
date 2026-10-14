@@ -37,8 +37,17 @@ guardan en volúmenes Docker.
    docker compose up -d --build
    ```
 
+<<<<<<< HEAD
 3. Las migraciones se aplican automáticamente al crear por primera vez el
    volumen de la base de datos. Para generar cuentas de demostración, ejecuta
+=======
+3. El contenedor `db` importa el esquema y aplica las migraciones 001–006 en
+   orden al crear por primera vez un volumen de base de datos vacío. La
+   aplicación espera a que MariaDB confirme que terminó la migración final y
+   que están disponibles las tablas y datos base antes de arrancar. Los
+   volúmenes existentes se conservan y no vuelven a ejecutar los SQL. Para
+   generar cuentas de demostración, ejecuta
+>>>>>>> origin/main
    el seed explícitamente y guarda las contraseñas aleatorias que imprima:
 
    ```powershell
@@ -48,8 +57,15 @@ guardan en volúmenes Docker.
    ```
 
    Espera a que `db` y `clamav` estén saludables; en el primer arranque, ClamAV
+<<<<<<< HEAD
    puede tardar en descargar sus firmas. El dump base y las migraciones 001–006
    se importan una sola vez al inicializar un volumen de base de datos vacío.
+=======
+   puede tardar en descargar sus firmas. Para reiniciar la base de datos desde
+   cero solo cuando puedas descartar todos los datos locales, ejecuta
+   `docker compose down -v` antes de volver a levantar los servicios; esto
+   elimina también los volúmenes de archivos privados y firmas de ClamAV.
+>>>>>>> origin/main
    El seed crea cuentas ausentes con contraseñas aleatorias. Para establecer
    contraseñas elegidas explícitamente, pásalas mediante las variables
    `FCT_DEMO_PASSWORD_ADMINISTRADOR`, `FCT_DEMO_PASSWORD_COORDINADOR`,
