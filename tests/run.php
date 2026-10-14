@@ -439,6 +439,28 @@ try {
         count($availabilityModel->obtenerPorUsuario($createdUsers[1])) === 1,
         'Una franja horaria inválida no debe sobrescribir la disponibilidad persistida.'
     );
+    $futureStart = (new DateTimeImmutable('tomorrow'))->format('Y-m-d');
+    $futureEnd = (new DateTimeImmutable('tomorrow + 30 days'))->format('Y-m-d');
+    $_POST = [
+        'fecha_inicio' => $futureStart,
+        'fecha_fin' => $futureEnd,
+        'turno' => 'Indiferente',
+        'horarios' => [
+            '1' => ['activo' => '1', 'hora_inicio' => '08:00', 'hora_fin' => '12:00'],
+            '+1' => ['activo' => '1', 'hora_inicio' => '13:00', 'hora_fin' => '17:00'],
+        ],
+    ];
+    ob_start();
+    (new DisponibilidadController($db))->gestionar();
+    $duplicateDayHtml = ob_get_clean();
+    assertTrue(
+        is_string($duplicateDayHtml) && str_contains($duplicateDayHtml, 'cada día de la semana una sola vez'),
+        'El servidor debe rechazar claves distintas que representan el mismo día de la semana.'
+    );
+    assertTrue(
+        count($availabilityModel->obtenerHorarioSemanalPorUsuario($createdUsers[1])) === 1,
+        'Un día semanal duplicado no debe sobrescribir la disponibilidad persistida.'
+    );
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_POST = [];
 
