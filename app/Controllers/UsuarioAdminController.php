@@ -60,15 +60,16 @@ class UsuarioAdminController
                 || trim($password) === ''
             ) {
                 $error = 'Indica un correo válido y una contraseña de 12 a 72 caracteres.';
+            } elseif (!in_array($role, ['Administrador', 'Coordinador', 'Observador'], true)) {
+                $error = 'Selecciona un rol válido para la cuenta del centro.';
+            } elseif (
+                $role === 'Coordinador'
+                && ($nombre === '' || $apellidos === '' || mb_strlen($nombre) > 50 || mb_strlen($apellidos) > 100)
+            ) {
+                $error = 'Los coordinadores necesitan nombre y apellidos válidos (máximo 50 y 100 caracteres).';
             } else {
                 try {
                     $this->db->beginTransaction();
-                    if (
-                        $role === 'Coordinador'
-                        && ($nombre === '' || $apellidos === '' || mb_strlen($nombre) > 50 || mb_strlen($apellidos) > 100)
-                    ) {
-                        throw new InvalidArgumentException('Los coordinadores necesitan nombre y apellidos.');
-                    }
                     $id = $this->model->crearCuentaStaff($email, $password, $role);
                     if ($role === 'Coordinador') {
                         $profile = $this->db->prepare(

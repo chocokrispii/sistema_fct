@@ -745,6 +745,21 @@ try {
             && !str_contains($accountFormHtml, 'NeverEchoThisPassword123'),
         'Un error al crear una cuenta debe conservar los campos no sensibles y limpiar la contraseña.'
     );
+    $_POST = [
+        'email' => 'coordinador-valido@example.test',
+        'password' => 'ValidInitialPassword123',
+        'nombre' => '',
+        'apellidos' => '',
+        'rol' => 'Coordinador',
+    ];
+    ob_start();
+    (new UsuarioAdminController($db))->gestionar();
+    $missingCoordinatorNameHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($missingCoordinatorNameHtml, 'Los coordinadores necesitan nombre y apellidos válidos')
+            && !str_contains($missingCoordinatorNameHtml, 'Comprueba si el correo ya está registrado'),
+        'Los datos obligatorios del coordinador deben producir un error específico antes de intentar crear la cuenta.'
+    );
     $_POST = [];
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_GET = ['estado_actualizado' => '1'];
