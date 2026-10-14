@@ -741,8 +741,11 @@ try {
         str_contains($filteredAdminView, htmlspecialchars($emails[3], ENT_QUOTES, 'UTF-8'))
             && !str_contains($filteredAdminView, htmlspecialchars($emails[4], ENT_QUOTES, 'UTF-8'))
             && str_contains($filteredAdminView, 'value="Coordinador" selected')
-            && str_contains($filteredAdminView, 'value="1" selected'),
-        'La página administrativa debe aplicar filtros y conservarlos en el formulario.'
+            && str_contains($filteredAdminView, 'value="1" selected')
+            && str_contains($filteredAdminView, 'name="buscar" value="' . htmlspecialchars($emails[3], ENT_QUOTES, 'UTF-8') . '"')
+            && str_contains($filteredAdminView, 'name="rol" value="Coordinador"')
+            && str_contains($filteredAdminView, 'name="activo_filtro" value="1"'),
+        'La página administrativa debe aplicar filtros y conservarlos en los formularios de acción.'
     );
     $_GET = [];
 

@@ -64,6 +64,9 @@
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
                     <input type="hidden" name="usuario_id" value="<?= (int)$usuario['id'] ?>">
                     <input type="hidden" name="activo" value="<?= $estaActiva ? '0' : '1' ?>">
+                    <input type="hidden" name="buscar" value="<?= htmlspecialchars($busqueda, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="rol" value="<?= htmlspecialchars($rolFiltro, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="activo_filtro" value="<?= htmlspecialchars($estadoFiltro, ENT_QUOTES, 'UTF-8') ?>">
                     <button type="submit" aria-label="<?= htmlspecialchars(($estaActiva ? 'Desactivar cuenta de ' : 'Activar cuenta de ') . $usuario['email'], ENT_QUOTES, 'UTF-8') ?>"><?= $estaActiva ? 'Desactivar' : 'Activar' ?></button>
                 </form>
                 <?php else: ?>
@@ -83,6 +86,9 @@
     <form method="POST" action="index.php?action=eliminar-usuario">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="usuario_id" value="" data-delete-user-id>
+        <input type="hidden" name="buscar" value="<?= htmlspecialchars($busqueda, ENT_QUOTES, 'UTF-8') ?>">
+        <input type="hidden" name="rol" value="<?= htmlspecialchars($rolFiltro, ENT_QUOTES, 'UTF-8') ?>">
+        <input type="hidden" name="activo_filtro" value="<?= htmlspecialchars($estadoFiltro, ENT_QUOTES, 'UTF-8') ?>">
         <h3 id="user-delete-title">¿Estás seguro?</h3>
         <p id="user-delete-description">Se eliminará permanentemente <strong data-delete-user-email></strong>. Esta acción no se puede deshacer.</p>
         <div class="user-delete-dialog__actions">

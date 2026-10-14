@@ -124,7 +124,7 @@ class UsuarioAdminController
             $this->redirectWithError('No se pudo eliminar la cuenta. No se realizaron cambios.');
         }
 
-        header('Location: index.php?action=usuarios&eliminado=1');
+        header('Location: ' . $this->gestionUrl(['eliminado' => '1']));
         exit;
     }
 
@@ -168,7 +168,7 @@ class UsuarioAdminController
             throw $e;
         }
 
-        header('Location: index.php?action=usuarios');
+        header('Location: ' . $this->gestionUrl());
         exit;
     }
 
@@ -185,7 +185,27 @@ class UsuarioAdminController
 
     private function redirectWithError(string $message): never
     {
-        header('Location: index.php?action=usuarios&error=' . rawurlencode($message));
+        header('Location: ' . $this->gestionUrl(['error' => $message]));
         exit;
+    }
+
+    private function gestionUrl(array $extra = []): string
+    {
+        $parameters = ['action' => 'usuarios'];
+        $search = $_POST['buscar'] ?? '';
+        $role = $_POST['rol'] ?? '';
+        $active = $_POST['activo_filtro'] ?? '';
+
+        if (is_string($search) && mb_strlen(trim($search)) <= 100 && trim($search) !== '') {
+            $parameters['buscar'] = trim($search);
+        }
+        if (is_string($role) && in_array($role, ['Administrador', 'Coordinador', 'Observador', 'Empresa', 'Alumno'], true)) {
+            $parameters['rol'] = $role;
+        }
+        if (is_string($active) && in_array($active, ['0', '1'], true)) {
+            $parameters['activo'] = $active;
+        }
+
+        return 'index.php?' . http_build_query($parameters + $extra);
     }
 }
