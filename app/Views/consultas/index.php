@@ -29,22 +29,21 @@
 <?php else: ?>
     <p role="status">No se encontraron resultados.</p>
 <?php endif; ?>
-<table>
-    <caption>Resultados de consultas y seguimiento</caption>
-    <thead><tr><th scope="col">Empresa</th><th scope="col">Ciclo</th><th scope="col">Periodo</th><th scope="col">Turno</th><th scope="col">Plazas</th><th scope="col">Oferta</th><th scope="col">Alumno asignado</th><th scope="col">Prácticas</th></tr></thead>
-    <tbody><?php foreach ($rows as $row): ?>
-        <tr>
-            <td><?= htmlspecialchars($row['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($row['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($row['fecha_inicio'] . ' – ' . $row['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($row['turno'] === 'M' ? 'Mañana' : ($row['turno'] === 'T' ? 'Tarde' : 'Indiferente'), ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= (int)$row['plazas_cuantas'] ?></td>
-            <td><?= htmlspecialchars($row['estado'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars(trim(($row['alumno_nombre'] ?? '') . ' ' . ($row['apellidos'] ?? '')), ENT_QUOTES, 'UTF-8') ?: '—' ?></td>
-            <td><?= htmlspecialchars($row['estado_asignacion'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>
-        </tr>
-    <?php endforeach; ?></tbody>
-</table>
+<?php if ($rows !== []): ?>
+    <table>
+        <thead><tr><th>Empresa</th><th>Ciclo</th><th>Periodo</th><th>Oferta</th><th>Alumno asignado</th><th>Prácticas</th></tr></thead>
+        <tbody><?php foreach ($rows as $row): ?>
+            <tr>
+                <td><?= htmlspecialchars($row['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars($row['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars($row['fecha_inicio'] . ' – ' . $row['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars($row['estado'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars(trim(($row['alumno_nombre'] ?? '') . ' ' . ($row['apellidos'] ?? '')), ENT_QUOTES, 'UTF-8') ?: '—' ?></td>
+                <td><?= htmlspecialchars($row['estado_asignacion'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>
+            </tr>
+        <?php endforeach; ?></tbody>
+    </table>
+<?php endif; ?>
 <?php if ($totalPaginas > 1): ?>
     <?php
     $paginationParameters = [
@@ -59,7 +58,7 @@
         <?php if ($pagina > 1): ?>
             <a rel="prev" href="<?= htmlspecialchars('index.php?' . http_build_query($paginationParameters + ['pagina' => $pagina - 1]), ENT_QUOTES, 'UTF-8') ?>">Anterior</a>
         <?php endif; ?>
-        <span>Página <?= (int)$pagina ?> de <?= (int)$totalPaginas ?></span>
+        <span aria-current="page">Página <?= (int)$pagina ?> de <?= (int)$totalPaginas ?></span>
         <?php if ($pagina < $totalPaginas): ?>
             <a rel="next" href="<?= htmlspecialchars('index.php?' . http_build_query($paginationParameters + ['pagina' => $pagina + 1]), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a>
         <?php endif; ?>
