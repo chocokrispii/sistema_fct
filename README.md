@@ -14,6 +14,60 @@ arquitectura MVC propia, sin framework ni dependencias de Composer.
   está disponible, la aplicación rechaza las cargas.
 - Git, si se va a clonar el repositorio.
 
+## Inicio con Docker Compose
+
+Docker Compose ejecuta PHP 8.2 con Apache, MariaDB 10.4.32 y el servicio oficial
+ClamAV. La versión de MariaDB coincide con la instalación XAMPP local observada;
+10.4 ya no recibe soporte, por lo que esta composición es exclusivamente para
+desarrollo local y no debe desplegarse en producción. El Dockerfile instala
+`pdo_mysql` y `mbstring`; `fileinfo` viene con la imagen PHP. Composer está
+disponible en el contenedor, aunque esta aplicación no tiene dependencias
+Composer. Los datos de MariaDB, las firmas de ClamAV y los archivos privados se
+guardan en volúmenes Docker.
+
+1. Copia la plantilla de entorno:
+
+   ```powershell
+   Copy-Item .env.docker.example .env
+   ```
+
+2. Construye y arranca los servicios:
+
+   ```powershell
+   docker compose up -d --build
+   ```
+
+3. El contenedor `db` importa el esquema y aplica las migraciones 001–006 en
+   orden al crear por primera vez un volumen de base de datos vacío. La
+   aplicación espera a que MariaDB confirme que terminó la migración final y
+   que están disponibles las tablas y datos base antes de arrancar. Los
+   volúmenes existentes se conservan y no vuelven a ejecutar los SQL. Para
+   generar cuentas de demostración, ejecuta
+   el seed explícitamente y guarda las contraseñas aleatorias que imprima:
+
+   ```powershell
+   docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/crear_cuentas_demo.php
+   docker compose ps
+   docker compose exec app php -v
+   ```
+
+   Espera a que `db` y `clamav` estén saludables; en el primer arranque, ClamAV
+   puede tardar en descargar sus firmas. Para reiniciar la base de datos desde
+   cero solo cuando puedas descartar todos los datos locales, ejecuta
+   `docker compose down -v` antes de volver a levantar los servicios; esto
+   elimina también los volúmenes de archivos privados y firmas de ClamAV.
+   El seed crea cuentas ausentes con contraseñas aleatorias. Para establecer
+   contraseñas elegidas explícitamente, pásalas mediante las variables
+   `FCT_DEMO_PASSWORD_ADMINISTRADOR`, `FCT_DEMO_PASSWORD_COORDINADOR`,
+   `FCT_DEMO_PASSWORD_OBSERVADOR`, `FCT_DEMO_PASSWORD_EMPRESA` y
+   `FCT_DEMO_PASSWORD_ALUMNO`; para reemplazar contraseñas de cuentas demo ya
+   existentes, habilita además `FCT_DEMO_SEED_RESET_PASSWORDS=1`. Las
+   contraseñas proporcionadas por entorno nunca se imprimen. No guardes estos
+   valores en archivos versionados.
+   Abre `http://localhost:8080` (o el puerto definido por `APP_PORT` en `.env`).
+   Las contraseñas de desarrollo son configurables en `.env`; no reutilices
+   esos valores fuera del entorno local.
+
 ## Instalación local con XAMPP
 
 ### 1. Configurar Apache
@@ -66,15 +120,17 @@ SetEnv FCT_CLAMSCAN "C:/Program Files/ClamAV/clamscan.exe"
 SetEnv FCT_CLAMAV_DATABASE "C:/ProgramData/ClamAV/db"
 ```
 
-Crea previamente el directorio de almacenamiento fuera del `DocumentRoot` y
-configura `FCT_STORAGE_PATH`; no existe una ruta predeterminada. La aplicación
+En XAMPP, crea previamente el directorio de almacenamiento fuera del
+`DocumentRoot` y configura `FCT_STORAGE_PATH`; no existe una ruta
+predeterminada. La aplicación
 resuelve ambas rutas y rechaza directorios inexistentes, rutas relativas,
 almacenamientos dentro del `DocumentRoot` o directorios que lo contengan. Mantén
 el almacenamiento fuera del árbol del proyecto y de `htdocs`. En XAMPP local,
-`public/.htaccess` puede definir estas variables, los límites PHP por
-directorio y el límite de Apache, siempre que esté habilitado `mod_php` y las
-opciones `AllowOverride` indicadas. La configuración comprobada para Apache
-queda limitada a esta aplicación.
+`public/.htaccess` configura los límites PHP por directorio y el límite de
+Apache, siempre que esté habilitado `mod_php` y las opciones `AllowOverride`
+indicadas. Define las variables de entorno en Apache o en el VirtualHost, no en
+`.htaccess`. La configuración comprobada para Apache queda limitada a esta
+aplicación.
 
 En Windows, instala la distribución oficial de Cisco Talos desde WinGet:
 
@@ -141,13 +197,14 @@ icacls "C:\xampp\private\sistema-fct" /grant:r "BUILTIN\Administrators:(OI)(CI)F
 ```
 
 Los PDFs pasan por validación de extensión, MIME y tamaño y, antes de persistir,
-por `clamscan`. La variable `FCT_CLAMSCAN` debe señalar al ejecutable confiable
-con ruta absoluta; si no está configurado, no se puede iniciar o tarda más de
-30 segundos, la carga falla cerrada. Mantén ClamAV instalado y sus firmas
-actualizadas (por ejemplo, con `freshclam`), supervisa los fallos del análisis
-y examina el almacenamiento existente antes de habilitar este flujo. Si se
-detecta malware, no publiques el documento: aíslalo, registra el incidente y
-elimínalo según la política del centro.
+por ClamAV. En XAMPP, `FCT_CLAMSCAN` debe señalar al ejecutable confiable con
+ruta absoluta; en Docker se usa `FCT_CLAMD_HOST` y el protocolo TCP de ClamD.
+Si el antivirus no está configurado, no se puede contactar, tiene firmas con
+más de tres días o no puede completar el análisis, la carga falla cerrada.
+Mantén ClamAV instalado y sus firmas actualizadas, supervisa los fallos del
+análisis y examina el almacenamiento existente antes de habilitar este flujo.
+Si se detecta malware, no publiques el documento: aíslalo, registra el
+incidente y elimínalo según la política del centro.
 
 ### 2. Crear e importar la base
 
@@ -236,11 +293,14 @@ $env:FCT_ENABLE_DEMO_SEED = "1"
 Remove-Item Env:FCT_ENABLE_DEMO_SEED
 ```
 
-El script solo funciona con PHP CLI y la base `sistema_fct` en `localhost`.
-Crea perfiles de prueba para Coordinador, Empresa y Alumno; imprime una
-contraseña aleatoria una sola vez por cada cuenta nueva y no cambia cuentas ya
-existentes. Guarda las contraseñas cuando se impriman. No lo ejecutes en una
-instalación publicada y elimina o cambia estas cuentas antes de desplegar.
+El script solo funciona con PHP CLI y la base `sistema_fct` en `localhost`; en
+Docker requiere la confirmación adicional `FCT_DEMO_SEED_ALLOW_DOCKER=1` y solo
+admite el host de servicio `db`. Crea perfiles de prueba para Coordinador,
+Empresa y Alumno; imprime las contraseñas aleatorias de las cuentas nuevas una
+sola vez y no cambia cuentas ya existentes, salvo que se habilite
+explícitamente `FCT_DEMO_SEED_RESET_PASSWORDS=1` y se pase una nueva contraseña
+por variable de entorno. No lo ejecutes en una instalación publicada y elimina
+o cambia estas cuentas antes de desplegar.
 Al iniciar sesión, cada rol aterriza en un módulo propio; el menú ofrece el
 resto de pantallas autorizadas. El alumnado puede gestionar su horario semanal
 y consultar las notas de prácticas finalizadas; Administradores y Coordinadores
@@ -263,6 +323,8 @@ historial y conserva el registro de auditoría.
 - **Alumno:** registro con expediente y tutor legal para menores de edad;
   portal privado con sus datos de expediente, disponibilidad y prácticas;
   edición del perfil con validación de DNI/NIE, teléfono, correo y código postal;
+  el perfil permite completar o corregir los datos del tutor legal de menores,
+  incluso en expedientes heredados incompletos;
   actualización de disponibilidad por periodo, turno y franja semanal por día
   en intervalos de diez minutos;
   consulta de prácticas propias y sus calificaciones finales.

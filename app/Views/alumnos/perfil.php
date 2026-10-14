@@ -64,6 +64,36 @@
                 </div>
             </div>
         </fieldset>
+        <fieldset class="student-registration__section">
+            <legend>Datos del tutor legal</legend>
+            <p>Completa esta sección si eres menor de 18 años. Si los datos de tu expediente son antiguos o están incompletos, puedes actualizarlos aquí.</p>
+            <div class="student-registration__grid">
+                <div class="student-registration__field">
+                    <label for="profile-guardian-name">Nombre completo</label>
+                    <input id="profile-guardian-name" name="tutor_nombre" maxlength="100" autocomplete="off" value="<?= htmlspecialchars($values['tutor_nombre'], ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+                <div class="student-registration__field">
+                    <label for="profile-guardian-dni">DNI/NIE</label>
+                    <input id="profile-guardian-dni" name="tutor_dni" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_dni'], ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+                <div class="student-registration__field">
+                    <label for="profile-guardian-nss">Número de Seguridad Social</label>
+                    <input id="profile-guardian-nss" name="tutor_nss" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_nss'], ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+                <div class="student-registration__field">
+                    <label for="profile-guardian-email">Correo electrónico</label>
+                    <input id="profile-guardian-email" type="email" name="tutor_correo" maxlength="100" autocomplete="off" value="<?= htmlspecialchars($values['tutor_correo'], ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+                <div class="student-registration__field">
+                    <label for="profile-guardian-phone">Teléfono</label>
+                    <input id="profile-guardian-phone" type="tel" name="tutor_telefono" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_telefono'], ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+                <div class="student-registration__field">
+                    <label for="profile-guardian-address">Dirección</label>
+                    <input id="profile-guardian-address" name="tutor_direccion" maxlength="255" autocomplete="off" value="<?= htmlspecialchars($values['tutor_direccion'], ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+            </div>
+        </fieldset>
         <div class="student-registration__actions">
             <p>Los cambios se guardan en tu expediente privado.</p>
             <button class="student-registration__submit" type="submit">Guardar cambios</button>

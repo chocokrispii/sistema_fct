@@ -48,7 +48,8 @@ class Alumno {
         string $nss,
         string $telefono,
         string $direccion,
-        string $codigoPostal
+        string $codigoPostal,
+        ?array $tutor = null
     ): void {
         $this->db->beginTransaction();
         try {
@@ -115,6 +116,52 @@ class Alumno {
                     'direccion' => $direccion,
                     'id' => $contactId,
                 ]);
+            }
+
+            if ($tutor !== null) {
+                $guardian = $this->db->prepare(
+                    'SELECT id FROM tutores_legales
+                     WHERE alumno_id = :alumno_id
+                     ORDER BY id
+                     LIMIT 1
+                     FOR UPDATE'
+                );
+                $guardian->execute(['alumno_id' => $alumnoId]);
+                $guardianId = $guardian->fetchColumn();
+                if ($guardianId === false) {
+                    $saveGuardian = $this->db->prepare(
+                        'INSERT INTO tutores_legales
+                            (alumno_id, nombre_completo, dni, numero_seguridad_social, direccion, telefono, correo)
+                         VALUES
+                            (:alumno_id, :nombre, :dni, :nss, :direccion, :telefono, :correo)'
+                    );
+                    $saveGuardian->execute([
+                        'alumno_id' => $alumnoId,
+                        'nombre' => $tutor['nombre'],
+                        'dni' => $tutor['dni'],
+                        'nss' => $tutor['nss'],
+                        'direccion' => $tutor['direccion'],
+                        'telefono' => $tutor['telefono'],
+                        'correo' => $tutor['correo'],
+                    ]);
+                } else {
+                    $saveGuardian = $this->db->prepare(
+                        'UPDATE tutores_legales
+                         SET nombre_completo = :nombre, dni = :dni,
+                             numero_seguridad_social = :nss, direccion = :direccion,
+                             telefono = :telefono, correo = :correo
+                         WHERE id = :id'
+                    );
+                    $saveGuardian->execute([
+                        'nombre' => $tutor['nombre'],
+                        'dni' => $tutor['dni'],
+                        'nss' => $tutor['nss'],
+                        'direccion' => $tutor['direccion'],
+                        'telefono' => $tutor['telefono'],
+                        'correo' => $tutor['correo'],
+                        'id' => $guardianId,
+                    ]);
+                }
             }
             $this->db->commit();
         } catch (Throwable $exception) {
