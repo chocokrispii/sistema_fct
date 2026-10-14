@@ -1,0 +1,13 @@
+{
+  "name": "proyecto",
+  "version": "1.0.0",
+  "scripts": {
+    "docker:watch": "MSYS_NO_PATHCONV=1 docker run --rm -v \"$(pwd)\":/app -w /app node:lts-alpine npx postcss public/assets/css/style.src.css -o public/assets/css/style.css --watch"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "postcss-cli": "^11.0.0",
+    "postcss-nested": "^6.0.1"
+  }
+}
