@@ -672,9 +672,30 @@ try {
         str_contains($adminViewHtml, 'Coordinadora Álvarez O&#039;Connor')
             && str_contains($adminViewHtml, 'Estás seguro?')
             && str_contains($adminViewHtml, 'No, volver.')
-            && str_contains($adminViewHtml, 'Sí, eliminar'),
-        'La administración debe mostrar el nombre del coordinador y el modal con las acciones pedidas.'
+            && str_contains($adminViewHtml, 'Sí, eliminar')
+            && str_contains($adminViewHtml, 'Buscar por correo o nombre')
+            && str_contains($adminViewHtml, 'Filtrar cuentas'),
+        'La administración debe mostrar el nombre, las acciones y los controles de búsqueda de cuentas.'
     );
+    $filteredStaff = (new Usuario($db))->obtenerTodos($emails[3], 'Coordinador', true);
+    assertTrue(
+        count($filteredStaff) === 1
+            && $filteredStaff[0]['email'] === $emails[3]
+            && $filteredStaff[0]['rol'] === 'Coordinador',
+        'Los filtros de texto, rol y estado deben combinarse sin devolver cuentas ajenas.'
+    );
+    $_GET = ['buscar' => $emails[3], 'rol' => 'Coordinador', 'activo' => '1'];
+    ob_start();
+    (new UsuarioAdminController($db))->gestionar();
+    $filteredAdminView = (string)ob_get_clean();
+    assertTrue(
+        str_contains($filteredAdminView, htmlspecialchars($emails[3], ENT_QUOTES, 'UTF-8'))
+            && !str_contains($filteredAdminView, htmlspecialchars($emails[4], ENT_QUOTES, 'UTF-8'))
+            && str_contains($filteredAdminView, 'value="Coordinador" selected')
+            && str_contains($filteredAdminView, 'value="1" selected'),
+        'La página administrativa debe aplicar filtros y conservarlos en el formulario.'
+    );
+    $_GET = [];
 
     $historicalStudentDeleteBlocked = false;
     try {

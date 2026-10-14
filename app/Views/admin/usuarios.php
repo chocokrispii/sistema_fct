@@ -17,6 +17,33 @@
     </label>
     <button type="submit">Crear cuenta del centro</button>
 </form>
+<form class="page-form page-form--narrow" method="GET" action="index.php">
+    <input type="hidden" name="action" value="usuarios">
+    <label>Buscar por correo o nombre
+        <input type="search" name="buscar" maxlength="100" value="<?= htmlspecialchars($busqueda, ENT_QUOTES, 'UTF-8') ?>">
+    </label>
+    <label>Rol
+        <select name="rol">
+            <option value="">Todos los roles</option>
+            <?php foreach (['Administrador', 'Coordinador', 'Observador', 'Empresa', 'Alumno'] as $rol): ?>
+                <option value="<?= htmlspecialchars($rol, ENT_QUOTES, 'UTF-8') ?>" <?= $rolFiltro === $rol ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($rol, ENT_QUOTES, 'UTF-8') ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+    <label>Estado
+        <select name="activo">
+            <option value="" <?= $estadoFiltro === '' ? 'selected' : '' ?>>Todos</option>
+            <option value="1" <?= $estadoFiltro === '1' ? 'selected' : '' ?>>Activo</option>
+            <option value="0" <?= $estadoFiltro === '0' ? 'selected' : '' ?>>Desactivado</option>
+        </select>
+    </label>
+    <button type="submit">Filtrar cuentas</button>
+    <?php if ($busqueda !== '' || $rolFiltro !== '' || $estadoFiltro !== ''): ?>
+        <a href="index.php?action=usuarios">Limpiar filtros</a>
+    <?php endif; ?>
+</form>
 <table>
     <thead><tr><th>Correo</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
     <tbody><?php foreach ($usuarios as $usuario): ?>

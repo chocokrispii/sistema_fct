@@ -36,15 +36,36 @@ class Usuario {
         return $user ?: null;
     }
 
-    public function obtenerTodos(): array
+    public function obtenerTodos(?string $busqueda = null, ?string $rol = null, ?bool $activo = null): array
     {
-        $stmt = $this->db->query(
-            "SELECT u.id, u.email, u.rol, u.activo, u.fecha_creacion,
-                    COALESCE(NULLIF(CONCAT_WS(' ', c.nombre, c.apellidos), ''), '—') AS nombre_completo
-             FROM usuarios u
-             LEFT JOIN coordinadores c ON c.usuario_id = u.id
-             ORDER BY u.rol, u.email"
-        );
+        $sql = "SELECT u.id, u.email, u.rol, u.activo, u.fecha_creacion,
+                       COALESCE(NULLIF(CONCAT_WS(' ', c.nombre, c.apellidos), ''), '—') AS nombre_completo
+                FROM usuarios u
+                LEFT JOIN coordinadores c ON c.usuario_id = u.id";
+        $conditions = [];
+        $params = [];
+        if ($busqueda !== null && $busqueda !== '') {
+            $conditions[] = '(u.email LIKE :email OR CONCAT_WS(\' \', c.nombre, c.apellidos) LIKE :nombre)';
+            $params['email'] = '%' . $busqueda . '%';
+            $params['nombre'] = '%' . $busqueda . '%';
+        }
+        if ($rol !== null) {
+            if (!in_array($rol, ['Administrador', 'Coordinador', 'Observador', 'Empresa', 'Alumno'], true)) {
+                throw new InvalidArgumentException('El rol de búsqueda no es válido.');
+            }
+            $conditions[] = 'u.rol = :rol';
+            $params['rol'] = $rol;
+        }
+        if ($activo !== null) {
+            $conditions[] = 'u.activo = :activo';
+            $params['activo'] = $activo ? 1 : 0;
+        }
+        if ($conditions !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $conditions);
+        }
+        $sql .= ' ORDER BY u.rol, u.email';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 

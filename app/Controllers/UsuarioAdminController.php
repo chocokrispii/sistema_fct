@@ -17,6 +17,9 @@ class UsuarioAdminController
     public function gestionar(): void
     {
         $error = '';
+        $busqueda = '';
+        $rolFiltro = '';
+        $estadoFiltro = '';
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $emailRaw = $_POST['email'] ?? '';
             $password = $_POST['password'] ?? '';
@@ -69,10 +72,35 @@ class UsuarioAdminController
                     $error = 'No se pudo crear la cuenta. Comprueba si el correo ya está registrado.';
                 }
             }
+        } else {
+            $busquedaRaw = $_GET['buscar'] ?? '';
+            $rolRaw = $_GET['rol'] ?? '';
+            $estadoRaw = $_GET['activo'] ?? '';
+            if (
+                !is_string($busquedaRaw)
+                || !is_string($rolRaw)
+                || !is_string($estadoRaw)
+                || mb_strlen(trim($busquedaRaw)) > 100
+                || ($rolRaw !== '' && !in_array($rolRaw, ['Administrador', 'Coordinador', 'Observador', 'Empresa', 'Alumno'], true))
+                || !in_array($estadoRaw, ['', '0', '1'], true)
+            ) {
+                $error = 'Los filtros de búsqueda no tienen un formato válido.';
+            } else {
+                $busqueda = trim($busquedaRaw);
+                $rolFiltro = $rolRaw;
+                $estadoFiltro = $estadoRaw;
+            }
         }
 
         View::render('admin/usuarios', [
-            'usuarios' => $this->model->obtenerTodos(),
+            'usuarios' => $this->model->obtenerTodos(
+                $busqueda !== '' ? $busqueda : null,
+                $rolFiltro !== '' ? $rolFiltro : null,
+                $estadoFiltro === '' ? null : $estadoFiltro === '1'
+            ),
+            'busqueda' => $busqueda,
+            'rolFiltro' => $rolFiltro,
+            'estadoFiltro' => $estadoFiltro,
             'error' => $error !== '' ? $error : (is_string($_GET['error'] ?? null) ? $_GET['error'] : ''),
             'eliminado' => isset($_GET['eliminado']),
         ]);
