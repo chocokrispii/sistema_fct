@@ -31,7 +31,8 @@
 <?php endif; ?>
 <?php if ($rows !== []): ?>
     <table>
-        <thead><tr><th>Empresa</th><th>Ciclo</th><th>Periodo</th><th>Oferta</th><th>Alumno asignado</th><th>Prácticas</th></tr></thead>
+        <caption>Resultados de consultas y seguimiento</caption>
+        <thead><tr><th scope="col">Empresa</th><th scope="col">Ciclo</th><th scope="col">Periodo</th><th scope="col">Oferta</th><th scope="col">Alumno asignado</th><th scope="col">Prácticas</th></tr></thead>
         <tbody><?php foreach ($rows as $row): ?>
             <tr>
                 <td><?= htmlspecialchars($row['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
