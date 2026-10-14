@@ -23,12 +23,7 @@ final class SpanishDataValidator
 
     public static function isSpanishPhone(string $value): bool
     {
-        $phone = trim($value);
-        if (preg_match('/\A(?:\+34|0034)\s*/', $phone) === 1) {
-            $phone = preg_replace('/\A(?:\+34|0034)\s*/', '', $phone) ?? '';
-        }
-        $digits = preg_replace('/[\s().-]+/', '', $phone);
-        return is_string($digits) && preg_match('/\A[6789]\d{8}\z/', $digits) === 1;
+        return preg_match('/\A[6789]\d{8}\z/', self::normalizePhone($value)) === 1;
     }
 
     public static function isSpanishPostcode(string $value): bool

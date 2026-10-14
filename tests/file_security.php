@@ -52,6 +52,11 @@ assertFileSecurity(SpanishDataValidator::isDniNie('X-1234567-L'), 'Se rechazó u
 assertFileSecurity(!SpanishDataValidator::isDniNie('12345678A'), 'Se aceptó un DNI con letra de control incorrecta.');
 assertFileSecurity(!SpanishDataValidator::isDniNie('X1234567A'), 'Se aceptó un NIE con letra de control incorrecta.');
 assertFileSecurity(SpanishDataValidator::isSpanishPhone('+34 612 345 678'), 'Se rechazó un teléfono válido con prefijo +34.');
+assertFileSecurity(SpanishDataValidator::isSpanishPhone('0034 (612) 345-678'), 'Se rechazó un teléfono válido con prefijo 0034.');
+assertFileSecurity(
+    SpanishDataValidator::normalizePhone('0034 (612) 345-678') === '612345678',
+    'No se normalizó el prefijo internacional y formato del teléfono.'
+);
 assertFileSecurity(!SpanishDataValidator::isSpanishPhone('512345678'), 'Se aceptó un teléfono con prefijo nacional no permitido.');
 assertFileSecurity(SpanishDataValidator::isSpanishPostcode('28013'), 'Se rechazó un código postal válido.');
 assertFileSecurity(!SpanishDataValidator::isSpanishPostcode('53000'), 'Se aceptó un código postal fuera del rango provincial español.');
