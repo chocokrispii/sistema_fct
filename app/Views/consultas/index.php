@@ -30,7 +30,8 @@
     <p role="status">No se encontraron resultados.</p>
 <?php endif; ?>
 <table>
-    <thead><tr><th>Empresa</th><th>Ciclo</th><th>Periodo</th><th>Oferta</th><th>Alumno asignado</th><th>Prácticas</th></tr></thead>
+    <caption>Resultados de consultas y seguimiento</caption>
+    <thead><tr><th scope="col">Empresa</th><th scope="col">Ciclo</th><th scope="col">Periodo</th><th scope="col">Oferta</th><th scope="col">Alumno asignado</th><th scope="col">Prácticas</th></tr></thead>
     <tbody><?php foreach ($rows as $row): ?>
         <tr>
             <td><?= htmlspecialchars($row['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
@@ -44,24 +45,21 @@
 </table>
 <?php if ($totalPaginas > 1): ?>
     <?php
-    $paginationUrl = static function (int $targetPage) use ($filters): string {
-        return 'index.php?' . http_build_query([
-            'action' => 'consultas',
-            'especialidad_id' => $filters['especialidad'] === '' ? null : $filters['especialidad'],
-            'estado' => $filters['estado'] === '' ? null : $filters['estado'],
-            'desde' => $filters['desde'] === '' ? null : $filters['desde'],
-            'hasta' => $filters['hasta'] === '' ? null : $filters['hasta'],
-            'pagina' => $targetPage,
-        ]);
-    };
+    $paginationParameters = [
+        'action' => 'consultas',
+        'especialidad_id' => $filters['especialidad'] === '' ? null : $filters['especialidad'],
+        'estado' => $filters['estado'] === '' ? null : $filters['estado'],
+        'desde' => $filters['desde'] === '' ? null : $filters['desde'],
+        'hasta' => $filters['hasta'] === '' ? null : $filters['hasta'],
+    ];
     ?>
     <nav aria-label="Paginación de consultas">
         <?php if ($pagina > 1): ?>
-            <a rel="prev" href="<?= htmlspecialchars($paginationUrl($pagina - 1), ENT_QUOTES, 'UTF-8') ?>">Anterior</a>
+            <a rel="prev" href="<?= htmlspecialchars('index.php?' . http_build_query($paginationParameters + ['pagina' => $pagina - 1]), ENT_QUOTES, 'UTF-8') ?>">Anterior</a>
         <?php endif; ?>
         <span>Página <?= (int)$pagina ?> de <?= (int)$totalPaginas ?></span>
         <?php if ($pagina < $totalPaginas): ?>
-            <a rel="next" href="<?= htmlspecialchars($paginationUrl($pagina + 1), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a>
+            <a rel="next" href="<?= htmlspecialchars('index.php?' . http_build_query($paginationParameters + ['pagina' => $pagina + 1]), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a>
         <?php endif; ?>
     </nav>
 <?php endif; ?>
