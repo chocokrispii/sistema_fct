@@ -185,6 +185,11 @@ class Alumno {
         int $especialidadId,
         string $codigoPostal = ''
     ): int {
+        $ownsTransaction = !$this->db->inTransaction();
+        if ($ownsTransaction) {
+            $this->db->beginTransaction();
+        }
+
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO alumnos
@@ -217,10 +222,16 @@ class Alumno {
                 'direccion' => $direccion,
             ]);
 
+            if ($ownsTransaction) {
+                $this->db->commit();
+            }
+
             return $alumnoId;
-        } catch (PDOException $e) {
-            error_log("Error al crear alumno: " . $e->getMessage());
-            return 0;
+        } catch (Throwable $exception) {
+            if ($ownsTransaction && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $exception;
         }
     }
 
