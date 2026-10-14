@@ -103,6 +103,7 @@ class UsuarioAdminController
             'estadoFiltro' => $estadoFiltro,
             'error' => $error !== '' ? $error : (is_string($_GET['error'] ?? null) ? $_GET['error'] : ''),
             'eliminado' => isset($_GET['eliminado']),
+            'estadoActualizado' => ($_GET['estado_actualizado'] ?? null) === '1',
         ]);
     }
 
@@ -168,7 +169,7 @@ class UsuarioAdminController
             throw $e;
         }
 
-        header('Location: ' . $this->gestionUrl());
+        header('Location: ' . $this->gestionUrl(['estado_actualizado' => '1']));
         exit;
     }
 

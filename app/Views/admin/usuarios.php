@@ -1,5 +1,6 @@
 <?php if ($error !== ''): ?><p class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if ($eliminado): ?><p class="message message-success" role="status">Usuario eliminado permanentemente.</p><?php endif; ?>
+<?php if ($estadoActualizado): ?><p class="message message-success" role="status">Estado de la cuenta actualizado.</p><?php endif; ?>
 <h2>Gestión de cuentas</h2>
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=usuarios">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">

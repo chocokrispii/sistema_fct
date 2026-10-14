@@ -726,6 +726,15 @@ try {
             && !str_contains($adminViewHtml, 'aria-label="Desactivar cuenta de ' . htmlspecialchars($emails[4], ENT_QUOTES, 'UTF-8') . '"'),
         'La administración debe mostrar el nombre, las acciones y los controles de búsqueda de cuentas.'
     );
+    $_GET = ['estado_actualizado' => '1'];
+    ob_start();
+    (new UsuarioAdminController($db))->gestionar();
+    $updatedAccountStatusHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($updatedAccountStatusHtml, 'Estado de la cuenta actualizado.')
+            && str_contains($updatedAccountStatusHtml, 'role="status"'),
+        'La administración debe confirmar de forma accesible la actualización del estado de una cuenta.'
+    );
     $filteredStaff = (new Usuario($db))->obtenerTodos($emails[3], 'Coordinador', true);
     assertTrue(
         count($filteredStaff) === 1
