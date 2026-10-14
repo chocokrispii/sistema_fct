@@ -721,7 +721,9 @@ try {
             && str_contains($adminViewHtml, 'No, volver.')
             && str_contains($adminViewHtml, 'Sí, eliminar')
             && str_contains($adminViewHtml, 'Buscar por correo o nombre')
-            && str_contains($adminViewHtml, 'Filtrar cuentas'),
+            && str_contains($adminViewHtml, 'Filtrar cuentas')
+            && str_contains($adminViewHtml, 'Cuenta actual')
+            && !str_contains($adminViewHtml, 'aria-label="Desactivar cuenta de ' . htmlspecialchars($emails[4], ENT_QUOTES, 'UTF-8') . '"'),
         'La administración debe mostrar el nombre, las acciones y los controles de búsqueda de cuentas.'
     );
     $filteredStaff = (new Usuario($db))->obtenerTodos($emails[3], 'Coordinador', true);

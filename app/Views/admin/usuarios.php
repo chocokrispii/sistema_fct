@@ -49,19 +49,27 @@
     <caption>Cuentas de usuario</caption>
     <thead><tr><th scope="col">Correo</th><th scope="col">Nombre</th><th scope="col">Rol</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead>
     <tbody><?php foreach ($usuarios as $usuario): ?>
+        <?php
+        $esCuentaActual = (int)$usuario['id'] === (int)($_SESSION['usuario_id'] ?? 0);
+        $estaActiva = (int)$usuario['activo'] === 1;
+        ?>
         <tr>
             <td><?= htmlspecialchars($usuario['email'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= htmlspecialchars($usuario['nombre_completo'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= htmlspecialchars($usuario['rol'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= (int)$usuario['activo'] === 1 ? 'Activo' : 'Desactivado' ?></td>
+            <td><?= $estaActiva ? 'Activo' : 'Desactivado' ?></td>
             <td><div class="user-actions">
+                <?php if (!$esCuentaActual || !$estaActiva): ?>
                 <form class="action-form" method="POST" action="index.php?action=estado-usuario">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
                     <input type="hidden" name="usuario_id" value="<?= (int)$usuario['id'] ?>">
-                    <input type="hidden" name="activo" value="<?= (int)$usuario['activo'] === 1 ? '0' : '1' ?>">
-                    <button type="submit" aria-label="<?= htmlspecialchars(((int)$usuario['activo'] === 1 ? 'Desactivar cuenta de ' : 'Activar cuenta de ') . $usuario['email'], ENT_QUOTES, 'UTF-8') ?>"><?= (int)$usuario['activo'] === 1 ? 'Desactivar' : 'Activar' ?></button>
+                    <input type="hidden" name="activo" value="<?= $estaActiva ? '0' : '1' ?>">
+                    <button type="submit" aria-label="<?= htmlspecialchars(($estaActiva ? 'Desactivar cuenta de ' : 'Activar cuenta de ') . $usuario['email'], ENT_QUOTES, 'UTF-8') ?>"><?= $estaActiva ? 'Desactivar' : 'Activar' ?></button>
                 </form>
-                <?php if ((int)$usuario['id'] !== (int)($_SESSION['usuario_id'] ?? 0)): ?>
+                <?php else: ?>
+                    <span class="text-muted">Cuenta actual</span>
+                <?php endif; ?>
+                <?php if (!$esCuentaActual): ?>
                     <button class="user-delete-trigger" type="button" aria-label="<?= htmlspecialchars('Eliminar cuenta de ' . $usuario['email'], ENT_QUOTES, 'UTF-8') ?>" data-delete-user="<?= (int)$usuario['id'] ?>" data-delete-email="<?= htmlspecialchars($usuario['email'], ENT_QUOTES, 'UTF-8') ?>">Eliminar usuario</button>
                 <?php endif; ?>
             </div></td>
