@@ -39,16 +39,13 @@ class AsignacionController
         $errorRaw = $_GET['error'] ?? '';
         $error = is_string($errorRaw) ? $errorRaw : '';
         $ofertaModel = new Oferta($this->db);
-        $ofertas = $ofertaModel->obtenerTodas(true);
+        $ofertas = $ofertaModel->obtenerVigentesConAsignaciones();
+        $candidatosPorOferta = $ofertas === [] ? [] : $ofertaModel->obtenerCandidatosVigentes();
         foreach ($ofertas as &$oferta) {
-            $stmt = $this->db->prepare(
-                "SELECT COUNT(*) FROM asignaciones_fct WHERE oferta_id = :id AND estado IN ('Asignada', 'Cerrada')"
-            );
-            $stmt->execute(['id' => $oferta['id']]);
-            $oferta['asignadas'] = (int)$stmt->fetchColumn();
+            $oferta['asignadas'] = (int)$oferta['asignadas'];
             $oferta['plazas_disponibles'] = max(0, (int)$oferta['plazas_cuantas'] - $oferta['asignadas']);
             $oferta['candidatos'] = $oferta['plazas_disponibles'] > 0
-                ? $ofertaModel->obtenerCandidatos((int)$oferta['id'])
+                ? ($candidatosPorOferta[(int)$oferta['id']] ?? [])
                 : [];
         }
         unset($oferta);

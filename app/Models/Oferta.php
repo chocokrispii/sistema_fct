@@ -59,6 +59,27 @@ class Oferta {
         return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function obtenerVigentesConAsignaciones(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT p.id, p.plazas_cuantas, p.fecha_inicio, p.fecha_fin, p.turno,
+                    e.nombre_empresa, es.nombre_especialidad,
+                    COALESCE(conteo.asignadas, 0) AS asignadas
+             FROM empresa_especialidades_plazas p
+             INNER JOIN empresas e ON e.id = p.empresa_id
+             INNER JOIN especialidades es ON es.id = p.especialidad_id
+             LEFT JOIN (
+                 SELECT oferta_id, COUNT(*) AS asignadas
+                 FROM asignaciones_fct
+                 WHERE estado IN ('Asignada', 'Cerrada')
+                 GROUP BY oferta_id
+             ) conteo ON conteo.oferta_id = p.id
+             WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
+             ORDER BY p.fecha_inicio"
+        );
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function obtenerPendientes(): array
     {
         $stmt = $this->db->query(self::SELECT_BASE . " WHERE p.estado = 'Pendiente' ORDER BY p.fecha_inicio");
@@ -88,7 +109,57 @@ class Oferta {
 
     public function obtenerCandidatos(int $ofertaId): array
     {
-        $sql = "SELECT a.id AS alumno_id, a.nombre, a.apellidos, a.correo, d.turno
+        return $this->consultarCandidatos('p.id = :oferta_id', ['oferta_id' => $ofertaId]);
+    }
+
+    public function obtenerCandidatosVigentes(): array
+    {
+        $stmt = $this->consultarCandidatos(
+            'p.fecha_fin >= CURDATE()',
+            [],
+            true,
+            true
+        );
+        $candidatesByOffer = [];
+        foreach ($stmt as $candidate) {
+            $offerId = (int)$candidate['oferta_id'];
+            unset($candidate['oferta_id']);
+            $candidatesByOffer[$offerId][] = $candidate;
+        }
+
+        return $candidatesByOffer;
+    }
+
+    private function consultarCandidatos(
+        string $filter,
+        array $params,
+        bool $includeOfferId = false,
+        bool $onlyOffersWithCapacity = false
+    ): array
+    {
+        $conditions = [
+            $filter,
+            "p.estado = 'Aprobada'",
+            "NOT EXISTS (
+                SELECT 1 FROM asignaciones_fct af
+                WHERE af.alumno_id = a.id AND af.estado = 'Asignada'
+            )",
+        ];
+        if ($onlyOffersWithCapacity) {
+            $conditions[] = 'COALESCE(capacidad.asignadas, 0) < p.plazas_cuantas';
+        }
+
+        $offerColumn = $includeOfferId ? 'p.id AS oferta_id, ' : '';
+        $offerGroup = $includeOfferId ? 'p.id, ' : '';
+        $capacityJoin = $onlyOffersWithCapacity
+            ? "LEFT JOIN (
+                    SELECT oferta_id, COUNT(*) AS asignadas
+                    FROM asignaciones_fct
+                    WHERE estado IN ('Asignada', 'Cerrada')
+                    GROUP BY oferta_id
+                ) capacidad ON capacidad.oferta_id = p.id"
+            : '';
+        $sql = "SELECT {$offerColumn}a.id AS alumno_id, a.nombre, a.apellidos, a.correo, d.turno
                 FROM empresa_especialidades_plazas p
                 INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
                 INNER JOIN alumno_disponibilidad d
@@ -112,16 +183,12 @@ class Oferta {
                                 OR (p.turno = 'T' AND ds.hora_inicio < '23:59:59' AND ds.hora_fin > '14:00:00')
                             )
                     )
-                WHERE p.id = :oferta_id
-                    AND p.estado = 'Aprobada'
-                    AND NOT EXISTS (
-                        SELECT 1 FROM asignaciones_fct af
-                        WHERE af.alumno_id = a.id AND af.estado = 'Asignada'
-                    )
-                GROUP BY a.id, a.nombre, a.apellidos, a.correo, d.turno
-                ORDER BY a.apellidos, a.nombre";
+                {$capacityJoin}
+                WHERE " . implode("\n                    AND ", $conditions) . "
+                GROUP BY {$offerGroup}a.id, a.nombre, a.apellidos, a.correo, d.turno
+                ORDER BY " . ($includeOfferId ? 'p.id, ' : '') . 'a.apellidos, a.nombre';
         $stmt = $this->db->prepare($sql);
-        $stmt->execute(['oferta_id' => $ofertaId]);
+        $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }

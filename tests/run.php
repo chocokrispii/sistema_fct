@@ -539,6 +539,18 @@ try {
         count($candidates) === 1 && (int)$candidates[0]['alumno_id'] === $createdStudents[0],
         'El motor de compatibilidad debe excluir alumnos cuyo horario semanal no coincide con el turno.'
     );
+    $offersWithCounts = $matching->obtenerVigentesConAsignaciones();
+    assertTrue(
+        count($offersWithCounts) === 1
+            && (int)$offersWithCounts[0]['asignadas'] === 0,
+        'La lista de ofertas debe cargar el número de plazas cubiertas en una consulta agrupada.'
+    );
+    $bulkCandidates = $matching->obtenerCandidatosVigentes();
+    assertTrue(
+        count($bulkCandidates[$createdOffer] ?? []) === 1
+            && (int)$bulkCandidates[$createdOffer][0]['alumno_id'] === $createdStudents[0],
+        'La consulta agrupada debe devolver los candidatos indexados por oferta.'
+    );
 
     $assignments = new Asignacion($db);
     $assignments->crear($createdOffer, $createdStudents[0], $createdUsers[3], 'Tutor de empresa');
@@ -546,7 +558,24 @@ try {
         'SELECT id FROM asignaciones_fct WHERE oferta_id = ' . $createdOffer . ' AND alumno_id = ' . $createdStudents[0]
     )->fetchColumn();
     $createdAssignmentId = $assignmentId;
-    assertTrue(count($matching->obtenerCandidatos($createdOffer)) === 0, 'Un alumno asignado no debe seguir siendo candidato.');
+    $availabilityModel->reemplazar(
+        $createdUsers[2],
+        '2027-03-01',
+        '2027-06-30',
+        'M',
+        [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
+    );
+    $remainingCandidates = $matching->obtenerCandidatos($createdOffer);
+    assertTrue(
+        count($remainingCandidates) === 1
+            && (int)$remainingCandidates[0]['alumno_id'] === $createdStudents[1],
+        'El motor individual debe excluir al alumno asignado y conservar al candidato compatible.'
+    );
+    assertTrue(
+        (int)$matching->obtenerVigentesConAsignaciones()[0]['asignadas'] === 1
+            && !isset($matching->obtenerCandidatosVigentes()[$createdOffer]),
+        'El matching agrupado debe reflejar plazas ocupadas y excluir ofertas sin capacidad.'
+    );
     $availabilityModel->reemplazar(
         $createdUsers[1],
         '2027-04-01',
