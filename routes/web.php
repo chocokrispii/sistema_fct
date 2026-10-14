@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'inicio' => ['method' => 'GET', 'roles' => [], 'controller' => null, 'action' => null],
+    'inicio' => ['method' => 'GET', 'roles' => [], 'controller' => InicioController::class, 'action' => 'mostrar'],
     'login' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => AuthController::class, 'action' => 'login'],
     'recuperar' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => RecuperacionController::class, 'action' => 'solicitar'],
     'restablecer' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => RecuperacionController::class, 'action' => 'restablecer'],
