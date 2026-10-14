@@ -20,14 +20,38 @@ class UsuarioAdminController
         $busqueda = '';
         $rolFiltro = '';
         $estadoFiltro = '';
+        $datosCuenta = [
+            'email' => '',
+            'nombre' => '',
+            'apellidos' => '',
+            'rol' => 'Coordinador',
+        ];
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $emailRaw = $_POST['email'] ?? '';
             $password = $_POST['password'] ?? '';
             $role = $_POST['rol'] ?? '';
-            if (!is_string($emailRaw) || !is_string($password) || !is_string($role)) {
+            $nombreRaw = $_POST['nombre'] ?? '';
+            $apellidosRaw = $_POST['apellidos'] ?? '';
+            if (
+                !is_string($emailRaw)
+                || !is_string($password)
+                || !is_string($role)
+                || !is_string($nombreRaw)
+                || !is_string($apellidosRaw)
+            ) {
                 throw new InvalidArgumentException('Los datos de la cuenta no tienen un formato válido.');
             }
             $email = trim($emailRaw);
+            $nombre = trim($nombreRaw);
+            $apellidos = trim($apellidosRaw);
+            $datosCuenta = [
+                'email' => $email,
+                'nombre' => $nombre,
+                'apellidos' => $apellidos,
+                'rol' => in_array($role, ['Coordinador', 'Observador', 'Administrador'], true)
+                    ? $role
+                    : '',
+            ];
             if (
                 !filter_var($email, FILTER_VALIDATE_EMAIL)
                 || strlen($email) > 100
@@ -39,13 +63,6 @@ class UsuarioAdminController
             } else {
                 try {
                     $this->db->beginTransaction();
-                    $nombreRaw = $_POST['nombre'] ?? '';
-                    $apellidosRaw = $_POST['apellidos'] ?? '';
-                    if (!is_string($nombreRaw) || !is_string($apellidosRaw)) {
-                        throw new InvalidArgumentException('El nombre y los apellidos deben ser texto.');
-                    }
-                    $nombre = trim($nombreRaw);
-                    $apellidos = trim($apellidosRaw);
                     if (
                         $role === 'Coordinador'
                         && ($nombre === '' || $apellidos === '' || mb_strlen($nombre) > 50 || mb_strlen($apellidos) > 100)
@@ -101,6 +118,7 @@ class UsuarioAdminController
             'busqueda' => $busqueda,
             'rolFiltro' => $rolFiltro,
             'estadoFiltro' => $estadoFiltro,
+            'datosCuenta' => $datosCuenta,
             'error' => $error !== '' ? $error : (is_string($_GET['error'] ?? null) ? $_GET['error'] : ''),
             'eliminado' => isset($_GET['eliminado']),
             'estadoActualizado' => ($_GET['estado_actualizado'] ?? null) === '1',
