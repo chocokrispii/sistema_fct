@@ -24,16 +24,7 @@ class OfertaController {
         View::render('ofertas/listado', ['ofertas' => $ofertas]);
     }
 
-   public function publicar(): void {
-       if (session_status() === PHP_SESSION_NONE) {
-       //     session_start();
-        }
-
-       // if (($_SESSION['rol'] ?? '') !== 'Empresa') {
-          //     header('Location: index.php?action=login');
-           // exit;
-        }
-
+    public function publicar(): void {
         $empresa = $this->empresaModel->obtenerPorUsuarioId((int)$_SESSION['usuario_id']);
         if ($empresa === null) {
             throw new RuntimeException('Tu usuario no tiene un perfil de empresa asociado.');
