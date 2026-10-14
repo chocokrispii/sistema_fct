@@ -748,17 +748,19 @@ try {
     $_POST = [
         'email' => 'coordinador-valido@example.test',
         'password' => 'ValidInitialPassword123',
-        'nombre' => '',
-        'apellidos' => '',
+        'nombre' => '<script>alert(1)</script>',
+        'apellidos' => 'Apellidos válidos',
         'rol' => 'Coordinador',
     ];
     ob_start();
     (new UsuarioAdminController($db))->gestionar();
     $missingCoordinatorNameHtml = (string)ob_get_clean();
     assertTrue(
-        str_contains($missingCoordinatorNameHtml, 'Los coordinadores necesitan nombre y apellidos válidos')
+        str_contains($missingCoordinatorNameHtml, 'Los coordinadores necesitan nombres y apellidos válidos')
+            && !str_contains($missingCoordinatorNameHtml, '<script>alert(1)</script>')
+            && str_contains($missingCoordinatorNameHtml, '&lt;script&gt;alert(1)&lt;/script&gt;')
             && !str_contains($missingCoordinatorNameHtml, 'Comprueba si el correo ya está registrado'),
-        'Los datos obligatorios del coordinador deben producir un error específico antes de intentar crear la cuenta.'
+        'El nombre del coordinador debe validarse y mostrarse escapado antes de intentar crear la cuenta.'
     );
     $_POST = [];
     $_SERVER['REQUEST_METHOD'] = 'GET';

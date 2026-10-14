@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
+require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 
 class UsuarioAdminController
 {
@@ -64,9 +65,12 @@ class UsuarioAdminController
                 $error = 'Selecciona un rol válido para la cuenta del centro.';
             } elseif (
                 $role === 'Coordinador'
-                && ($nombre === '' || $apellidos === '' || mb_strlen($nombre) > 50 || mb_strlen($apellidos) > 100)
+                && (
+                    !SpanishDataValidator::isPersonName($nombre, 50)
+                    || !SpanishDataValidator::isPersonName($apellidos, 100)
+                )
             ) {
-                $error = 'Los coordinadores necesitan nombre y apellidos válidos (máximo 50 y 100 caracteres).';
+                $error = 'Los coordinadores necesitan nombres y apellidos válidos (máximo 50 y 100 caracteres).';
             } else {
                 try {
                     $this->db->beginTransaction();
