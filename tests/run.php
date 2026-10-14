@@ -717,7 +717,7 @@ try {
     $adminViewHtml = (string)ob_get_clean();
     assertTrue(
         str_contains($adminViewHtml, 'Coordinadora Álvarez O&#039;Connor')
-            && str_contains($adminViewHtml, 'Estás seguro?')
+            && str_contains($adminViewHtml, '¿Estás seguro?')
             && str_contains($adminViewHtml, 'No, volver.')
             && str_contains($adminViewHtml, 'Sí, eliminar')
             && str_contains($adminViewHtml, 'Buscar por correo o nombre')
