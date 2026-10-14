@@ -31,12 +31,14 @@
 <?php endif; ?>
 <table>
     <caption>Resultados de consultas y seguimiento</caption>
-    <thead><tr><th scope="col">Empresa</th><th scope="col">Ciclo</th><th scope="col">Periodo</th><th scope="col">Oferta</th><th scope="col">Alumno asignado</th><th scope="col">Prácticas</th></tr></thead>
+    <thead><tr><th scope="col">Empresa</th><th scope="col">Ciclo</th><th scope="col">Periodo</th><th scope="col">Turno</th><th scope="col">Plazas</th><th scope="col">Oferta</th><th scope="col">Alumno asignado</th><th scope="col">Prácticas</th></tr></thead>
     <tbody><?php foreach ($rows as $row): ?>
         <tr>
             <td><?= htmlspecialchars($row['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= htmlspecialchars($row['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= htmlspecialchars($row['fecha_inicio'] . ' – ' . $row['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
+            <td><?= htmlspecialchars($row['turno'] === 'M' ? 'Mañana' : ($row['turno'] === 'T' ? 'Tarde' : 'Indiferente'), ENT_QUOTES, 'UTF-8') ?></td>
+            <td><?= (int)$row['plazas_cuantas'] ?></td>
             <td><?= htmlspecialchars($row['estado'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= htmlspecialchars(trim(($row['alumno_nombre'] ?? '') . ' ' . ($row['apellidos'] ?? '')), ENT_QUOTES, 'UTF-8') ?: '—' ?></td>
             <td><?= htmlspecialchars($row['estado_asignacion'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>
