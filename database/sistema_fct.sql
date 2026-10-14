@@ -382,4 +382,3 @@ ALTER TABLE `alumnos`
   ALTER TABLE `usuarios`
   ADD COLUMN `fecha_actualizacion` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP;
   
-  DESCRIBE `empresa_especialidades_plazas`;

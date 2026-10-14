@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 190" width="360" height="190">
+  <defs>
+    <linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f8cff"/><stop offset="1" stop-color="#2f62e6"/></linearGradient>
+    <linearGradient id="l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a8cff"/><stop offset="1" stop-color="#6f6bf0"/></linearGradient>
+  </defs>
+  <!-- edificios -->
+  <rect x="190" y="22" width="86" height="168" rx="6" fill="url(#b)"/>
+  <rect x="262" y="62" width="58" height="128" rx="6" fill="#6aa0ff"/>
+  <g fill="#dbe8ff">
+    <rect x="202" y="40" width="14" height="14" rx="2"/><rect x="226" y="40" width="14" height="14" rx="2"/><rect x="250" y="40" width="14" height="14" rx="2"/>
+    <rect x="202" y="66" width="14" height="14" rx="2"/><rect x="226" y="66" width="14" height="14" rx="2"/><rect x="250" y="66" width="14" height="14" rx="2"/>
+    <rect x="202" y="92" width="14" height="14" rx="2"/><rect x="226" y="92" width="14" height="14" rx="2"/><rect x="250" y="92" width="14" height="14" rx="2"/>
+    <rect x="274" y="80" width="12" height="12" rx="2"/><rect x="296" y="80" width="12" height="12" rx="2"/>
+    <rect x="274" y="104" width="12" height="12" rx="2"/><rect x="296" y="104" width="12" height="12" rx="2"/>
+  </g>
+  <!-- hojas -->
+  <path d="M176 190c-6-40 20-70 62-78 8 44-14 72-62 78z" fill="url(#l)" opacity=".9"/>
+  <path d="M236 190c4-30 30-52 66-54-2 34-26 52-66 54z" fill="#8b86f7" opacity=".85"/>
+  <path d="M120 184c8-14 22-20 36-18-4 14-18 22-36 18z" fill="#7b78f2" opacity=".8"/>
+  <!-- persona -->
+  <path d="M90 190c-26 0-40-22-38-60 3-32 22-44 44-44s42 14 44 44c2 38-12 60-50 60z" fill="#2f62e6"/>
+  <rect x="62" y="104" width="14" height="70" rx="7" fill="#1f46b8"/>
+  <path d="M80 84c0-14 8-24 22-24s20 10 20 24v10H80z" fill="#1c2f6b"/>
+  <circle cx="102" cy="86" r="22" fill="#f3b48f"/>
+  <path d="M80 82c2-18 16-26 30-22 10 3 14 12 14 22-8-8-18-10-26-8-8 2-14 4-18 8z" fill="#1c2f6b"/>
+  <rect x="104" y="124" width="58" height="42" rx="5" fill="#26356b" transform="rotate(-8 104 124)"/>
+  <rect x="110" y="130" width="46" height="30" rx="3" fill="#3f5bb8" transform="rotate(-8 104 124)"/>
+  <rect x="86" y="162" width="16" height="28" rx="6" fill="#1f46b8"/>
+  <rect x="108" y="162" width="16" height="28" rx="6" fill="#26356b"/>
+</svg>

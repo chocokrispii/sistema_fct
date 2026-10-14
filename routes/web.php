@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'inicio' => ['method' => 'GET', 'roles' => [], 'controller' => null, 'action' => null],
+    'inicio' => ['method' => 'GET', 'roles' => [], 'controller' => InicioController::class, 'action' => 'mostrar'],
     'login' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => AuthController::class, 'action' => 'login'],
     'recuperar' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => RecuperacionController::class, 'action' => 'solicitar'],
     'restablecer' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => RecuperacionController::class, 'action' => 'restablecer'],
@@ -9,6 +9,8 @@ return [
     'verificar-recuperacion' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => RecuperacionController::class, 'action' => 'verificar'],
     'logout' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador', 'Observador', 'Empresa', 'Alumno'], 'controller' => AuthController::class, 'action' => 'logout'],
     'registro-alumno' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => AlumnoController::class, 'action' => 'registrar'],
+    'portal-alumno' => ['method' => 'GET', 'roles' => ['Alumno'], 'controller' => AlumnoController::class, 'action' => 'portal'],
+    'perfil-alumno' => ['method' => ['GET', 'POST'], 'roles' => ['Alumno'], 'controller' => AlumnoController::class, 'action' => 'editarPerfil'],
     'registro-empresa' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => EmpresaController::class, 'action' => 'registrar'],
     'ofertas' => ['method' => 'GET', 'roles' => [], 'controller' => OfertaController::class, 'action' => 'listar'],
     'publicar-oferta' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => OfertaController::class, 'action' => 'publicar'],
@@ -19,13 +21,17 @@ return [
     'asignaciones' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador'], 'controller' => AsignacionController::class, 'action' => 'listar'],
     'emparejar' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador'], 'controller' => AsignacionController::class, 'action' => 'emparejar'],
     'mis-asignaciones' => ['method' => 'GET', 'roles' => ['Alumno'], 'controller' => AsignacionController::class, 'action' => 'misAsignaciones'],
+    'calificaciones' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador'], 'controller' => CalificacionController::class, 'action' => 'listar'],
+    'mis-calificaciones' => ['method' => 'GET', 'roles' => ['Alumno'], 'controller' => CalificacionController::class, 'action' => 'misCalificaciones'],
+    'guardar-calificacion' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => CalificacionController::class, 'action' => 'guardar'],
     'asignar-alumno' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => AsignacionController::class, 'action' => 'asignar'],
     'cerrar-practica' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => AsignacionController::class, 'action' => 'cerrar'],
     'convenios' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => ConvenioController::class, 'action' => 'gestionarEmpresa'],
     'revisar-convenios' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador'], 'controller' => ConvenioController::class, 'action' => 'revisar'],
     'resolver-convenio' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => ConvenioController::class, 'action' => 'resolver'],
-    'descargar-convenio' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador', 'Empresa'], 'controller' => ConvenioController::class, 'action' => 'descargar'],
+    'descargar-convenio' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Empresa'], 'controller' => ConvenioController::class, 'action' => 'descargar'],
     'usuarios' => ['method' => ['GET', 'POST'], 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'gestionar'],
     'estado-usuario' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'cambiarEstado'],
+    'eliminar-usuario' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'eliminar'],
     'consultas' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador'], 'controller' => ConsultaController::class, 'action' => 'buscar'],
 ];
