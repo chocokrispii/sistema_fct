@@ -51,7 +51,11 @@ class Alumno {
         string $codigoPostal,
         ?array $tutor = null
     ): void {
-        $this->db->beginTransaction();
+        $ownsTransaction = !$this->db->inTransaction();
+        if ($ownsTransaction) {
+            $this->db->beginTransaction();
+        }
+
         try {
             $profile = $this->db->prepare(
                 'SELECT a.id
@@ -163,9 +167,11 @@ class Alumno {
                     ]);
                 }
             }
-            $this->db->commit();
+            if ($ownsTransaction) {
+                $this->db->commit();
+            }
         } catch (Throwable $exception) {
-            if ($this->db->inTransaction()) {
+            if ($ownsTransaction && $this->db->inTransaction()) {
                 $this->db->rollBack();
             }
             throw $exception;
