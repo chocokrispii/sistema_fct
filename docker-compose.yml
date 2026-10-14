@@ -41,10 +41,6 @@ services:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-root_local_dev}
     volumes:
       - db_data:/var/lib/mysql
-<<<<<<< HEAD
-=======
-      # MariaDB procesa estos archivos en orden al crear un volumen vacío.
->>>>>>> origin/main
       - ./database/sistema_fct.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
       - ./database/migrations/001_renombrar_nombre_especialidad.sql:/docker-entrypoint-initdb.d/002-migration.sql:ro
       - ./database/migrations/002_fct_workflows.sql:/docker-entrypoint-initdb.d/003-migration.sql:ro
@@ -55,30 +51,11 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-<<<<<<< HEAD
         - mariadb-admin ping --host=127.0.0.1 --user=root --password="$${MARIADB_ROOT_PASSWORD}" --silent
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
-=======
-        - >-
-          test "$$(mariadb --protocol=TCP --host=127.0.0.1
-          --user="$${MARIADB_USER}" --password="$${MARIADB_PASSWORD}"
-          "$${MARIADB_DATABASE}" --batch --skip-column-names
-          --execute="SELECT IF(
-          EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alumnos'
-          AND COLUMN_NAME = 'codigo_postal')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'calificaciones_fct')
-          AND EXISTS (SELECT 1 FROM usuarios
-          WHERE email = 'admin@centro.com'), 1, 0)")" = "1"
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 60s
->>>>>>> origin/main
     restart: unless-stopped
 
   clamav:
