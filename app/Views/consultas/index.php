@@ -20,10 +20,15 @@
             <?php endforeach; ?>
         </select>
     </label>
-    <label>Inicio desde <input type="date" name="desde" value="<?= htmlspecialchars($filters['desde']?->format('Y-m-d') ?? '', ENT_QUOTES, 'UTF-8') ?>"></label>
-    <label>Fin hasta <input type="date" name="hasta" value="<?= htmlspecialchars($filters['hasta']?->format('Y-m-d') ?? '', ENT_QUOTES, 'UTF-8') ?>"></label>
+    <label>Inicio desde <input type="date" name="desde" value="<?= htmlspecialchars($filters['desde'], ENT_QUOTES, 'UTF-8') ?>"></label>
+    <label>Fin hasta <input type="date" name="hasta" value="<?= htmlspecialchars($filters['hasta'], ENT_QUOTES, 'UTF-8') ?>"></label>
     <button type="submit">Filtrar</button>
 </form>
+<?php if ($totalFilas > 0): ?>
+    <p role="status">Mostrando <?= (int)$primerResultado ?>-<?= (int)$ultimoResultado ?> de <?= (int)$totalFilas ?> resultados</p>
+<?php else: ?>
+    <p role="status">No se encontraron resultados.</p>
+<?php endif; ?>
 <table>
     <thead><tr><th>Empresa</th><th>Ciclo</th><th>Periodo</th><th>Oferta</th><th>Alumno asignado</th><th>Prácticas</th></tr></thead>
     <tbody><?php foreach ($rows as $row): ?>
@@ -37,3 +42,26 @@
         </tr>
     <?php endforeach; ?></tbody>
 </table>
+<?php if ($totalPaginas > 1): ?>
+    <?php
+    $paginationUrl = static function (int $targetPage) use ($filters): string {
+        return 'index.php?' . http_build_query([
+            'action' => 'consultas',
+            'especialidad_id' => $filters['especialidad'] === '' ? null : $filters['especialidad'],
+            'estado' => $filters['estado'] === '' ? null : $filters['estado'],
+            'desde' => $filters['desde'] === '' ? null : $filters['desde'],
+            'hasta' => $filters['hasta'] === '' ? null : $filters['hasta'],
+            'pagina' => $targetPage,
+        ]);
+    };
+    ?>
+    <nav aria-label="Paginación de consultas">
+        <?php if ($pagina > 1): ?>
+            <a rel="prev" href="<?= htmlspecialchars($paginationUrl($pagina - 1), ENT_QUOTES, 'UTF-8') ?>">Anterior</a>
+        <?php endif; ?>
+        <span>Página <?= (int)$pagina ?> de <?= (int)$totalPaginas ?></span>
+        <?php if ($pagina < $totalPaginas): ?>
+            <a rel="next" href="<?= htmlspecialchars($paginationUrl($pagina + 1), ENT_QUOTES, 'UTF-8') ?>">Siguiente</a>
+        <?php endif; ?>
+    </nav>
+<?php endif; ?>

@@ -28,6 +28,7 @@ require_once __DIR__ . '/../app/Models/Convenio.php';
 require_once __DIR__ . '/../app/Models/Usuario.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
+require_once __DIR__ . '/../app/Controllers/ConsultaController.php';
 
 function assertTrue(bool $condition, string $message): void
 {
@@ -97,6 +98,7 @@ $createdUsers = [];
 $createdCompany = null;
 $createdStudents = [];
 $createdOffer = null;
+$createdPaginationOffers = [];
 $createdAssignmentId = null;
 $createdCycleId = null;
 
@@ -576,6 +578,51 @@ try {
             && !isset($matching->obtenerCandidatosVigentes()[$createdOffer]),
         'El matching agrupado debe reflejar plazas ocupadas y excluir ofertas sin capacidad.'
     );
+    $paginationOffer = $db->prepare(
+        "INSERT INTO empresa_especialidades_plazas
+            (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno, estado)
+         VALUES (:empresa, :ciclo, 1, '2027-03-15', '2027-03-15', 'M', 'Aprobada')"
+    );
+    for ($index = 0; $index < 51; $index++) {
+        $paginationOffer->execute(['empresa' => $createdCompany, 'ciclo' => $cycleId]);
+        $createdPaginationOffers[] = (int)$db->lastInsertId();
+    }
+    $_GET = [
+        'especialidad_id' => (string)$cycleId,
+        'estado' => 'Aprobada',
+        'desde' => '2027-03-15',
+        'hasta' => '2027-03-15',
+        'pagina' => '1',
+    ];
+    ob_start();
+    (new ConsultaController($db))->buscar();
+    $consultationPageOne = (string)ob_get_clean();
+    assertTrue(
+        str_contains($consultationPageOne, 'Mostrando 1-50 de')
+            && substr_count($consultationPageOne, '<tr>') === 51
+            && str_contains($consultationPageOne, 'estado=Aprobada'),
+        'La primera página debe limitar resultados y conservar los filtros en la navegación.'
+    );
+    $_GET['pagina'] = '2';
+    ob_start();
+    (new ConsultaController($db))->buscar();
+    $consultationPageTwo = (string)ob_get_clean();
+    assertTrue(
+        str_contains($consultationPageTwo, 'Mostrando 51-')
+            && str_contains($consultationPageTwo, 'Página 2 de')
+            && str_contains($consultationPageTwo, 'name="desde" value="2027-03-15"'),
+        'La segunda página debe mostrar resultados restantes y mantener filtros seleccionados.'
+    );
+    $_GET['pagina'] = '0';
+    ob_start();
+    (new ConsultaController($db))->buscar();
+    $invalidConsultationPage = (string)ob_get_clean();
+    assertTrue(
+        str_contains($invalidConsultationPage, 'Selecciona una página válida.')
+            && str_contains($invalidConsultationPage, 'No se encontraron resultados.'),
+        'La consulta debe rechazar números de página fuera del rango.'
+    );
+    $_GET = [];
     $availabilityModel->reemplazar(
         $createdUsers[1],
         '2027-04-01',
@@ -761,6 +808,10 @@ try {
 
     echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, disponibilidad, calificaciones, usuarios y CSRF.\n";
 } finally {
+    foreach ($createdPaginationOffers as $paginationOfferId) {
+        $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
+        $stmt->execute(['offer' => $paginationOfferId]);
+    }
     if ($createdOffer !== null) {
         $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');
         $stmt->execute(['offer' => $createdOffer]);

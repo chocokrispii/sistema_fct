@@ -2,16 +2,36 @@
 
 class ConsultaController
 {
+    private const FILAS_POR_PAGINA = 50;
+    private PDO $db;
+
+    public function __construct(?PDO $db = null)
+    {
+        $this->db = $db ?? getPDOConnection();
+    }
+
     public function buscar(): void
     {
-        $db = getPDOConnection();
+        $db = $this->db;
         $rawEspecialidad = $_GET['especialidad_id'] ?? '';
         $rawEstado = $_GET['estado'] ?? '';
         $rawDesde = $_GET['desde'] ?? '';
         $rawHasta = $_GET['hasta'] ?? '';
+        $rawPagina = $_GET['pagina'] ?? '1';
         $error = '';
-        if (!is_string($rawEspecialidad) || !is_string($rawEstado) || !is_string($rawDesde) || !is_string($rawHasta)) {
+        if (
+            !is_string($rawEspecialidad)
+            || !is_string($rawEstado)
+            || !is_string($rawDesde)
+            || !is_string($rawHasta)
+            || !is_string($rawPagina)
+        ) {
             throw new InvalidArgumentException('Los filtros de consulta deben ser valores simples.');
+        }
+        $paginaSolicitada = filter_var($rawPagina, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($paginaSolicitada === false) {
+            $error = 'Selecciona una página válida.';
+            $paginaSolicitada = 1;
         }
 
         $desde = $this->parseDate($rawDesde);
@@ -28,8 +48,8 @@ class ConsultaController
                 ? ''
                 : filter_var($rawEspecialidad, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]),
             'estado' => $rawEstado,
-            'desde' => $desde,
-            'hasta' => $hasta,
+            'desde' => $desde?->format('Y-m-d') ?? '',
+            'hasta' => $hasta?->format('Y-m-d') ?? '',
         ];
 
         $where = [];
@@ -46,32 +66,49 @@ class ConsultaController
         } elseif ($filters['estado'] !== '') {
             $error = 'Selecciona un estado válido.';
         }
-        if ($filters['desde'] !== null) {
+        if ($filters['desde'] !== '') {
             $where[] = 'p.fecha_inicio >= :desde';
-            $params['desde'] = $filters['desde']->format('Y-m-d');
+            $params['desde'] = $filters['desde'];
         }
-        if ($filters['hasta'] !== null) {
+        if ($filters['hasta'] !== '') {
             $where[] = 'p.fecha_fin <= :hasta';
-            $params['hasta'] = $filters['hasta']->format('Y-m-d');
+            $params['hasta'] = $filters['hasta'];
         }
 
-        $sql = "SELECT p.id, p.estado, p.fecha_inicio, p.fecha_fin, p.plazas_cuantas, p.turno,
-                       e.nombre_empresa, es.nombre_especialidad,
-                       a.nombre AS alumno_nombre, a.apellidos, af.estado AS estado_asignacion
-                FROM empresa_especialidades_plazas p
-                INNER JOIN empresas e ON e.id = p.empresa_id
-                INNER JOIN especialidades es ON es.id = p.especialidad_id
-                LEFT JOIN asignaciones_fct af ON af.oferta_id = p.id AND af.estado <> 'Cancelada'
-                LEFT JOIN alumnos a ON a.id = af.alumno_id";
+        $from = "FROM empresa_especialidades_plazas p
+                 INNER JOIN empresas e ON e.id = p.empresa_id
+                 INNER JOIN especialidades es ON es.id = p.especialidad_id
+                 LEFT JOIN asignaciones_fct af ON af.oferta_id = p.id AND af.estado <> 'Cancelada'
+                 LEFT JOIN alumnos a ON a.id = af.alumno_id";
+        $whereSql = '';
         if ($where !== []) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
+            $whereSql = ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY p.fecha_inicio DESC, e.nombre_empresa LIMIT 500';
 
         $rows = [];
+        $totalFilas = 0;
+        $totalPaginas = 1;
+        $pagina = 1;
         if ($error === '') {
+            $count = $db->prepare('SELECT COUNT(*) ' . $from . $whereSql);
+            $count->execute($params);
+            $totalFilas = (int)$count->fetchColumn();
+            $totalPaginas = max(1, (int)ceil($totalFilas / self::FILAS_POR_PAGINA));
+            $pagina = min((int)$paginaSolicitada, $totalPaginas);
+            $offset = ($pagina - 1) * self::FILAS_POR_PAGINA;
+            $sql = "SELECT p.id, p.estado, p.fecha_inicio, p.fecha_fin, p.plazas_cuantas, p.turno,
+                           e.nombre_empresa, es.nombre_especialidad,
+                           a.nombre AS alumno_nombre, a.apellidos, af.estado AS estado_asignacion
+                    $from$whereSql
+                    ORDER BY p.fecha_inicio DESC, e.nombre_empresa, p.id, af.id
+                    LIMIT :limite OFFSET :offset";
             $stmt = $db->prepare($sql);
-            $stmt->execute($params);
+            foreach ($params as $name => $value) {
+                $stmt->bindValue(':' . $name, $value);
+            }
+            $stmt->bindValue(':limite', self::FILAS_POR_PAGINA, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
         View::render('consultas/index', [
@@ -79,6 +116,11 @@ class ConsultaController
             'especialidades' => (new Especialidad($db))->obtenerTodas(),
             'filters' => $filters,
             'error' => $error,
+            'pagina' => $pagina,
+            'totalPaginas' => $totalPaginas,
+            'totalFilas' => $totalFilas,
+            'primerResultado' => $totalFilas === 0 ? 0 : $offset + 1,
+            'ultimoResultado' => min($pagina * self::FILAS_POR_PAGINA, $totalFilas),
         ]);
     }
 
