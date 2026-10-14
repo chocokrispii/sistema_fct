@@ -42,6 +42,10 @@ assertFileSecurity(
 assertFileSecurity(PhpIni::sizeToBytes('12M') === 12 * 1024 * 1024, 'No se interpretó el límite PHP de 12 MiB.');
 assertFileSecurity(PhpIni::sizeToBytes('512K') === 512 * 1024, 'No se interpretó un límite PHP en KiB.');
 assertFileSecurity(PhpIni::sizeToBytes('0') === PHP_INT_MAX, 'El límite PHP 0 debe representar tamaño ilimitado.');
+assertFileSecurity(
+    PhpIni::sizeToBytes('999999999999999999999G') === PHP_INT_MAX,
+    'Un límite PHP demasiado grande no se saturó al máximo entero.'
+);
 assertFileSecurity(PhpIni::sizeToBytes('invalid') === 0, 'Un límite PHP inválido no se rechazó de forma segura.');
 assertFileSecurity(SpanishDataValidator::isDniNie('12345678Z'), 'Se rechazó un DNI válido.');
 assertFileSecurity(SpanishDataValidator::isDniNie('X-1234567-L'), 'Se rechazó un NIE válido con separadores.');
