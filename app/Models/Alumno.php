@@ -15,20 +15,17 @@ class Alumno {
         $stmt = $this->db->prepare(
             'SELECT a.id, a.nombre, a.apellidos, a.fecha_nacimiento, a.dni,
                     a.numero_seguridad_social, a.codigo_postal, u.email AS correo,
-                    es.nombre_especialidad,
-                    (SELECT dt.telefono
-                     FROM direcciones_telefonos dt
-                     WHERE dt.alumno_id = a.id
-                     ORDER BY dt.es_principal DESC, dt.id
-                     LIMIT 1) AS telefono,
-                    (SELECT dt.direccion_completa
-                     FROM direcciones_telefonos dt
-                     WHERE dt.alumno_id = a.id
-                     ORDER BY dt.es_principal DESC, dt.id
-                     LIMIT 1) AS direccion
+                    es.nombre_especialidad, dt.telefono, dt.direccion_completa AS direccion
              FROM alumnos a
              INNER JOIN usuarios u ON u.id = a.usuario_id
              LEFT JOIN especialidades es ON es.id = a.especialidad_id
+             LEFT JOIN direcciones_telefonos dt ON dt.id = (
+                 SELECT contacto.id
+                 FROM direcciones_telefonos contacto
+                 WHERE contacto.alumno_id = a.id
+                 ORDER BY contacto.es_principal DESC, contacto.id
+                 LIMIT 1
+             )
              WHERE a.usuario_id = :usuario_id
              LIMIT 1'
         );
