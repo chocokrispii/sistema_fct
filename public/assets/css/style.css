@@ -180,6 +180,15 @@ table td {
 table tr:hover td {
       background-color: #f8fafc;
     }
+<<<<<<< HEAD
 table tr:last-child td {
       border-bottom: none;
     }
+=======
+
+    .student-registration__submit {
+        width: 100%;
+    }
+}
+/* Entorno Docker FCT configurado y operativo */
+>>>>>>> f09c465d52fc734cb0316b0f207d0bf5fbb5a790
