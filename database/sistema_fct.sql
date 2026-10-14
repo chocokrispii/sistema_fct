@@ -381,15 +381,3 @@ ALTER TABLE `alumnos`
 
   ALTER TABLE `usuarios`
   ADD COLUMN `fecha_actualizacion` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP;
-  
-  /*Prueba sql*/
-  SELECT 
-    e.nombre_empresa,
-    esp.nombre_specialidad,
-    eep.numero_convenio,
-    eep.fecha_firma_convenio,
-    eep.estado_convenio,
-    eep.plazas_cuantas
-FROM empresa_especialidades_plazas eep
-JOIN empresas e ON eep.empresa_id = e.id
-JOIN especialidades esp ON eep.especialidad_id = esp.id;

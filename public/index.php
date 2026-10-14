@@ -47,6 +47,7 @@ header("Content-Security-Policy: default-src 'self'; style-src 'self'; img-src '
 
 $action = $_GET['action'] ?? 'inicio';
 $routes = require __DIR__ . '/../routes/web.php';
+$outputBufferLevel = ob_get_level();
 ob_start();
 
 try {
@@ -79,6 +80,11 @@ try {
         }
     }
 } catch (Throwable $e) {
+    while (ob_get_level() > $outputBufferLevel + 1) {
+        ob_end_clean();
+    }
+    ob_clean();
+
     error_log('Error no controlado en "' . (is_string($action) ? $action : 'invalid') . '": ' . $e->getMessage());
     if (http_response_code() < 400) {
         http_response_code(500);
@@ -86,5 +92,8 @@ try {
     View::render('errors/generic', ['status' => http_response_code()]);
 }
 
+while (ob_get_level() > $outputBufferLevel + 1) {
+    ob_end_flush();
+}
 $contenido = ob_get_clean();
 require __DIR__ . '/../app/Views/layouts/main.php';
