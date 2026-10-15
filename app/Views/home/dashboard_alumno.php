@@ -58,7 +58,7 @@ $etiquetaClase = static function (string $texto): string {
             <a class="fct-stat fct-stat--green" href="index.php?action=ofertas">
                 <span class="fct-stat__icon"><?= $ico($icoEdificio) ?></span>
                 <strong><?= (int)$totalEmpresas ?></strong>
-                <span class="fct-stat__label">Empresas colaboradoras</span>
+                <span class="fct-stat__label">Empresas con ofertas vigentes</span>
                 <span class="fct-stat__go"><?= $arrow ?></span>
             </a>
             <a class="fct-stat fct-stat--purple" href="index.php?action=mis-asignaciones">
@@ -77,7 +77,7 @@ $etiquetaClase = static function (string $texto): string {
 
         <section class="fct-card fct-offers" aria-labelledby="fct-offers-title">
             <div class="fct-card__head">
-                <h3 id="fct-offers-title">Ofertas de prácticas recientes</h3>
+                <h3 id="fct-offers-title">Ofertas de prácticas vigentes</h3>
                 <a class="fct-link" href="index.php?action=ofertas">Ver todas <?= $arrow ?></a>
             </div>
             <?php if ($ofertasRecientes === []): ?>
