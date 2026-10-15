@@ -231,10 +231,13 @@ incidente y elimínalo según la política del centro.
 9. Ejecuta `database/migrations/006_alumno_codigo_postal.sql` para incorporar
    el código postal necesario para editar y validar los datos personales del
    alumnado.
-10. Comprueba que las migraciones terminen sin error. La migración `001` no es
+10. Ejecuta `database/migrations/007_webhooks.sql` para crear las bandejas de
+   entrada y salida de webhooks.
+11. Comprueba que las migraciones terminen sin error. La migración `001` no es
    idempotente: omítela si la columna ya se llama `nombre_especialidad`. La
    migración `002`, `004`, `005` y `006` pueden volver a ejecutarse para
-   completar un esquema parcial. Ejecuta la migración `003` una sola vez.
+   completar un esquema parcial; la `007` crea tablas con `IF NOT EXISTS`.
+   Ejecuta la migración `003` una sola vez.
 
 El volcado no selecciona la base con `USE`; elige explícitamente la base destino
 antes de importarlo. Las migraciones tampoco seleccionan una base. El dump
@@ -257,6 +260,21 @@ Si se usan otros datos, define las variables de entorno para el proceso que
 ejecuta PHP/Apache. Configurarlas solo en una terminal no garantiza que el
 servicio Apache de XAMPP las herede. En un entorno real crea un usuario MariaDB
 con permisos limitados y no uses `root` sin contraseña.
+
+## Integración por API y webhooks
+
+La API entrante inicial está en `public/webhook.php`. Acepta `POST` con un
+objeto JSON firmado y registra el evento en `webhook_inbox`; no cambia alumnos,
+empresas, ofertas, convenios ni prácticas. La aplicación encola eventos de
+ofertas, convenios y prácticas en `webhook_outbox` dentro de la transacción
+que guarda el cambio. El worker `scripts/dispatch_webhooks.php` los envía al
+destino configurado y reintenta errores temporales.
+
+Ejecuta `database/migrations/007_webhooks.sql` en las bases ya existentes.
+Configura los secretos y la URL como variables de entorno del proceso PHP que
+atiende Apache, no en el repositorio. Los secretos deben tener al menos 32
+caracteres aleatorios. Los ejemplos de contrato, firma HMAC, instalación y
+pruebas locales están en [docs/webhooks.md](docs/webhooks.md).
 
 ## Cuentas de demostración
 

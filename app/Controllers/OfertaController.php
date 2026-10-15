@@ -7,6 +7,7 @@ require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Models/Asignacion.php';
 require_once __DIR__ . '/../Models/Disponibilidad.php';
+require_once __DIR__ . '/../Core/Webhook.php';
 
 class OfertaController {
     private PDO $db;
@@ -24,30 +25,34 @@ class OfertaController {
     public function listar(): void {
         if (($_SESSION['rol'] ?? null) === 'Alumno') {
             $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
-            $ofertas = $this->ofertaModel->obtenerVigentesConAsignaciones();
-            $candidatosPorOferta = $this->ofertaModel->obtenerCandidatosVigentes(
-                $usuarioId
-            );
-            $ofertas = array_values(array_filter(
-                array_map(static function (array $oferta) use ($candidatosPorOferta): array {
-                    $oferta['plazas_disponibles'] = max(
-                        0,
-                        (int)$oferta['plazas_cuantas'] - (int)$oferta['asignadas']
-                    );
-                    return $oferta;
-                }, $ofertas),
-                static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
-                    && isset($candidatosPorOferta[(int)$oferta['id']])
-            ));
-            $asignacionesActivas = array_filter(
-                (new Asignacion($this->db))->listar(true, $usuarioId),
-                static fn(array $asignacion): bool => $asignacion['estado'] === 'Asignada'
-            ) !== [];
             $hoy = date('Y-m-d');
-            $tieneDisponibilidad = array_filter(
-                (new Disponibilidad($this->db))->obtenerPorUsuario($usuarioId),
-                static fn(array $disponibilidad): bool => $disponibilidad['fecha_fin'] >= $hoy
-            ) !== [];
+            $asignacionesActivas = (new Asignacion($this->db))->listarActivasPorUsuario($usuarioId) !== [];
+            $tieneDisponibilidad = (new Disponibilidad($this->db))
+                ->obtenerVigentesPorUsuario($usuarioId, $hoy) !== [];
+            $ofertas = [];
+            if (!$asignacionesActivas && $tieneDisponibilidad) {
+                $ofertasConPlazas = array_values(array_filter(
+                    array_map(static function (array $oferta): array {
+                        $oferta['plazas_disponibles'] = max(
+                            0,
+                            (int)$oferta['plazas_cuantas'] - (int)$oferta['asignadas']
+                        );
+                        return $oferta;
+                    }, $this->ofertaModel->obtenerVigentesConAsignaciones()),
+                    static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
+                ));
+                $idsCompatibles = array_fill_keys(
+                    $this->ofertaModel->obtenerIdsOfertasVigentesCompatibles(
+                        $usuarioId,
+                        array_map(static fn(array $oferta): int => (int)$oferta['id'], $ofertasConPlazas)
+                    ),
+                    true
+                );
+                $ofertas = array_values(array_filter(
+                    $ofertasConPlazas,
+                    static fn(array $oferta): bool => isset($idsCompatibles[(int)$oferta['id']])
+                ));
+            }
             View::render('ofertas/listado', [
                 'ofertas' => $ofertas,
                 'soloCompatibles' => true,
@@ -57,9 +62,13 @@ class OfertaController {
             return;
         }
 
-        $ofertas = $this->ofertaModel->obtenerTodas(true);
+        $resultado = $this->ofertaModel->obtenerPaginaTodas(
+            true,
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
         View::render('ofertas/listado', [
-            'ofertas' => $ofertas,
+            'ofertas' => $resultado['items'],
+            'paginacion' => $resultado,
             'soloCompatibles' => false,
             'tieneAsignacionActiva' => false,
             'tieneDisponibilidad' => false,
@@ -84,18 +93,27 @@ class OfertaController {
             $error = '';
         }
 
+        $resultadoOfertas = $this->ofertaModel->obtenerPaginaPorEmpresa(
+            $empresaId,
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
         View::render('ofertas/publicar', [
             'empresa' => $empresa,
             'error' => $error,
-            'ofertas' => $this->ofertaModel->obtenerPorEmpresa($empresaId),
+            'ofertas' => $resultadoOfertas['items'],
+            'paginacion' => $resultadoOfertas,
             'especialidades' => $this->especialidadModel->obtenerTodas(),
         ]);
     }
 
     public function revisar(): void
     {
+        $resultado = $this->ofertaModel->obtenerPaginaPendientes(
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
         View::render('ofertas/revisar', [
-            'ofertas' => $this->ofertaModel->obtenerPendientes(),
+            'ofertas' => $resultado['items'],
+            'paginacion' => $resultado,
             'error' => is_string($_GET['error'] ?? null) ? $_GET['error'] : '',
         ]);
     }
@@ -158,6 +176,10 @@ class OfertaController {
                 (int)$id,
                 'estado=' . $decision
             );
+            Webhook::enqueue($this->db, 'oferta.revisada', [
+                'oferta_id' => (int)$id,
+                'estado' => $decision,
+            ]);
             $this->db->commit();
         } catch (DomainException $e) {
             if ($this->db->inTransaction()) {
@@ -236,6 +258,16 @@ class OfertaController {
                 'ofertas',
                 $ofertaId
             );
+            Webhook::enqueue($this->db, 'oferta.creada', [
+                'oferta_id' => $ofertaId,
+                'empresa_id' => $empresaId,
+                'especialidad_id' => (int)$especialidadId,
+                'estado' => 'Pendiente',
+                'plazas' => (int)$plazas,
+                'fecha_inicio' => $fechaInicio->format('Y-m-d'),
+                'fecha_fin' => $fechaFin->format('Y-m-d'),
+                'turno' => $turno,
+            ]);
             $this->db->commit();
             return null;
         } catch (Throwable $e) {

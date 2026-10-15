@@ -13,6 +13,7 @@ if (getenv('FCT_DB_NAME') !== $testDatabase) {
 }
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../app/Core/Webhook.php';
 require_once __DIR__ . '/../app/Core/View.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
 require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
@@ -93,6 +94,11 @@ foreach ($required as $name => $definition) {
     ]);
     assertTrue((int)$stmt->fetchColumn() === 1, "Falta columna requerida para las migraciones: $name.");
 }
+$webhookTables = $db->query(
+    "SELECT COUNT(*) FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('webhook_inbox', 'webhook_outbox')"
+)->fetchColumn();
+assertTrue((int)$webhookTables === 2, 'Faltan tablas de entrada/salida webhook; ejecuta la migración 007.');
 
 $fixture = bin2hex(random_bytes(5));
 $dniLetters = 'TRWAGMYFPDXBNJZSQVHLCKE';
@@ -118,8 +124,108 @@ $createdOffer = null;
 $createdPaginationOffers = [];
 $createdAssignmentId = null;
 $createdCycleId = null;
+$webhookEventId = null;
 
 try {
+    $webhookEventId = 'test-' . bin2hex(random_bytes(12));
+    $webhookBody = json_encode([
+        'event_id' => $webhookEventId,
+        'event' => 'prueba.integracion',
+        'version' => 1,
+        'occurred_at' => gmdate('Y-m-d\TH:i:s\Z'),
+        'data' => (object)['registro_id' => 123],
+    ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    $webhookTimestamp = (string)time();
+    $webhookSecret = bin2hex(random_bytes(32));
+    $webhookSignature = 'sha256=' . hash_hmac(
+        'sha256',
+        $webhookTimestamp . '.' . $webhookBody,
+        $webhookSecret
+    );
+    assertTrue(
+        Webhook::receive(
+            $db,
+            $webhookBody,
+            $webhookEventId,
+            $webhookTimestamp,
+            $webhookSignature,
+            $webhookSecret
+        ),
+        'Un webhook firmado nuevo debe registrarse.'
+    );
+    assertTrue(
+        !Webhook::receive(
+            $db,
+            $webhookBody,
+            $webhookEventId,
+            $webhookTimestamp,
+            $webhookSignature,
+            $webhookSecret
+        ),
+        'Un webhook ya recibido debe detectarse como duplicado.'
+    );
+    $webhookSignatureRejected = false;
+    try {
+        Webhook::receive(
+            $db,
+            $webhookBody,
+            'another-' . $webhookEventId,
+            $webhookTimestamp,
+            'sha256=' . str_repeat('0', 64),
+            $webhookSecret
+        );
+    } catch (WebhookRequestException $exception) {
+        $webhookSignatureRejected = $exception->httpStatus === 401;
+    }
+    assertTrue($webhookSignatureRejected, 'Un webhook con firma HMAC incorrecta debe rechazarse.');
+    $conflictingPayload = json_decode($webhookBody, false, 16, JSON_THROW_ON_ERROR);
+    $conflictingPayload->data->registro_id = 124;
+    $conflictingBody = json_encode(
+        $conflictingPayload,
+        JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+    );
+    $conflictingSignature = 'sha256=' . hash_hmac(
+        'sha256',
+        $webhookTimestamp . '.' . $conflictingBody,
+        $webhookSecret
+    );
+    $webhookConflictRejected = false;
+    try {
+        Webhook::receive(
+            $db,
+            $conflictingBody,
+            $webhookEventId,
+            $webhookTimestamp,
+            $conflictingSignature,
+            $webhookSecret
+        );
+    } catch (WebhookRequestException $exception) {
+        $webhookConflictRejected = $exception->httpStatus === 409;
+    }
+    assertTrue($webhookConflictRejected, 'Un event_id reutilizado con distinto contenido debe rechazarse.');
+
+    putenv('FCT_WEBHOOK_OUTBOUND_URL=https://receiver.example.test/webhooks');
+    $db->beginTransaction();
+    try {
+        Webhook::enqueue($db, 'prueba.transaccional', ['registro_id' => 123]);
+        $queued = $db->query(
+            "SELECT event_type, payload FROM webhook_outbox
+             WHERE event_type = 'prueba.transaccional'
+             ORDER BY created_at DESC LIMIT 1"
+        )->fetch(PDO::FETCH_ASSOC);
+        assertTrue(
+            $queued !== false
+                && $queued['event_type'] === 'prueba.transaccional'
+                && json_decode($queued['payload'], true, 16, JSON_THROW_ON_ERROR)['data']['registro_id'] === 123,
+            'El evento saliente debe guardarse como JSON en la transacción local.'
+        );
+    } finally {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        putenv('FCT_WEBHOOK_OUTBOUND_URL');
+    }
+
     $roleHash = password_hash('TestPassword123!', PASSWORD_DEFAULT);
     $addUser = $db->prepare('INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :hash, :role)');
     $addUser->execute(['email' => $emails[0], 'hash' => $roleHash, 'role' => 'Empresa']);
@@ -910,6 +1016,17 @@ try {
         $matching->obtenerIdsOfertasVigentesCompatibles($createdUsers[1]) === [$createdOffer],
         'El dashboard debe poder obtener solo los IDs de ofertas compatibles con el alumno.'
     );
+    $candidatePage = $matching->obtenerCandidatosPaginados(
+        [$createdOffer],
+        [$createdOffer => 1],
+        1
+    );
+    assertTrue(
+        count($candidatePage[$createdOffer]['candidatos'] ?? []) === 1
+            && (int)$candidatePage[$createdOffer]['candidatos'][0]['alumno_id'] === $createdStudents[0]
+            && !$candidatePage[$createdOffer]['haySiguiente'],
+        'El matching paginado debe conservar el candidato compatible y el estado de navegación.'
+    );
 
     $assignments = new Asignacion($db);
     $assignments->crear($createdOffer, $createdStudents[0], $createdUsers[3], 'Tutor de empresa');
@@ -917,6 +1034,13 @@ try {
         'SELECT id FROM asignaciones_fct WHERE oferta_id = ' . $createdOffer . ' AND alumno_id = ' . $createdStudents[0]
     )->fetchColumn();
     $createdAssignmentId = $assignmentId;
+    $assignmentPage = $assignments->obtenerPagina(false, 0, 1);
+    assertTrue(
+        $assignmentPage['total'] === 1
+            && count($assignmentPage['items']) === 1
+            && (int)$assignmentPage['items'][0]['id'] === $assignmentId,
+        'El listado paginado de asignaciones debe devolver el total y la fila correspondiente.'
+    );
     $availabilityModel->reemplazar(
         $createdUsers[2],
         '2027-03-01',
@@ -960,6 +1084,13 @@ try {
         !in_array(false, $listedFixtureOfferPositions, true)
             && $listedFixtureOfferPositions === $sortedFixtureOfferPositions,
         'Las ofertas con la misma fecha de inicio deben conservar un orden predecible.'
+    );
+    $offerPage = $matching->obtenerPaginaTodas(true, 1, 10);
+    assertTrue(
+        count($offerPage['items']) === 10
+            && $offerPage['total'] === count($listedOfferIds)
+            && $offerPage['totalPaginas'] === (int)ceil(count($listedOfferIds) / 10),
+        'La paginación de ofertas debe limitar filas y calcular el total desde la base de datos.'
     );
     $_GET = [
         'especialidad_id' => (string)$cycleId,
@@ -1279,6 +1410,13 @@ try {
             && array_keys($activeAssignmentsForDashboard[0]) === ['fecha_inicio', 'fecha_fin', 'nombre_empresa'],
         'El dashboard debe recuperar solo las asignaciones activas y los campos que muestra.'
     );
+    $databaseEvents = $assignments->obtenerProximosEventos($createdUsers[1]);
+    assertTrue(
+        count($databaseEvents) === 5
+            && $databaseEvents[0]['fecha'] <= $databaseEvents[1]['fecha']
+            && !str_starts_with($databaseEvents[0]['titulo'], 'Fin de'),
+        'La consulta de próximos eventos debe incluir cinco elementos en orden cronológico estable.'
+    );
     $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno', 'nombre' => 'Alumno de prueba'];
     ob_start();
     (new InicioController())->mostrar();
@@ -1466,11 +1604,16 @@ try {
     }
     assertTrue($csrfRejected, 'Un token CSRF incorrecto debe rechazarse.');
 
-    echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, disponibilidad, dashboard, calificaciones, usuarios y CSRF.\n";
+    echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, paginación, disponibilidad, dashboard, calificaciones, usuarios, webhooks y CSRF.\n";
 } finally {
     foreach ($createdPaginationOffers as $paginationOfferId) {
         $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
         $stmt->execute(['offer' => $paginationOfferId]);
+    }
+    putenv('FCT_WEBHOOK_OUTBOUND_URL');
+    if ($webhookEventId !== null) {
+        $stmt = $db->prepare('DELETE FROM webhook_inbox WHERE event_id = :event_id');
+        $stmt->execute(['event_id' => $webhookEventId]);
     }
     if ($createdOffer !== null) {
         $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');

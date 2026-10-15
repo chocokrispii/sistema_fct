@@ -37,6 +37,20 @@ class Disponibilidad
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function tienePorUsuario(int $usuarioId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1
+             FROM alumno_disponibilidad d
+             INNER JOIN alumnos a ON a.id = d.alumno_id
+             WHERE a.usuario_id = :usuario_id
+             LIMIT 1'
+        );
+        $stmt->execute(['usuario_id' => $usuarioId]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
     public function obtenerHorarioSemanalPorUsuario(int $usuarioId): array
     {
         $stmt = $this->db->prepare(

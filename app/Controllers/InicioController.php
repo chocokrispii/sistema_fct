@@ -36,7 +36,13 @@ class InicioController
             ));
             $ofertasCompatibles = $ofertas === []
                 ? []
-                : array_fill_keys($ofertaModel->obtenerIdsOfertasVigentesCompatibles($usuarioId), true);
+                : array_fill_keys(
+                    $ofertaModel->obtenerIdsOfertasVigentesCompatibles(
+                        $usuarioId,
+                        array_map(static fn(array $oferta): int => (int)$oferta['id'], $ofertas)
+                    ),
+                    true
+                );
             $ofertas = array_values(array_filter(
                 $ofertas,
                 static fn(array $oferta): bool => isset($ofertasCompatibles[(int)$oferta['id']])

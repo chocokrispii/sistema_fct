@@ -16,6 +16,9 @@
       FCT_STORAGE_PATH: /var/lib/fct/storage
       FCT_CLAMD_HOST: clamav
       FCT_CLAMD_PORT: 3310
+      FCT_WEBHOOK_INBOUND_SECRET: ${FCT_WEBHOOK_INBOUND_SECRET:-}
+      FCT_WEBHOOK_OUTBOUND_URL: ${FCT_WEBHOOK_OUTBOUND_URL:-}
+      FCT_WEBHOOK_OUTBOUND_SECRET: ${FCT_WEBHOOK_OUTBOUND_SECRET:-}
     ports:
       - "${APP_PORT:-8080}:80"
     volumes:
@@ -49,6 +52,7 @@
       - ./database/migrations/004_convenios_por_especialidad.sql:/docker-entrypoint-initdb.d/005-migration.sql:ro
       - ./database/migrations/005_horarios_y_calificaciones.sql:/docker-entrypoint-initdb.d/006-migration.sql:ro
       - ./database/migrations/006_alumno_codigo_postal.sql:/docker-entrypoint-initdb.d/007-migration.sql:ro
+      - ./database/migrations/007_webhooks.sql:/docker-entrypoint-initdb.d/008-migration.sql:ro
     healthcheck:
       test:
         - CMD-SHELL

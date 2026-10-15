@@ -39,3 +39,4 @@
         <?php endforeach; ?></tbody>
     </table>
 <?php endif; ?>
+<?php require __DIR__ . '/../partials/paginacion.php'; ?>

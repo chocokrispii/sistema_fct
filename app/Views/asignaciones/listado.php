@@ -48,4 +48,5 @@
             </table>
         </div>
     <?php endif; ?>
+    <?php require __DIR__ . '/../partials/paginacion.php'; ?>
 </section>

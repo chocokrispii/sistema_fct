@@ -28,3 +28,6 @@
         </table>
     </div>
 <?php endif; ?>
+<?php if (isset($paginacion)): ?>
+    <?php require __DIR__ . '/../partials/paginacion.php'; ?>
+<?php endif; ?>
