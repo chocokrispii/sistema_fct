@@ -382,7 +382,7 @@ class AlumnoController
                     exit;
                 } catch (PDOException $exception) {
                     if ((string)$exception->getCode() === '23000') {
-                        $error = 'El correo o DNI/NIE indicado ya está asociado a otra cuenta.';
+                        $error = 'El correo, DNI/NIE o número de Seguridad Social indicado ya está asociado a otra cuenta.';
                     } else {
                         error_log('Error al actualizar perfil de alumno: ' . $exception->getMessage());
                         $error = 'No se pudo guardar el expediente. Inténtalo de nuevo o contacta con el centro.';

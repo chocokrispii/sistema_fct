@@ -298,6 +298,25 @@ try {
         $studentModel->obtenerPorUsuario($createdUsers[1])['dni'] === $firstStudentDni,
         'Un DNI/NIE inválido no debe modificar el expediente.'
     );
+    $_POST = [
+        'email' => $emails[1],
+        'nombre' => 'Ángela',
+        'apellidos' => "O'Connor",
+        'fecha_nacimiento' => '2005-01-01',
+        'dni' => $firstStudentDni,
+        'nss' => "NSS-$fixture-2",
+        'telefono' => '612345678',
+        'direccion' => 'Calle O’Donnell, 1',
+        'codigo_postal' => '28013',
+    ];
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $duplicateNssHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($duplicateNssHtml, 'correo, DNI/NIE o número de Seguridad Social')
+            && $studentModel->obtenerPorUsuario($createdUsers[1])['numero_seguridad_social'] === '12345-67890',
+        'Una colisión de NSS debe explicar el motivo y dejar intacto el perfil.'
+    );
     $db->prepare('UPDATE alumnos SET fecha_nacimiento = :nacimiento WHERE id = :id')
         ->execute(['nacimiento' => '2010-01-01', 'id' => $createdStudents[1]]);
     $legacyGuardian = $db->prepare(
