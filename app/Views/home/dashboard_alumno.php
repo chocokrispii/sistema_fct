@@ -52,13 +52,13 @@ $etiquetaClase = static function (string $texto): string {
             <a class="fct-stat fct-stat--blue" href="index.php?action=ofertas">
                 <span class="fct-stat__icon"><?= $ico($icoMaletin) ?></span>
                 <strong><?= (int)$totalOfertas ?></strong>
-                <span class="fct-stat__label">Ofertas vigentes</span>
+                <span class="fct-stat__label">Ofertas con plazas</span>
                 <span class="fct-stat__go"><?= $arrow ?></span>
             </a>
             <a class="fct-stat fct-stat--green" href="index.php?action=ofertas">
                 <span class="fct-stat__icon"><?= $ico($icoEdificio) ?></span>
                 <strong><?= (int)$totalEmpresas ?></strong>
-                <span class="fct-stat__label">Empresas con ofertas vigentes</span>
+                <span class="fct-stat__label">Empresas con plazas disponibles</span>
                 <span class="fct-stat__go"><?= $arrow ?></span>
             </a>
             <a class="fct-stat fct-stat--purple" href="index.php?action=mis-asignaciones">
@@ -77,11 +77,11 @@ $etiquetaClase = static function (string $texto): string {
 
         <section class="fct-card fct-offers" aria-labelledby="fct-offers-title">
             <div class="fct-card__head">
-                <h3 id="fct-offers-title">Ofertas de prácticas vigentes</h3>
+                <h3 id="fct-offers-title">Ofertas de prácticas con plazas disponibles</h3>
                 <a class="fct-link" href="index.php?action=ofertas">Ver todas <?= $arrow ?></a>
             </div>
             <?php if ($ofertasVigentes === []): ?>
-                <p class="fct-empty">No hay ofertas vigentes en este momento.</p>
+                <p class="fct-empty">No hay ofertas vigentes con plazas disponibles en este momento.</p>
             <?php else: ?>
                 <ul class="fct-offers__list">
                     <?php foreach ($ofertasVigentes as $i => $oferta): ?>
@@ -91,6 +91,7 @@ $etiquetaClase = static function (string $texto): string {
                                 <span class="fct-offer__info">
                                     <strong><?= $e($oferta['nombre_empresa']) ?></strong>
                                     <small><?= $e($oferta['nombre_especialidad']) ?></small>
+                                    <small class="fct-offer__capacity"><?= (int)$oferta['plazas_disponibles'] ?> <?= $oferta['plazas_disponibles'] === 1 ? 'plaza disponible' : 'plazas disponibles' ?></small>
                                 </span>
                                 <span class="fct-tag fct-tag--<?= $etiquetaClase($oferta['nombre_especialidad']) ?>"><?= $e($oferta['nombre_especialidad']) ?></span>
                                 <span class="fct-offer__chev"><?= $chevron ?></span>

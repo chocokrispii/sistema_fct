@@ -62,7 +62,7 @@ class Oferta {
     public function obtenerVigentesConAsignaciones(): array
     {
         $stmt = $this->db->query(
-            "SELECT p.id, p.plazas_cuantas, p.fecha_inicio, p.fecha_fin, p.turno,
+            "SELECT p.id, p.empresa_id, p.especialidad_id, p.plazas_cuantas, p.fecha_inicio, p.fecha_fin, p.turno,
                     e.nombre_empresa, es.nombre_especialidad,
                     COALESCE(conteo.asignadas, 0) AS asignadas
              FROM empresa_especialidades_plazas p
@@ -75,7 +75,7 @@ class Oferta {
                  GROUP BY oferta_id
              ) conteo ON conteo.oferta_id = p.id
              WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
-             ORDER BY p.fecha_inicio"
+             ORDER BY p.fecha_inicio, p.id"
         );
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

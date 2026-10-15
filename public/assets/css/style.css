@@ -211,6 +211,7 @@ tbody tr:hover td{background:#fafcff}
 .fct-offer:hover{background:#fafcff}
 .fct-offer__info strong{display:block;color:var(--ink);font-size:.95rem;font-weight:500}
 .fct-offer__info small{display:block}
+.fct-offer__capacity{color:#0b8a62;font-weight:600}
 .fct-offer__chev{color:#8a9ab5}
 .fct-offer__chev .fct-ico{width:16px;height:16px}
 .fct-logo{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;color:#fff;font-size:1.1rem;font-weight:700}

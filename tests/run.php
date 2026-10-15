@@ -1234,6 +1234,40 @@ try {
     ob_start();
     (new InicioController())->mostrar();
     $dashboardHtml = (string)ob_get_clean();
+    $dashboardOfferCount = $db->query(
+        "SELECT COUNT(*)
+         FROM empresa_especialidades_plazas p
+         LEFT JOIN (
+             SELECT oferta_id, COUNT(*) AS asignadas
+             FROM asignaciones_fct
+             WHERE estado IN ('Asignada', 'Cerrada')
+             GROUP BY oferta_id
+         ) conteo ON conteo.oferta_id = p.id
+         WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
+           AND COALESCE(conteo.asignadas, 0) < p.plazas_cuantas"
+    )->fetchColumn();
+    $dashboardCompanyCount = $db->query(
+        "SELECT COUNT(DISTINCT p.empresa_id)
+         FROM empresa_especialidades_plazas p
+         LEFT JOIN (
+             SELECT oferta_id, COUNT(*) AS asignadas
+             FROM asignaciones_fct
+             WHERE estado IN ('Asignada', 'Cerrada')
+             GROUP BY oferta_id
+         ) conteo ON conteo.oferta_id = p.id
+         WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
+           AND COALESCE(conteo.asignadas, 0) < p.plazas_cuantas"
+    )->fetchColumn();
+    preg_match(
+        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Ofertas con plazas</span>~',
+        $dashboardHtml,
+        $dashboardOfferMetric
+    );
+    preg_match(
+        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Empresas con plazas disponibles</span>~',
+        $dashboardHtml,
+        $dashboardCompanyMetric
+    );
     $availabilityStartPosition = strpos($dashboardHtml, 'Inicio de disponibilidad');
     $practiceStartPosition = strpos($dashboardHtml, 'Inicio de prácticas');
     $availabilityEndPosition = strpos($dashboardHtml, 'Fin de disponibilidad');
@@ -1244,7 +1278,11 @@ try {
         ? ''
         : substr($dashboardHtml, $eventListStart, $eventListEnd - $eventListStart);
     assertTrue(
-        $availabilityStartPosition !== false
+        isset($dashboardOfferMetric[1], $dashboardCompanyMetric[1])
+            && (int)$dashboardOfferMetric[1] === (int)$dashboardOfferCount
+            && (int)$dashboardCompanyMetric[1] === (int)$dashboardCompanyCount
+            && str_contains($dashboardHtml, '<small class="fct-offer__capacity">1 plaza disponible</small>')
+            && $availabilityStartPosition !== false
             && $practiceStartPosition !== false
             && $availabilityEndPosition !== false
             && $practiceEndPosition !== false
@@ -1253,7 +1291,7 @@ try {
             && substr_count($eventsHtml, '<li>') === 5
             && str_contains($dashboardHtml, $eventStart->format('Y'))
             && str_contains($dashboardHtml, $eventEnd->format('Y')),
-        'El dashboard debe mostrar cinco eventos en orden estable, incluidos los vencimientos y el año.'
+        'El dashboard debe contar solo plazas vacantes y mostrar los eventos ordenados con año visible.'
     );
 
     $_SESSION = [];
