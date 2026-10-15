@@ -1268,6 +1268,13 @@ try {
         $dashboardHtml,
         $dashboardCompanyMetric
     );
+    assertTrue(
+        str_contains(
+            $dashboardHtml,
+            'Del 15/03/2027 al 15/03/2027 - Turno mañana'
+        ),
+        'La tarjeta debe mostrar las fechas de la oferta y traducir su turno al castellano.'
+    );
     $availabilityStartPosition = strpos($dashboardHtml, 'Inicio de disponibilidad');
     $practiceStartPosition = strpos($dashboardHtml, 'Inicio de prácticas');
     $availabilityEndPosition = strpos($dashboardHtml, 'Fin de disponibilidad');

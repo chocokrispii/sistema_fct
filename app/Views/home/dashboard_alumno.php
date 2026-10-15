@@ -91,6 +91,7 @@ $etiquetaClase = static function (string $texto): string {
                                 <span class="fct-offer__info">
                                     <strong><?= $e($oferta['nombre_empresa']) ?></strong>
                                     <small><?= $e($oferta['nombre_especialidad']) ?></small>
+                                    <small>Del <?= $e(date('d/m/Y', strtotime($oferta['fecha_inicio']))) ?> al <?= $e(date('d/m/Y', strtotime($oferta['fecha_fin']))) ?> - Turno <?= $e($oferta['turno'] === 'M' ? 'mañana' : ($oferta['turno'] === 'T' ? 'tarde' : 'indiferente')) ?></small>
                                     <small class="fct-offer__capacity"><?= (int)$oferta['plazas_disponibles'] ?> <?= $oferta['plazas_disponibles'] === 1 ? 'plaza disponible' : 'plazas disponibles' ?></small>
                                 </span>
                                 <span class="fct-tag fct-tag--<?= $etiquetaClase($oferta['nombre_especialidad']) ?>"><?= $e($oferta['nombre_especialidad']) ?></span>
