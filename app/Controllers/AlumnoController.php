@@ -255,7 +255,8 @@ class AlumnoController
                 if ($this->usuarioModel->obtenerPorEmail($email) !== null) {
                     $this->db->rollBack();
                     $this->mostrarFormulario(
-                        'El correo, DNI/NIE o número de Seguridad Social indicado ya está asociado a otra cuenta.'
+                        'El correo indicado ya está asociado a otra cuenta.',
+                        ['email' => 'Este correo electrónico ya está registrado.']
                     );
                     return;
                 }
@@ -299,9 +300,16 @@ class AlumnoController
                 $this->db->rollBack();
             }
             if ($e instanceof PDOException && (int)($e->errorInfo[1] ?? 0) === 1062) {
-                $this->mostrarFormulario(
-                    'El correo, DNI/NIE o número de Seguridad Social indicado ya está asociado a otra cuenta.'
-                );
+                $duplicateErrors = $this->obtenerErroresDuplicadosRegistro($email, $dni, $nss);
+                if ($duplicateErrors !== []) {
+                    $this->mostrarFormulario(
+                        'El correo, DNI/NIE o número de Seguridad Social indicado ya está asociado a otra cuenta.',
+                        $duplicateErrors
+                    );
+                    return;
+                }
+                error_log('Error al registrar alumno: se detectó un conflicto de unicidad sin campo coincidente.');
+                $this->mostrarFormulario('No se pudo completar el registro del alumno.');
                 return;
             }
             error_log('Error al registrar alumno: ' . $e->getMessage());
@@ -509,6 +517,38 @@ class AlumnoController
             'error' => $error,
             'guardado' => isset($_GET['guardado']),
         ]);
+    }
+
+    private function obtenerErroresDuplicadosRegistro(string $email, string $dni, string $nss): array
+    {
+        $duplicates = $this->db->prepare(
+            'SELECT
+                EXISTS(SELECT 1 FROM usuarios WHERE email = :email) AS email,
+                EXISTS(SELECT 1 FROM alumnos WHERE dni = :dni) AS dni,
+                EXISTS(SELECT 1 FROM alumnos WHERE numero_seguridad_social = :nss) AS nss'
+        );
+        $duplicates->execute([
+            'email' => $email,
+            'dni' => $dni,
+            'nss' => $nss,
+        ]);
+        $existing = $duplicates->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($existing)) {
+            throw new RuntimeException('No se pudieron comprobar los datos duplicados del registro.');
+        }
+
+        $fieldErrors = [];
+        if ((int)$existing['email'] === 1) {
+            $fieldErrors['email'] = 'Este correo electrónico ya está registrado.';
+        }
+        if ((int)$existing['dni'] === 1) {
+            $fieldErrors['dni'] = 'Este DNI/NIE ya está asociado a otro expediente.';
+        }
+        if ((int)$existing['nss'] === 1) {
+            $fieldErrors['nss'] = 'Este número de Seguridad Social ya está asociado a otro expediente.';
+        }
+
+        return $fieldErrors;
     }
 
     private function mostrarFormulario(string $error = '', array $fieldErrors = []): void

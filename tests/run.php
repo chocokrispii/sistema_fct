@@ -516,9 +516,41 @@ try {
     $duplicateRegistrationCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
     $duplicateRegistrationCount->execute(['email' => $emails[1]]);
     assertTrue(
-        str_contains($duplicateRegistrationHtml, 'correo, DNI/NIE o número de Seguridad Social')
+        str_contains($duplicateRegistrationHtml, 'El correo indicado ya está asociado')
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-email")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $duplicateRegistrationHtml
+            ) === 1
+            && str_contains($duplicateRegistrationHtml, 'Este correo electrónico ya está registrado.')
             && (int)$duplicateRegistrationCount->fetchColumn() === 1,
-        'El registro con un correo ya asociado debe informar del conflicto sin crear otra cuenta.'
+        'Un correo duplicado debe señalar el campo, informar del conflicto y evitar crear otra cuenta.'
+    );
+    $_POST = [
+        'email' => "duplicate-dni-$fixture@example.test",
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Nuevo Alumno',
+        'apellidos' => 'DNI Duplicado',
+        'dni' => $firstStudentDni,
+        'nss' => "REG-$fixture-4",
+        'telefono' => '612345674',
+        'direccion' => 'Calle de prueba 4',
+        'codigo_postal' => '28013',
+        'fecha_nacimiento' => '2000-01-01',
+        'especialidad_id' => (string)$cycleId,
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $duplicateDniRegistrationHtml = (string)ob_get_clean();
+    $duplicateDniAccountCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $duplicateDniAccountCount->execute(['email' => $_POST['email']]);
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="student-dni")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $duplicateDniRegistrationHtml
+        ) === 1
+            && str_contains($duplicateDniRegistrationHtml, 'Este DNI/NIE ya está asociado a otro expediente.')
+            && (int)$duplicateDniAccountCount->fetchColumn() === 0,
+        'Un DNI/NIE duplicado debe señalar el campo y revertir el alta completa.'
     );
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_POST = [];
