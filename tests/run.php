@@ -1250,7 +1250,7 @@ try {
     );
     $addAvailabilityPeriod->execute([
         'alumno' => $createdStudents[0],
-        'inicio' => $eventStart->modify('-2 days')->format('Y-m-d'),
+        'inicio' => $eventEnd->format('Y-m-d'),
         'fin' => $eventEnd->modify('+5 days')->format('Y-m-d'),
         'turno' => 'M',
     ]);
@@ -1364,6 +1364,8 @@ try {
     $eventsHtml = $eventListStart === false || $eventListEnd === false
         ? ''
         : substr($dashboardHtml, $eventListStart, $eventListEnd - $eventListStart);
+    $lastAvailabilityStartPosition = strrpos($eventsHtml, 'Inicio de disponibilidad');
+    $sameDayPracticeEndPosition = strpos($eventsHtml, 'Fin de prácticas');
     assertTrue(
         isset($dashboardOfferMetric[1], $dashboardCompanyMetric[1])
             && (int)$dashboardOfferMetric[1] === (int)$dashboardOfferCount
@@ -1378,9 +1380,12 @@ try {
             && $availabilityStartPosition < $practiceStartPosition
             && $availabilityEndPosition < $practiceEndPosition
             && substr_count($eventsHtml, '<li>') === 5
+            && $lastAvailabilityStartPosition !== false
+            && $sameDayPracticeEndPosition !== false
+            && $lastAvailabilityStartPosition < $sameDayPracticeEndPosition
             && str_contains($dashboardHtml, $eventStart->format('Y'))
             && str_contains($dashboardHtml, $eventEnd->format('Y')),
-        'El dashboard debe contar solo plazas vacantes y mostrar los eventos ordenados con año visible.'
+        'El dashboard debe contar solo plazas vacantes y ordenar inicios antes que finales en fechas iguales.'
     );
 
     $pastAvailability = $db->prepare(

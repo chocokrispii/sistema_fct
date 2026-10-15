@@ -71,6 +71,8 @@ class InicioController
         }
         usort($eventos, static function (array $x, array $y): int {
             return strcmp($x['fecha'], $y['fecha'])
+                ?: ((str_starts_with($x['titulo'], 'Fin de') ? 1 : 0)
+                    <=> (str_starts_with($y['titulo'], 'Fin de') ? 1 : 0))
                 ?: strcmp($x['titulo'], $y['titulo'])
                 ?: strcmp($x['detalle'], $y['detalle']);
         });
