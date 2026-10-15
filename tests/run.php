@@ -399,6 +399,42 @@ try {
             && $updatedGuardian['correo'] === 'tutor@example.test',
         'Guardar el perfil del menor debe completar el tutor legado dentro de la misma operación.'
     );
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_SESSION = [];
+    $_GET = [];
+    $_POST = [
+        'email' => "new-student-$fixture@example.test",
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Nuevo Alumno',
+        'apellidos' => 'Prueba de Registro',
+        'dni' => sprintf(
+            '%08d%s',
+            $secondDniNumber + 1,
+            $dniLetters[($secondDniNumber + 1) % 23]
+        ),
+        'nss' => "REG-$fixture-1",
+        'telefono' => '612345671',
+        'direccion' => 'Calle de prueba 1',
+        'codigo_postal' => '28013',
+        'fecha_nacimiento' => '2010-01-01',
+        'especialidad_id' => (string)$cycleId,
+        'tutor_nombre' => 'Tutor de Prueba',
+        'tutor_dni' => '12345678Z',
+        'tutor_nss' => 'NSS!',
+        'tutor_correo' => 'tutor-registro@example.test',
+        'tutor_direccion' => 'Calle Tutor 1',
+        'tutor_telefono' => '612345672',
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $invalidGuardianRegistrationHtml = (string)ob_get_clean();
+    $invalidGuardianAccountCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $invalidGuardianAccountCount->execute(['email' => $_POST['email']]);
+    assertTrue(
+        str_contains($invalidGuardianRegistrationHtml, 'número de Seguridad Social y dirección del tutor')
+            && (int)$invalidGuardianAccountCount->fetchColumn() === 0,
+        'Un NSS de tutor inválido debe impedir crear la cuenta del alumno.'
+    );
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_POST = [];
     $_GET = [];

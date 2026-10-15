@@ -137,6 +137,14 @@ class AlumnoController
             $this->mostrarFormulario('Comprueba el DNI/NIE, teléfono y correo electrónico del tutor.');
             return;
         }
+        if (
+            ($tutor['nombre'] !== '' && !SpanishDataValidator::isPersonName($tutor['nombre'], 100))
+            || ($tutor['nss'] !== '' && preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $tutor['nss']) !== 1)
+            || ($tutor['direccion'] !== '' && preg_match('/[\p{Cc}]/u', $tutor['direccion']) === 1)
+        ) {
+            $this->mostrarFormulario('Comprueba el nombre, número de Seguridad Social y dirección del tutor.');
+            return;
+        }
         $dni = SpanishDataValidator::normalizeDniNie($dni);
         $telefono = SpanishDataValidator::normalizePhone($telefono);
         if ($tutor['dni'] !== '') {
@@ -157,7 +165,7 @@ class AlumnoController
                 $tutor['nombre'] === ''
                 || $tutor['dni'] === ''
                 || $tutor['nss'] === ''
-                || !filter_var($tutor['correo'], FILTER_VALIDATE_EMAIL)
+                || !SpanishDataValidator::isEmail($tutor['correo'])
                 || $tutor['direccion'] === ''
                 || $tutor['telefono'] === ''
             )
