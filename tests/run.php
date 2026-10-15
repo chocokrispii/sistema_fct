@@ -941,6 +941,22 @@ try {
         $paginationOffer->execute(['empresa' => $createdCompany, 'ciclo' => $cycleId]);
         $createdPaginationOffers[] = (int)$db->lastInsertId();
     }
+    $listedOfferIds = array_map(
+        'intval',
+        array_column($matching->obtenerTodas(true), 'id')
+    );
+    $fixtureOfferIds = array_merge([$createdOffer], $createdPaginationOffers);
+    $listedFixtureOfferPositions = array_map(
+        static fn(int $offerId): int|false => array_search($offerId, $listedOfferIds, true),
+        $fixtureOfferIds
+    );
+    $sortedFixtureOfferPositions = $listedFixtureOfferPositions;
+    sort($sortedFixtureOfferPositions);
+    assertTrue(
+        !in_array(false, $listedFixtureOfferPositions, true)
+            && $listedFixtureOfferPositions === $sortedFixtureOfferPositions,
+        'Las ofertas con la misma fecha de inicio deben conservar un orden predecible.'
+    );
     $_GET = [
         'especialidad_id' => (string)$cycleId,
         'estado' => 'Aprobada',

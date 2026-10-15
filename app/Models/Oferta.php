@@ -55,7 +55,7 @@ class Oferta {
     public function obtenerTodas(bool $soloVigentes = false): array {
         $sql = self::SELECT_BASE
             . ($soloVigentes ? " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '')
-            . ' ORDER BY p.fecha_inicio';
+            . ' ORDER BY p.fecha_inicio, p.id';
         return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
