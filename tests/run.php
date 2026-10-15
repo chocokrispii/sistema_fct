@@ -726,6 +726,15 @@ try {
             && !str_contains($adminViewHtml, 'aria-label="Desactivar cuenta de ' . htmlspecialchars($emails[4], ENT_QUOTES, 'UTF-8') . '"'),
         'La administración debe mostrar el nombre, las acciones y los controles de búsqueda de cuentas.'
     );
+    $_GET = ['cuenta_creada' => '1'];
+    ob_start();
+    (new UsuarioAdminController($db))->gestionar();
+    $createdAccountHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($createdAccountHtml, 'Cuenta creada correctamente.')
+            && str_contains($createdAccountHtml, 'role="status"'),
+        'La administración debe confirmar de forma accesible la creación correcta de una cuenta.'
+    );
     $_SERVER['REQUEST_METHOD'] = 'POST';
     $_POST = [
         'email' => 'correo-invalido',

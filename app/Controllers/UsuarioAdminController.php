@@ -84,7 +84,7 @@ class UsuarioAdminController
                     }
                     $this->audit('usuario.creado', $id, 'rol=' . $role);
                     $this->db->commit();
-                    header('Location: index.php?action=usuarios');
+                    header('Location: index.php?action=usuarios&cuenta_creada=1');
                     exit;
                 } catch (Throwable $e) {
                     if ($this->db->inTransaction()) {
@@ -127,6 +127,7 @@ class UsuarioAdminController
             'error' => $error !== '' ? $error : (is_string($_GET['error'] ?? null) ? $_GET['error'] : ''),
             'eliminado' => isset($_GET['eliminado']),
             'estadoActualizado' => ($_GET['estado_actualizado'] ?? null) === '1',
+            'cuentaCreada' => ($_GET['cuenta_creada'] ?? null) === '1',
         ]);
     }
 
