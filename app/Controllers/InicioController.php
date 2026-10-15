@@ -18,9 +18,11 @@ class InicioController
         $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
         $asignaciones = (new Asignacion($db))->listarActivasPorUsuario($usuarioId);
         $asignacionesActivas = count($asignaciones);
+        $hoy = date('Y-m-d');
+        $disponibilidades = (new Disponibilidad($db))->obtenerVigentesPorUsuario($usuarioId, $hoy);
 
         $ofertas = [];
-        if ($asignacionesActivas === 0) {
+        if ($asignacionesActivas === 0 && $disponibilidades !== []) {
             $ofertaModel = new Oferta($db);
             $ofertas = array_values(array_filter(
                 array_map(static function (array $oferta): array {
@@ -41,8 +43,6 @@ class InicioController
             ));
         }
         $notaMedia = (new Calificacion($db))->obtenerNotaMediaPorUsuario($usuarioId);
-        $hoy = date('Y-m-d');
-        $disponibilidades = (new Disponibilidad($db))->obtenerVigentesPorUsuario($usuarioId, $hoy);
 
         $eventos = [];
         foreach ($asignaciones as $a) {
