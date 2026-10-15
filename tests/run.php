@@ -270,7 +270,11 @@ try {
     assertTrue(
         is_string($profileHtml)
             && str_contains($profileHtml, 'Ángela')
-            && str_contains($profileHtml, 'value="28013"'),
+            && str_contains($profileHtml, 'value="28013"')
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="profile-dni")(?=[^>]*\bmaxlength="20")[^>]*>/',
+                $profileHtml
+            ) === 1,
         'El formulario de perfil debe cargar los datos que se pueden editar.'
     );
     $_SERVER['REQUEST_METHOD'] = 'POST';
@@ -415,8 +419,24 @@ try {
             && $updatedGuardian['correo'] === 'tutor@example.test',
         'Guardar el perfil del menor debe completar el tutor legado dentro de la misma operación.'
     );
-    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_SERVER['REQUEST_METHOD'] = 'GET';
     $_SESSION = [];
+    $_POST = [];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $registrationHtml = (string)ob_get_clean();
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="student-dni")(?=[^>]*\bmaxlength="20")[^>]*>/',
+            $registrationHtml
+        ) === 1
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-guardian-dni")(?=[^>]*\bmaxlength="20")[^>]*>/',
+                $registrationHtml
+            ) === 1,
+        'El registro debe permitir los separadores admitidos en DNI/NIE del alumno y del tutor.'
+    );
+    $_SERVER['REQUEST_METHOD'] = 'POST';
     $_GET = [];
     $_POST = [
         'email' => "new-student-$fixture@example.test",

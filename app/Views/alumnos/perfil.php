@@ -25,7 +25,7 @@
                 </div>
                 <div class="student-registration__field">
                     <label for="profile-dni">DNI/NIE</label>
-                    <input id="profile-dni" name="dni" maxlength="10" autocomplete="off" value="<?= htmlspecialchars($values['dni'], ENT_QUOTES, 'UTF-8') ?>" data-spanish-id aria-invalid="<?= isset($fieldErrors['dni']) ? 'true' : 'false' ?>" required>
+                    <input id="profile-dni" name="dni" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['dni'], ENT_QUOTES, 'UTF-8') ?>" data-spanish-id aria-invalid="<?= isset($fieldErrors['dni']) ? 'true' : 'false' ?>" required>
                     <small>Se valida la letra de control del DNI/NIE.</small>
                     <small data-field-error><?= htmlspecialchars($fieldErrors['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>

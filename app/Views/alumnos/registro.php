@@ -51,7 +51,7 @@
 
                 <div class="student-registration__field">
                     <label for="student-dni">DNI/NIE <span aria-hidden="true">*</span></label>
-                    <input id="student-dni" type="text" name="dni" maxlength="10" autocomplete="off" value="<?= htmlspecialchars($values['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['dni']) ? 'true' : 'false' ?>" aria-describedby="student-dni-help student-dni-error" required>
+                    <input id="student-dni" type="text" name="dni" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['dni']) ? 'true' : 'false' ?>" aria-describedby="student-dni-help student-dni-error" required>
                     <small id="student-dni-help">DNI o NIE español con letra de control.</small>
                     <small id="student-dni-error" data-field-error><?= htmlspecialchars($fieldErrors['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
@@ -119,7 +119,7 @@
 
                 <div class="student-registration__field">
                     <label for="student-guardian-dni">DNI/NIE</label>
-                    <input id="student-guardian-dni" type="text" name="tutor_dni" maxlength="10" autocomplete="off" value="<?= htmlspecialchars($values['tutor_dni'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_dni']) ? 'true' : 'false' ?>" aria-describedby="student-guardian-dni-error">
+                    <input id="student-guardian-dni" type="text" name="tutor_dni" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_dni'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_dni']) ? 'true' : 'false' ?>" aria-describedby="student-guardian-dni-error">
                     <small id="student-guardian-dni-error" data-field-error><?= htmlspecialchars($fieldErrors['tutor_dni'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
