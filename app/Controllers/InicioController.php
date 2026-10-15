@@ -41,8 +41,8 @@ class InicioController
             ));
         }
         $notaMedia = (new Calificacion($db))->obtenerNotaMediaPorUsuario($usuarioId);
-        $disponibilidades = (new Disponibilidad($db))->obtenerPorUsuario($usuarioId);
         $hoy = date('Y-m-d');
+        $disponibilidades = (new Disponibilidad($db))->obtenerVigentesPorUsuario($usuarioId, $hoy);
 
         $eventos = [];
         foreach ($asignaciones as $a) {
@@ -77,10 +77,7 @@ class InicioController
             'ofertasVigentes' => array_slice($ofertas, 0, 4),
             'eventos' => array_slice($eventos, 0, 5),
             'tieneAsignacionActiva' => $asignacionesActivas > 0,
-            'tieneDisponibilidad' => array_filter(
-                $disponibilidades,
-                static fn(array $disponibilidad): bool => $disponibilidad['fecha_fin'] >= $hoy
-            ) !== [],
+            'tieneDisponibilidad' => $disponibilidades !== [],
         ]);
     }
 }

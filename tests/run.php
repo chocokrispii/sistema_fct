@@ -1315,6 +1315,15 @@ try {
         'M',
         [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
     );
+    $upcomingAvailability = $availabilityModel->obtenerVigentesPorUsuario(
+        $createdUsers[2],
+        (new DateTimeImmutable('today'))->format('Y-m-d')
+    );
+    assertTrue(
+        count($upcomingAvailability) === 1
+            && array_keys($upcomingAvailability[0]) === ['fecha_inicio', 'fecha_fin'],
+        'El dashboard debe recuperar solo fechas de disponibilidad vigente o futura.'
+    );
     $compatibleCandidates = (new Oferta($db))->obtenerCandidatosVigentes($createdUsers[2]);
     assertTrue(
         isset($compatibleCandidates[$createdOffer]),
