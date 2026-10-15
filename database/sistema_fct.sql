@@ -44,8 +44,8 @@ CREATE TABLE `alumnos` (
 --
 
 INSERT INTO `alumnos` (`id`, `usuario_id`, `nombre`, `apellidos`, `dni`, `numero_seguridad_social`, `correo`, `especialidad_id`, `proceso_solicitud_practicas`) VALUES
-(1, 4, 'Lucas', 'Pérez Ruiz', '12345678A', 'SS-11111111', 'lucas@correo.com', 1, 'Pendiente'),
-(2, 5, 'Sofía', 'García López', '87654321B', 'SS-22222222', 'sofia@correo.com', 2, 'Pendiente');
+(1, 4, 'Lucas', 'Pérez Ruiz', '12345678Z', 'SS-11111111', 'lucas@correo.com', 1, 'Pendiente'),
+(2, 5, 'Sofía', 'García López', '87654321X', 'SS-22222222', 'sofia@correo.com', 2, 'Pendiente');
 
 -- --------------------------------------------------------
 

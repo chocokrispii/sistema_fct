@@ -28,12 +28,12 @@ INSERT INTO empresa_especialidades_plazas (empresa_id, especialidad_id, plazas_c
 
 -- 6. INSERTAR ALUMNOS (Aquí se corrigió la coma de la línea 35)
 INSERT INTO alumnos (id, usuario_id, nombre, apellidos, fecha_nacimiento, dni, numero_seguridad_social, correo, especialidad_id) VALUES
-(1, 4, 'Lucas', 'Pérez Ruiz', '2009-01-01', '12345678A', 'SS-11111111', 'lucas@correo.com', 1),
-(2, 5, 'Sofía', 'García López', '2000-01-01', '87654321B', 'SS-22222222', 'sofia@correo.com', 2);
+(1, 4, 'Lucas', 'Pérez Ruiz', '2009-01-01', '12345678Z', 'SS-11111111', 'lucas@correo.com', 1),
+(2, 5, 'Sofía', 'García López', '2000-01-01', '87654321X', 'SS-22222222', 'sofia@correo.com', 2);
 
 -- 7. INSERTAR TUTOR LEGAL
 INSERT INTO tutores_legales (alumno_id, nombre_completo, dni, numero_seguridad_social, direccion, telefono, correo) VALUES
-(1, 'Padre de Lucas Pérez', '11223344Z', 'SS-33333333', 'Calle Mayor 12, Madrid', '600123456', 'tutor@correo.com');
+(1, 'Padre de Lucas Pérez', '11223344B', 'SS-33333333', 'Calle Mayor 12, Madrid', '600123456', 'tutor@correo.com');
 
 -- 8. INSERTAR TELÉFONOS Y DIRECCIONES
 INSERT INTO direcciones_telefonos (empresa_id, alumno_id, tutor_id, telefono, direccion_completa, es_principal) VALUES

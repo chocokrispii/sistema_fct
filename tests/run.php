@@ -59,6 +59,16 @@ foreach ($demoUsers as $demoUser) {
         'La contraseña de demostración no valida para ' . $demoUser['email'] . '.'
     );
 }
+$demoDnis = $db->query(
+    "SELECT dni FROM alumnos WHERE correo IN ('lucas@correo.com', 'sofia@correo.com')"
+)->fetchAll(PDO::FETCH_COLUMN);
+assertTrue(count($demoDnis) === 2, 'Faltan expedientes de alumno de demostración.');
+foreach ($demoDnis as $demoDni) {
+    assertTrue(
+        is_string($demoDni) && SpanishDataValidator::isDniNie($demoDni),
+        'El DNI/NIE de un alumno de demostración no tiene una letra de control válida.'
+    );
+}
 
 $required = [
     'persona_contacto' => ['table' => 'empresas', 'column' => 'persona_contacto'],
@@ -83,6 +93,11 @@ foreach ($required as $name => $definition) {
 }
 
 $fixture = bin2hex(random_bytes(5));
+$dniLetters = 'TRWAGMYFPDXBNJZSQVHLCKE';
+$firstDniNumber = 10000000 + hexdec(substr($fixture, 0, 6));
+$firstStudentDni = sprintf('%08d%s', $firstDniNumber, $dniLetters[$firstDniNumber % 23]);
+$secondDniNumber = $firstDniNumber + 1;
+$secondStudentDni = sprintf('%08d%s', $secondDniNumber, $dniLetters[$secondDniNumber % 23]);
 $emails = [
     "company-$fixture@example.test",
     "student-a-$fixture@example.test",
@@ -208,7 +223,7 @@ try {
         'Ángela',
         "O'Connor",
         '2005-01-01',
-        '12345678Z',
+        $firstStudentDni,
         '12345-67890',
         '612345678',
         'Calle O’Donnell, 1',
@@ -219,7 +234,7 @@ try {
         $updatedProfile !== null
             && $updatedProfile['nombre'] === 'Ángela'
             && $updatedProfile['apellidos'] === "O'Connor"
-            && $updatedProfile['dni'] === '12345678Z'
+            && $updatedProfile['dni'] === $firstStudentDni
             && $updatedProfile['codigo_postal'] === '28013'
             && $updatedProfile['telefono'] === '612345678',
         'La edición del perfil debe guardar los datos personales, postales y de contacto.'
@@ -232,7 +247,7 @@ try {
             'Cambio parcial',
             "O'Connor",
             '2005-01-01',
-            '12345678Z',
+            $firstStudentDni,
             '12345-67890',
             '612345678',
             'Calle O’Donnell, 1',
@@ -280,7 +295,7 @@ try {
         'Los datos inválidos deben marcar el campo y mostrar feedback específico sin guardar.'
     );
     assertTrue(
-        $studentModel->obtenerPorUsuario($createdUsers[1])['dni'] === '12345678Z',
+        $studentModel->obtenerPorUsuario($createdUsers[1])['dni'] === $firstStudentDni,
         'Un DNI/NIE inválido no debe modificar el expediente.'
     );
     $db->prepare('UPDATE alumnos SET fecha_nacimiento = :nacimiento WHERE id = :id')
@@ -314,7 +329,7 @@ try {
         'nombre' => 'Alumno',
         'apellidos' => 'Apellidos Legado',
         'fecha_nacimiento' => '2010-01-01',
-        'dni' => '87654321X',
+        'dni' => $secondStudentDni,
         'nss' => "NSS-$fixture-2",
         'telefono' => '612345679',
         'direccion' => 'Calle Nueva 2',
@@ -338,7 +353,7 @@ try {
         'Alumno',
         'Apellidos Legado',
         '2010-01-01',
-        '87654321X',
+        $secondStudentDni,
         "NSS-$fixture-2",
         '612345679',
         'Calle Nueva 2',

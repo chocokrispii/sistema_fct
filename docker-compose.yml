@@ -41,10 +41,7 @@
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-root_local_dev}
     volumes:
       - db_data:/var/lib/mysql
-<<<<<<< HEAD
       # MariaDB procesa estos archivos en orden al crear un volumen vacío.
-=======
->>>>>>> origin/main
       - ./database/sistema_fct.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
       - ./database/migrations/001_renombrar_nombre_especialidad.sql:/docker-entrypoint-initdb.d/002-migration.sql:ro
       - ./database/migrations/002_fct_workflows.sql:/docker-entrypoint-initdb.d/003-migration.sql:ro
