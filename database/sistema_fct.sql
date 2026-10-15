@@ -115,7 +115,7 @@ CREATE TABLE `empresas` (
 --
 
 INSERT INTO `empresas` (`id`, `usuario_id`, `nombre_empresa`, `cif_empresa`, `pagina_web`, `pertenece_grupo_empresa`, `categoria`, `cnae`, `registro_mercantil`, `convenios_documentacion`) VALUES
-(1, 3, 'Tech Solutions S.L.', 'B12345678', '://techsolutions.com', 0, 'Desarrollo de Software', NULL, NULL, NULL);
+(1, 3, 'Tech Solutions S.L.', 'B12345678', 'https://techsolutions.com', 0, 'Desarrollo de Software', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -373,11 +373,10 @@ COMMIT;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 
 ALTER TABLE `alumnos`
-  ADD CONSTRAINT `uk_alumnos_dni` UNIQUE (`dni`),
   ADD CONSTRAINT `uk_alumnos_nss` UNIQUE (`numero_seguridad_social`);
 
-  ALTER TABLE `usuarios`
+ALTER TABLE `usuarios`
   MODIFY COLUMN `password_hash` VARCHAR(255) NOT NULL;
 
-  ALTER TABLE `usuarios`
+ALTER TABLE `usuarios`
   ADD COLUMN `fecha_actualizacion` DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP;
