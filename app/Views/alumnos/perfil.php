@@ -70,27 +70,33 @@
             <div class="student-registration__grid">
                 <div class="student-registration__field">
                     <label for="profile-guardian-name">Nombre completo</label>
-                    <input id="profile-guardian-name" name="tutor_nombre" maxlength="100" autocomplete="off" value="<?= htmlspecialchars($values['tutor_nombre'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="profile-guardian-name" name="tutor_nombre" maxlength="100" autocomplete="off" value="<?= htmlspecialchars($values['tutor_nombre'], ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_nombre']) ? 'true' : 'false' ?>">
+                    <small data-field-error><?= htmlspecialchars($fieldErrors['tutor_nombre'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
                 <div class="student-registration__field">
                     <label for="profile-guardian-dni">DNI/NIE</label>
-                    <input id="profile-guardian-dni" name="tutor_dni" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_dni'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="profile-guardian-dni" name="tutor_dni" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_dni'], ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_dni']) ? 'true' : 'false' ?>">
+                    <small data-field-error><?= htmlspecialchars($fieldErrors['tutor_dni'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
                 <div class="student-registration__field">
                     <label for="profile-guardian-nss">Número de Seguridad Social</label>
-                    <input id="profile-guardian-nss" name="tutor_nss" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_nss'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="profile-guardian-nss" name="tutor_nss" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_nss'], ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_nss']) ? 'true' : 'false' ?>">
+                    <small data-field-error><?= htmlspecialchars($fieldErrors['tutor_nss'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
                 <div class="student-registration__field">
                     <label for="profile-guardian-email">Correo electrónico</label>
-                    <input id="profile-guardian-email" type="email" name="tutor_correo" maxlength="100" autocomplete="off" value="<?= htmlspecialchars($values['tutor_correo'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="profile-guardian-email" type="email" name="tutor_correo" maxlength="100" autocomplete="off" value="<?= htmlspecialchars($values['tutor_correo'], ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_correo']) ? 'true' : 'false' ?>">
+                    <small data-field-error><?= htmlspecialchars($fieldErrors['tutor_correo'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
                 <div class="student-registration__field">
                     <label for="profile-guardian-phone">Teléfono</label>
-                    <input id="profile-guardian-phone" type="tel" name="tutor_telefono" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_telefono'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="profile-guardian-phone" type="tel" name="tutor_telefono" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_telefono'], ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_telefono']) ? 'true' : 'false' ?>">
+                    <small data-field-error><?= htmlspecialchars($fieldErrors['tutor_telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
                 <div class="student-registration__field">
                     <label for="profile-guardian-address">Dirección</label>
-                    <input id="profile-guardian-address" name="tutor_direccion" maxlength="255" autocomplete="off" value="<?= htmlspecialchars($values['tutor_direccion'], ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="profile-guardian-address" name="tutor_direccion" maxlength="255" autocomplete="off" value="<?= htmlspecialchars($values['tutor_direccion'], ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_direccion']) ? 'true' : 'false' ?>">
+                    <small data-field-error><?= htmlspecialchars($fieldErrors['tutor_direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
             </div>
         </fieldset>

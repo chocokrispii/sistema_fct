@@ -366,6 +366,22 @@ try {
         str_contains($incompleteGuardianHtml, 'name="tutor_dni"'),
         'El formulario debe conservar acceso a la corrección de los datos del tutor legal.'
     );
+    $_POST['tutor_nombre'] = 'Tutor legado';
+    $_POST['tutor_dni'] = '12345678A';
+    $_POST['tutor_nss'] = '12345-67890';
+    $_POST['tutor_direccion'] = 'Calle Tutor 2';
+    $_POST['tutor_telefono'] = '612345670';
+    $_POST['tutor_correo'] = 'tutor@example.test';
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $invalidGuardianHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($invalidGuardianHtml, 'id="profile-guardian-dni"')
+            && str_contains($invalidGuardianHtml, 'aria-invalid="true"')
+            && str_contains($invalidGuardianHtml, 'Introduce un DNI/NIE con una letra de control válida.')
+            && str_contains($invalidGuardianHtml, 'value="12345678A"'),
+        'Un DNI/NIE de tutor inválido debe señalar el campo y conservar el valor para corregirlo.'
+    );
     $studentModel->actualizarPerfil(
         $createdUsers[2],
         $emails[2],

@@ -369,16 +369,34 @@ class AlumnoController
                     'telefono' => SpanishDataValidator::normalizePhone($values['tutor_telefono']),
                     'correo' => $values['tutor_correo'],
                 ];
-                if (
-                    !SpanishDataValidator::isPersonName($tutorData['nombre'], 100)
-                    || !SpanishDataValidator::isDniNie($tutorData['dni'])
-                    || preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $tutorData['nss']) !== 1
-                    || $tutorData['direccion'] === ''
-                    || mb_strlen($tutorData['direccion']) > 255
-                    || preg_match('/[\p{Cc}]/u', $tutorData['direccion']) === 1
-                    || !SpanishDataValidator::isSpanishPhone($tutorData['telefono'])
-                    || !SpanishDataValidator::isEmail($tutorData['correo'])
-                ) {
+                $tutorFieldErrors = [
+                    'tutor_nombre' => !SpanishDataValidator::isPersonName($tutorData['nombre'], 100)
+                        ? 'Introduce un nombre válido de hasta 100 caracteres.'
+                        : null,
+                    'tutor_dni' => !SpanishDataValidator::isDniNie($tutorData['dni'])
+                        ? 'Introduce un DNI/NIE con una letra de control válida.'
+                        : null,
+                    'tutor_nss' => preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $tutorData['nss']) !== 1
+                        ? 'Introduce un número de Seguridad Social válido (5–20 caracteres).'
+                        : null,
+                    'tutor_direccion' => $tutorData['direccion'] === ''
+                        || mb_strlen($tutorData['direccion']) > 255
+                        || preg_match('/[\p{Cc}]/u', $tutorData['direccion']) === 1
+                        ? 'Introduce una dirección de hasta 255 caracteres, sin caracteres de control.'
+                        : null,
+                    'tutor_telefono' => !SpanishDataValidator::isSpanishPhone($tutorData['telefono'])
+                        ? 'Introduce un teléfono español válido de nueve cifras.'
+                        : null,
+                    'tutor_correo' => !SpanishDataValidator::isEmail($tutorData['correo'])
+                        ? 'Introduce un correo electrónico válido.'
+                        : null,
+                ];
+                foreach ($tutorFieldErrors as $field => $message) {
+                    if ($message !== null) {
+                        $fieldErrors[$field] = $message;
+                    }
+                }
+                if ($fieldErrors !== []) {
                     $error = 'Completa los datos del tutor legal con información válida para guardar el expediente de un menor.';
                 }
             }
