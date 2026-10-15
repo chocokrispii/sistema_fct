@@ -315,6 +315,13 @@ class AlumnoController
     {
         $usuarioId = (int)$_SESSION['usuario_id'];
         $alumno = $this->alumnoModel->obtenerPorUsuario($usuarioId);
+        $resultadoAsignaciones = $alumno
+            ? (new Asignacion($this->db))->obtenerPagina(
+                true,
+                $usuarioId,
+                Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+            )
+            : ['items' => [], 'total' => 0];
 
         View::render('alumnos/portal', [
             'alumno' => $alumno,
@@ -324,9 +331,9 @@ class AlumnoController
             'horarioSemanal' => $alumno
                 ? (new Disponibilidad($this->db))->obtenerHorarioSemanalPorUsuario($usuarioId)
                 : [],
-            'asignaciones' => $alumno
-                ? (new Asignacion($this->db))->listar(true, $usuarioId)
-                : [],
+            'asignaciones' => $resultadoAsignaciones['items'],
+            'totalAsignaciones' => $resultadoAsignaciones['total'],
+            'paginacion' => $resultadoAsignaciones,
             'calificaciones' => $alumno
                 ? (new Calificacion($this->db))->listar(true, $usuarioId)
                 : [],
