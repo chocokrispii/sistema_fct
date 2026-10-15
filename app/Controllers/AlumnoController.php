@@ -39,7 +39,10 @@ class AlumnoController
         foreach ($fields as $field) {
             $value = $_POST[$field] ?? '';
             if (!is_string($value)) {
-                $this->mostrarFormulario('Los datos del registro deben ser valores de texto válidos.');
+                $this->mostrarFormulario(
+                    'Los datos del registro deben ser valores de texto válidos.',
+                    [$field => 'Este campo debe contener un único valor de texto.']
+                );
                 return;
             }
             // La contraseña no se recorta: los espacios cuentan.

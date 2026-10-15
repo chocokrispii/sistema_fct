@@ -498,6 +498,38 @@ try {
             && (int)$invalidStudentAccountCount->fetchColumn() === 0,
         'El registro debe señalar todos los campos inválidos y no crear la cuenta.'
     );
+    $malformedEmail = "malformed-email-$fixture@example.test";
+    $_POST = [
+        'email' => ['malformed'],
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Nuevo Alumno',
+        'apellidos' => 'Entrada no válida',
+        'dni' => sprintf(
+            '%08d%s',
+            $secondDniNumber + 4,
+            $dniLetters[($secondDniNumber + 4) % 23]
+        ),
+        'nss' => "REG-$fixture-5",
+        'telefono' => '612345675',
+        'direccion' => 'Calle de prueba 5',
+        'codigo_postal' => '28013',
+        'fecha_nacimiento' => '2000-01-01',
+        'especialidad_id' => (string)$cycleId,
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $malformedEmailHtml = (string)ob_get_clean();
+    $malformedEmailCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $malformedEmailCount->execute(['email' => $malformedEmail]);
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="student-email")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $malformedEmailHtml
+        ) === 1
+            && str_contains($malformedEmailHtml, 'Este campo debe contener un único valor de texto.')
+            && (int)$malformedEmailCount->fetchColumn() === 0,
+        'Un campo enviado con tipo incorrecto debe señalarse y detener el registro.'
+    );
     $_POST = [
         'email' => $emails[1],
         'password' => 'ValidStudentPassword123',
