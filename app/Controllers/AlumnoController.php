@@ -387,6 +387,7 @@ class AlumnoController
                 }
                 $values[$field] = trim($posted);
             }
+            $studentPhoneWithinLimit = mb_strlen($values['telefono']) <= 20;
             $values['dni'] = SpanishDataValidator::normalizeDniNie($values['dni']);
             $values['telefono'] = SpanishDataValidator::normalizePhone($values['telefono']);
 
@@ -399,7 +400,7 @@ class AlumnoController
             $surname = SpanishDataValidator::isPersonName($values['apellidos'], 100);
             $dni = SpanishDataValidator::isDniNie($values['dni']);
             $nss = preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $values['nss']) === 1;
-            $phone = SpanishDataValidator::isSpanishPhone($values['telefono']);
+            $phone = $studentPhoneWithinLimit && SpanishDataValidator::isSpanishPhone($values['telefono']);
             $address = $values['direccion'] !== ''
                 && mb_strlen($values['direccion']) <= 255
                 && preg_match('/[\p{Cc}]/u', $values['direccion']) !== 1;
@@ -420,7 +421,7 @@ class AlumnoController
                 $fieldErrors['nss'] = 'Introduce entre 5 y 20 caracteres alfanuméricos, espacios, puntos o guiones.';
             }
             if (!$phone) {
-                $fieldErrors['telefono'] = 'Introduce un teléfono español válido de nueve cifras, con o sin prefijo +34.';
+                $fieldErrors['telefono'] = 'Introduce un teléfono español válido de hasta 20 caracteres.';
             }
             if (!$address) {
                 $fieldErrors['direccion'] = 'La dirección es obligatoria, no puede superar 255 caracteres ni contener controles.';
@@ -443,6 +444,7 @@ class AlumnoController
             }
 
             if ($error === '' && $birthDate->diff(new DateTimeImmutable('today'))->y < 18) {
+                $guardianPhoneWithinLimit = mb_strlen($values['tutor_telefono']) <= 20;
                 $tutorData = [
                     'nombre' => $values['tutor_nombre'],
                     'dni' => SpanishDataValidator::normalizeDniNie($values['tutor_dni']),
@@ -466,8 +468,9 @@ class AlumnoController
                         || preg_match('/[\p{Cc}]/u', $tutorData['direccion']) === 1
                         ? 'Introduce una dirección de hasta 255 caracteres, sin caracteres de control.'
                         : null,
-                    'tutor_telefono' => !SpanishDataValidator::isSpanishPhone($tutorData['telefono'])
-                        ? 'Introduce un teléfono español válido de nueve cifras.'
+                    'tutor_telefono' => !$guardianPhoneWithinLimit
+                        || !SpanishDataValidator::isSpanishPhone($tutorData['telefono'])
+                        ? 'Introduce un teléfono español válido de hasta 20 caracteres.'
                         : null,
                     'tutor_correo' => !SpanishDataValidator::isEmail($tutorData['correo'])
                         ? 'Introduce un correo electrónico válido.'

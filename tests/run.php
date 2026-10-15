@@ -308,6 +308,29 @@ try {
         'apellidos' => "O'Connor",
         'fecha_nacimiento' => '2005-01-01',
         'dni' => $firstStudentDni,
+        'nss' => '12345-67890',
+        'telefono' => '------------612345678',
+        'direccion' => 'Calle O’Donnell, 1',
+        'codigo_postal' => '28013',
+    ];
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $longStudentPhoneHtml = (string)ob_get_clean();
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="profile-phone")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $longStudentPhoneHtml
+        ) === 1
+            && str_contains($longStudentPhoneHtml, 'Introduce un teléfono español válido de hasta 20 caracteres.')
+            && $studentModel->obtenerPorUsuario($createdUsers[1])['telefono'] === '612345678',
+        'El perfil debe rechazar teléfonos normalizados válidos que superen su maxlength y no guardarlos.'
+    );
+    $_POST = [
+        'email' => $emails[1],
+        'nombre' => 'Ángela',
+        'apellidos' => "O'Connor",
+        'fecha_nacimiento' => '2005-01-01',
+        'dni' => $firstStudentDni,
         'nss' => "NSS-$fixture-2",
         'telefono' => '612345678',
         'direccion' => 'Calle O’Donnell, 1',
@@ -385,6 +408,19 @@ try {
             && str_contains($invalidGuardianHtml, 'Introduce un DNI/NIE con una letra de control válida.')
             && str_contains($invalidGuardianHtml, 'value="12345678A"'),
         'Un DNI/NIE de tutor inválido debe señalar el campo y conservar el valor para corregirlo.'
+    );
+    $_POST['tutor_dni'] = '12345678Z';
+    $_POST['tutor_telefono'] = '------------612345670';
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $longGuardianPhoneHtml = (string)ob_get_clean();
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="profile-guardian-phone")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $longGuardianPhoneHtml
+        ) === 1
+            && str_contains($longGuardianPhoneHtml, 'Introduce un teléfono español válido de hasta 20 caracteres.'),
+        'El perfil del menor debe rechazar los teléfonos largos de tutor tras normalización.'
     );
     $studentModel->actualizarPerfil(
         $createdUsers[2],
