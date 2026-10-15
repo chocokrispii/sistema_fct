@@ -1376,10 +1376,11 @@ try {
     (new InicioController())->mostrar();
     $expiredAvailabilityDashboard = (string)ob_get_clean();
     assertTrue(
-        str_contains($expiredAvailabilityDashboard, 'Completa tu disponibilidad')
+        str_contains($expiredAvailabilityDashboard, 'Registra una disponibilidad vigente')
+            && str_contains($expiredAvailabilityDashboard, 'href="index.php?action=disponibilidad">Registrar disponibilidad')
             && str_contains($expiredAvailabilityDashboard, 'Gestionar disponibilidad')
             && str_contains($expiredAvailabilityDashboard, 'No tienes eventos próximos.'),
-        'Un periodo vencido no debe contar como disponibilidad vigente ni aparecer como próximo evento.'
+        'Un periodo vencido debe ofrecer registrar disponibilidad y no aparecer como evento próximo.'
     );
 
     $_SESSION = [];

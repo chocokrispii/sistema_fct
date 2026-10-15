@@ -84,6 +84,9 @@ $etiquetaClase = static function (string $texto): string {
             <?php if ($ofertasVigentes === []): ?>
                 <?php if ($tieneAsignacionActiva): ?>
                     <p class="fct-empty">Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.</p>
+                <?php elseif (!$tieneDisponibilidad): ?>
+                    <p class="fct-empty">Registra una disponibilidad vigente para encontrar ofertas compatibles con tu perfil.</p>
+                    <a class="fct-link" href="index.php?action=disponibilidad">Registrar disponibilidad <?= $arrow ?></a>
                 <?php else: ?>
                     <p class="fct-empty">No hay ofertas con plazas compatibles con tu ciclo, disponibilidad y turno.</p>
                 <?php endif; ?>
