@@ -5,6 +5,7 @@ require_once __DIR__ . '/../Models/Oferta.php';
 require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
+require_once __DIR__ . '/../Models/Asignacion.php';
 
 class OfertaController {
     private PDO $db;
@@ -21,9 +22,10 @@ class OfertaController {
 
     public function listar(): void {
         if (($_SESSION['rol'] ?? null) === 'Alumno') {
+            $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
             $ofertas = $this->ofertaModel->obtenerVigentesConAsignaciones();
             $candidatosPorOferta = $this->ofertaModel->obtenerCandidatosVigentes(
-                (int)($_SESSION['usuario_id'] ?? 0)
+                $usuarioId
             );
             $ofertas = array_values(array_filter(
                 array_map(static function (array $oferta) use ($candidatosPorOferta): array {
@@ -36,9 +38,14 @@ class OfertaController {
                 static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
                     && isset($candidatosPorOferta[(int)$oferta['id']])
             ));
+            $asignacionesActivas = array_filter(
+                (new Asignacion($this->db))->listar(true, $usuarioId),
+                static fn(array $asignacion): bool => $asignacion['estado'] === 'Asignada'
+            ) !== [];
             View::render('ofertas/listado', [
                 'ofertas' => $ofertas,
                 'soloCompatibles' => true,
+                'tieneAsignacionActiva' => $asignacionesActivas,
             ]);
             return;
         }
@@ -47,6 +54,7 @@ class OfertaController {
         View::render('ofertas/listado', [
             'ofertas' => $ofertas,
             'soloCompatibles' => false,
+            'tieneAsignacionActiva' => false,
         ]);
     }
 

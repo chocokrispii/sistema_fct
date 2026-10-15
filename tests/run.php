@@ -1258,8 +1258,19 @@ try {
         isset($assignedStudentOfferMetric[1], $assignedStudentCompanyMetric[1])
             && (int)$assignedStudentOfferMetric[1] === 0
             && (int)$assignedStudentCompanyMetric[1] === 0
-            && str_contains($dashboardHtml, 'No hay ofertas con plazas compatibles con tu ciclo, disponibilidad y turno.'),
+            && str_contains($dashboardHtml, 'Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.'),
         'El dashboard no debe ofrecer nuevas prácticas a un alumno que ya tiene una asignación activa.'
+    );
+    $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno'];
+    ob_start();
+    (new OfertaController($db))->listar();
+    $assignedStudentOfferListingHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains(
+            $assignedStudentOfferListingHtml,
+            'Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.'
+        ),
+        'El listado debe explicar que las nuevas ofertas no están disponibles mientras haya una práctica activa.'
     );
 
     $availabilityModel->reemplazar(

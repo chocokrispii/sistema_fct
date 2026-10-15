@@ -1,6 +1,10 @@
 <h2><?= $soloCompatibles ? 'Ofertas compatibles con tu perfil' : 'Ofertas de FCT aprobadas' ?></h2>
 <?php if ($ofertas === []): ?>
-    <p><?= $soloCompatibles ? 'No hay ofertas con plazas compatibles con tu ciclo, disponibilidad y turno.' : 'No hay ofertas aprobadas para mostrar.' ?></p>
+    <?php if ($soloCompatibles && $tieneAsignacionActiva): ?>
+        <p>Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.</p>
+    <?php else: ?>
+        <p><?= $soloCompatibles ? 'No hay ofertas con plazas compatibles con tu ciclo, disponibilidad y turno.' : 'No hay ofertas aprobadas para mostrar.' ?></p>
+    <?php endif; ?>
 <?php else: ?>
     <table>
         <thead><tr><th>Empresa</th><th>Ciclo</th><th><?= $soloCompatibles ? 'Plazas disponibles' : 'Plazas' ?></th><th>Turno</th><th>Inicio</th><th>Fin</th></tr></thead>

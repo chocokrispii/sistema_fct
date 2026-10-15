@@ -5,6 +5,7 @@
 /** @var float|null $notaMedia */
 /** @var array $ofertasVigentes */
 /** @var array $eventos */
+/** @var bool $tieneAsignacionActiva */
 /** @var bool $tieneDisponibilidad */
 
 $nombreCompleto = trim((string)($_SESSION['nombre'] ?? ''));
@@ -81,7 +82,11 @@ $etiquetaClase = static function (string $texto): string {
                 <a class="fct-link" href="index.php?action=ofertas">Ver todas <?= $arrow ?></a>
             </div>
             <?php if ($ofertasVigentes === []): ?>
-                <p class="fct-empty">No hay ofertas con plazas compatibles con tu ciclo, disponibilidad y turno.</p>
+                <?php if ($tieneAsignacionActiva): ?>
+                    <p class="fct-empty">Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.</p>
+                <?php else: ?>
+                    <p class="fct-empty">No hay ofertas con plazas compatibles con tu ciclo, disponibilidad y turno.</p>
+                <?php endif; ?>
             <?php else: ?>
                 <ul class="fct-offers__list">
                     <?php foreach ($ofertasVigentes as $i => $oferta): ?>

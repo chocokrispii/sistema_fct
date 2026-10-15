@@ -36,6 +36,10 @@ class InicioController
             static fn(array $oferta): bool => isset($candidatosPorOferta[(int)$oferta['id']])
         ));
         $asignaciones = (new Asignacion($db))->listar(true, $usuarioId);
+        $asignacionesActivas = count(array_filter(
+            $asignaciones,
+            static fn(array $asignacion): bool => $asignacion['estado'] === 'Asignada'
+        ));
         $calificaciones = (new Calificacion($db))->listar(true, $usuarioId);
         $disponibilidades = (new Disponibilidad($db))->obtenerPorUsuario($usuarioId);
         $hoy = date('Y-m-d');
@@ -74,10 +78,11 @@ class InicioController
         View::render('home/dashboard_alumno', [
             'totalOfertas' => count($ofertas),
             'totalEmpresas' => count(array_unique(array_column($ofertas, 'empresa_id'))),
-            'asignacionesActivas' => count(array_filter($asignaciones, static fn(array $a) => $a['estado'] === 'Asignada')),
+            'asignacionesActivas' => $asignacionesActivas,
             'notaMedia' => $notas === [] ? null : array_sum(array_map('floatval', $notas)) / count($notas),
             'ofertasVigentes' => array_slice($ofertas, 0, 4),
             'eventos' => array_slice($eventos, 0, 5),
+            'tieneAsignacionActiva' => $asignacionesActivas > 0,
             'tieneDisponibilidad' => array_filter(
                 $disponibilidades,
                 static fn(array $disponibilidad): bool => $disponibilidad['fecha_fin'] >= $hoy
