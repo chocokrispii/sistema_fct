@@ -112,11 +112,17 @@ class Oferta {
         return $this->consultarCandidatos('p.id = :oferta_id', ['oferta_id' => $ofertaId]);
     }
 
-    public function obtenerCandidatosVigentes(): array
+    public function obtenerCandidatosVigentes(?int $usuarioId = null): array
     {
+        $filter = 'p.fecha_fin >= CURDATE()';
+        $params = [];
+        if ($usuarioId !== null) {
+            $filter .= ' AND a.usuario_id = :usuario_id';
+            $params['usuario_id'] = $usuarioId;
+        }
         $stmt = $this->consultarCandidatos(
-            'p.fecha_fin >= CURDATE()',
-            [],
+            $filter,
+            $params,
             true,
             true
         );

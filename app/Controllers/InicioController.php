@@ -17,6 +17,7 @@ class InicioController
         $db = getPDOConnection();
         $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
 
+        $ofertaModel = new Oferta($db);
         $ofertas = array_values(array_filter(
             array_map(static function (array $oferta): array {
                 $oferta['plazas_disponibles'] = max(
@@ -24,8 +25,15 @@ class InicioController
                     (int)$oferta['plazas_cuantas'] - (int)$oferta['asignadas']
                 );
                 return $oferta;
-            }, (new Oferta($db))->obtenerVigentesConAsignaciones()),
+            }, $ofertaModel->obtenerVigentesConAsignaciones()),
             static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
+        ));
+        $candidatosPorOferta = $ofertas === []
+            ? []
+            : $ofertaModel->obtenerCandidatosVigentes($usuarioId);
+        $ofertas = array_values(array_filter(
+            $ofertas,
+            static fn(array $oferta): bool => isset($candidatosPorOferta[(int)$oferta['id']])
         ));
         $asignaciones = (new Asignacion($db))->listar(true, $usuarioId);
         $calificaciones = (new Calificacion($db))->listar(true, $usuarioId);

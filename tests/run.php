@@ -899,6 +899,12 @@ try {
             && (int)$bulkCandidates[$createdOffer][0]['alumno_id'] === $createdStudents[0],
         'La consulta agrupada debe devolver los candidatos indexados por oferta.'
     );
+    $studentCandidates = $matching->obtenerCandidatosVigentes($createdUsers[1]);
+    assertTrue(
+        count($studentCandidates[$createdOffer] ?? []) === 1
+            && (int)$studentCandidates[$createdOffer][0]['alumno_id'] === $createdStudents[0],
+        'La consulta agrupada debe poder limitar los candidatos compatibles a un alumno.'
+    );
 
     $assignments = new Asignacion($db);
     $assignments->crear($createdOffer, $createdStudents[0], $createdUsers[3], 'Tutor de empresa');
@@ -921,7 +927,8 @@ try {
     );
     assertTrue(
         (int)$matching->obtenerVigentesConAsignaciones()[0]['asignadas'] === 1
-            && !isset($matching->obtenerCandidatosVigentes()[$createdOffer]),
+            && !isset($matching->obtenerCandidatosVigentes()[$createdOffer])
+            && !isset($matching->obtenerCandidatosVigentes($createdUsers[1])[$createdOffer]),
         'El matching agrupado debe reflejar plazas ocupadas y excluir ofertas sin capacidad.'
     );
     $paginationOffer = $db->prepare(
@@ -1234,43 +1241,49 @@ try {
     ob_start();
     (new InicioController())->mostrar();
     $dashboardHtml = (string)ob_get_clean();
-    $dashboardOfferCount = $db->query(
-        "SELECT COUNT(*)
-         FROM empresa_especialidades_plazas p
-         LEFT JOIN (
-             SELECT oferta_id, COUNT(*) AS asignadas
-             FROM asignaciones_fct
-             WHERE estado IN ('Asignada', 'Cerrada')
-             GROUP BY oferta_id
-         ) conteo ON conteo.oferta_id = p.id
-         WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
-           AND COALESCE(conteo.asignadas, 0) < p.plazas_cuantas"
-    )->fetchColumn();
-    $dashboardCompanyCount = $db->query(
-        "SELECT COUNT(DISTINCT p.empresa_id)
-         FROM empresa_especialidades_plazas p
-         LEFT JOIN (
-             SELECT oferta_id, COUNT(*) AS asignadas
-             FROM asignaciones_fct
-             WHERE estado IN ('Asignada', 'Cerrada')
-             GROUP BY oferta_id
-         ) conteo ON conteo.oferta_id = p.id
-         WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
-           AND COALESCE(conteo.asignadas, 0) < p.plazas_cuantas"
-    )->fetchColumn();
     preg_match(
-        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Ofertas con plazas</span>~',
+        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Ofertas compatibles</span>~',
         $dashboardHtml,
+        $assignedStudentOfferMetric
+    );
+    preg_match(
+        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Empresas compatibles</span>~',
+        $dashboardHtml,
+        $assignedStudentCompanyMetric
+    );
+    assertTrue(
+        isset($assignedStudentOfferMetric[1], $assignedStudentCompanyMetric[1])
+            && (int)$assignedStudentOfferMetric[1] === 0
+            && (int)$assignedStudentCompanyMetric[1] === 0
+            && str_contains($dashboardHtml, 'No hay ofertas con plazas compatibles con tu ciclo, disponibilidad y turno.'),
+        'El dashboard no debe ofrecer nuevas prácticas a un alumno que ya tiene una asignación activa.'
+    );
+
+    $compatibleCandidates = (new Oferta($db))->obtenerCandidatosVigentes($createdUsers[2]);
+    $compatibleOfferIds = array_fill_keys(array_map('intval', array_keys($compatibleCandidates)), true);
+    $compatibleOffers = array_values(array_filter(
+        (new Oferta($db))->obtenerVigentesConAsignaciones(),
+        static fn(array $offer): bool => isset($compatibleOfferIds[(int)$offer['id']])
+    ));
+    $dashboardOfferCount = count($compatibleOffers);
+    $dashboardCompanyCount = count(array_unique(array_column($compatibleOffers, 'empresa_id')));
+    $_SESSION = ['usuario_id' => $createdUsers[2], 'rol' => 'Alumno', 'nombre' => 'Segundo alumno'];
+    ob_start();
+    (new InicioController())->mostrar();
+    $compatibleDashboardHtml = (string)ob_get_clean();
+    preg_match(
+        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Ofertas compatibles</span>~',
+        $compatibleDashboardHtml,
         $dashboardOfferMetric
     );
     preg_match(
-        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Empresas con plazas disponibles</span>~',
-        $dashboardHtml,
+        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Empresas compatibles</span>~',
+        $compatibleDashboardHtml,
         $dashboardCompanyMetric
     );
     assertTrue(
         str_contains(
-            $dashboardHtml,
+            $compatibleDashboardHtml,
             'Del 15/03/2027 al 15/03/2027 - Turno mañana'
         ),
         'La tarjeta debe mostrar las fechas de la oferta y traducir su turno al castellano.'
@@ -1288,7 +1301,7 @@ try {
         isset($dashboardOfferMetric[1], $dashboardCompanyMetric[1])
             && (int)$dashboardOfferMetric[1] === (int)$dashboardOfferCount
             && (int)$dashboardCompanyMetric[1] === (int)$dashboardCompanyCount
-            && str_contains($dashboardHtml, '<small class="fct-offer__capacity">1 plaza disponible</small>')
+            && str_contains($compatibleDashboardHtml, '<small class="fct-offer__capacity">1 plaza disponible</small>')
             && str_contains($dashboardHtml, 'href="index.php?action=mis-asignaciones">Ver asignaciones')
             && str_contains($dashboardHtml, 'href="index.php?action=disponibilidad">Gestionar disponibilidad')
             && $availabilityStartPosition !== false
