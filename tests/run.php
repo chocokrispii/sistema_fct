@@ -1260,9 +1260,11 @@ try {
     ]);
     $activateAssignment = $db->prepare("UPDATE asignaciones_fct SET estado = 'Asignada' WHERE id = :id");
     $activateAssignment->execute(['id' => $createdAssignmentId]);
+    $activeAssignmentsForDashboard = $assignments->listarActivasPorUsuario($createdUsers[1]);
     assertTrue(
-        count($assignments->listarActivasPorUsuario($createdUsers[1])) === 1,
-        'El dashboard debe recuperar las asignaciones activas del alumno.'
+        count($activeAssignmentsForDashboard) === 1
+            && array_keys($activeAssignmentsForDashboard[0]) === ['fecha_inicio', 'fecha_fin', 'nombre_empresa'],
+        'El dashboard debe recuperar solo las asignaciones activas y los campos que muestra.'
     );
     $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno', 'nombre' => 'Alumno de prueba'];
     ob_start();
