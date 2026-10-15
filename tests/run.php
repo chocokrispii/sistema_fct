@@ -1385,6 +1385,17 @@ try {
             && str_contains($expiredAvailabilityDashboard, 'No tienes eventos próximos.'),
         'Un periodo vencido debe ofrecer registrar disponibilidad y no aparecer como evento próximo.'
     );
+    ob_start();
+    (new OfertaController($db))->listar();
+    $expiredAvailabilityOfferListingHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($expiredAvailabilityOfferListingHtml, 'Registra una disponibilidad vigente')
+            && str_contains(
+                $expiredAvailabilityOfferListingHtml,
+                'href="index.php?action=disponibilidad">Registrar disponibilidad'
+            ),
+        'El listado de ofertas debe permitir actualizar disponibilidad cuando todos los periodos vencieron.'
+    );
 
     $_SESSION = [];
     $token = CsrfMiddleware::token();

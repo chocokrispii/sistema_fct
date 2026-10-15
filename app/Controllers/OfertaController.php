@@ -6,6 +6,7 @@ require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Models/Asignacion.php';
+require_once __DIR__ . '/../Models/Disponibilidad.php';
 
 class OfertaController {
     private PDO $db;
@@ -42,10 +43,16 @@ class OfertaController {
                 (new Asignacion($this->db))->listar(true, $usuarioId),
                 static fn(array $asignacion): bool => $asignacion['estado'] === 'Asignada'
             ) !== [];
+            $hoy = date('Y-m-d');
+            $tieneDisponibilidad = array_filter(
+                (new Disponibilidad($this->db))->obtenerPorUsuario($usuarioId),
+                static fn(array $disponibilidad): bool => $disponibilidad['fecha_fin'] >= $hoy
+            ) !== [];
             View::render('ofertas/listado', [
                 'ofertas' => $ofertas,
                 'soloCompatibles' => true,
                 'tieneAsignacionActiva' => $asignacionesActivas,
+                'tieneDisponibilidad' => $tieneDisponibilidad,
             ]);
             return;
         }
@@ -55,6 +62,7 @@ class OfertaController {
             'ofertas' => $ofertas,
             'soloCompatibles' => false,
             'tieneAsignacionActiva' => false,
+            'tieneDisponibilidad' => false,
         ]);
     }
 
