@@ -1294,6 +1294,27 @@ try {
         'El dashboard debe contar solo plazas vacantes y mostrar los eventos ordenados con año visible.'
     );
 
+    $pastAvailability = $db->prepare(
+        'UPDATE alumno_disponibilidad
+         SET fecha_inicio = :inicio, fecha_fin = :fin
+         WHERE alumno_id = :alumno'
+    );
+    $pastAvailability->execute([
+        'inicio' => (new DateTimeImmutable('today'))->modify('-30 days')->format('Y-m-d'),
+        'fin' => (new DateTimeImmutable('today'))->modify('-1 day')->format('Y-m-d'),
+        'alumno' => $createdStudents[1],
+    ]);
+    $_SESSION = ['usuario_id' => $createdUsers[2], 'rol' => 'Alumno', 'nombre' => 'Segundo alumno'];
+    ob_start();
+    (new InicioController())->mostrar();
+    $expiredAvailabilityDashboard = (string)ob_get_clean();
+    assertTrue(
+        str_contains($expiredAvailabilityDashboard, 'Completa tu disponibilidad')
+            && str_contains($expiredAvailabilityDashboard, 'Gestionar disponibilidad')
+            && str_contains($expiredAvailabilityDashboard, 'No tienes eventos próximos.'),
+        'Un periodo vencido no debe contar como disponibilidad vigente ni aparecer como próximo evento.'
+    );
+
     $_SESSION = [];
     $token = CsrfMiddleware::token();
     $_POST['_csrf'] = $token;

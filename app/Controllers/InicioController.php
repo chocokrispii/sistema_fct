@@ -30,13 +30,13 @@ class InicioController
         $asignaciones = (new Asignacion($db))->listar(true, $usuarioId);
         $calificaciones = (new Calificacion($db))->listar(true, $usuarioId);
         $disponibilidades = (new Disponibilidad($db))->obtenerPorUsuario($usuarioId);
+        $hoy = date('Y-m-d');
 
         $notas = array_values(array_filter(
             array_map(static fn(array $c) => $c['nota'], $calificaciones),
             static fn($nota) => $nota !== null
         ));
 
-        $hoy = date('Y-m-d');
         $eventos = [];
         foreach ($asignaciones as $a) {
             if ($a['estado'] !== 'Asignada') {
@@ -70,7 +70,10 @@ class InicioController
             'notaMedia' => $notas === [] ? null : array_sum(array_map('floatval', $notas)) / count($notas),
             'ofertasVigentes' => array_slice($ofertas, 0, 4),
             'eventos' => array_slice($eventos, 0, 5),
-            'tieneDisponibilidad' => $disponibilidades !== [],
+            'tieneDisponibilidad' => array_filter(
+                $disponibilidades,
+                static fn(array $disponibilidad): bool => $disponibilidad['fecha_fin'] >= $hoy
+            ) !== [],
         ]);
     }
 }
