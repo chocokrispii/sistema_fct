@@ -455,7 +455,7 @@ try {
         'fecha_nacimiento' => '2010-01-01',
         'especialidad_id' => (string)$cycleId,
         'tutor_nombre' => 'Tutor de Prueba',
-        'tutor_dni' => '12345678Z',
+        'tutor_dni' => '12345678A',
         'tutor_nss' => 'NSS!',
         'tutor_correo' => 'tutor-registro@example.test',
         'tutor_direccion' => 'Calle Tutor 1',
@@ -467,15 +467,20 @@ try {
     $invalidGuardianAccountCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
     $invalidGuardianAccountCount->execute(['email' => $_POST['email']]);
     assertTrue(
-        str_contains($invalidGuardianRegistrationHtml, 'número de Seguridad Social y dirección del tutor')
+        str_contains($invalidGuardianRegistrationHtml, 'Comprueba los datos del tutor indicados.')
             && preg_match(
                 '/<input\b(?=[^>]*\bid="student-guardian-nss")(?=[^>]*\baria-invalid="true")[^>]*>/',
                 $invalidGuardianRegistrationHtml
             ) === 1
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-guardian-dni")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $invalidGuardianRegistrationHtml
+            ) === 1
             && str_contains($invalidGuardianRegistrationHtml, 'Introduce un número de Seguridad Social válido')
+            && str_contains($invalidGuardianRegistrationHtml, 'Introduce un DNI/NIE con una letra de control válida.')
             && str_contains($invalidGuardianRegistrationHtml, 'value="NSS!"')
             && (int)$invalidGuardianAccountCount->fetchColumn() === 0,
-        'Un NSS de tutor inválido debe señalar el campo, conservar el valor e impedir crear la cuenta.'
+        'Los errores de DNI/NIE y NSS del tutor deben señalar ambos campos e impedir crear la cuenta.'
     );
     $_POST = [
         'email' => "invalid-student-$fixture@example.test",
@@ -488,7 +493,7 @@ try {
             $dniLetters[($secondDniNumber + 3) % 23]
         ),
         'nss' => "REG-$fixture-3",
-        'telefono' => '123',
+        'telefono' => '------------612345678',
         'direccion' => 'Calle de prueba 3',
         'codigo_postal' => '99999',
         'fecha_nacimiento' => '2099-01-01',
@@ -512,7 +517,7 @@ try {
                 '/<input\b(?=[^>]*\bid="student-birth-date")(?=[^>]*\baria-invalid="true")[^>]*>/',
                 $invalidStudentRegistrationHtml
             ) === 1
-            && str_contains($invalidStudentRegistrationHtml, 'Introduce un teléfono español válido')
+            && str_contains($invalidStudentRegistrationHtml, 'Introduce un teléfono español válido de hasta 20 caracteres.')
             && str_contains($invalidStudentRegistrationHtml, 'código postal español válido')
             && str_contains($invalidStudentRegistrationHtml, 'La fecha de nacimiento no puede ser futura.')
             && (int)$invalidStudentAccountCount->fetchColumn() === 0,
