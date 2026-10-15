@@ -136,11 +136,28 @@ class Oferta {
         return $candidatesByOffer;
     }
 
+    public function obtenerIdsOfertasVigentesCompatibles(int $usuarioId): array
+    {
+        $candidates = $this->consultarCandidatos(
+            'p.fecha_fin >= CURDATE() AND a.usuario_id = :usuario_id',
+            ['usuario_id' => $usuarioId],
+            true,
+            true,
+            true
+        );
+
+        return array_map(
+            static fn(array $candidate): int => (int)$candidate['oferta_id'],
+            $candidates
+        );
+    }
+
     private function consultarCandidatos(
         string $filter,
         array $params,
         bool $includeOfferId = false,
-        bool $onlyOffersWithCapacity = false
+        bool $onlyOffersWithCapacity = false,
+        bool $offerIdsOnly = false
     ): array
     {
         $conditions = [
@@ -155,8 +172,14 @@ class Oferta {
             $conditions[] = 'COALESCE(capacidad.asignadas, 0) < p.plazas_cuantas';
         }
 
-        $offerColumn = $includeOfferId ? 'p.id AS oferta_id, ' : '';
-        $offerGroup = $includeOfferId ? 'p.id, ' : '';
+        $selectColumns = $offerIdsOnly
+            ? 'p.id AS oferta_id'
+            : ($includeOfferId ? 'p.id AS oferta_id, ' : '')
+                . 'a.id AS alumno_id, a.nombre, a.apellidos, a.correo, d.turno';
+        $groupColumns = $offerIdsOnly
+            ? 'p.id'
+            : ($includeOfferId ? 'p.id, ' : '')
+                . 'a.id, a.nombre, a.apellidos, a.correo, d.turno';
         $capacityJoin = $onlyOffersWithCapacity
             ? "LEFT JOIN (
                     SELECT oferta_id, COUNT(*) AS asignadas
@@ -165,7 +188,7 @@ class Oferta {
                     GROUP BY oferta_id
                 ) capacidad ON capacidad.oferta_id = p.id"
             : '';
-        $sql = "SELECT {$offerColumn}a.id AS alumno_id, a.nombre, a.apellidos, a.correo, d.turno
+        $sql = "SELECT {$selectColumns}
                 FROM empresa_especialidades_plazas p
                 INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
                 INNER JOIN alumno_disponibilidad d
@@ -191,8 +214,9 @@ class Oferta {
                     )
                 {$capacityJoin}
                 WHERE " . implode("\n                    AND ", $conditions) . "
-                GROUP BY {$offerGroup}a.id, a.nombre, a.apellidos, a.correo, d.turno
-                ORDER BY " . ($includeOfferId ? 'p.id, ' : '') . 'a.apellidos, a.nombre';
+                GROUP BY {$groupColumns}
+                ORDER BY " . ($includeOfferId ? 'p.id' : 'a.apellidos, a.nombre')
+                . ($offerIdsOnly ? '' : ($includeOfferId ? ', a.apellidos, a.nombre' : ''));
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

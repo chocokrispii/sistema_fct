@@ -32,12 +32,12 @@ class InicioController
                 }, $ofertaModel->obtenerVigentesConAsignaciones()),
                 static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
             ));
-            $candidatosPorOferta = $ofertas === []
+            $ofertasCompatibles = $ofertas === []
                 ? []
-                : $ofertaModel->obtenerCandidatosVigentes($usuarioId);
+                : array_fill_keys($ofertaModel->obtenerIdsOfertasVigentesCompatibles($usuarioId), true);
             $ofertas = array_values(array_filter(
                 $ofertas,
-                static fn(array $oferta): bool => isset($candidatosPorOferta[(int)$oferta['id']])
+                static fn(array $oferta): bool => isset($ofertasCompatibles[(int)$oferta['id']])
             ));
         }
         $notaMedia = (new Calificacion($db))->obtenerNotaMediaPorUsuario($usuarioId);

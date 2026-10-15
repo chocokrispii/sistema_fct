@@ -906,6 +906,10 @@ try {
             && (int)$studentCandidates[$createdOffer][0]['alumno_id'] === $createdStudents[0],
         'La consulta agrupada debe poder limitar los candidatos compatibles a un alumno.'
     );
+    assertTrue(
+        $matching->obtenerIdsOfertasVigentesCompatibles($createdUsers[1]) === [$createdOffer],
+        'El dashboard debe poder obtener solo los IDs de ofertas compatibles con el alumno.'
+    );
 
     $assignments = new Asignacion($db);
     $assignments->crear($createdOffer, $createdStudents[0], $createdUsers[3], 'Tutor de empresa');
