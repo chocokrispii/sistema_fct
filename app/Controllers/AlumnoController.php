@@ -179,6 +179,13 @@ class AlumnoController
 
             $usuarioId = $this->usuarioModel->crear($email, $password, 'Alumno');
             if ($usuarioId < 1) {
+                if ($this->usuarioModel->obtenerPorEmail($email) !== null) {
+                    $this->db->rollBack();
+                    $this->mostrarFormulario(
+                        'El correo, DNI/NIE o número de Seguridad Social indicado ya está asociado a otra cuenta.'
+                    );
+                    return;
+                }
                 throw new RuntimeException('No se pudo crear el usuario del alumno.');
             }
 
@@ -217,6 +224,12 @@ class AlumnoController
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
+            }
+            if ($e instanceof PDOException && (int)($e->errorInfo[1] ?? 0) === 1062) {
+                $this->mostrarFormulario(
+                    'El correo, DNI/NIE o número de Seguridad Social indicado ya está asociado a otra cuenta.'
+                );
+                return;
             }
             error_log('Error al registrar alumno: ' . $e->getMessage());
             $this->mostrarFormulario('No se pudo completar el registro del alumno.');

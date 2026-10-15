@@ -435,6 +435,33 @@ try {
             && (int)$invalidGuardianAccountCount->fetchColumn() === 0,
         'Un NSS de tutor inválido debe impedir crear la cuenta del alumno.'
     );
+    $_POST = [
+        'email' => $emails[1],
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Nuevo Alumno',
+        'apellidos' => 'Prueba de Registro',
+        'dni' => sprintf(
+            '%08d%s',
+            $secondDniNumber + 2,
+            $dniLetters[($secondDniNumber + 2) % 23]
+        ),
+        'nss' => "REG-$fixture-2",
+        'telefono' => '612345673',
+        'direccion' => 'Calle de prueba 2',
+        'codigo_postal' => '28013',
+        'fecha_nacimiento' => '2000-01-01',
+        'especialidad_id' => (string)$cycleId,
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $duplicateRegistrationHtml = (string)ob_get_clean();
+    $duplicateRegistrationCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $duplicateRegistrationCount->execute(['email' => $emails[1]]);
+    assertTrue(
+        str_contains($duplicateRegistrationHtml, 'correo, DNI/NIE o número de Seguridad Social')
+            && (int)$duplicateRegistrationCount->fetchColumn() === 1,
+        'El registro con un correo ya asociado debe informar del conflicto sin crear otra cuenta.'
+    );
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_POST = [];
     $_GET = [];
