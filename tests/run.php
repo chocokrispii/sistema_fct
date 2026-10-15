@@ -1379,7 +1379,7 @@ try {
     (new InicioController())->mostrar();
     $expiredAvailabilityDashboard = (string)ob_get_clean();
     assertTrue(
-        str_contains($expiredAvailabilityDashboard, 'Registra una disponibilidad vigente')
+        str_contains($expiredAvailabilityDashboard, '<p class="fct-empty" role="status">Registra una disponibilidad vigente')
             && str_contains($expiredAvailabilityDashboard, 'href="index.php?action=disponibilidad">Registrar disponibilidad')
             && str_contains($expiredAvailabilityDashboard, 'Gestionar disponibilidad')
             && str_contains($expiredAvailabilityDashboard, 'No tienes eventos próximos.'),
@@ -1389,7 +1389,7 @@ try {
     (new OfertaController($db))->listar();
     $expiredAvailabilityOfferListingHtml = (string)ob_get_clean();
     assertTrue(
-        str_contains($expiredAvailabilityOfferListingHtml, 'Registra una disponibilidad vigente')
+        str_contains($expiredAvailabilityOfferListingHtml, '<p role="status">Registra una disponibilidad vigente')
             && str_contains(
                 $expiredAvailabilityOfferListingHtml,
                 'href="index.php?action=disponibilidad">Registrar disponibilidad'

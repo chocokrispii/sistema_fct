@@ -83,12 +83,12 @@ $etiquetaClase = static function (string $texto): string {
             </div>
             <?php if ($ofertasVigentes === []): ?>
                 <?php if ($tieneAsignacionActiva): ?>
-                    <p class="fct-empty">Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.</p>
+                    <p class="fct-empty" role="status">Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.</p>
                 <?php elseif (!$tieneDisponibilidad): ?>
-                    <p class="fct-empty">Registra una disponibilidad vigente para encontrar ofertas compatibles con tu perfil.</p>
+                    <p class="fct-empty" role="status">Registra una disponibilidad vigente para encontrar ofertas compatibles con tu perfil.</p>
                     <a class="fct-link" href="index.php?action=disponibilidad">Registrar disponibilidad <?= $arrow ?></a>
                 <?php else: ?>
-                    <p class="fct-empty">No hay ofertas con plazas compatibles con tu ciclo, disponibilidad y turno.</p>
+                    <p class="fct-empty" role="status">No hay ofertas con plazas compatibles con tu ciclo, disponibilidad y turno.</p>
                 <?php endif; ?>
             <?php else: ?>
                 <ul class="fct-offers__list">
@@ -140,7 +140,7 @@ $etiquetaClase = static function (string $texto): string {
                 </nav>
             </div>
             <?php if ($eventos === []): ?>
-                <p class="fct-empty">No tienes eventos próximos.</p>
+                <p class="fct-empty" role="status">No tienes eventos próximos.</p>
             <?php else: ?>
                 <ol class="fct-events__list">
                     <?php foreach ($eventos as $ev): $ts = strtotime($ev['fecha']); ?>
