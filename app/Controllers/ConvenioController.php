@@ -4,6 +4,7 @@ require_once __DIR__ . '/../Models/Convenio.php';
 require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
+require_once __DIR__ . '/../Core/Webhook.php';
 require_once __DIR__ . '/../Core/FileScanner.php';
 require_once __DIR__ . '/../Core/PhpIni.php';
 require_once __DIR__ . '/../../config/storage.php';
@@ -194,6 +195,14 @@ class ConvenioController
                 $convenioId,
                 'estado=Pendiente'
             );
+            Webhook::enqueue($this->db, 'convenio.creado', [
+                'convenio_id' => $convenioId,
+                'empresa_id' => $empresaId,
+                'especialidad_id' => $especialidadId,
+                'estado' => 'Pendiente',
+                'fecha_inicio' => $inicio->format('Y-m-d'),
+                'fecha_fin' => $fin->format('Y-m-d'),
+            ]);
             $this->db->commit();
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
@@ -241,6 +250,10 @@ class ConvenioController
                 (int)$id,
                 'estado=' . $decision
             );
+            Webhook::enqueue($this->db, 'convenio.revisado', [
+                'convenio_id' => (int)$id,
+                'estado' => $decision,
+            ]);
             $this->db->commit();
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {

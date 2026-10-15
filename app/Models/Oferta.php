@@ -2,6 +2,7 @@
 // app/Models/Oferta.php
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../Core/Paginacion.php';
 
 class Oferta {
     private PDO $db;
@@ -52,6 +53,11 @@ class Oferta {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function obtenerPaginaPorEmpresa(int $empresaId, int $pagina, int $porPagina = 20): array
+    {
+        return $this->obtenerPagina('p.empresa_id = :empresa_id', ['empresa_id' => $empresaId], 'p.fecha_inicio DESC, p.id DESC', $pagina, $porPagina);
+    }
+
     public function obtenerTodas(bool $soloVigentes = false): array {
         $sql = self::SELECT_BASE
             . ($soloVigentes ? " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '')
@@ -59,10 +65,49 @@ class Oferta {
         return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function obtenerResumenVigentes(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT COUNT(*) AS total_ofertas, COUNT(DISTINCT empresa_id) AS total_empresas
+             FROM empresa_especialidades_plazas
+             WHERE estado = 'Aprobada' AND fecha_fin >= CURDATE()"
+        );
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function obtenerRecientesVigentes(int $limite = 4): array
+    {
+        if ($limite < 1 || $limite > 20) {
+            throw new InvalidArgumentException('El límite de ofertas recientes debe estar entre 1 y 20.');
+        }
+
+        $stmt = $this->db->prepare(
+            self::SELECT_BASE
+            . " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
+               ORDER BY p.fecha_inicio, p.id LIMIT :limite"
+        );
+        $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function obtenerPaginaTodas(bool $soloVigentes, int $pagina, int $porPagina = 20): array
+    {
+        $where = $soloVigentes ? "p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '';
+        return $this->obtenerPagina($where, [], 'p.fecha_inicio, p.id', $pagina, $porPagina);
+    }
+
     public function obtenerPendientes(): array
     {
         $stmt = $this->db->query(self::SELECT_BASE . " WHERE p.estado = 'Pendiente' ORDER BY p.fecha_inicio");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function obtenerPaginaPendientes(int $pagina, int $porPagina = 20): array
+    {
+        return $this->obtenerPagina("p.estado = 'Pendiente'", [], 'p.fecha_inicio, p.id', $pagina, $porPagina);
     }
 
     public function resolver(int $ofertaId, string $estado, string $motivo, int $revisorId): bool
@@ -88,7 +133,140 @@ class Oferta {
 
     public function obtenerCandidatos(int $ofertaId): array
     {
-        $sql = "SELECT a.id AS alumno_id, a.nombre, a.apellidos, a.correo, d.turno
+        [$sql, $params] = $this->construirConsultaCandidatos([$ofertaId]);
+        $sql .= ' ORDER BY apellidos, nombre';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $candidatos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($candidatos as &$candidato) {
+            unset($candidato['oferta_id']);
+        }
+        unset($candidato);
+        return $candidatos;
+    }
+
+    public function obtenerCandidatosPaginados(
+        array $ofertaIds,
+        array $paginasPorOferta,
+        int $porPagina = 10
+    ): array {
+        if ($ofertaIds === []) {
+            return [];
+        }
+        if ($porPagina < 1 || $porPagina > 100) {
+            throw new InvalidArgumentException('El tamaño de página debe estar entre 1 y 100.');
+        }
+
+        foreach ($ofertaIds as $ofertaId) {
+            if (!is_int($ofertaId) || $ofertaId < 1) {
+                throw new InvalidArgumentException('El identificador de oferta no es válido.');
+            }
+        }
+        $ofertaIds = array_values(array_unique($ofertaIds));
+
+        [$baseSql, $params] = $this->construirConsultaCandidatos($ofertaIds);
+        $rangosDesde = [];
+        $rangosHasta = [];
+        foreach ($ofertaIds as $indice => $ofertaId) {
+            $pagina = Paginacion::desdeEntrada($paginasPorOferta[$ofertaId] ?? 1);
+            $offset = ($pagina - 1) * $porPagina;
+
+            $desdeId = 'desde_oferta_' . $indice;
+            $desdeFila = 'desde_fila_' . $indice;
+            $hastaId = 'hasta_oferta_' . $indice;
+            $hastaFila = 'hasta_fila_' . $indice;
+            $rangosDesde[] = 'WHEN :' . $desdeId . ' THEN :' . $desdeFila;
+            $rangosHasta[] = 'WHEN :' . $hastaId . ' THEN :' . $hastaFila;
+            $params[$desdeId] = $ofertaId;
+            $params[$desdeFila] = $offset;
+            $params[$hastaId] = $ofertaId;
+            $params[$hastaFila] = $offset + $porPagina + 1;
+        }
+
+        $sql = 'SELECT pagina_candidatos.*
+                FROM (
+                    SELECT candidatos.*,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY oferta_id
+                               ORDER BY apellidos, nombre, alumno_id, turno
+                           ) AS numero_fila
+                    FROM (' . $baseSql . ') candidatos
+                ) pagina_candidatos
+                WHERE pagina_candidatos.numero_fila > CASE pagina_candidatos.oferta_id '
+                    . implode(' ', $rangosDesde) . ' ELSE 0 END
+                  AND pagina_candidatos.numero_fila <= CASE pagina_candidatos.oferta_id '
+                    . implode(' ', $rangosHasta) . ' ELSE 0 END
+                ORDER BY pagina_candidatos.oferta_id, pagina_candidatos.numero_fila';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $resultado = [];
+        foreach ($ofertaIds as $ofertaId) {
+            $resultado[$ofertaId] = [
+                'candidatos' => [],
+                'haySiguiente' => false,
+                'pagina' => Paginacion::desdeEntrada($paginasPorOferta[$ofertaId] ?? 1),
+            ];
+        }
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $candidato) {
+            $ofertaId = (int)$candidato['oferta_id'];
+            if ((int)$candidato['numero_fila'] > (($resultado[$ofertaId]['pagina'] - 1) * $porPagina) + $porPagina) {
+                $resultado[$ofertaId]['haySiguiente'] = true;
+                continue;
+            }
+            unset($candidato['oferta_id'], $candidato['numero_fila']);
+            $resultado[$ofertaId]['candidatos'][] = $candidato;
+        }
+
+        return $resultado;
+    }
+
+    public function contarAsignacionesPorOferta(array $ofertaIds): array
+    {
+        if ($ofertaIds === []) {
+            return [];
+        }
+        foreach ($ofertaIds as $ofertaId) {
+            if (!is_int($ofertaId) || $ofertaId < 1) {
+                throw new InvalidArgumentException('El identificador de oferta no es válido.');
+            }
+        }
+        $ofertaIds = array_values(array_unique($ofertaIds));
+
+        $placeholders = [];
+        $params = [];
+        $conteos = array_fill_keys($ofertaIds, 0);
+        foreach ($ofertaIds as $indice => $ofertaId) {
+            $placeholder = 'oferta_' . $indice;
+            $placeholders[] = ':' . $placeholder;
+            $params[$placeholder] = $ofertaId;
+        }
+
+        $sql = "SELECT oferta_id, COUNT(*) AS asignadas
+                FROM asignaciones_fct
+                WHERE oferta_id IN (" . implode(', ', $placeholders) . ")
+                  AND estado IN ('Asignada', 'Cerrada')
+                GROUP BY oferta_id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+            $conteos[(int)$fila['oferta_id']] = (int)$fila['asignadas'];
+        }
+
+        return $conteos;
+    }
+
+    private function construirConsultaCandidatos(array $ofertaIds): array
+    {
+        $placeholders = [];
+        $params = [];
+        foreach ($ofertaIds as $indice => $ofertaId) {
+            $placeholder = 'oferta_' . $indice;
+            $placeholders[] = ':' . $placeholder;
+            $params[$placeholder] = $ofertaId;
+        }
+
+        $sql = "SELECT p.id AS oferta_id, a.id AS alumno_id, a.nombre, a.apellidos, a.correo, d.turno
                 FROM empresa_especialidades_plazas p
                 INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
                 INNER JOIN alumno_disponibilidad d
@@ -112,16 +290,38 @@ class Oferta {
                                 OR (p.turno = 'T' AND ds.hora_inicio < '23:59:59' AND ds.hora_fin > '14:00:00')
                             )
                     )
-                WHERE p.id = :oferta_id
+                WHERE p.id IN (" . implode(', ', $placeholders) . ")
                     AND p.estado = 'Aprobada'
                     AND NOT EXISTS (
                         SELECT 1 FROM asignaciones_fct af
                         WHERE af.alumno_id = a.id AND af.estado = 'Asignada'
                     )
-                GROUP BY a.id, a.nombre, a.apellidos, a.correo, d.turno
-                ORDER BY a.apellidos, a.nombre";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(['oferta_id' => $ofertaId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+                GROUP BY p.id, a.id, a.nombre, a.apellidos, a.correo, d.turno";
+        return [$sql, $params];
+    }
+
+    private function obtenerPagina(string $where, array $params, string $orden, int $pagina, int $porPagina): array
+    {
+        if ($porPagina < 1 || $porPagina > 100) {
+            throw new InvalidArgumentException('El tamaño de página debe estar entre 1 y 100.');
+        }
+
+        $whereSql = $where === '' ? '' : ' WHERE ' . $where;
+        $count = $this->db->prepare('SELECT COUNT(*) FROM empresa_especialidades_plazas p' . $whereSql);
+        $count->execute($params);
+        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
+
+        $stmt = $this->db->prepare(
+            self::SELECT_BASE . $whereSql . ' ORDER BY ' . $orden . ' LIMIT :limite OFFSET :offset'
+        );
+        foreach ($params as $nombre => $valor) {
+            $stmt->bindValue(':' . $nombre, $valor, PDO::PARAM_INT);
+        }
+        $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
+        $stmt->execute();
+
+        $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $paginacion;
     }
 }

@@ -56,7 +56,7 @@ $turnoTxt = static fn(string $t): string => $t === 'M' ? 'Mañana' : ($t === 'T'
 
         <div class="sp-stats" aria-label="Resumen del expediente">
             <div class="sp-stat sp-tone--blue"><span class="sp-stat__icon"><?= $fl($icoCalF) ?></span><div><strong><?= count($disponibilidades) ?></strong><span>Periodos de disponibilidad</span></div></div>
-            <div class="sp-stat sp-tone--green"><span class="sp-stat__icon"><?= $fl($icoMalF) ?></span><div><strong><?= count($asignaciones) ?></strong><span>Prácticas asignadas</span></div></div>
+            <div class="sp-stat sp-tone--green"><span class="sp-stat__icon"><?= $fl($icoMalF) ?></span><div><strong><?= (int)$totalAsignaciones ?></strong><span>Prácticas asignadas</span></div></div>
             <div class="sp-stat sp-tone--orange"><span class="sp-stat__icon"><?= $fl($icoStarF) ?></span><div><strong><?= count($notasPublicadas) ?></strong><span>Calificaciones publicadas</span></div></div>
         </div>
 
@@ -119,6 +119,7 @@ $turnoTxt = static fn(string $t): string => $t === 'M' ? 'Mañana' : ($t === 'T'
                             </li>
                         <?php endforeach; ?>
                     </ul>
+                    <?php require __DIR__ . '/../partials/paginacion.php'; ?>
                     <a class="sp-card__cta" href="index.php?action=mis-asignaciones">Ver todas mis prácticas</a>
                 <?php endif; ?>
             </section>

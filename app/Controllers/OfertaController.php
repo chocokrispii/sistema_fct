@@ -5,6 +5,7 @@ require_once __DIR__ . '/../Models/Oferta.php';
 require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
+require_once __DIR__ . '/../Core/Webhook.php';
 
 class OfertaController {
     private PDO $db;
@@ -20,8 +21,12 @@ class OfertaController {
     }
 
     public function listar(): void {
-        $ofertas = $this->ofertaModel->obtenerTodas(true);
-        View::render('ofertas/listado', ['ofertas' => $ofertas]);
+        $pagina = Paginacion::desdeEntrada($_GET['pagina'] ?? null);
+        $resultado = $this->ofertaModel->obtenerPaginaTodas(true, $pagina);
+        View::render('ofertas/listado', [
+            'ofertas' => $resultado['items'],
+            'paginacion' => $resultado,
+        ]);
     }
 
     public function publicar(): void {
@@ -42,18 +47,27 @@ class OfertaController {
             $error = '';
         }
 
+        $resultadoOfertas = $this->ofertaModel->obtenerPaginaPorEmpresa(
+            $empresaId,
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
         View::render('ofertas/publicar', [
             'empresa' => $empresa,
             'error' => $error,
-            'ofertas' => $this->ofertaModel->obtenerPorEmpresa($empresaId),
+            'ofertas' => $resultadoOfertas['items'],
+            'paginacion' => $resultadoOfertas,
             'especialidades' => $this->especialidadModel->obtenerTodas(),
         ]);
     }
 
     public function revisar(): void
     {
+        $resultado = $this->ofertaModel->obtenerPaginaPendientes(
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
         View::render('ofertas/revisar', [
-            'ofertas' => $this->ofertaModel->obtenerPendientes(),
+            'ofertas' => $resultado['items'],
+            'paginacion' => $resultado,
             'error' => is_string($_GET['error'] ?? null) ? $_GET['error'] : '',
         ]);
     }
@@ -116,6 +130,10 @@ class OfertaController {
                 (int)$id,
                 'estado=' . $decision
             );
+            Webhook::enqueue($this->db, 'oferta.revisada', [
+                'oferta_id' => (int)$id,
+                'estado' => $decision,
+            ]);
             $this->db->commit();
         } catch (DomainException $e) {
             if ($this->db->inTransaction()) {
@@ -194,6 +212,16 @@ class OfertaController {
                 'ofertas',
                 $ofertaId
             );
+            Webhook::enqueue($this->db, 'oferta.creada', [
+                'oferta_id' => $ofertaId,
+                'empresa_id' => $empresaId,
+                'especialidad_id' => (int)$especialidadId,
+                'estado' => 'Pendiente',
+                'plazas' => (int)$plazas,
+                'fecha_inicio' => $fechaInicio->format('Y-m-d'),
+                'fecha_fin' => $fechaFin->format('Y-m-d'),
+                'turno' => $turno,
+            ]);
             $this->db->commit();
             return null;
         } catch (Throwable $e) {
