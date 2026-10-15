@@ -125,7 +125,10 @@ $etiquetaClase = static function (string $texto): string {
         <section class="fct-card fct-events" aria-labelledby="fct-events-title">
             <div class="fct-card__head">
                 <h3 id="fct-events-title">Próximos eventos</h3>
-                <a class="fct-link" href="index.php?action=mis-asignaciones">Ver calendario <?= $arrow ?></a>
+                <nav class="fct-events__links" aria-label="Accesos relacionados con los eventos">
+                    <a class="fct-link" href="index.php?action=mis-asignaciones">Ver asignaciones <?= $arrow ?></a>
+                    <a class="fct-link" href="index.php?action=disponibilidad">Gestionar disponibilidad <?= $arrow ?></a>
+                </nav>
             </div>
             <?php if ($eventos === []): ?>
                 <p class="fct-empty">No tienes eventos próximos.</p>

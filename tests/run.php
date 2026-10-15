@@ -1282,6 +1282,8 @@ try {
             && (int)$dashboardOfferMetric[1] === (int)$dashboardOfferCount
             && (int)$dashboardCompanyMetric[1] === (int)$dashboardCompanyCount
             && str_contains($dashboardHtml, '<small class="fct-offer__capacity">1 plaza disponible</small>')
+            && str_contains($dashboardHtml, 'href="index.php?action=mis-asignaciones">Ver asignaciones')
+            && str_contains($dashboardHtml, 'href="index.php?action=disponibilidad">Gestionar disponibilidad')
             && $availabilityStartPosition !== false
             && $practiceStartPosition !== false
             && $availabilityEndPosition !== false
