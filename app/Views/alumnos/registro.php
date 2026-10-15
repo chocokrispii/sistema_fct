@@ -101,32 +101,38 @@
             <div class="student-registration__grid">
                 <div class="student-registration__field">
                     <label for="student-guardian-name">Nombre completo</label>
-                    <input id="student-guardian-name" type="text" name="tutor_nombre" maxlength="100" value="<?= htmlspecialchars($values['tutor_nombre'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="student-guardian-name" type="text" name="tutor_nombre" maxlength="100" value="<?= htmlspecialchars($values['tutor_nombre'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_nombre']) ? 'true' : 'false' ?>" aria-describedby="student-guardian-name-error">
+                    <small id="student-guardian-name-error" data-field-error><?= htmlspecialchars($fieldErrors['tutor_nombre'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-guardian-dni">DNI/NIE</label>
-                    <input id="student-guardian-dni" type="text" name="tutor_dni" maxlength="10" autocomplete="off" value="<?= htmlspecialchars($values['tutor_dni'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="student-guardian-dni" type="text" name="tutor_dni" maxlength="10" autocomplete="off" value="<?= htmlspecialchars($values['tutor_dni'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_dni']) ? 'true' : 'false' ?>" aria-describedby="student-guardian-dni-error">
+                    <small id="student-guardian-dni-error" data-field-error><?= htmlspecialchars($fieldErrors['tutor_dni'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-guardian-nss">Número de Seguridad Social</label>
-                    <input id="student-guardian-nss" type="text" name="tutor_nss" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_nss'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="student-guardian-nss" type="text" name="tutor_nss" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['tutor_nss'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_nss']) ? 'true' : 'false' ?>" aria-describedby="student-guardian-nss-error">
+                    <small id="student-guardian-nss-error" data-field-error><?= htmlspecialchars($fieldErrors['tutor_nss'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-guardian-email">Correo electrónico</label>
-                    <input id="student-guardian-email" type="email" name="tutor_correo" maxlength="100" autocomplete="email" value="<?= htmlspecialchars($values['tutor_correo'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="student-guardian-email" type="email" name="tutor_correo" maxlength="100" autocomplete="email" value="<?= htmlspecialchars($values['tutor_correo'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_correo']) ? 'true' : 'false' ?>" aria-describedby="student-guardian-email-error">
+                    <small id="student-guardian-email-error" data-field-error><?= htmlspecialchars($fieldErrors['tutor_correo'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-guardian-phone">Teléfono</label>
-                    <input id="student-guardian-phone" type="tel" name="tutor_telefono" maxlength="20" autocomplete="tel" value="<?= htmlspecialchars($values['tutor_telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="student-guardian-phone" type="tel" name="tutor_telefono" maxlength="20" autocomplete="tel" value="<?= htmlspecialchars($values['tutor_telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_telefono']) ? 'true' : 'false' ?>" aria-describedby="student-guardian-phone-error">
+                    <small id="student-guardian-phone-error" data-field-error><?= htmlspecialchars($fieldErrors['tutor_telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-guardian-address">Dirección</label>
-                    <input id="student-guardian-address" type="text" name="tutor_direccion" maxlength="255" autocomplete="street-address" value="<?= htmlspecialchars($values['tutor_direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    <input id="student-guardian-address" type="text" name="tutor_direccion" maxlength="255" autocomplete="street-address" value="<?= htmlspecialchars($values['tutor_direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['tutor_direccion']) ? 'true' : 'false' ?>" aria-describedby="student-guardian-address-error">
+                    <small id="student-guardian-address-error" data-field-error><?= htmlspecialchars($fieldErrors['tutor_direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
             </div>
         </fieldset>

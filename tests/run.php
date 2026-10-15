@@ -448,8 +448,14 @@ try {
     $invalidGuardianAccountCount->execute(['email' => $_POST['email']]);
     assertTrue(
         str_contains($invalidGuardianRegistrationHtml, 'número de Seguridad Social y dirección del tutor')
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-guardian-nss")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $invalidGuardianRegistrationHtml
+            ) === 1
+            && str_contains($invalidGuardianRegistrationHtml, 'Introduce un número de Seguridad Social válido')
+            && str_contains($invalidGuardianRegistrationHtml, 'value="NSS!"')
             && (int)$invalidGuardianAccountCount->fetchColumn() === 0,
-        'Un NSS de tutor inválido debe impedir crear la cuenta del alumno.'
+        'Un NSS de tutor inválido debe señalar el campo, conservar el valor e impedir crear la cuenta.'
     );
     $_POST = [
         'email' => $emails[1],

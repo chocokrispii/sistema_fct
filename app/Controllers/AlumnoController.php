@@ -118,6 +118,7 @@ class AlumnoController
             'direccion' => $input['tutor_direccion'],
             'telefono' => $input['tutor_telefono'],
         ];
+        $tutorFieldErrors = [];
         if (
             mb_strlen($tutor['nombre']) > 100
             || mb_strlen($tutor['dni']) > 20
@@ -126,23 +127,52 @@ class AlumnoController
             || mb_strlen($tutor['direccion']) > 255
             || mb_strlen($tutor['telefono']) > 20
         ) {
-            $this->mostrarFormulario('Uno o varios datos del tutor superan el límite permitido.');
+            foreach ([
+                'nombre' => ['tutor_nombre', 100],
+                'dni' => ['tutor_dni', 20],
+                'nss' => ['tutor_nss', 20],
+                'correo' => ['tutor_correo', 100],
+                'direccion' => ['tutor_direccion', 255],
+                'telefono' => ['tutor_telefono', 20],
+            ] as $field => [$inputField, $limit]) {
+                $length = $field === 'correo' ? strlen($tutor[$field]) : mb_strlen($tutor[$field]);
+                if ($length > $limit) {
+                    $tutorFieldErrors[$inputField] = "No puede superar $limit caracteres.";
+                }
+            }
+            $this->mostrarFormulario('Uno o varios datos del tutor superan el límite permitido.', $tutorFieldErrors);
             return;
         }
-        if (
-            ($tutor['dni'] !== '' && !SpanishDataValidator::isDniNie($tutor['dni']))
-            || ($tutor['telefono'] !== '' && !SpanishDataValidator::isSpanishPhone($tutor['telefono']))
-            || ($tutor['correo'] !== '' && !SpanishDataValidator::isEmail($tutor['correo']))
-        ) {
-            $this->mostrarFormulario('Comprueba el DNI/NIE, teléfono y correo electrónico del tutor.');
+        if ($tutor['dni'] !== '' && !SpanishDataValidator::isDniNie($tutor['dni'])) {
+            $tutorFieldErrors['tutor_dni'] = 'Introduce un DNI/NIE con una letra de control válida.';
+        }
+        if ($tutor['telefono'] !== '' && !SpanishDataValidator::isSpanishPhone($tutor['telefono'])) {
+            $tutorFieldErrors['tutor_telefono'] = 'Introduce un teléfono español válido de nueve cifras.';
+        }
+        if ($tutor['correo'] !== '' && !SpanishDataValidator::isEmail($tutor['correo'])) {
+            $tutorFieldErrors['tutor_correo'] = 'Introduce un correo electrónico válido.';
+        }
+        if (isset($tutorFieldErrors['tutor_dni']) || isset($tutorFieldErrors['tutor_telefono']) || isset($tutorFieldErrors['tutor_correo'])) {
+            $this->mostrarFormulario(
+                'Comprueba el DNI/NIE, teléfono y correo electrónico del tutor.',
+                $tutorFieldErrors
+            );
             return;
         }
-        if (
-            ($tutor['nombre'] !== '' && !SpanishDataValidator::isPersonName($tutor['nombre'], 100))
-            || ($tutor['nss'] !== '' && preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $tutor['nss']) !== 1)
-            || ($tutor['direccion'] !== '' && preg_match('/[\p{Cc}]/u', $tutor['direccion']) === 1)
-        ) {
-            $this->mostrarFormulario('Comprueba el nombre, número de Seguridad Social y dirección del tutor.');
+        if ($tutor['nombre'] !== '' && !SpanishDataValidator::isPersonName($tutor['nombre'], 100)) {
+            $tutorFieldErrors['tutor_nombre'] = 'Introduce un nombre válido de hasta 100 caracteres.';
+        }
+        if ($tutor['nss'] !== '' && preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $tutor['nss']) !== 1) {
+            $tutorFieldErrors['tutor_nss'] = 'Introduce un número de Seguridad Social válido (5–20 caracteres).';
+        }
+        if ($tutor['direccion'] !== '' && preg_match('/[\p{Cc}]/u', $tutor['direccion']) === 1) {
+            $tutorFieldErrors['tutor_direccion'] = 'La dirección no puede contener caracteres de control.';
+        }
+        if ($tutorFieldErrors !== []) {
+            $this->mostrarFormulario(
+                'Comprueba el nombre, número de Seguridad Social y dirección del tutor.',
+                $tutorFieldErrors
+            );
             return;
         }
         $dni = SpanishDataValidator::normalizeDniNie($dni);
@@ -170,7 +200,22 @@ class AlumnoController
                 || $tutor['telefono'] === ''
             )
         ) {
-            $this->mostrarFormulario('Para menores de 18 años, completa todos los datos del tutor legal.');
+            foreach ([
+                'nombre' => 'tutor_nombre',
+                'dni' => 'tutor_dni',
+                'nss' => 'tutor_nss',
+                'correo' => 'tutor_correo',
+                'direccion' => 'tutor_direccion',
+                'telefono' => 'tutor_telefono',
+            ] as $field => $inputField) {
+                if ($tutor[$field] === '') {
+                    $tutorFieldErrors[$inputField] = 'Este campo es obligatorio para alumnos menores de 18 años.';
+                }
+            }
+            $this->mostrarFormulario(
+                'Para menores de 18 años, completa todos los datos del tutor legal.',
+                $tutorFieldErrors
+            );
             return;
         }
 
@@ -438,7 +483,7 @@ class AlumnoController
         ]);
     }
 
-    private function mostrarFormulario(string $error = ''): void
+    private function mostrarFormulario(string $error = '', array $fieldErrors = []): void
     {
         $especialidades = $this->especialidadModel->obtenerTodas();
         $values = [];
@@ -453,6 +498,7 @@ class AlumnoController
         }
         View::render('alumnos/registro', [
             'error' => $error,
+            'fieldErrors' => $fieldErrors,
             'especialidades' => $especialidades,
             'values' => $values,
         ]);
