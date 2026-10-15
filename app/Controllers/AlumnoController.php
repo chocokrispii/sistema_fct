@@ -388,6 +388,7 @@ class AlumnoController
                 $values[$field] = trim($posted);
             }
             $studentPhoneWithinLimit = mb_strlen($values['telefono']) <= 20;
+            $studentDniWithinLimit = mb_strlen($values['dni']) <= 20;
             $values['dni'] = SpanishDataValidator::normalizeDniNie($values['dni']);
             $values['telefono'] = SpanishDataValidator::normalizePhone($values['telefono']);
 
@@ -398,7 +399,7 @@ class AlumnoController
             $email = SpanishDataValidator::isEmail($values['email']);
             $name = SpanishDataValidator::isPersonName($values['nombre'], 50);
             $surname = SpanishDataValidator::isPersonName($values['apellidos'], 100);
-            $dni = SpanishDataValidator::isDniNie($values['dni']);
+            $dni = $studentDniWithinLimit && SpanishDataValidator::isDniNie($values['dni']);
             $nss = preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $values['nss']) === 1;
             $phone = $studentPhoneWithinLimit && SpanishDataValidator::isSpanishPhone($values['telefono']);
             $address = $values['direccion'] !== ''
@@ -415,7 +416,7 @@ class AlumnoController
                 $fieldErrors['apellidos'] = 'Introduce apellidos válidos de hasta 100 caracteres.';
             }
             if (!$dni) {
-                $fieldErrors['dni'] = 'Introduce un DNI/NIE con una letra de control válida.';
+                $fieldErrors['dni'] = 'Introduce un DNI/NIE válido de hasta 20 caracteres, con letra de control.';
             }
             if (!$nss) {
                 $fieldErrors['nss'] = 'Introduce entre 5 y 20 caracteres alfanuméricos, espacios, puntos o guiones.';
@@ -445,6 +446,7 @@ class AlumnoController
 
             if ($error === '' && $birthDate->diff(new DateTimeImmutable('today'))->y < 18) {
                 $guardianPhoneWithinLimit = mb_strlen($values['tutor_telefono']) <= 20;
+                $guardianDniWithinLimit = mb_strlen($values['tutor_dni']) <= 20;
                 $tutorData = [
                     'nombre' => $values['tutor_nombre'],
                     'dni' => SpanishDataValidator::normalizeDniNie($values['tutor_dni']),
@@ -457,8 +459,8 @@ class AlumnoController
                     'tutor_nombre' => !SpanishDataValidator::isPersonName($tutorData['nombre'], 100)
                         ? 'Introduce un nombre válido de hasta 100 caracteres.'
                         : null,
-                    'tutor_dni' => !SpanishDataValidator::isDniNie($tutorData['dni'])
-                        ? 'Introduce un DNI/NIE con una letra de control válida.'
+                    'tutor_dni' => !$guardianDniWithinLimit || !SpanishDataValidator::isDniNie($tutorData['dni'])
+                        ? 'Introduce un DNI/NIE válido de hasta 20 caracteres, con letra de control.'
                         : null,
                     'tutor_nss' => preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $tutorData['nss']) !== 1
                         ? 'Introduce un número de Seguridad Social válido (5–20 caracteres).'

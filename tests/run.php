@@ -295,7 +295,7 @@ try {
     assertTrue(
         is_string($invalidProfileHtml)
             && str_contains($invalidProfileHtml, 'aria-invalid="true"')
-            && str_contains($invalidProfileHtml, 'letra de control válida'),
+            && str_contains($invalidProfileHtml, 'con letra de control'),
         'Los datos inválidos deben marcar el campo y mostrar feedback específico sin guardar.'
     );
     assertTrue(
@@ -324,6 +324,20 @@ try {
             && str_contains($longStudentPhoneHtml, 'Introduce un teléfono español válido de hasta 20 caracteres.')
             && $studentModel->obtenerPorUsuario($createdUsers[1])['telefono'] === '612345678',
         'El perfil debe rechazar teléfonos normalizados válidos que superen su maxlength y no guardarlos.'
+    );
+    $_POST['telefono'] = '612345678';
+    $_POST['dni'] = implode('--', str_split($firstStudentDni));
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $longStudentDniHtml = (string)ob_get_clean();
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="profile-dni")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $longStudentDniHtml
+        ) === 1
+            && str_contains($longStudentDniHtml, 'DNI/NIE válido de hasta 20 caracteres')
+            && $studentModel->obtenerPorUsuario($createdUsers[1])['dni'] === $firstStudentDni,
+        'El perfil debe rechazar DNI/NIE largos aunque la normalización produzca un documento válido.'
     );
     $_POST = [
         'email' => $emails[1],
@@ -405,9 +419,22 @@ try {
     assertTrue(
         str_contains($invalidGuardianHtml, 'id="profile-guardian-dni"')
             && str_contains($invalidGuardianHtml, 'aria-invalid="true"')
-            && str_contains($invalidGuardianHtml, 'Introduce un DNI/NIE con una letra de control válida.')
+            && str_contains($invalidGuardianHtml, 'DNI/NIE válido de hasta 20 caracteres')
             && str_contains($invalidGuardianHtml, 'value="12345678A"'),
         'Un DNI/NIE de tutor inválido debe señalar el campo y conservar el valor para corregirlo.'
+    );
+    $_POST['tutor_dni'] = implode('--', str_split('12345678Z'));
+    $_POST['tutor_telefono'] = '612345670';
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $longGuardianDniHtml = (string)ob_get_clean();
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="profile-guardian-dni")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $longGuardianDniHtml
+        ) === 1
+            && str_contains($longGuardianDniHtml, 'DNI/NIE válido de hasta 20 caracteres'),
+        'El perfil del menor debe limitar la longitud original del DNI/NIE de tutor.'
     );
     $_POST['tutor_dni'] = '12345678Z';
     $_POST['tutor_telefono'] = '------------612345670';
