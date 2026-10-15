@@ -20,8 +20,34 @@ class OfertaController {
     }
 
     public function listar(): void {
+        if (($_SESSION['rol'] ?? null) === 'Alumno') {
+            $ofertas = $this->ofertaModel->obtenerVigentesConAsignaciones();
+            $candidatosPorOferta = $this->ofertaModel->obtenerCandidatosVigentes(
+                (int)($_SESSION['usuario_id'] ?? 0)
+            );
+            $ofertas = array_values(array_filter(
+                array_map(static function (array $oferta) use ($candidatosPorOferta): array {
+                    $oferta['plazas_disponibles'] = max(
+                        0,
+                        (int)$oferta['plazas_cuantas'] - (int)$oferta['asignadas']
+                    );
+                    return $oferta;
+                }, $ofertas),
+                static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
+                    && isset($candidatosPorOferta[(int)$oferta['id']])
+            ));
+            View::render('ofertas/listado', [
+                'ofertas' => $ofertas,
+                'soloCompatibles' => true,
+            ]);
+            return;
+        }
+
         $ofertas = $this->ofertaModel->obtenerTodas(true);
-        View::render('ofertas/listado', ['ofertas' => $ofertas]);
+        View::render('ofertas/listado', [
+            'ofertas' => $ofertas,
+            'soloCompatibles' => false,
+        ]);
     }
 
     public function publicar(): void {

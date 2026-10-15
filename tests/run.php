@@ -19,6 +19,7 @@ require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
 require_once __DIR__ . '/../app/Controllers/CalificacionController.php';
 require_once __DIR__ . '/../app/Controllers/DisponibilidadController.php';
 require_once __DIR__ . '/../app/Controllers/InicioController.php';
+require_once __DIR__ . '/../app/Controllers/OfertaController.php';
 require_once __DIR__ . '/../app/Controllers/UsuarioAdminController.php';
 require_once __DIR__ . '/../app/Models/Oferta.php';
 require_once __DIR__ . '/../app/Models/Asignacion.php';
@@ -1217,6 +1218,8 @@ try {
         'fin' => $eventEnd->format('Y-m-d'),
         'id' => $createdOffer,
     ]);
+    $db->prepare('UPDATE empresa_especialidades_plazas SET plazas_cuantas = 2 WHERE id = :id')
+        ->execute(['id' => $createdOffer]);
     $updateAvailabilityDates = $db->prepare(
         'UPDATE alumno_disponibilidad SET fecha_inicio = :inicio, fecha_fin = :fin WHERE alumno_id = :alumno'
     );
@@ -1259,7 +1262,18 @@ try {
         'El dashboard no debe ofrecer nuevas prácticas a un alumno que ya tiene una asignación activa.'
     );
 
+    $availabilityModel->reemplazar(
+        $createdUsers[2],
+        $eventStart->modify('-2 days')->format('Y-m-d'),
+        $eventEnd->modify('+5 days')->format('Y-m-d'),
+        'M',
+        [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
+    );
     $compatibleCandidates = (new Oferta($db))->obtenerCandidatosVigentes($createdUsers[2]);
+    assertTrue(
+        isset($compatibleCandidates[$createdOffer]),
+        'El alumno compatible debe aparecer para la oferta con plazas libres.'
+    );
     $compatibleOfferIds = array_fill_keys(array_map('intval', array_keys($compatibleCandidates)), true);
     $compatibleOffers = array_values(array_filter(
         (new Oferta($db))->obtenerVigentesConAsignaciones(),
@@ -1271,6 +1285,9 @@ try {
     ob_start();
     (new InicioController())->mostrar();
     $compatibleDashboardHtml = (string)ob_get_clean();
+    ob_start();
+    (new OfertaController($db))->listar();
+    $compatibleOfferListingHtml = (string)ob_get_clean();
     preg_match(
         '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Ofertas compatibles</span>~',
         $compatibleDashboardHtml,
@@ -1284,9 +1301,26 @@ try {
     assertTrue(
         str_contains(
             $compatibleDashboardHtml,
-            'Del 15/03/2027 al 15/03/2027 - Turno mañana'
+            'Del ' . $eventStart->format('d/m/Y') . ' al ' . $eventEnd->format('d/m/Y') . ' - Turno mañana'
         ),
         'La tarjeta debe mostrar las fechas de la oferta y traducir su turno al castellano.'
+    );
+    assertTrue(
+        str_contains($compatibleOfferListingHtml, '<h2>Ofertas compatibles con tu perfil</h2>')
+            && str_contains($compatibleOfferListingHtml, '<th>Plazas disponibles</th>')
+            && str_contains($compatibleOfferListingHtml, '<td>1</td>')
+            && str_contains($compatibleOfferListingHtml, "Test Company $fixture")
+            && substr_count($compatibleOfferListingHtml, '<tr>') === 2,
+        'El listado abierto desde el dashboard debe mantener el filtro de compatibilidad y mostrar el cupo libre.'
+    );
+    $_SESSION = [];
+    ob_start();
+    (new OfertaController($db))->listar();
+    $publicOfferListingHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($publicOfferListingHtml, '<h2>Ofertas de FCT aprobadas</h2>')
+            && !str_contains($publicOfferListingHtml, 'Ofertas compatibles con tu perfil'),
+        'El listado público debe conservar la visualización general de ofertas aprobadas.'
     );
     $availabilityStartPosition = strpos($dashboardHtml, 'Inicio de disponibilidad');
     $practiceStartPosition = strpos($dashboardHtml, 'Inicio de prácticas');
