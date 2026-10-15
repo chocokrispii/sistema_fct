@@ -1020,6 +1020,10 @@ try {
     assertTrue($capacityRejected, 'El sistema debe impedir superar el cupo de plazas.');
 
     $gradeModel = new Calificacion($db);
+    assertTrue(
+        $gradeModel->obtenerNotaMediaPorUsuario($createdUsers[1]) === null,
+        'El promedio del alumno debe permanecer vacío mientras no tenga calificaciones.'
+    );
     $gradeBeforeCloseRejected = false;
     try {
         $gradeModel->guardar((int)$createdAssignmentId, $createdUsers[3], 8.5, 'Prueba');
@@ -1035,6 +1039,10 @@ try {
         'El dashboard no debe recuperar del historial las asignaciones ya cerradas.'
     );
     $gradeModel->guardar($assignmentId, $createdUsers[3], 8.5, 'Buen desempeño.');
+    assertTrue(
+        $gradeModel->obtenerNotaMediaPorUsuario($createdUsers[1]) === 8.5,
+        'El promedio del dashboard debe incluir la calificación final del alumno.'
+    );
     $ownGrades = $gradeModel->listar(true, $createdUsers[1]);
     assertTrue(
         count($ownGrades) === 1
@@ -1045,7 +1053,8 @@ try {
     $gradeModel->guardar($assignmentId, $createdUsers[3], 9.25, 'Nota revisada.');
     assertTrue(
         count($gradeModel->listar()) === 1
-            && (float)$gradeModel->listar()[0]['nota'] === 9.25,
+            && (float)$gradeModel->listar()[0]['nota'] === 9.25
+            && $gradeModel->obtenerNotaMediaPorUsuario($createdUsers[1]) === 9.25,
         'La edición de una nota debe actualizar la misma calificación, sin duplicarla.'
     );
     $_SESSION = ['usuario_id' => $createdUsers[3], 'rol' => 'Coordinador'];

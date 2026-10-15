@@ -40,14 +40,9 @@ class InicioController
                 static fn(array $oferta): bool => isset($candidatosPorOferta[(int)$oferta['id']])
             ));
         }
-        $calificaciones = (new Calificacion($db))->listar(true, $usuarioId);
+        $notaMedia = (new Calificacion($db))->obtenerNotaMediaPorUsuario($usuarioId);
         $disponibilidades = (new Disponibilidad($db))->obtenerPorUsuario($usuarioId);
         $hoy = date('Y-m-d');
-
-        $notas = array_values(array_filter(
-            array_map(static fn(array $c) => $c['nota'], $calificaciones),
-            static fn($nota) => $nota !== null
-        ));
 
         $eventos = [];
         foreach ($asignaciones as $a) {
@@ -78,7 +73,7 @@ class InicioController
             'totalOfertas' => count($ofertas),
             'totalEmpresas' => count(array_unique(array_column($ofertas, 'empresa_id'))),
             'asignacionesActivas' => $asignacionesActivas,
-            'notaMedia' => $notas === [] ? null : array_sum(array_map('floatval', $notas)) / count($notas),
+            'notaMedia' => $notaMedia,
             'ofertasVigentes' => array_slice($ofertas, 0, 4),
             'eventos' => array_slice($eventos, 0, 5),
             'tieneAsignacionActiva' => $asignacionesActivas > 0,
