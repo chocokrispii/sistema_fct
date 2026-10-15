@@ -2,33 +2,125 @@
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/Auditoria.php';
+require_once __DIR__ . '/../Core/Webhook.php';
+require_once __DIR__ . '/../Core/Paginacion.php';
 
 class Asignacion
 {
+    private const SELECT_LISTADO =
+        "SELECT af.id, af.estado, af.fecha_asignacion, af.fecha_cierre, af.tutor_empresa,
+                a.id AS alumno_id, a.nombre AS alumno_nombre, a.apellidos, a.correo AS alumno_correo,
+                p.id AS oferta_id, p.fecha_inicio, p.fecha_fin,
+                e.nombre_empresa, es.nombre_especialidad
+         FROM asignaciones_fct af
+         INNER JOIN alumnos a ON a.id = af.alumno_id
+         INNER JOIN empresa_especialidades_plazas p ON p.id = af.oferta_id
+         INNER JOIN empresas e ON e.id = p.empresa_id
+         INNER JOIN especialidades es ON es.id = p.especialidad_id";
+
     public function __construct(private PDO $db)
     {
     }
 
     public function listar(bool $soloPropias = false, int $usuarioId = 0): array
     {
-        $sql = "SELECT af.id, af.estado, af.fecha_asignacion, af.fecha_cierre, af.tutor_empresa,
-                       a.id AS alumno_id, a.nombre AS alumno_nombre, a.apellidos, a.correo AS alumno_correo,
-                       p.id AS oferta_id, p.fecha_inicio, p.fecha_fin,
-                       e.nombre_empresa, es.nombre_especialidad, u.id AS alumno_usuario_id
-                FROM asignaciones_fct af
-                INNER JOIN alumnos a ON a.id = af.alumno_id
-                INNER JOIN usuarios u ON u.id = a.usuario_id
-                INNER JOIN empresa_especialidades_plazas p ON p.id = af.oferta_id
-                INNER JOIN empresas e ON e.id = p.empresa_id
-                INNER JOIN especialidades es ON es.id = p.especialidad_id";
-        $params = [];
-        if ($soloPropias) {
-            $sql .= ' WHERE u.id = :usuario_id';
-            $params['usuario_id'] = $usuarioId;
-        }
-        $sql .= ' ORDER BY af.fecha_asignacion DESC';
+        [$sql, $params] = $this->consultaListado($soloPropias, $usuarioId);
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function obtenerPagina(bool $soloPropias, int $usuarioId, int $pagina, int $porPagina = 20): array
+    {
+        if ($porPagina < 1 || $porPagina > 100) {
+            throw new InvalidArgumentException('El tamaño de página debe estar entre 1 y 100.');
+        }
+
+        $whereSql = $soloPropias ? ' WHERE a.usuario_id = :usuario_id' : '';
+        $params = $soloPropias ? ['usuario_id' => $usuarioId] : [];
+        $countSql = 'SELECT COUNT(*) FROM asignaciones_fct af'
+            . ($soloPropias ? ' INNER JOIN alumnos a ON a.id = af.alumno_id' . $whereSql : '');
+        $count = $this->db->prepare($countSql);
+        $count->execute($params);
+        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
+
+        [$sql, $params] = $this->consultaListado($soloPropias, $usuarioId);
+        $stmt = $this->db->prepare($sql . ' LIMIT :limite OFFSET :offset');
+        foreach ($params as $nombre => $valor) {
+            $stmt->bindValue(':' . $nombre, $valor, PDO::PARAM_INT);
+        }
+        $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
+        $stmt->execute();
+
+        $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $paginacion;
+    }
+
+    private function consultaListado(bool $soloPropias, int $usuarioId): array
+    {
+        $sql = self::SELECT_LISTADO;
+        $params = [];
+        if ($soloPropias) {
+            $sql .= ' WHERE a.usuario_id = :usuario_id';
+            $params['usuario_id'] = $usuarioId;
+        }
+        $sql .= ' ORDER BY af.fecha_asignacion DESC, af.id DESC';
+
+        return [$sql, $params];
+    }
+
+    public function contarActivasPorUsuario(int $usuarioId): int
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*)
+             FROM asignaciones_fct af
+             INNER JOIN alumnos a ON a.id = af.alumno_id
+             WHERE a.usuario_id = :usuario_id AND af.estado = 'Asignada'"
+        );
+        $stmt->execute(['usuario_id' => $usuarioId]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    public function obtenerProximosEventos(int $usuarioId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT eventos.fecha, eventos.titulo, eventos.detalle
+             FROM (
+                 SELECT p.fecha_inicio AS fecha, 'Inicio de prácticas' AS titulo,
+                        e.nombre_empresa AS detalle
+                 FROM asignaciones_fct af
+                 INNER JOIN alumnos a ON a.id = af.alumno_id
+                 INNER JOIN empresa_especialidades_plazas p ON p.id = af.oferta_id
+                 INNER JOIN empresas e ON e.id = p.empresa_id
+                 WHERE a.usuario_id = :usuario_inicio
+                   AND af.estado = 'Asignada' AND p.fecha_inicio >= CURDATE()
+                 UNION ALL
+                 SELECT p.fecha_fin AS fecha, 'Fin de prácticas' AS titulo,
+                        e.nombre_empresa AS detalle
+                 FROM asignaciones_fct af
+                 INNER JOIN alumnos a ON a.id = af.alumno_id
+                 INNER JOIN empresa_especialidades_plazas p ON p.id = af.oferta_id
+                 INNER JOIN empresas e ON e.id = p.empresa_id
+                 WHERE a.usuario_id = :usuario_fin
+                   AND af.estado = 'Asignada' AND p.fecha_fin >= CURDATE()
+                 UNION ALL
+                 SELECT d.fecha_inicio AS fecha, 'Inicio de disponibilidad' AS titulo,
+                        'Periodo registrado' AS detalle
+                 FROM alumno_disponibilidad d
+                 INNER JOIN alumnos a ON a.id = d.alumno_id
+                 WHERE a.usuario_id = :usuario_disponibilidad
+                   AND d.fecha_inicio >= CURDATE()
+             ) eventos
+             ORDER BY eventos.fecha
+             LIMIT 3"
+        );
+        $stmt->execute([
+            'usuario_inicio' => $usuarioId,
+            'usuario_fin' => $usuarioId,
+            'usuario_disponibilidad' => $usuarioId,
+        ]);
+
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -108,13 +200,19 @@ class Asignacion
                 'tutor' => $tutorEmpresa,
                 'coordinador' => $coordinadorId,
             ]);
+            $asignacionId = (int)$this->db->lastInsertId();
             (new Auditoria($this->db))->registrar(
                 $coordinadorId,
                 'asignacion.creada',
                 'asignaciones_fct',
-                (int)$this->db->lastInsertId(),
+                $asignacionId,
                 'alumno_id=' . $alumnoId
             );
+            Webhook::enqueue($this->db, 'practica.asignada', [
+                'asignacion_id' => $asignacionId,
+                'oferta_id' => $ofertaId,
+                'alumno_id' => $alumnoId,
+            ]);
             $this->db->commit();
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
@@ -138,6 +236,9 @@ class Asignacion
                 return false;
             }
             (new Auditoria($this->db))->registrar($usuarioId, 'asignacion.cerrada', 'asignaciones_fct', $id);
+            Webhook::enqueue($this->db, 'practica.cerrada', [
+                'asignacion_id' => $id,
+            ]);
             $this->db->commit();
             return true;
         } catch (Throwable $e) {
