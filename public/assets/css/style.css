@@ -237,8 +237,8 @@ tbody tr:hover td{background:#fafcff}
 .fct-events__list{list-style:none;margin:6px 0 0;padding:0}
 .fct-events__list li{display:flex;align-items:center;gap:14px;padding:10px 0;border-top:1px solid #edf1f7}
 .fct-events__list li:first-child{border-top:0}
-.fct-date{display:flex;flex-direction:column;align-items:center;justify-content:center;width:48px;height:50px;border-radius:8px;background:#f1f3ff;color:var(--ink);line-height:1.1}
-.fct-date strong{font-size:1.1rem}.fct-date small{color:var(--ink);font-size:.74rem}
+.fct-date{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none;width:48px;height:56px;border-radius:8px;background:#f1f3ff;color:var(--ink);line-height:1.1}
+.fct-date strong{font-size:1.1rem}.fct-date small{color:var(--ink);font-size:.74rem}.fct-date small:last-child{font-size:.65rem}
 .fct-events__body strong{display:block;color:var(--ink);font-size:.88rem;font-weight:500}
 .fct-events__body small{display:block}
 

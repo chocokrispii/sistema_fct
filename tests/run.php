@@ -18,6 +18,7 @@ require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
 require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
 require_once __DIR__ . '/../app/Controllers/CalificacionController.php';
 require_once __DIR__ . '/../app/Controllers/DisponibilidadController.php';
+require_once __DIR__ . '/../app/Controllers/InicioController.php';
 require_once __DIR__ . '/../app/Controllers/UsuarioAdminController.php';
 require_once __DIR__ . '/../app/Models/Oferta.php';
 require_once __DIR__ . '/../app/Models/Asignacion.php';
@@ -1199,6 +1200,62 @@ try {
     $deletionAudit->execute(['actor' => $adminId, 'entidad' => $createdUsers[5]]);
     assertTrue((int)$deletionAudit->fetchColumn() === 1, 'La eliminación permanente debe quedar registrada en auditoría.');
 
+    $eventStart = (new DateTimeImmutable('today'))->modify('+3 days');
+    $eventEnd = $eventStart->modify('+7 days');
+    $updateOfferDates = $db->prepare(
+        'UPDATE empresa_especialidades_plazas SET fecha_inicio = :inicio, fecha_fin = :fin WHERE id = :id'
+    );
+    $updateOfferDates->execute([
+        'inicio' => $eventStart->format('Y-m-d'),
+        'fin' => $eventEnd->format('Y-m-d'),
+        'id' => $createdOffer,
+    ]);
+    $updateAvailabilityDates = $db->prepare(
+        'UPDATE alumno_disponibilidad SET fecha_inicio = :inicio, fecha_fin = :fin WHERE alumno_id = :alumno'
+    );
+    $updateAvailabilityDates->execute([
+        'inicio' => $eventStart->format('Y-m-d'),
+        'fin' => $eventEnd->format('Y-m-d'),
+        'alumno' => $createdStudents[0],
+    ]);
+    $addAvailabilityPeriod = $db->prepare(
+        'INSERT INTO alumno_disponibilidad (alumno_id, fecha_inicio, fecha_fin, turno)
+         VALUES (:alumno, :inicio, :fin, :turno)'
+    );
+    $addAvailabilityPeriod->execute([
+        'alumno' => $createdStudents[0],
+        'inicio' => $eventStart->modify('-2 days')->format('Y-m-d'),
+        'fin' => $eventEnd->modify('+5 days')->format('Y-m-d'),
+        'turno' => 'M',
+    ]);
+    $activateAssignment = $db->prepare("UPDATE asignaciones_fct SET estado = 'Asignada' WHERE id = :id");
+    $activateAssignment->execute(['id' => $createdAssignmentId]);
+    $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno', 'nombre' => 'Alumno de prueba'];
+    ob_start();
+    (new InicioController())->mostrar();
+    $dashboardHtml = (string)ob_get_clean();
+    $availabilityStartPosition = strpos($dashboardHtml, 'Inicio de disponibilidad');
+    $practiceStartPosition = strpos($dashboardHtml, 'Inicio de prácticas');
+    $availabilityEndPosition = strpos($dashboardHtml, 'Fin de disponibilidad');
+    $practiceEndPosition = strpos($dashboardHtml, 'Fin de prácticas');
+    $eventListStart = strpos($dashboardHtml, '<ol class="fct-events__list">');
+    $eventListEnd = $eventListStart === false ? false : strpos($dashboardHtml, '</ol>', $eventListStart);
+    $eventsHtml = $eventListStart === false || $eventListEnd === false
+        ? ''
+        : substr($dashboardHtml, $eventListStart, $eventListEnd - $eventListStart);
+    assertTrue(
+        $availabilityStartPosition !== false
+            && $practiceStartPosition !== false
+            && $availabilityEndPosition !== false
+            && $practiceEndPosition !== false
+            && $availabilityStartPosition < $practiceStartPosition
+            && $availabilityEndPosition < $practiceEndPosition
+            && substr_count($eventsHtml, '<li>') === 5
+            && str_contains($dashboardHtml, $eventStart->format('Y'))
+            && str_contains($dashboardHtml, $eventEnd->format('Y')),
+        'El dashboard debe mostrar cinco eventos en orden estable, incluidos los vencimientos y el año.'
+    );
+
     $_SESSION = [];
     $token = CsrfMiddleware::token();
     $_POST['_csrf'] = $token;
@@ -1212,7 +1269,7 @@ try {
     }
     assertTrue($csrfRejected, 'Un token CSRF incorrecto debe rechazarse.');
 
-    echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, disponibilidad, calificaciones, usuarios y CSRF.\n";
+    echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, disponibilidad, dashboard, calificaciones, usuarios y CSRF.\n";
 } finally {
     foreach ($createdPaginationOffers as $paginationOfferId) {
         $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');

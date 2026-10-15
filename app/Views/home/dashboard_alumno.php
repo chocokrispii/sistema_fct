@@ -132,7 +132,7 @@ $etiquetaClase = static function (string $texto): string {
                 <ol class="fct-events__list">
                     <?php foreach ($eventos as $ev): $ts = strtotime($ev['fecha']); ?>
                         <li>
-                            <span class="fct-date"><strong><?= (int)date('j', $ts) ?></strong><small><?= $e($meses[(int)date('n', $ts)]) ?></small></span>
+                            <span class="fct-date"><strong><?= (int)date('j', $ts) ?></strong><small><?= $e($meses[(int)date('n', $ts)]) ?></small><small><?= $e(date('Y', $ts)) ?></small></span>
                             <span class="fct-events__body"><strong><?= $e($ev['titulo']) ?></strong><small><?= $e($ev['detalle']) ?></small></span>
                         </li>
                     <?php endforeach; ?>

@@ -44,8 +44,15 @@ class InicioController
             if ($d['fecha_inicio'] >= $hoy) {
                 $eventos[] = ['fecha' => $d['fecha_inicio'], 'titulo' => 'Inicio de disponibilidad', 'detalle' => 'Periodo registrado'];
             }
+            if ($d['fecha_fin'] >= $hoy) {
+                $eventos[] = ['fecha' => $d['fecha_fin'], 'titulo' => 'Fin de disponibilidad', 'detalle' => 'Periodo registrado'];
+            }
         }
-        usort($eventos, static fn(array $x, array $y) => strcmp($x['fecha'], $y['fecha']));
+        usort($eventos, static function (array $x, array $y): int {
+            return strcmp($x['fecha'], $y['fecha'])
+                ?: strcmp($x['titulo'], $y['titulo'])
+                ?: strcmp($x['detalle'], $y['detalle']);
+        });
 
         View::render('home/dashboard_alumno', [
             'totalOfertas' => count($ofertas),
@@ -53,7 +60,7 @@ class InicioController
             'asignacionesActivas' => count(array_filter($asignaciones, static fn(array $a) => $a['estado'] === 'Asignada')),
             'notaMedia' => $notas === [] ? null : array_sum(array_map('floatval', $notas)) / count($notas),
             'ofertasVigentes' => array_slice($ofertas, 0, 4),
-            'eventos' => array_slice($eventos, 0, 3),
+            'eventos' => array_slice($eventos, 0, 5),
             'tieneDisponibilidad' => $disponibilidades !== [],
         ]);
     }
