@@ -32,6 +32,21 @@ class Asignacion
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function listarActivasPorUsuario(int $usuarioId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT af.estado, p.fecha_inicio, p.fecha_fin, e.nombre_empresa
+             FROM asignaciones_fct af
+             INNER JOIN alumnos a ON a.id = af.alumno_id
+             INNER JOIN empresa_especialidades_plazas p ON p.id = af.oferta_id
+             INNER JOIN empresas e ON e.id = p.empresa_id
+             WHERE a.usuario_id = :usuario_id AND af.estado = 'Asignada'
+             ORDER BY af.fecha_asignacion DESC"
+        );
+        $stmt->execute(['usuario_id' => $usuarioId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function crear(int $ofertaId, int $alumnoId, int $coordinadorId, string $tutorEmpresa): void
     {
         $this->db->beginTransaction();

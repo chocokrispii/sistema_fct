@@ -16,11 +16,8 @@ class InicioController
 
         $db = getPDOConnection();
         $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
-        $asignaciones = (new Asignacion($db))->listar(true, $usuarioId);
-        $asignacionesActivas = count(array_filter(
-            $asignaciones,
-            static fn(array $asignacion): bool => $asignacion['estado'] === 'Asignada'
-        ));
+        $asignaciones = (new Asignacion($db))->listarActivasPorUsuario($usuarioId);
+        $asignacionesActivas = count($asignaciones);
 
         $ofertas = [];
         if ($asignacionesActivas === 0) {
@@ -54,9 +51,6 @@ class InicioController
 
         $eventos = [];
         foreach ($asignaciones as $a) {
-            if ($a['estado'] !== 'Asignada') {
-                continue;
-            }
             if ($a['fecha_inicio'] >= $hoy) {
                 $eventos[] = ['fecha' => $a['fecha_inicio'], 'titulo' => 'Inicio de prácticas', 'detalle' => $a['nombre_empresa']];
             }

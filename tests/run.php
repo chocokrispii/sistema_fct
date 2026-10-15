@@ -1030,6 +1030,10 @@ try {
 
     assertTrue($assignments->cerrar($assignmentId, $createdUsers[3]), 'Una asignación activa debe poder cerrarse.');
     assertTrue(!$assignments->cerrar($assignmentId, $createdUsers[3]), 'Una asignación cerrada no debe cerrarse dos veces.');
+    assertTrue(
+        $assignments->listarActivasPorUsuario($createdUsers[1]) === [],
+        'El dashboard no debe recuperar del historial las asignaciones ya cerradas.'
+    );
     $gradeModel->guardar($assignmentId, $createdUsers[3], 8.5, 'Buen desempeño.');
     $ownGrades = $gradeModel->listar(true, $createdUsers[1]);
     assertTrue(
@@ -1256,6 +1260,10 @@ try {
     ]);
     $activateAssignment = $db->prepare("UPDATE asignaciones_fct SET estado = 'Asignada' WHERE id = :id");
     $activateAssignment->execute(['id' => $createdAssignmentId]);
+    assertTrue(
+        count($assignments->listarActivasPorUsuario($createdUsers[1])) === 1,
+        'El dashboard debe recuperar las asignaciones activas del alumno.'
+    );
     $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno', 'nombre' => 'Alumno de prueba'];
     ob_start();
     (new InicioController())->mostrar();
