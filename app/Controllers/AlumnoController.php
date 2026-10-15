@@ -132,6 +132,14 @@ class AlumnoController
         }
 
         $edad = $fechaNacimientoObj->diff($hoy)->y;
+        if ($edad < 16) {
+            $this->mostrarFormulario(
+                'El alumno debe tener al menos 16 años.',
+                ['fecha_nacimiento' => 'El alumno debe tener al menos 16 años.']
+            );
+            return;
+        }
+
         $tutor = [
             'nombre' => $input['tutor_nombre'],
             'dni' => $input['tutor_dni'],
@@ -204,14 +212,6 @@ class AlumnoController
         }
         if ($tutor['telefono'] !== '') {
             $tutor['telefono'] = SpanishDataValidator::normalizePhone($tutor['telefono']);
-        }
-
-        if ($edad < 16) {
-            $this->mostrarFormulario(
-                'El alumno debe tener al menos 16 años.',
-                ['fecha_nacimiento' => 'El alumno debe tener al menos 16 años.']
-            );
-            return;
         }
 
         if (

@@ -550,6 +550,39 @@ try {
             && (int)$malformedEmailCount->fetchColumn() === 0,
         'Un campo enviado con tipo incorrecto debe señalarse y detener el registro.'
     );
+    $underageEmail = "underage-student-$fixture@example.test";
+    $_POST = [
+        'email' => $underageEmail,
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Alumno Menor',
+        'apellidos' => 'Edad Insuficiente',
+        'dni' => sprintf(
+            '%08d%s',
+            $secondDniNumber + 5,
+            $dniLetters[($secondDniNumber + 5) % 23]
+        ),
+        'nss' => "REG-$fixture-6",
+        'telefono' => '612345676',
+        'direccion' => 'Calle de prueba 6',
+        'codigo_postal' => '28013',
+        'fecha_nacimiento' => '2015-01-01',
+        'especialidad_id' => (string)$cycleId,
+        'tutor_nss' => 'NSS!',
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $underageRegistrationHtml = (string)ob_get_clean();
+    $underageAccountCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $underageAccountCount->execute(['email' => $underageEmail]);
+    assertTrue(
+        str_contains($underageRegistrationHtml, 'El alumno debe tener al menos 16 años.')
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-birth-date")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $underageRegistrationHtml
+            ) === 1
+            && (int)$underageAccountCount->fetchColumn() === 0,
+        'La edad mínima debe mostrarse junto a la fecha antes de validar los datos del tutor.'
+    );
     $_POST = [
         'email' => $emails[1],
         'password' => 'ValidStudentPassword123',
