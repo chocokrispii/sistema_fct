@@ -1318,7 +1318,10 @@ try {
     );
     assertTrue(
         str_contains($compatibleOfferListingHtml, '<h2>Ofertas compatibles con tu perfil</h2>')
-            && str_contains($compatibleOfferListingHtml, '<th>Plazas disponibles</th>')
+            && str_contains($compatibleOfferListingHtml, '<div class="table-responsive" role="region" aria-label="Listado de ofertas" tabindex="0">')
+            && str_contains($compatibleOfferListingHtml, '<caption>Ofertas compatibles con tu perfil</caption>')
+            && str_contains($compatibleOfferListingHtml, '<th scope="col">Empresa</th>')
+            && str_contains($compatibleOfferListingHtml, '<th scope="col">Plazas disponibles</th>')
             && str_contains($compatibleOfferListingHtml, '<td>1</td>')
             && str_contains($compatibleOfferListingHtml, '<td>Mañana</td>')
             && str_contains($compatibleOfferListingHtml, '<td>' . $eventStart->format('d/m/Y') . '</td>')
