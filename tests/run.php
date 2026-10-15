@@ -1320,8 +1320,11 @@ try {
         str_contains($compatibleOfferListingHtml, '<h2>Ofertas compatibles con tu perfil</h2>')
             && str_contains($compatibleOfferListingHtml, '<th>Plazas disponibles</th>')
             && str_contains($compatibleOfferListingHtml, '<td>1</td>')
+            && str_contains($compatibleOfferListingHtml, '<td>Mañana</td>')
+            && str_contains($compatibleOfferListingHtml, '<td>' . $eventStart->format('d/m/Y') . '</td>')
+            && str_contains($compatibleOfferListingHtml, '<td>' . $eventEnd->format('d/m/Y') . '</td>')
             && str_contains($compatibleOfferListingHtml, "Test Company $fixture")
-            && substr_count($compatibleOfferListingHtml, '<tr>') === 2,
+            && !str_contains($compatibleOfferListingHtml, '<td>M</td>'),
         'El listado abierto desde el dashboard debe mantener el filtro de compatibilidad y mostrar el cupo libre.'
     );
     $_SESSION = [];
