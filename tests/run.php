@@ -471,7 +471,7 @@ try {
         'telefono' => '123',
         'direccion' => 'Calle de prueba 3',
         'codigo_postal' => '99999',
-        'fecha_nacimiento' => '2000-01-01',
+        'fecha_nacimiento' => '2099-01-01',
         'especialidad_id' => (string)$cycleId,
     ];
     ob_start();
@@ -488,8 +488,13 @@ try {
                 '/<input\b(?=[^>]*\bid="student-postcode")(?=[^>]*\baria-invalid="true")[^>]*>/',
                 $invalidStudentRegistrationHtml
             ) === 1
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-birth-date")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $invalidStudentRegistrationHtml
+            ) === 1
             && str_contains($invalidStudentRegistrationHtml, 'Introduce un teléfono español válido')
             && str_contains($invalidStudentRegistrationHtml, 'código postal español válido')
+            && str_contains($invalidStudentRegistrationHtml, 'La fecha de nacimiento no puede ser futura.')
             && (int)$invalidStudentAccountCount->fetchColumn() === 0,
         'El registro debe señalar todos los campos inválidos y no crear la cuenta.'
     );

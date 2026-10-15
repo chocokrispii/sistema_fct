@@ -70,15 +70,9 @@ class AlumnoController
         ) {
             $fieldErrors['fecha_nacimiento'] = 'Introduce una fecha de nacimiento válida.';
         } else {
-            $hoy = new DateTimeImmutable('today');
-            if ($fechaNacimientoObj > $hoy) {
+            if ($fechaNacimientoObj > new DateTimeImmutable('today')) {
                 $fieldErrors['fecha_nacimiento'] = 'La fecha de nacimiento no puede ser futura.';
             }
-        }
-
-        if ($fieldErrors !== []) {
-            $this->mostrarFormulario('Revisa los campos indicados y vuelve a intentarlo.', $fieldErrors);
-            return;
         }
 
         $hoy = new DateTimeImmutable('today');
