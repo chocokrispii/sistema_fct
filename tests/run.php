@@ -458,6 +458,42 @@ try {
         'Un NSS de tutor inválido debe señalar el campo, conservar el valor e impedir crear la cuenta.'
     );
     $_POST = [
+        'email' => "invalid-student-$fixture@example.test",
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Nuevo Alumno',
+        'apellidos' => 'Prueba de Validación',
+        'dni' => sprintf(
+            '%08d%s',
+            $secondDniNumber + 3,
+            $dniLetters[($secondDniNumber + 3) % 23]
+        ),
+        'nss' => "REG-$fixture-3",
+        'telefono' => '123',
+        'direccion' => 'Calle de prueba 3',
+        'codigo_postal' => '99999',
+        'fecha_nacimiento' => '2000-01-01',
+        'especialidad_id' => (string)$cycleId,
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $invalidStudentRegistrationHtml = (string)ob_get_clean();
+    $invalidStudentAccountCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $invalidStudentAccountCount->execute(['email' => $_POST['email']]);
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="student-phone")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $invalidStudentRegistrationHtml
+        ) === 1
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-postcode")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $invalidStudentRegistrationHtml
+            ) === 1
+            && str_contains($invalidStudentRegistrationHtml, 'Introduce un teléfono español válido')
+            && str_contains($invalidStudentRegistrationHtml, 'código postal español válido')
+            && (int)$invalidStudentAccountCount->fetchColumn() === 0,
+        'El registro debe señalar todos los campos inválidos y no crear la cuenta.'
+    );
+    $_POST = [
         'email' => $emails[1],
         'password' => 'ValidStudentPassword123',
         'nombre' => 'Nuevo Alumno',

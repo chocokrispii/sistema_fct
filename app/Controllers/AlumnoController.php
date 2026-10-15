@@ -61,51 +61,76 @@ class AlumnoController
             ['options' => ['min_range' => 1]]
         );
 
+        $fieldErrors = [];
         $fechaNacimientoObj = DateTimeImmutable::createFromFormat('!Y-m-d', $fechaNacimiento);
         $fechaErrores = DateTimeImmutable::getLastErrors();
         if (
             !$fechaNacimientoObj
             || ($fechaErrores !== false && ($fechaErrores['warning_count'] > 0 || $fechaErrores['error_count'] > 0))
         ) {
-            $this->mostrarFormulario('La fecha de nacimiento no es válida.');
+            $fieldErrors['fecha_nacimiento'] = 'Introduce una fecha de nacimiento válida.';
+        } else {
+            $hoy = new DateTimeImmutable('today');
+            if ($fechaNacimientoObj > $hoy) {
+                $fieldErrors['fecha_nacimiento'] = 'La fecha de nacimiento no puede ser futura.';
+            }
+        }
+
+        if ($fieldErrors !== []) {
+            $this->mostrarFormulario('Revisa los campos indicados y vuelve a intentarlo.', $fieldErrors);
             return;
         }
 
         $hoy = new DateTimeImmutable('today');
-        if ($fechaNacimientoObj > $hoy) {
-            $this->mostrarFormulario('La fecha de nacimiento no puede ser futura.');
-            return;
+        $registrationErrors = [
+            'email' => !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 100
+                ? 'Introduce un correo electrónico válido de hasta 100 caracteres.'
+                : null,
+            'password' => strlen($password) < 12 || strlen($password) > 72 || trim($password) === ''
+                ? 'La contraseña debe tener entre 12 y 72 caracteres y no estar vacía.'
+                : null,
+            'nombre' => !SpanishDataValidator::isPersonName($nombre, 50)
+                ? 'Introduce un nombre válido de hasta 50 caracteres.'
+                : null,
+            'apellidos' => !SpanishDataValidator::isPersonName($apellidos, 100)
+                ? 'Introduce apellidos válidos de hasta 100 caracteres.'
+                : null,
+            'dni' => mb_strlen($dni) > 20 || !SpanishDataValidator::isDniNie($dni)
+                ? 'Introduce un DNI/NIE con una letra de control válida.'
+                : null,
+            'nss' => preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $nss) !== 1
+                ? 'Introduce un número de Seguridad Social válido (5–20 caracteres).'
+                : null,
+            'telefono' => !SpanishDataValidator::isSpanishPhone($telefono)
+                ? 'Introduce un teléfono español válido de nueve cifras.'
+                : null,
+            'direccion' => $direccion === ''
+                || mb_strlen($direccion) > 255
+                || preg_match('/[\p{Cc}]/u', $direccion) === 1
+                ? 'Introduce una dirección de hasta 255 caracteres, sin caracteres de control.'
+                : null,
+            'codigo_postal' => !SpanishDataValidator::isSpanishPostcode($codigoPostal)
+                ? 'Introduce un código postal español válido de cinco cifras.'
+                : null,
+            'especialidad_id' => $especialidadId === false
+                ? 'Selecciona un ciclo formativo válido.'
+                : null,
+        ];
+        foreach ($registrationErrors as $field => $message) {
+            if ($message !== null) {
+                $fieldErrors[$field] = $message;
+            }
         }
-
-        if (
-            !filter_var($email, FILTER_VALIDATE_EMAIL)
-            || strlen($email) > 100
-            || strlen($password) < 12
-            || strlen($password) > 72
-            || trim($password) === ''
-            || $nombre === ''
-            || !SpanishDataValidator::isPersonName($nombre, 50)
-            || $apellidos === ''
-            || !SpanishDataValidator::isPersonName($apellidos, 100)
-            || $dni === ''
-            || mb_strlen($dni) > 20
-            || !SpanishDataValidator::isDniNie($dni)
-            || $nss === ''
-            || preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $nss) !== 1
-            || $telefono === ''
-            || !SpanishDataValidator::isSpanishPhone($telefono)
-            || $direccion === ''
-            || mb_strlen($direccion) > 255
-            || !SpanishDataValidator::isSpanishPostcode($codigoPostal)
-            || preg_match('/[\p{Cc}]/u', $direccion) === 1
-            || $especialidadId === false
-        ) {
-            $this->mostrarFormulario('Completa correctamente todos los campos. Comprueba el DNI/NIE, teléfono y código postal.');
+        if ($fieldErrors !== []) {
+            $this->mostrarFormulario('Completa correctamente los campos indicados.', $fieldErrors);
             return;
         }
 
         if (!$this->especialidadModel->existe($especialidadId)) {
-            $this->mostrarFormulario('La especialidad seleccionada no existe.');
+            $this->mostrarFormulario(
+                'La especialidad seleccionada no existe.',
+                ['especialidad_id' => 'Selecciona un ciclo formativo disponible.']
+            );
             return;
         }
 
@@ -185,7 +210,10 @@ class AlumnoController
         }
 
         if ($edad < 16) {
-            $this->mostrarFormulario('El alumno debe tener al menos 16 años.');
+            $this->mostrarFormulario(
+                'El alumno debe tener al menos 16 años.',
+                ['fecha_nacimiento' => 'El alumno debe tener al menos 16 años.']
+            );
             return;
         }
 

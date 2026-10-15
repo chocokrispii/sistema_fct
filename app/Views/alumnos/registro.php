@@ -19,13 +19,15 @@
             <div class="student-registration__grid">
                 <div class="student-registration__field">
                     <label for="student-email">Correo electrónico <span aria-hidden="true">*</span></label>
-                    <input id="student-email" type="email" name="email" maxlength="100" autocomplete="email" value="<?= htmlspecialchars($values['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                    <input id="student-email" type="email" name="email" maxlength="100" autocomplete="email" value="<?= htmlspecialchars($values['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['email']) ? 'true' : 'false' ?>" aria-describedby="student-email-error" required>
+                    <small id="student-email-error" data-field-error><?= htmlspecialchars($fieldErrors['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-password">Contraseña <span aria-hidden="true">*</span></label>
-                    <input id="student-password" type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" aria-describedby="student-password-help" required>
+                    <input id="student-password" type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" aria-invalid="<?= isset($fieldErrors['password']) ? 'true' : 'false' ?>" aria-describedby="student-password-help student-password-error" required>
                     <small id="student-password-help">Debe tener entre 12 y 72 caracteres. Los espacios cuentan.</small>
+                    <small id="student-password-error" data-field-error><?= htmlspecialchars($fieldErrors['password'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
             </div>
         </fieldset>
@@ -37,28 +39,33 @@
             <div class="student-registration__grid">
                 <div class="student-registration__field">
                     <label for="student-name">Nombre <span aria-hidden="true">*</span></label>
-                    <input id="student-name" type="text" name="nombre" maxlength="50" autocomplete="given-name" value="<?= htmlspecialchars($values['nombre'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                    <input id="student-name" type="text" name="nombre" maxlength="50" autocomplete="given-name" value="<?= htmlspecialchars($values['nombre'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['nombre']) ? 'true' : 'false' ?>" aria-describedby="student-name-error" required>
+                    <small id="student-name-error" data-field-error><?= htmlspecialchars($fieldErrors['nombre'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-surname">Apellidos <span aria-hidden="true">*</span></label>
-                    <input id="student-surname" type="text" name="apellidos" maxlength="100" autocomplete="family-name" value="<?= htmlspecialchars($values['apellidos'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                    <input id="student-surname" type="text" name="apellidos" maxlength="100" autocomplete="family-name" value="<?= htmlspecialchars($values['apellidos'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['apellidos']) ? 'true' : 'false' ?>" aria-describedby="student-surname-error" required>
+                    <small id="student-surname-error" data-field-error><?= htmlspecialchars($fieldErrors['apellidos'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-dni">DNI/NIE <span aria-hidden="true">*</span></label>
-                    <input id="student-dni" type="text" name="dni" maxlength="10" autocomplete="off" value="<?= htmlspecialchars($values['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-describedby="student-dni-help" required>
+                    <input id="student-dni" type="text" name="dni" maxlength="10" autocomplete="off" value="<?= htmlspecialchars($values['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['dni']) ? 'true' : 'false' ?>" aria-describedby="student-dni-help student-dni-error" required>
                     <small id="student-dni-help">DNI o NIE español con letra de control.</small>
+                    <small id="student-dni-error" data-field-error><?= htmlspecialchars($fieldErrors['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-nss">Número de Seguridad Social <span aria-hidden="true">*</span></label>
-                    <input id="student-nss" type="text" name="nss" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['nss'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                    <input id="student-nss" type="text" name="nss" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['nss'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['nss']) ? 'true' : 'false' ?>" aria-describedby="student-nss-error" required>
+                    <small id="student-nss-error" data-field-error><?= htmlspecialchars($fieldErrors['nss'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-birth-date">Fecha de nacimiento <span aria-hidden="true">*</span></label>
-                    <input id="student-birth-date" type="date" name="fecha_nacimiento" autocomplete="bday" value="<?= htmlspecialchars($values['fecha_nacimiento'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                    <input id="student-birth-date" type="date" name="fecha_nacimiento" autocomplete="bday" value="<?= htmlspecialchars($values['fecha_nacimiento'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['fecha_nacimiento']) ? 'true' : 'false' ?>" aria-describedby="student-birth-date-error" required>
+                    <small id="student-birth-date-error" data-field-error><?= htmlspecialchars($fieldErrors['fecha_nacimiento'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
             </div>
         </fieldset>
@@ -70,26 +77,31 @@
             <div class="student-registration__grid">
                 <div class="student-registration__field">
                     <label for="student-phone">Teléfono <span aria-hidden="true">*</span></label>
-                    <input id="student-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" pattern="(?:\+34|0034)?[\s().-]*[6789](?:[\s().-]*\d){8}" value="<?= htmlspecialchars($values['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-describedby="student-phone-help" required>
+                    <input id="student-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" pattern="(?:\+34|0034)?[\s().-]*[6789](?:[\s().-]*\d){8}" value="<?= htmlspecialchars($values['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['telefono']) ? 'true' : 'false' ?>" aria-describedby="student-phone-help student-phone-error" required>
                     <small id="student-phone-help">Teléfono español de 9 cifras; se acepta el prefijo +34.</small>
+                    <small id="student-phone-error" data-field-error><?= htmlspecialchars($fieldErrors['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-address">Dirección <span aria-hidden="true">*</span></label>
-                    <input id="student-address" type="text" name="direccion" maxlength="255" autocomplete="street-address" value="<?= htmlspecialchars($values['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                    <input id="student-address" type="text" name="direccion" maxlength="255" autocomplete="street-address" value="<?= htmlspecialchars($values['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['direccion']) ? 'true' : 'false' ?>" aria-describedby="student-address-error" required>
+                    <small id="student-address-error" data-field-error><?= htmlspecialchars($fieldErrors['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field">
                     <label for="student-postcode">Código postal <span aria-hidden="true">*</span></label>
-                    <input id="student-postcode" type="text" name="codigo_postal" inputmode="numeric" maxlength="5" pattern="(?:0[1-9]|[1-4][0-9]|5[0-2])[0-9]{3}" autocomplete="postal-code" value="<?= htmlspecialchars($values['codigo_postal'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                    <input id="student-postcode" type="text" name="codigo_postal" inputmode="numeric" maxlength="5" pattern="(?:0[1-9]|[1-4][0-9]|5[0-2])[0-9]{3}" autocomplete="postal-code" value="<?= htmlspecialchars($values['codigo_postal'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['codigo_postal']) ? 'true' : 'false' ?>" aria-describedby="student-postcode-error" required>
+                    <small id="student-postcode-error" data-field-error><?= htmlspecialchars($fieldErrors['codigo_postal'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
 
                 <div class="student-registration__field student-registration__field--full">
                     <label for="student-specialty">Ciclo formativo <span aria-hidden="true">*</span></label>
                     <?php $especialidadSelectId = 'student-specialty'; ?>
                     <?php $especialidadSeleccionada = $values['especialidad_id'] ?? ''; ?>
+                    <?php $especialidadError = $fieldErrors['especialidad_id'] ?? ''; ?>
                     <?php require __DIR__ . '/../partials/select_especialidades.php'; ?>
-                    <?php unset($especialidadSelectId, $especialidadSeleccionada); ?>
+                    <?php unset($especialidadSelectId, $especialidadSeleccionada, $especialidadError); ?>
+                    <small id="student-specialty-error" data-field-error><?= htmlspecialchars($fieldErrors['especialidad_id'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
             </div>
         </fieldset>
