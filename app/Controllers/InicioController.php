@@ -16,30 +16,33 @@ class InicioController
 
         $db = getPDOConnection();
         $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
-
-        $ofertaModel = new Oferta($db);
-        $ofertas = array_values(array_filter(
-            array_map(static function (array $oferta): array {
-                $oferta['plazas_disponibles'] = max(
-                    0,
-                    (int)$oferta['plazas_cuantas'] - (int)$oferta['asignadas']
-                );
-                return $oferta;
-            }, $ofertaModel->obtenerVigentesConAsignaciones()),
-            static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
-        ));
-        $candidatosPorOferta = $ofertas === []
-            ? []
-            : $ofertaModel->obtenerCandidatosVigentes($usuarioId);
-        $ofertas = array_values(array_filter(
-            $ofertas,
-            static fn(array $oferta): bool => isset($candidatosPorOferta[(int)$oferta['id']])
-        ));
         $asignaciones = (new Asignacion($db))->listar(true, $usuarioId);
         $asignacionesActivas = count(array_filter(
             $asignaciones,
             static fn(array $asignacion): bool => $asignacion['estado'] === 'Asignada'
         ));
+
+        $ofertas = [];
+        if ($asignacionesActivas === 0) {
+            $ofertaModel = new Oferta($db);
+            $ofertas = array_values(array_filter(
+                array_map(static function (array $oferta): array {
+                    $oferta['plazas_disponibles'] = max(
+                        0,
+                        (int)$oferta['plazas_cuantas'] - (int)$oferta['asignadas']
+                    );
+                    return $oferta;
+                }, $ofertaModel->obtenerVigentesConAsignaciones()),
+                static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
+            ));
+            $candidatosPorOferta = $ofertas === []
+                ? []
+                : $ofertaModel->obtenerCandidatosVigentes($usuarioId);
+            $ofertas = array_values(array_filter(
+                $ofertas,
+                static fn(array $oferta): bool => isset($candidatosPorOferta[(int)$oferta['id']])
+            ));
+        }
         $calificaciones = (new Calificacion($db))->listar(true, $usuarioId);
         $disponibilidades = (new Disponibilidad($db))->obtenerPorUsuario($usuarioId);
         $hoy = date('Y-m-d');
