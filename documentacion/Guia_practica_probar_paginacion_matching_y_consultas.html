@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Guía práctica: probar paginación, matching y consultas</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 18mm 17mm 19mm;
+        }
+        * { box-sizing: border-box; }
+        body {
+            color: #1d2939;
+            font: 10.5pt/1.48 "Segoe UI", Arial, sans-serif;
+            margin: 0;
+        }
+        h1, h2, h3 { color: #173b63; line-height: 1.2; }
+        h1 { font-size: 27pt; margin: 0 0 12mm; }
+        h2 {
+            border-bottom: 1px solid #b9c9d9;
+            font-size: 17pt;
+            margin: 0 0 5mm;
+            padding-bottom: 2mm;
+        }
+        h3 { font-size: 12pt; margin: 6mm 0 2mm; }
+        p { margin: 2mm 0 3mm; }
+        ul, ol { margin: 2mm 0 4mm; padding-left: 7mm; }
+        li { margin: 1.5mm 0; }
+        code {
+            background: #f0f3f7;
+            border-radius: 2px;
+            font: 9pt Consolas, "Courier New", monospace;
+            padding: 0.4mm 1mm;
+            overflow-wrap: anywhere;
+        }
+        pre {
+            background: #f3f6fa;
+            border: 1px solid #d8e1ea;
+            border-left: 3px solid #3478b8;
+            border-radius: 3px;
+            font: 8.5pt/1.42 Consolas, "Courier New", monospace;
+            margin: 2mm 0 4mm;
+            padding: 3mm;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+        table { border-collapse: collapse; font-size: 9.5pt; margin: 3mm 0 5mm; width: 100%; }
+        th, td { border: 1px solid #cbd5df; padding: 2mm; text-align: left; vertical-align: top; }
+        th { background: #eaf1f7; color: #173b63; }
+        .cover {
+            align-content: center;
+            background: linear-gradient(145deg, #eff6fc, #fff);
+            border: 1px solid #d5e3ef;
+            border-radius: 7px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 242mm;
+            padding: 19mm;
+            break-after: page;
+            page-break-after: always;
+        }
+        .eyebrow { color: #3478b8; font-size: 10pt; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
+        .subtitle { color: #475467; font-size: 14pt; max-width: 145mm; }
+        .cover-note { border-top: 2px solid #3478b8; margin-top: 12mm; padding-top: 5mm; }
+        .section { break-before: page; }
+        .section.first { break-before: auto; }
+        .callout {
+            background: #eef6ff;
+            border-left: 4px solid #3478b8;
+            margin: 4mm 0;
+            padding: 3mm 4mm;
+        }
+        .warning { background: #fff5e8; border-left-color: #d97706; }
+        .success { background: #edf8f0; border-left-color: #27904b; }
+        .small { color: #667085; font-size: 9pt; }
+        .checklist li { list-style-type: "☐  "; padding-left: 1mm; }
+        a { color: #1768a5; text-decoration: none; }
+        .footer { border-top: 1px solid #d8e1ea; color: #667085; font-size: 8pt; margin-top: 8mm; padding-top: 2mm; }
+    </style>
+</head>
+<body>
+    <section class="cover">
+        <div class="eyebrow">Sistema FCT · Guía de pruebas</div>
+        <h1>Cómo comprobar la paginación, el matching y las consultas</h1>
+        <p class="subtitle">Instrucciones paso a paso para probar la aplicación en el navegador, repetir el benchmark local y ejecutar las pruebas automatizadas sin mezclar sus bases de datos.</p>
+        <div class="cover-note">
+            <p><strong>Entorno documentado:</strong> Windows, XAMPP, PHP CLI y MariaDB local.</p>
+            <p><strong>Duración aproximada:</strong> 10–15 minutos para la prueba visual; 2–5 minutos para repetir la medición.</p>
+            <p><strong>Base actual de sintéticos distribuidos:</strong> <code>fct_bench_distribucion_local</code>.</p>
+            <p><strong>Base para pruebas automatizadas:</strong> <code>fct_test_local</code>.</p>
+        </div>
+        <div class="callout warning">
+            <strong>Regla importante:</strong> no pulses botones de asignar, aprobar, cerrar o guardar durante la prueba visual. Esas acciones sí modifican datos. Esta guía usa enlaces de navegación y una base local de desarrollo, nunca producción.
+        </div>
+    </section>
+
+    <section class="section first">
+        <h2>1. Qué vas a verificar</h2>
+        <p>La mejora limita la cantidad de filas que se cargan en los listados y reduce consultas repetidas en la pantalla de matching. La comprobación tiene tres partes:</p>
+        <ol>
+            <li><strong>Navegación web:</strong> comprobar que se muestran páginas de tamaño limitado y que «Siguiente» cambia los registros.</li>
+            <li><strong>Benchmark:</strong> medir recuentos de consultas y latencias en una base sintética preparada para este fin.</li>
+            <li><strong>Pruebas automatizadas:</strong> ejecutar la suite sobre su propia base aislada, sin usar la base de benchmark ni la de desarrollo normal.</li>
+        </ol>
+        <table>
+            <thead><tr><th>Base</th><th>Uso</th><th>Qué evitar</th></tr></thead>
+            <tbody>
+                <tr><td><code>sistema_fct</code></td><td>Desarrollo habitual y datos demo del volcado.</td><td>No usarla para generar la muestra ni para fixtures.</td></tr>
+                <tr><td><code>fct_bench_distribucion_local</code></td><td>Prueba visual y benchmark con convenios y datos sintéticos distribuidos.</td><td>No enviar formularios que asignen o revisen datos.</td></tr>
+                <tr><td><code>fct_test_local</code></td><td>Suite automatizada; inserta y limpia fixtures de prueba.</td><td>No introducir datos personales o reales.</td></tr>
+            </tbody>
+        </table>
+        <div class="callout">
+            La muestra actual crea 10 empresas sintéticas, cada una con un convenio aprobado y 25 ofertas de 2 plazas. De los 500 alumnos, 400 están repartidos en 200 ofertas (20 ofertas por empresa) y 100 quedan disponibles para matching. Las primeras 10 ofertas están libres para comprobar los candidatos. También se crean 500 disponibilidades y 1.000 franjas semanales. Los correos sintéticos usan el dominio reservado <code>bench.invalid</code>; los nombres de archivo de los convenios son marcadores, no PDFs descargables.
+        </div>
+        <p>Para ver a qué convenio está vinculada cada empresa y cuántas ofertas/asignaciones tiene, ejecuta en la base <code>fct_bench_distribucion_local</code>:</p>
+        <pre>&amp; 'C:\xampp\mysql\bin\mysql.exe' -h 127.0.0.1 -uroot --database=fct_bench_distribucion_local `
+  -e "SELECT e.nombre_empresa,c.numero_convenio,c.estado,c.fecha_inicio,c.fecha_fin,
+             COUNT(DISTINCT p.id) AS ofertas,COUNT(DISTINCT af.alumno_id) AS alumnos_asignados
+      FROM empresas e
+      JOIN usuarios u ON u.id=e.usuario_id
+      JOIN convenios c ON c.empresa_id=e.id
+      LEFT JOIN empresa_especialidades_plazas p ON p.empresa_id=e.id
+      LEFT JOIN asignaciones_fct af ON af.oferta_id=p.id AND af.estado='Asignada'
+      WHERE u.email LIKE 'bench.company.%@bench.invalid'
+      GROUP BY e.id,c.id ORDER BY e.nombre_empresa;"</pre>
+    </section>
+
+    <section class="section">
+        <h2>2. Preparar el servidor local</h2>
+        <ol>
+            <li>Comprueba que MariaDB de XAMPP está en ejecución. Si utilizas el servidor PHP integrado, no necesitas iniciar Apache para esta guía.</li>
+            <li>Abre una ventana nueva de PowerShell. Ejecuta cada línea:</li>
+        </ol>
+        <pre>Set-Location C:\xampp\htdocs\Practicas_Desarrollo
+$env:FCT_DB_HOST = '127.0.0.1'
+$env:FCT_DB_NAME = 'fct_bench_distribucion_local'
+& 'C:\xampp\php\php.exe' -S 127.0.0.1:8002 -t public</pre>
+        <ol start="3">
+            <li>Deja esta ventana abierta. Es el servidor; si la cierras o pulsas Ctrl+C, la web deja de estar disponible.</li>
+            <li>El mensaje de PHP indicará que escucha en <code>http://127.0.0.1:8002</code>. Este puerto separado deja intactos el servidor habitual (8000) y la instancia local de webhooks (8001).</li>
+        </ol>
+        <div class="callout warning">
+            El proceso de PHP hereda las variables de entorno de esta ventana. Por eso se configuran <em>antes</em> de iniciar el servidor. No cambies el nombre de la base a <code>sistema_fct</code> para estas pruebas.
+        </div>
+        <h3>Confirmación opcional de la base</h3>
+        <p>En otra ventana de PowerShell, verifica que existe y tiene la muestra:</p>
+        <pre>        &amp; 'C:\xampp\mysql\bin\mysql.exe' -h 127.0.0.1 -uroot -N -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='fct_bench_distribucion_local';"</pre>
+        <p class="small">Si tu MariaDB tiene contraseña para root, agrega <code>-p</code> y escribe la contraseña cuando la solicite; no la pongas directamente en el comando.</p>
+    </section>
+
+    <section class="section">
+        <h2>3. Iniciar sesión en la aplicación</h2>
+        <ol>
+            <li>Abre esta dirección: <a href="http://127.0.0.1:8002/index.php?action=login">http://127.0.0.1:8002/index.php?action=login</a>.</li>
+            <li>Introduce la cuenta local de demostración:</li>
+        </ol>
+        <table>
+            <tbody>
+                <tr><th>Correo</th><td><code>coordinador@centro.com</code></td></tr>
+                <tr><th>Contraseña</th><td><code>password123</code></td></tr>
+            </tbody>
+        </table>
+        <ol start="3">
+            <li>Tras iniciar sesión, confirma que aparece el menú de coordinación. Esta cuenta solo se debe usar en desarrollo local.</li>
+        </ol>
+        <div class="callout success">
+            Si no puedes acceder, revisa primero la sección «Problemas frecuentes». La prueba automatizada confirma que el hash de esta cuenta demo corresponde a esa contraseña en la base aislada de pruebas.
+        </div>
+        <h3>Consultar los convenios sintéticos</h3>
+        <p>Para ver que las empresas de la muestra tienen convenios asociados, cierra la sesión de coordinación e inicia sesión con la cuenta de empresa:</p>
+        <table>
+            <tbody>
+                <tr><th>Correo</th><td><code>bench.company.01@bench.invalid</code></td></tr>
+                <tr><th>Contraseña</th><td><code>Benchmark data only</code></td></tr>
+            </tbody>
+        </table>
+        <ol>
+            <li>Abre <a href="http://127.0.0.1:8002/index.php?action=convenios">la página de convenios</a>.</li>
+            <li>En «Historial de convenios», comprueba el convenio <code>BENCH-CNV-01</code> y su estado aprobado.</li>
+            <li>No pulses «Descargar PDF»: el nombre de archivo sintético solo permite satisfacer el esquema y no corresponde a un documento real.</li>
+        </ol>
+    </section>
+
+    <section class="section">
+        <h2>4. Probar ofertas y asignaciones</h2>
+        <h3>Listado público de ofertas</h3>
+        <ol>
+            <li>Abre <a href="http://127.0.0.1:8002/index.php?action=ofertas">la página de ofertas</a>.</li>
+            <li>Cuenta las filas de ofertas: la primera página debe mostrar como máximo 20.</li>
+            <li>Pulsa <strong>Siguiente</strong>. Debe cambiar la página y la dirección debe contener <code>pagina=2</code>.</li>
+            <li>Pulsa <strong>Anterior</strong> para volver a la primera página.</li>
+        </ol>
+        <h3>Listado de asignaciones</h3>
+        <ol>
+            <li>Abre <a href="http://127.0.0.1:8002/index.php?action=asignaciones">la página de asignaciones</a>.</li>
+            <li>Verifica que se muestran como máximo 20 filas por página.</li>
+            <li>Usa Siguiente y Anterior. Debe conservarse la ruta de asignaciones y cambiar la página.</li>
+        </ol>
+        <div class="callout">
+            La muestra sintética tiene 400 asignaciones. Por eso se puede comprobar que no se presentan todas en una sola página. Un cambio de página es correcto aunque algunos registros del volcado aparezcan junto a los sintéticos.
+        </div>
+    </section>
+
+    <section class="section">
+        <h2>5. Probar matching y páginas de candidatos</h2>
+        <ol>
+            <li>Abre <a href="http://127.0.0.1:8002/index.php?action=emparejar">Emparejamiento y asignación</a>. Debes iniciar sesión como Coordinador o Administrador.</li>
+            <li>Cuenta las tarjetas de oferta: se muestran hasta 10 por página.</li>
+            <li>En una oferta con plazas, comprueba que la lista contiene hasta 10 candidatos.</li>
+            <li>Usa la paginación de candidatos dentro de esa tarjeta. Cambia la página de candidatos y comprueba que la página principal de ofertas se mantiene.</li>
+            <li>Usa la paginación general de ofertas al final. Debe cambiar la página principal; las páginas de candidatos son independientes para cada oferta.</li>
+        </ol>
+        <div class="callout success">
+            Las primeras 10 ofertas sintéticas están libres y hay 100 alumnos sin asignar, compatibles por ciclo, fechas, turno y disponibilidad semanal. Debe aparecer más de una página de candidatos.
+        </div>
+        <div class="callout warning">
+            <strong>No pulses «Asignar a esta oferta».</strong> Aunque se trate de datos sintéticos, ese botón guarda una asignación adicional. Para esta prueba basta con navegar y observar.
+        </div>
+    </section>
+
+    <section class="section">
+        <h2>6. Repetir el benchmark</h2>
+        <p>El benchmark mide en la conexión PDO el número de sentencias <code>SELECT</code> y el tiempo de cada operación. El script rechaza ejecutarse si no se activa expresamente o si la base no comienza por <code>fct_bench_</code>.</p>
+        <ol>
+            <li>Deja abierta la ventana del servidor si quieres conservar también la prueba web.</li>
+            <li>Abre una segunda ventana PowerShell y ejecuta:</li>
+        </ol>
+        <pre>Set-Location C:\xampp\htdocs\Practicas_Desarrollo
+$env:FCT_DB_HOST = '127.0.0.1'
+$env:FCT_DB_NAME = 'fct_bench_distribucion_local'
+$env:FCT_BENCH_ALLOW = '1'
+$env:FCT_BENCH_REPETITIONS = '7'
+&amp; 'C:\xampp\php\php.exe' scripts\benchmark_listados.php
+Remove-Item Env:FCT_BENCH_ALLOW
+Remove-Item Env:FCT_BENCH_REPETITIONS</pre>
+        <ol start="3">
+            <li>Espera la salida JSON. Comprueba que menciona <code>fct_bench_distribucion_local</code>, MariaDB 10.4.32 y siete repeticiones.</li>
+            <li>Busca los resultados <code>matching.pagina_1.implementacion_anterior</code> y <code>matching.pagina_1.implementacion_paginada</code>.</li>
+        </ol>
+        <p>Los otros dos nombres útiles son <code>ofertas.aprobadas.pagina_1</code> y <code>asignaciones.pagina_1</code>. El campo <code>filas_visibles</code> indica las filas que devuelve cada método; <code>consultas_select_mediana</code> es la mediana del número de consultas y <code>tiempo_mediana_ms</code> la mediana de latencia en milisegundos.</p>
+        <div class="callout warning">
+            El benchmark es de solo lectura. No vuelvas a ejecutar <code>seed_benchmark.php</code> en esta base: la muestra ya está creada y el generador protege contra duplicarla. Para sembrar desde cero necesitarías otra base de benchmark nueva.
+        </div>
+    </section>
+
+    <section class="section">
+        <h2>7. Resultados de referencia</h2>
+        <p>Medición actual en <code>fct_bench_distribucion_local</code>, MariaDB 10.4.32, siete repeticiones. El total incluye los pocos registros del volcado además de los datos sintéticos. Los resultados son locales y no garantizan esos tiempos en producción:</p>
+        <table>
+            <thead><tr><th>Operación</th><th>Filas</th><th>SELECT mediana</th><th>Tiempo mediano</th></tr></thead>
+            <tbody>
+                <tr><td>Ofertas sin paginar</td><td>250</td><td>1</td><td>2,283 ms</td></tr>
+                <tr><td>Ofertas, página 1</td><td>20</td><td>2</td><td>2,189 ms</td></tr>
+                <tr><td>Asignaciones sin paginar</td><td>400</td><td>1</td><td>4,861 ms</td></tr>
+                <tr><td>Asignaciones, página 1</td><td>20</td><td>2</td><td>1,749 ms</td></tr>
+                <tr><td>Matching anterior</td><td>100</td><td>20</td><td>41,224 ms</td></tr>
+                <tr><td>Matching paginado</td><td>100</td><td>2</td><td>18,402 ms</td></tr>
+            </tbody>
+        </table>
+        <p>En esa ejecución el matching redujo las consultas medidas de 20 a 2 (90 % menos) y la mediana local de unos 72 ms a 61 ms (aproximadamente 15 % menos). Las latencias dependen del equipo, la caché y los datos; no son una garantía para producción.</p>
+        <p>Las páginas de ofertas y asignaciones cargan menos filas que el método sin paginar. Eso reduce los resultados transferidos y dibujados, aunque en esta muestra pequeña no necesariamente reduce el tiempo de ida y vuelta a la base.</p>
+        <div class="callout">
+            No se añadieron índices nuevos. El análisis de planes mostró índices existentes elegidos para ofertas, asignaciones y franjas semanales. En 500 disponibilidades MariaDB recorrió la tabla, pero esa muestra no bastó para justificar otro índice.
+        </div>
+    </section>
+
+    <section class="section">
+        <h2>8. Ejecutar la suite automatizada (opcional)</h2>
+        <p>Las pruebas de integración insertan datos temporales y los limpian. Ejecuta la suite únicamente contra la base dedicada <code>fct_test_local</code>, nunca contra <code>sistema_fct</code> o <code>fct_bench_distribucion_local</code>.</p>
+        <ol>
+            <li>Abre una tercera ventana de PowerShell (o termina el servidor local con Ctrl+C).</li>
+            <li>Configura ambas variables para apuntar al mismo nombre de prueba y ejecuta:</li>
+        </ol>
+        <pre>Set-Location C:\xampp\htdocs\Practicas_Desarrollo
+$env:FCT_DB_HOST = '127.0.0.1'
+$env:FCT_DB_NAME = 'fct_test_local'
+$env:FCT_TEST_DB_NAME = 'fct_test_local'
+&amp; 'C:\xampp\php\php.exe' tests\run.php</pre>
+        <p>La prueba correcta termina con mensajes <code>OK</code> sobre validadores, rutas, almacenamiento, migraciones, perfiles, ofertas, matching, disponibilidad, calificaciones, usuarios y CSRF. Si la suite indica que el nombre de base debe empezar por <code>fct_test_</code>, confirma que las dos variables se escribieron correctamente.</p>
+    </section>
+
+    <section class="section">
+        <h2>9. Problemas frecuentes</h2>
+        <table>
+            <thead><tr><th>Qué ocurre</th><th>Qué comprobar</th></tr></thead>
+            <tbody>
+                <tr><td>El navegador dice que no puede conectarse.</td><td>Confirma que la ventana de PHP sigue abierta y muestra el puerto 8002. Arranca de nuevo el comando del paso 2 si la cerraste.</td></tr>
+                <tr><td>Error de conexión a MariaDB.</td><td>Comprueba MySQL/MariaDB en XAMPP y que <code>FCT_DB_HOST</code> y <code>FCT_DB_NAME</code> se definieron antes de arrancar el servidor.</td></tr>
+                <tr><td>No aparece Siguiente.</td><td>Confirma que estás en <code>fct_bench_distribucion_local</code> y en la ruta correcta. La página no necesita un enlace si no hay más registros.</td></tr>
+                <tr><td>El matching no muestra candidatos.</td><td>Revisa que estás en las ofertas sintéticas aprobadas y vigentes y que la fecha del equipo sea correcta.</td></tr>
+                <tr><td>El login rechaza la contraseña.</td><td>Revisa el correo y la contraseña, y verifica que el servidor PHP apunta a <code>fct_bench_distribucion_local</code>. No alteres el volcado para resolver un problema de sesión.</td></tr>
+                <tr><td>El benchmark exige una variable de permiso.</td><td>En esa misma ventana define <code>$env:FCT_BENCH_ALLOW = '1'</code> antes de ejecutar el script.</td></tr>
+                <tr><td>El benchmark dice que faltan filas.</td><td>Confirma el nombre de la base y que ya se ejecutó una vez <code>seed_benchmark.php</code> en ella. No repitas el seed si ya hay 500 alumnos <code>bench.student.*@bench.invalid</code>.</td></tr>
+                <tr><td>La suite automatizada rechaza la base.</td><td>Define <code>FCT_DB_NAME</code> y <code>FCT_TEST_DB_NAME</code> ambos como <code>fct_test_local</code>.</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="section">
+        <h2>10. Terminar la prueba y conservar los resultados</h2>
+        <ol>
+            <li>Si el servidor PHP sigue activo, vuelve a su ventana y pulsa <strong>Ctrl+C</strong>.</li>
+            <li>Cierra las ventanas PowerShell de prueba. Las variables de entorno usadas ahí no afectan a otros procesos de Windows.</li>
+            <li>Guarda la salida JSON del benchmark si necesitas comparar otra versión; anota también la versión de MariaDB, el número de repeticiones y el tamaño de la muestra.</li>
+            <li>Consulta <code>docs/optimizacion_consultas.md</code> para el análisis de consultas e índices y el README del proyecto para instalación y configuración general.</li>
+        </ol>
+        <ul class="checklist">
+            <li>MariaDB local estaba activa.</li>
+            <li>El servidor web se conectó a <code>fct_bench_distribucion_local</code>.</li>
+            <li>Ofertas y asignaciones navegaron entre páginas.</li>
+            <li>Matching permitió paginar las ofertas y candidatos de forma independiente.</li>
+            <li>El benchmark informó consultas y latencias.</li>
+            <li>La suite automatizada, si se ejecutó, usó <code>fct_test_local</code>.</li>
+            <li>No se pulsaron acciones que cambian ofertas o asignaciones.</li>
+        </ul>
+        <div class="footer">Sistema FCT · Pruebas locales de paginación, matching y consultas · Guía para desarrollo, no para producción.</div>
+    </section>
+</body>
+</html>
