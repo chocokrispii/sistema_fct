@@ -52,7 +52,7 @@ class InicioController
             'totalEmpresas' => count(array_unique(array_column($ofertas, 'empresa_id'))),
             'asignacionesActivas' => count(array_filter($asignaciones, static fn(array $a) => $a['estado'] === 'Asignada')),
             'notaMedia' => $notas === [] ? null : array_sum(array_map('floatval', $notas)) / count($notas),
-            'ofertasRecientes' => array_slice($ofertas, 0, 4),
+            'ofertasVigentes' => array_slice($ofertas, 0, 4),
             'eventos' => array_slice($eventos, 0, 3),
             'tieneDisponibilidad' => $disponibilidades !== [],
         ]);

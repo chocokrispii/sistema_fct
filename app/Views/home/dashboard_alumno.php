@@ -3,7 +3,7 @@
 /** @var int $totalEmpresas */
 /** @var int $asignacionesActivas */
 /** @var float|null $notaMedia */
-/** @var array $ofertasRecientes */
+/** @var array $ofertasVigentes */
 /** @var array $eventos */
 /** @var bool $tieneDisponibilidad */
 
@@ -52,7 +52,7 @@ $etiquetaClase = static function (string $texto): string {
             <a class="fct-stat fct-stat--blue" href="index.php?action=ofertas">
                 <span class="fct-stat__icon"><?= $ico($icoMaletin) ?></span>
                 <strong><?= (int)$totalOfertas ?></strong>
-                <span class="fct-stat__label">Ofertas disponibles</span>
+                <span class="fct-stat__label">Ofertas vigentes</span>
                 <span class="fct-stat__go"><?= $arrow ?></span>
             </a>
             <a class="fct-stat fct-stat--green" href="index.php?action=ofertas">
@@ -80,11 +80,11 @@ $etiquetaClase = static function (string $texto): string {
                 <h3 id="fct-offers-title">Ofertas de prácticas vigentes</h3>
                 <a class="fct-link" href="index.php?action=ofertas">Ver todas <?= $arrow ?></a>
             </div>
-            <?php if ($ofertasRecientes === []): ?>
+            <?php if ($ofertasVigentes === []): ?>
                 <p class="fct-empty">No hay ofertas vigentes en este momento.</p>
             <?php else: ?>
                 <ul class="fct-offers__list">
-                    <?php foreach ($ofertasRecientes as $i => $oferta): ?>
+                    <?php foreach ($ofertasVigentes as $i => $oferta): ?>
                         <li>
                             <a class="fct-offer" href="index.php?action=ofertas">
                                 <span class="fct-logo fct-logo--<?= ($i % 4) + 1 ?>"><?= $e(mb_strtoupper(mb_substr($oferta['nombre_empresa'], 0, 1, 'UTF-8'), 'UTF-8')) ?></span>
