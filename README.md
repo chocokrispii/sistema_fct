@@ -269,9 +269,9 @@ incidente y elimínalo según la política del centro.
    respuestas HTTP de recepción y envío de webhooks.
 13. Comprueba que las migraciones terminen sin error. La migración `001` no es
    idempotente: omítela si la columna ya se llama `nombre_especialidad`. La
-   migración `002`, `004`, `005` y `006` pueden volver a ejecutarse para
-   completar un esquema parcial; la `007` crea tablas con `IF NOT EXISTS`.
-   Ejecuta las migraciones `003`, `008` y `009` una sola vez.
+   migración `002` a `009` admiten volver a ejecutarse después de aplicarse
+   correctamente. Esto no corrige columnas, índices o tablas que existan con
+   una definición distinta de la esperada.
 
 Para que Docker y los servidores locales de XAMPP utilicen los mismos datos,
 `FCT_DB_HOST` de `.env` y `.env.local` debe apuntar al mismo MariaDB y a la misma
@@ -510,8 +510,8 @@ importar en ella el dump base y aplicar las migraciones `001` a `009` en orden.
 La suite necesita, entre otras, la columna de código postal de la migración
 `006`, las bandejas de webhooks de la `007` y las columnas de respuesta de la
 `009`. La migración `001` solo se ejecuta si la columna conserva el nombre
-antiguo; la `003` se ejecuta una sola vez. Al importar el dump, selecciona
-explícitamente `fct_test_local`. Después, desde PowerShell, ejecuta:
+antiguo. Al importar el dump, selecciona explícitamente `fct_test_local`.
+Después, desde PowerShell, ejecuta:
 
 ```powershell
 $env:FCT_TEST_DB_NAME = "fct_test_local"
