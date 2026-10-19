@@ -20,7 +20,7 @@
             <p><?= $soloPropias ? 'Cuando el centro cierre y califique una práctica, aparecerá aquí.' : 'Las prácticas y sus calificaciones aparecerán aquí.' ?></p>
         </div>
     <?php else: ?>
-        <div class="assignments-table-wrap">
+        <div class="assignments-table-wrap" role="region" aria-label="Listado de calificaciones" tabindex="0">
             <table class="assignments-table">
                 <thead><tr>
                     <?php if (!$soloPropias): ?><th>Alumno</th><?php endif; ?>

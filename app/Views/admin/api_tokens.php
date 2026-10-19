@@ -18,6 +18,7 @@
     </label>
     <button type="submit" <?= $users === [] ? 'disabled' : '' ?>>Crear token</button>
 </form>
+<div class="table-responsive" role="region" aria-label="Tokens de API" tabindex="0">
 <table>
     <thead><tr><th>Nombre</th><th>Cuenta</th><th>Rol</th><th>Creado</th><th>Último uso</th><th>Estado</th><th>Acción</th></tr></thead>
     <tbody><?php foreach ($tokens as $token): ?>
@@ -39,3 +40,4 @@
         </tr>
     <?php endforeach; ?></tbody>
 </table>
+</div>
