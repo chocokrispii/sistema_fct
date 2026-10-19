@@ -354,7 +354,7 @@ tbody tr:hover td{background:#fafcff}
 @media(max-width:1050px){.student-portal__details{grid-template-columns:repeat(2,minmax(0,1fr))}.site-home__features{grid-template-columns:repeat(2,minmax(0,1fr))}.fct-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){
   :root{--sidebar:72px}
-  .app-brand{justify-content:center;padding:0}.app-brand>span,.app-nav a>span:not(.app-nav__icon),.app-sidebar__bottom button>span:not(.app-nav__icon){display:none}
+  .app-brand{justify-content:center;padding:0}.app-brand>span,.app-nav a>span:not(.app-nav__icon),.app-sidebar__bottom button>span:not(.app-nav__icon){position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap;border:0}
   .app-nav a,.app-sidebar__bottom button{justify-content:center;padding:0}
   .student-portal__columns,.student-registration__grid,.company-registration__grid{grid-template-columns:1fr}
   .fct-hero__art{display:none}

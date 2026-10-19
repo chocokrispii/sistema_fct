@@ -47,7 +47,7 @@ $nombreUsuario = $_SESSION['nombre'] ?? $_SESSION['email'] ?? 'Usuario';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Sistema FCT</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=20261016-a">
+    <link rel="stylesheet" href="assets/css/style.css?v=20261019-a">
 </head>
 
 <body data-role="<?= htmlspecialchars(strtolower($rolActual ?? 'publico'), ENT_QUOTES, 'UTF-8') ?>">
