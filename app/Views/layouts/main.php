@@ -27,8 +27,8 @@ $navItems = [['Inicio', 'index.php', 'inicio'], ['Ofertas de prácticas', 'index
 if ($rolActual === 'Empresa') {
     $navItems = array_merge($navItems, [['Publicar oferta', 'index.php?action=publicar-oferta', 'mas'], ['Sedes', 'index.php?action=sedes', 'sede'], ['Convenios', 'index.php?action=convenios', 'documento']]);
 } elseif (in_array($rolActual, ['Administrador', 'Coordinador'], true)) {
-    $navItems = array_merge($navItems, [['Revisar convenios', 'index.php?action=revisar-convenios', 'documento'], ['Revisar ofertas', 'index.php?action=revisar-ofertas', 'check'], ['Emparejar alumnos', 'index.php?action=emparejar', 'usuarios'], ['Asignaciones', 'index.php?action=asignaciones', 'calendario'], ['Consultas', 'index.php?action=consultas', 'buscar'], ['Calificaciones', 'index.php?action=calificaciones', 'estrella'], ['Recuperaciones', 'index.php?action=recuperaciones', 'refrescar']]);
-    if ($rolActual === 'Administrador') $navItems[] = ['Usuarios', 'index.php?action=usuarios', 'usuario'];
+    $navItems = array_merge($navItems, [['Empresas', 'index.php?action=empresas-centro', 'edificio'], ['Convenios', 'index.php?action=revisar-convenios', 'documento'], ['Revisar ofertas', 'index.php?action=revisar-ofertas', 'check'], ['Emparejar alumnos', 'index.php?action=emparejar', 'usuarios'], ['Asignaciones', 'index.php?action=asignaciones', 'calendario'], ['Consultas', 'index.php?action=consultas', 'buscar'], ['Calificaciones', 'index.php?action=calificaciones', 'estrella'], ['Recuperaciones', 'index.php?action=recuperaciones', 'refrescar']]);
+    if ($rolActual === 'Administrador') $navItems = array_merge($navItems, [['Usuarios', 'index.php?action=usuarios', 'usuario'], ['Tokens API', 'index.php?action=api-tokens', 'refrescar'], ['Pruebas API y webhooks', 'index.php?action=pruebas-integracion', 'refrescar'], ['Webhooks por empresa', 'index.php?action=webhooks-empresa', 'documento']]);
 } elseif ($rolActual === 'Observador') {
     $navItems = array_merge($navItems, [['Asignaciones', 'index.php?action=asignaciones', 'usuarios'], ['Consultas', 'index.php?action=consultas', 'buscar'], ['Calificaciones', 'index.php?action=calificaciones', 'estrella']]);
 } elseif ($rolActual === 'Alumno') {
@@ -47,7 +47,7 @@ $nombreUsuario = $_SESSION['nombre'] ?? $_SESSION['email'] ?? 'Usuario';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Sistema FCT</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=20261014-c">
+    <link rel="stylesheet" href="assets/css/style.css?v=20261016-a">
 </head>
 
 <body data-role="<?= htmlspecialchars(strtolower($rolActual ?? 'publico'), ENT_QUOTES, 'UTF-8') ?>">

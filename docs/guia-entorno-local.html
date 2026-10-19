@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guía para usar Sistema FCT en local</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 17mm 19mm;
+    }
+    :root {
+      color: #172033;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.48;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    h1, h2, h3 { color: #143c68; line-height: 1.2; }
+    h1 { margin: 0 0 8pt; font-size: 27pt; }
+    h2 { margin: 23pt 0 8pt; font-size: 16pt; }
+    h3 { margin: 14pt 0 5pt; font-size: 11.5pt; }
+    p { margin: 6pt 0 9pt; }
+    ul, ol { margin: 5pt 0 11pt; padding-left: 21pt; }
+    li { margin: 3pt 0; }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 9pt;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      margin: 7pt 0 12pt;
+      padding: 10pt 12pt;
+      border-left: 3pt solid #2874b8;
+      border-radius: 3pt;
+      background: #f1f5f9;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    pre code { font-size: 8.8pt; }
+    a { color: #125da1; text-decoration: none; }
+    .cover {
+      min-height: 225mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      page-break-after: always;
+    }
+    .eyebrow {
+      margin-bottom: 12pt;
+      color: #2874b8;
+      font-size: 10pt;
+      font-weight: 700;
+      letter-spacing: 1.5pt;
+      text-transform: uppercase;
+    }
+    .subtitle { max-width: 145mm; color: #49566a; font-size: 14pt; }
+    .cover-card, .note, .warning {
+      margin-top: 16pt;
+      padding: 12pt 14pt;
+      border-radius: 5pt;
+    }
+    .cover-card { background: #edf5fc; }
+    .note { border-left: 3pt solid #2874b8; background: #f1f5f9; }
+    .warning { border-left: 3pt solid #c88319; background: #fff7e7; }
+    .url-list { padding: 0; list-style: none; }
+    .url-list li { margin: 9pt 0; }
+    .url-label { display: block; color: #536174; font-size: 9pt; }
+    .url-list code { font-size: 10pt; font-weight: 600; }
+    .small { color: #596579; font-size: 9pt; }
+    .keep { break-inside: avoid; }
+    table { width: 100%; border-collapse: collapse; margin: 8pt 0 12pt; }
+    th, td { padding: 7pt; border: 1px solid #d7dee8; text-align: left; vertical-align: top; }
+    th { background: #edf5fc; color: #143c68; }
+    footer {
+      position: fixed;
+      right: 0;
+      bottom: -12mm;
+      left: 0;
+      padding-top: 5pt;
+      border-top: 1px solid #d7dee8;
+      color: #647084;
+      font-size: 8pt;
+    }
+    @media screen {
+      body { max-width: 800px; margin: 32px auto; padding: 0 30px; }
+      .cover { min-height: 900px; }
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <p class="eyebrow">Sistema FCT · Guía de desarrollo</p>
+    <h1>Usar el sistema en local</h1>
+    <p class="subtitle">Cómo iniciar la aplicación, comprobar la API REST y probar el recorrido local de webhooks en Windows con XAMPP.</p>
+    <div class="cover-card">
+      <strong>Entorno local configurado</strong>
+      <p>La aplicación y las herramientas de prueba se sirven desde este equipo. Las pruebas locales no envían eventos a servicios externos.</p>
+      <p class="small">Guía para el proyecto Practicas_Desarrollo · 16 de octubre de 2026</p>
+    </div>
+  </section>
+
+  <main>
+    <h2>1. Antes de empezar</h2>
+    <ol>
+      <li>Abre XAMPP y comprueba que el servicio MySQL/MariaDB esté iniciado.</li>
+      <li>Abre PowerShell y sitúate en la carpeta del proyecto:
+        <pre><code>Set-Location C:\xampp\htdocs\Practicas_Desarrollo</code></pre>
+      </li>
+      <li>El archivo local <code>.env.local</code> debe estar configurado. Contiene ajustes privados y no se debe compartir ni subir al repositorio.</li>
+    </ol>
+
+    <h2>2. Iniciar y abrir las páginas</h2>
+    <p>En PowerShell, ejecuta el lanzador. Mantén abierta esa ventana mientras uses el entorno:</p>
+    <pre><code>powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode All</code></pre>
+    <p>El modo <code>All</code> inicia los servidores locales y comprueba que estén disponibles.</p>
+    <ul class="url-list">
+      <li><span class="url-label">Aplicación Sistema FCT</span><code>http://127.0.0.1:8002/index.php</code></li>
+      <li><span class="url-label">Prueba de webhooks</span><code>http://127.0.0.1:8003/webhook_test.php</code></li>
+      <li><span class="url-label">Receptor local de webhooks</span><code>http://127.0.0.1:8001/webhook.php</code></li>
+      <li><span class="url-label">API REST v1 (base)</span><code>http://127.0.0.1:8002/api/v1/</code></li>
+    </ul>
+    <div class="note keep">
+      <strong>Importante:</strong> usa exactamente <code>127.0.0.1</code> en la página de pruebas de webhooks. El receptor acepta solicitudes <code>POST</code>; si se abre directamente en el navegador con <code>GET</code>, puede responder <code>405</code>, que es normal.
+    </div>
+
+    <h2>3. Comprobar el entorno y detenerlo</h2>
+    <p>La ventana de PowerShell indica si los servicios arrancaron correctamente. Al terminar, detén solo los servidores gestionados por el lanzador:</p>
+    <pre><code>powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode Stop</code></pre>
+    <p>Los registros de diagnóstico se guardan en <code>%TEMP%\fct-local-servers</code>. Si una URL no responde, comprueba primero que la ventana del lanzador siga abierta, que MySQL esté iniciado y que los puertos 8001, 8002 y 8003 no estén siendo usados por otro programa.</p>
+
+    <h2>4. Pruebas de webhooks</h2>
+    <p>La página de pruebas permite enviar un evento sintético al receptor local y comprobar también el envío saliente. Todo el recorrido permanece en el equipo.</p>
+    <ul>
+      <li>Usa referencias ficticias; no introduzcas datos personales.</li>
+      <li>La recepción de prueba se registra en la bandeja local <code>webhook_inbox</code>.</li>
+      <li>La prueba saliente usa <code>webhook_outbox</code> y entrega el evento al receptor local.</li>
+      <li>Estos eventos de prueba no crean ni modifican expedientes, alumnos, empresas, ofertas o convenios.</li>
+    </ul>
+
+    <h2>5. API REST y autenticación</h2>
+    <p>La API REST v1 se encuentra bajo <code>/api/v1/</code>. Las rutas requieren un token Bearer; por ello, consultar un recurso sin token debe responder <code>401</code>. No significa que el servidor esté averiado.</p>
+    <ol>
+      <li>Entra en la aplicación con una cuenta administradora.</li>
+      <li>Abre la sección <strong>Tokens API</strong>, crea un token y guárdalo de forma segura. El token completo se muestra una sola vez.</li>
+      <li>Envía el token en la cabecera <code>Authorization</code> de cada solicitud. No lo incluyas en la URL, capturas, código versionado ni logs.</li>
+    </ol>
+    <p>La API aplica los permisos del rol de la cuenta. Consulta <code>docs\api-rest.md</code> para las rutas, permisos y ejemplos de solicitudes.</p>
+    <h3>Pruebas manuales en Docker</h3>
+    <p>Con Docker abierto, inicia sesión como Administración y abre <code>http://localhost:8080/index.php?action=pruebas-integracion</code> (también aparece en el menú como <strong>Pruebas API y webhooks</strong>).</p>
+    <ul>
+      <li>En el probador de API elige método y recurso, escribe el JSON y usa un token activo. El campo del token se borra después de cada solicitud.</li>
+      <li><code>GET</code> solo consulta. <code>POST</code> y <code>PATCH</code> guardan cambios en la base actual y exigen marcar una confirmación; no tienen borrado automático.</li>
+      <li>La recepción de webhook manda un evento firmado al endpoint local y lo archiva en <code>webhook_inbox</code>.</li>
+      <li>El envío saliente añade un evento sintético a <code>webhook_outbox</code>, ejecuta el despachador y lo entrega al receptor del mismo Docker; no contacta el destino externo.</li>
+    </ul>
+    <p class="warning"><strong>Usa datos ficticios.</strong> Las pruebas de webhook no cambian expedientes, pero los eventos quedan guardados. No incluyas datos personales y no confirmes escrituras de API que no quieras conservar.</p>
+
+    <h2>6. ¿Se ve lo mismo en local que en el servidor?</h2>
+    <p><strong>La versión local está actualizada para probar la aplicación y los cambios presentes en este proyecto.</strong> Las páginas locales se sirven desde la carpeta del proyecto y el entorno de desarrollo ya fue comprobado.</p>
+    <div class="warning">
+      <strong>El código y los datos son cosas distintas.</strong> La base local de XAMPP es independiente de la base del servidor público. Por tanto, las cuentas, ofertas y demás registros no se sincronizan automáticamente. Por ejemplo, si en local aparece “No hay ofertas aprobadas para mostrar”, puede deberse a que la base local no contiene ofertas aprobadas, aunque sí existan en el servidor.
+    </div>
+    <p>Los cambios hechos en local tampoco se publican automáticamente. Para que el servidor público muestre una versión nueva hay que desplegar allí el código y aplicar sus migraciones de forma controlada. No copies datos reales o personales del servidor a local sin autorización y medidas de protección.</p>
+
+    <h2>7. Documentación del proyecto</h2>
+    <table>
+      <thead><tr><th>Documento</th><th>Contenido</th></tr></thead>
+      <tbody>
+        <tr><td><code>README.md</code></td><td>Requisitos e instalación del proyecto.</td></tr>
+        <tr><td><code>docs\api-rest.md</code></td><td>Autenticación, recursos, permisos y ejemplos de la API REST.</td></tr>
+        <tr><td><code>docs\webhooks.md</code></td><td>Configuración y comportamiento de webhooks.</td></tr>
+      </tbody>
+    </table>
+    <p class="small">Guía local preparada para este proyecto. Las direcciones con 127.0.0.1 solo funcionan en el ordenador donde está iniciado el entorno.</p>
+  </main>
+  <footer>Sistema FCT · Entorno de desarrollo local · No compartir tokens, secretos ni datos personales</footer>
+</body>
+</html>

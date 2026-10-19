@@ -124,7 +124,7 @@ class Asignacion
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function crear(int $ofertaId, int $alumnoId, int $coordinadorId, string $tutorEmpresa): void
+    public function crear(int $ofertaId, int $alumnoId, int $coordinadorId, string $tutorEmpresa): int
     {
         $this->db->beginTransaction();
         try {
@@ -214,6 +214,7 @@ class Asignacion
                 'alumno_id' => $alumnoId,
             ]);
             $this->db->commit();
+            return $asignacionId;
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();

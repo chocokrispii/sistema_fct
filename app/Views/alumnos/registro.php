@@ -70,7 +70,7 @@
             <div class="student-registration__grid">
                 <div class="student-registration__field">
                     <label for="student-phone">Teléfono <span aria-hidden="true">*</span></label>
-                    <input id="student-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" pattern="(?:\+34|0034)?[\s().-]*[6789](?:[\s().-]*\d){8}" value="<?= htmlspecialchars($values['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-describedby="student-phone-help" required>
+                    <input id="student-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" value="<?= htmlspecialchars($values['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-describedby="student-phone-help" required>
                     <small id="student-phone-help">Teléfono español de 9 cifras; se acepta el prefijo +34.</small>
                 </div>
 

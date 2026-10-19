@@ -17,7 +17,11 @@ arquitectura MVC propia, sin framework ni dependencias de Composer.
 ## Inicio con Docker Compose
 
 Docker Compose ejecuta PHP 8.2 con Apache, MariaDB 10.4.32 y el servicio oficial
-ClamAV. La versión de MariaDB coincide con la instalación XAMPP local observada;
+ClamAV. El código del proyecto se monta desde la carpeta local, por lo que los
+cambios en archivos PHP, vistas y recursos se reflejan en Docker sin reconstruir
+la imagen. Por defecto, la base de datos Docker es independiente de la de XAMPP;
+se puede configurar `FCT_DB_HOST` en `.env` para que la aplicación use una base
+compartida. La versión de MariaDB coincide con la instalación XAMPP local observada;
 10.4 ya no recibe soporte, por lo que esta composición es exclusivamente para
 desarrollo local y no debe desplegarse en producción. El Dockerfile instala
 `pdo_mysql` y `mbstring`; `fileinfo` viene con la imagen PHP. Composer está
@@ -43,6 +47,7 @@ guardan en volúmenes Docker.
 
    ```powershell
    docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/crear_cuentas_demo.php
+   docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/seed_datos_sinteticos.php
    docker compose ps
    docker compose exec app php -v
    ```
@@ -62,7 +67,22 @@ guardan en volúmenes Docker.
    Las contraseñas de desarrollo son configurables en `.env`; no reutilices
    esos valores fuera del entorno local.
 
+Para que Docker y XAMPP muestren y modifiquen los mismos datos, configura la
+aplicación Docker contra MariaDB de XAMPP mediante `FCT_DB_HOST=host.docker.internal`
+en `.env`, y usa en `FCT_DB_USER` y `FCT_DB_PASS` una cuenta de MariaDB con
+permisos limitados a la base `sistema_fct`. Crea esa cuenta en MariaDB de XAMPP;
+no uses `root` para la conexión desde Docker. El servidor de MariaDB de XAMPP
+debe estar iniciado y aceptar la conexión local de Docker. La base Docker
+existente no se borra, pero la aplicación deja de usarla mientras esté activa
+esta configuración compartida. `http://127.0.0.1:8002/index.php` también usa
+MariaDB de XAMPP mediante `.env.local`.
+
 ## Instalación local con XAMPP
+
+La API REST versionada está documentada en [docs/api-rest.md](docs/api-rest.md).
+Antes de usarla en una base existente, ejecuta la migración
+`database/migrations/008_api_access_tokens.sql` y crea/revoca tokens desde
+**Tokens API** en el panel de administración.
 
 ### 1. Configurar Apache
 
@@ -114,7 +134,15 @@ SetEnv FCT_CLAMSCAN "C:/Program Files/ClamAV/clamscan.exe"
 SetEnv FCT_CLAMAV_DATABASE "C:/ProgramData/ClamAV/db"
 ```
 
-En XAMPP, crea previamente el directorio de almacenamiento fuera del
+Para el lanzador de desarrollo de XAMPP, Docker publica ClamAV solo en
+`127.0.0.1:3310`; no hace falta instalar un segundo antivirus en Windows.
+Mantén Docker y su servicio `clamav` iniciados mientras se cargan convenios.
+El lanzador configura automáticamente `FCT_CLAMD_HOST=127.0.0.1` y
+`FCT_CLAMD_PORT=3310`, salvo que `.env.local` especifique `FCT_CLAMD_HOST` o
+un ejecutable local `FCT_CLAMSCAN`. El puerto no queda expuesto a otros equipos
+de la red.
+
+En una instalación Apache/XAMPP distinta del lanzador local, crea previamente el directorio de almacenamiento fuera del
 `DocumentRoot` y configura `FCT_STORAGE_PATH`; no existe una ruta
 predeterminada. La aplicación
 resuelve ambas rutas y rechaza directorios inexistentes, rutas relativas,
@@ -126,7 +154,8 @@ indicadas. Define las variables de entorno en Apache o en el VirtualHost, no en
 `.htaccess`. La configuración comprobada para Apache queda limitada a esta
 aplicación.
 
-En Windows, instala la distribución oficial de Cisco Talos desde WinGet:
+Si no se usa Docker como analizador en una instalación Apache/XAMPP, se puede
+instalar la distribución oficial de Cisco Talos desde WinGet:
 
 ```powershell
 winget install --id Cisco.ClamAV --exact --source winget
@@ -135,8 +164,7 @@ Copy-Item config\clamav\freshclam.conf.example "C:\ProgramData\ClamAV\freshclam.
 & "C:\Program Files\ClamAV\freshclam.exe" --config-file="C:\ProgramData\ClamAV\freshclam.conf"
 ```
 
-El `public/.htaccess` de desarrollo ya apunta a `clamscan.exe` y a ese
-directorio de firmas. Mantén el almacenamiento privado con permisos de
+Configura las variables anteriores en Apache para este método nativo. Mantén el almacenamiento privado con permisos de
 modificación solo para la identidad que ejecuta Apache, y lectura restringida;
 no concedas escritura a `Usuarios autentificados`. Programa `freshclam` para
 actualizar las firmas al menos cada dos horas. En la instalación local se usa
@@ -191,8 +219,10 @@ icacls "C:\xampp\private\sistema-fct" /grant:r "BUILTIN\Administrators:(OI)(CI)F
 ```
 
 Los PDFs pasan por validación de extensión, MIME y tamaño y, antes de persistir,
-por ClamAV. En XAMPP, `FCT_CLAMSCAN` debe señalar al ejecutable confiable con
-ruta absoluta; en Docker se usa `FCT_CLAMD_HOST` y el protocolo TCP de ClamD.
+por ClamAV. En el lanzador local de XAMPP se usa el servicio Docker ClamAV en
+`127.0.0.1:3310`; para otra instalación XAMPP, `FCT_CLAMSCAN` debe señalar al
+ejecutable confiable con ruta absoluta. En Docker se usa `FCT_CLAMD_HOST` y el
+protocolo TCP de ClamD.
 Si el antivirus no está configurado, no se puede contactar, tiene firmas con
 más de tres días o no puede completar el análisis, la carga falla cerrada.
 Mantén ClamAV instalado y sus firmas actualizadas, supervisa los fallos del
@@ -233,11 +263,21 @@ incidente y elimínalo según la política del centro.
    alumnado.
 10. Ejecuta `database/migrations/007_webhooks.sql` para crear las bandejas de
    entrada y salida de webhooks.
-11. Comprueba que las migraciones terminen sin error. La migración `001` no es
+11. Ejecuta `database/migrations/008_api_access_tokens.sql` para habilitar los
+   tokens Bearer de la API REST.
+12. Ejecuta `database/migrations/009_webhook_responses.sql` para conservar las
+   respuestas HTTP de recepción y envío de webhooks.
+13. Comprueba que las migraciones terminen sin error. La migración `001` no es
    idempotente: omítela si la columna ya se llama `nombre_especialidad`. La
    migración `002`, `004`, `005` y `006` pueden volver a ejecutarse para
    completar un esquema parcial; la `007` crea tablas con `IF NOT EXISTS`.
-   Ejecuta la migración `003` una sola vez.
+   Ejecuta las migraciones `003`, `008` y `009` una sola vez.
+
+Para que Docker y los servidores locales de XAMPP utilicen los mismos datos,
+`FCT_DB_HOST` de `.env` y `.env.local` debe apuntar al mismo MariaDB y a la misma
+base. Las credenciales de cada entorno pueden ser distintas si ambas cuentas
+tienen permisos sobre esa base. Por defecto, Docker utiliza su propia base
+independiente.
 
 El volcado no selecciona la base con `USE`; elige explícitamente la base destino
 antes de importarlo. Las migraciones tampoco seleccionan una base. El dump
@@ -263,18 +303,47 @@ con permisos limitados y no uses `root` sin contraseña.
 
 ## Integración por API y webhooks
 
-La API entrante inicial está en `public/webhook.php`. Acepta `POST` con un
-objeto JSON firmado y registra el evento en `webhook_inbox`; no cambia alumnos,
-empresas, ofertas, convenios ni prácticas. La aplicación encola eventos de
-ofertas, convenios y prácticas en `webhook_outbox` dentro de la transacción
-que guarda el cambio. El worker `scripts/dispatch_webhooks.php` los envía al
-destino configurado y reintenta errores temporales.
+La API REST versionada está en `public/api.php` y usa la ruta `/api/v1/`;
+consulta la [guía REST](docs/api-rest.md) para sus recursos, permisos y
+autenticación. El administrador puede emitir y revocar tokens Bearer en
+**Tokens API**. Ejecuta `database/migrations/008_api_access_tokens.sql` en las
+bases existentes antes de crear tokens.
+
+El endpoint `public/webhook.php` acepta `POST` con un objeto JSON firmado y
+registra el evento en `webhook_inbox`; no cambia alumnos, empresas, ofertas,
+convenios ni prácticas. La aplicación encola eventos de ofertas, convenios y
+prácticas en `webhook_outbox` dentro de la transacción que guarda el cambio. El
+worker `scripts/dispatch_webhooks.php` los envía al destino configurado y
+reintenta errores temporales.
 
 Ejecuta `database/migrations/007_webhooks.sql` en las bases ya existentes.
 Configura los secretos y la URL como variables de entorno del proceso PHP que
 atiende Apache, no en el repositorio. Los secretos deben tener al menos 32
 caracteres aleatorios. Los ejemplos de contrato, firma HMAC, instalación y
 pruebas locales están en [docs/webhooks.md](docs/webhooks.md).
+
+Para ver la aplicación y la interfaz local de webhooks juntas en XAMPP, inicia
+Apache y MySQL y ejecuta:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode All
+```
+
+Abre `http://127.0.0.1:8002/index.php` para la aplicación y
+`http://127.0.0.1:8003/webhook_test.php` para las pruebas; el receptor local
+usa `http://127.0.0.1:8001/webhook.php`. Detén únicamente esos servidores con
+el mismo comando y `-Mode Stop`. Las instrucciones detalladas están en
+[docs/webhooks.md](docs/webhooks.md).
+Al ejecutar el lanzador, XAMPP usa `FCT_STORAGE_PATH` si se define en
+`.env.local`; en caso contrario, crea el almacenamiento privado
+`%LOCALAPPDATA%\FCT\storage`.
+La API REST local usa `http://127.0.0.1:8002/api/v1/`.
+La guía para iniciar y probar el entorno local está disponible en
+[PDF](docs/guia-entorno-local.pdf) y en [HTML](docs/guia-entorno-local.html).
+En Docker, el panel **Pruebas API y webhooks** está disponible para
+Administración en `index.php?action=pruebas-integracion`. Las solicitudes
+POST/PATCH de la API modifican la base actual tras confirmación; las pruebas
+salientes de webhook de ese panel se envían únicamente al receptor local.
 
 ## Cuentas de demostración
 
@@ -313,6 +382,34 @@ sola vez y no cambia cuentas ya existentes, salvo que se habilite
 explícitamente `FCT_DEMO_SEED_RESET_PASSWORDS=1` y se pase una nueva contraseña
 por variable de entorno. No lo ejecutes en una instalación publicada y elimina
 o cambia estas cuentas antes de desplegar.
+
+Para cargar un conjunto persistente de empresas, alumnos disponibles, ofertas
+aprobadas y convenios sintéticos (con documentos PDF explícitamente marcados
+como demostración), ejecuta `scripts/seed_datos_sinteticos.php` después de
+aplicar las migraciones. Es idempotente y solo admite `sistema_fct` local o
+Docker con confirmación explícita. En XAMPP, desde PowerShell:
+
+```powershell
+foreach ($line in Get-Content .env.local) {
+    if ($line -match '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+    }
+}
+$env:FCT_ENABLE_DEMO_SEED = "1"
+$env:FCT_STORAGE_PATH = Join-Path $env:LOCALAPPDATA "FCT\storage"
+New-Item -ItemType Directory -Force -Path $env:FCT_STORAGE_PATH | Out-Null
+& "C:\xampp\php\php.exe" scripts\seed_datos_sinteticos.php
+Remove-Item Env:FCT_ENABLE_DEMO_SEED
+```
+
+En Docker, usa el segundo comando del bloque de inicio de Docker Compose anterior.
+La interfaz pública muestra las ofertas aprobadas en `index.php?action=ofertas`;
+Administración/Coordinación puede consultar empresas en
+`index.php?action=empresas-centro`, candidatos en `index.php?action=emparejar`
+y convenios en `index.php?action=revisar-convenios`. Los datos de XAMPP y Docker
+son independientes y el seed debe ejecutarse una vez en cada base que se quiera
+visualizar. Las cuentas sintéticas usan correos `example.invalid` y claves
+aleatorias no mostradas; no son cuentas de acceso.
 Al iniciar sesión, cada rol aterriza en un módulo propio; el menú ofrece el
 resto de pantallas autorizadas. El alumnado puede gestionar su horario semanal
 y consultar las notas de prácticas finalizadas; Administradores y Coordinadores
@@ -332,6 +429,8 @@ historial y conserva el registro de auditoría.
 
 - **Acceso y seguridad:** login/logout, sesiones, control por rol y token CSRF
   en todas las peticiones POST.
+- **Empresas:** Administración y Coordinación pueden consultar el directorio
+  de empresas registradas y el estado de sus cuentas.
 - **Alumno:** registro con expediente y tutor legal para menores de edad;
   portal privado con sus datos de expediente, disponibilidad y prácticas;
   edición del perfil con validación de DNI/NIE, teléfono, correo y código postal;

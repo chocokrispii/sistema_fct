@@ -8,10 +8,13 @@ un sistema externo:
 - **Recepción:** `POST /webhook.php` recibe un sobre JSON firmado, lo valida y
   guarda en `webhook_inbox`. Es un buzón de entrada; no crea ni modifica
   alumnos, empresas, cursos, ofertas, convenios, prácticas o calificaciones.
+  También conserva la respuesta HTTP más reciente para inspeccionar si el
+  emisor recibió `202` o una respuesta de duplicado `200`.
 - **Envío:** cuando se configura `FCT_WEBHOOK_OUTBOUND_URL`, los cambios de
   ofertas, convenios y prácticas añaden un evento JSON a `webhook_outbox` en
   la misma transacción que el cambio. Un proceso CLI separado entrega la cola
-  y programa reintentos si el receptor no está disponible.
+  y programa reintentos si el receptor no está disponible. Conserva el código
+  HTTP y el cuerpo de la respuesta del receptor, con un límite de 16 KiB.
 
 El proyecto no tiene un módulo independiente de cursos ni un endpoint REST
 para consultar expedientes. Por eso los eventos incluidos notifican los
@@ -27,13 +30,16 @@ En las bases existentes selecciona la base correcta y ejecuta una vez:
 ```powershell
 & 'C:\xampp\mysql\bin\mysql.exe' -h 127.0.0.1 -uroot --database=sistema_fct < database\migrations\007_webhooks.sql
 & 'C:\xampp\mysql\bin\mysql.exe' -h 127.0.0.1 -uroot --database=fct_test_local < database\migrations\007_webhooks.sql
+Get-Content -Raw database\migrations\009_webhook_responses.sql | & 'C:\xampp\mysql\bin\mysql.exe' -h 127.0.0.1 -uroot --database=sistema_fct
 ```
 
 Sustituye los nombres por las bases de desarrollo y pruebas que uses. La
 migración crea `webhook_inbox` y `webhook_outbox` mediante `IF NOT EXISTS`; no
-borra datos existentes. Para nuevas instalaciones Docker Compose, la migración
-está enlazada en el orden de arranque inicial de MariaDB. Los volúmenes ya
-inicializados no vuelven a ejecutar scripts de inicialización automáticamente.
+borra datos existentes. Ejecuta la migración `009` una sola vez en cada base
+existente; añade las columnas donde se guardan las respuestas HTTP. Para nuevas
+instalaciones Docker Compose, las migraciones están enlazadas en el orden de
+arranque inicial de MariaDB. Los volúmenes ya inicializados no vuelven a
+ejecutar scripts de inicialización automáticamente.
 
 ## Configuración de secretos
 
@@ -76,17 +82,30 @@ FCT_WEBHOOK_OUTBOUND_URL=http://127.0.0.1:8001/webhook.php
 "@ | Set-Content -LiteralPath .env.local -Encoding ascii
 ```
 
-El lanzador local lee el archivo sin imprimir el secreto. Inicia un servidor
-adicional en el puerto `8001`; el servidor XAMPP actual y sus funciones quedan
-intactos:
+El lanzador local lee el archivo sin imprimir el secreto. Inicia de una vez
+el receptor, la aplicación y la interfaz local:
 
 ```powershell
 Set-Location C:\xampp\htdocs\Practicas_Desarrollo
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode Server
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode All
 ```
 
-Usa la aplicación en `http://127.0.0.1:8001` para crear o revisar ofertas,
-convenios o prácticas, que encolan los eventos. En otra ventana procesa la cola:
+Abre la aplicación en `http://127.0.0.1:8002/index.php`, la interfaz de prueba
+en `http://127.0.0.1:8003/webhook_test.php` y el receptor en
+`http://127.0.0.1:8001/webhook.php`. La aplicación principal usa la misma base
+local de XAMPP; úsala para crear o revisar ofertas, convenios o prácticas.
+El modo `All` verifica los puertos y las páginas antes de informar que el
+entorno está listo.
+
+Para detener los servidores iniciados por el lanzador:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode Stop
+```
+
+También puedes iniciar cada servicio por separado con `-Mode Server` (8001),
+`-Mode App` (8002) y `-Mode Interface` (8003). Para procesar eventos de la
+cola de negocio manualmente, ejecuta:
 
 ```powershell
 Set-Location C:\xampp\htdocs\Practicas_Desarrollo
@@ -94,29 +113,60 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.p
 ```
 
 El worker debe indicar `Entregado` y el endpoint registrará el evento en
-`webhook_inbox`. Repite `Dispatch` para procesar eventos posteriores. El servidor
-solo escucha en `127.0.0.1`, por lo que no es accesible desde otros equipos.
-No compartas `.env.local` ni incluyas el secreto en capturas o logs. Esta
-configuración no altera Apache ni variables globales de Windows.
-
-Para usar la interfaz visual y probar también el envío saliente, deja el
-receptor en `8001` y abre otra ventana de PowerShell para iniciar la interfaz
-aislada en `8003`:
-
-```powershell
-Set-Location C:\xampp\htdocs\Practicas_Desarrollo
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode Interface
-```
-
-Abre `http://127.0.0.1:8003/webhook_test.php`. Los dos servidores son
-necesarios: la interfaz en `8003` despacha el evento y el receptor de `8001`
-lo recibe sin bloquear la petición. La sección saliente solo acepta el destino
-local exacto `http://127.0.0.1:8001/webhook.php` y despacha únicamente el
-identificador sintético que acaba de crear.
+`webhook_inbox`. Repite `Dispatch` para procesar eventos posteriores. Los
+servidores locales escuchan solo en `127.0.0.1`. No compartas `.env.local` ni
+incluyas el secreto en capturas o logs; esta configuración no modifica Apache
+ni variables globales de Windows.
 
 Para Docker, añade las variables requeridas a un `.env` local ignorado por Git
 y reinicia el servicio de aplicación. No copies secretos en
 `.env.docker.example`.
+
+### Panel manual de integración en Docker
+
+Con la sesión de Administrador, abre **Pruebas API y webhooks** en la
+aplicación. La recepción manual firma un evento ficticio y lo envía por HTTP al
+endpoint local; se archiva en `webhook_inbox` y no cambia datos académicos.
+El envío saliente crea una fila sintética en `webhook_outbox`, ejecuta el
+despachador real y la entrega únicamente al receptor del mismo contenedor, sin
+usar el destino externo configurado. Ambas pruebas muestran la respuesta HTTP
+y el identificador del evento. En el lanzador local de XAMPP, la aplicación
+de `8002` envía las pruebas al receptor de `8001`; en Docker se usa el endpoint
+local del contenedor.
+
+El panel de API de esa página envía las solicitudes desde el navegador y borra
+el token del campo después de cada petición. Las operaciones POST/PATCH sí
+escriben en la base actual y requieren confirmación en pantalla; no tienen
+borrado automático. No uses datos personales ni ejecutes escrituras que no
+quieras conservar.
+
+Con sesión de Administrador, usa las páginas **Webhooks recibidos** y
+**Webhooks enviados** para consultar por separado los últimos 50 eventos de
+cada dirección, sus JSON, estados y respuestas HTTP. Los datos se muestran
+escapados como texto y ambas páginas son de solo lectura. Las respuestas de
+eventos anteriores a la migración 009 no se conservan y se indican como tales.
+
+La página **Webhooks por empresa** reúne por separado los eventos enviados y
+recibidos de una empresa seleccionada. Los eventos salientes de convenios,
+ofertas y prácticas incluyen `data.empresa_id`, resuelto desde el registro
+asociado. En los eventos entrantes, el emisor debe incluir `empresa_id` dentro
+de `data` con el ID de empresa que usa esta base de datos. Los eventos sin ese
+campo, o con un ID no numérico, aparecen bajo **Sin empresa identificada**;
+no se asocian automáticamente por nombre, correo ni otro dato ambiguo. El ID
+interno debe comunicarse al integrador de forma controlada si se acuerda usarlo
+como referencia.
+
+Abre **Webhooks por empresa** con la cuenta de Administrador y selecciona la
+empresa. La ficha mantiene secciones separadas de enviados y recibidos, pero
+reúne los distintos tipos de evento de esa empresa. Para consultar la misma
+actividad mediante un enlace directo:
+
+```text
+http://127.0.0.1:8002/index.php?action=webhooks-empresa&empresa_id=3
+```
+
+Sustituye `3` por el ID interno mostrado en el selector. La ficha es de solo
+lectura; no procesa el contenido de los webhooks entrantes.
 
 ## Endpoint entrante
 
