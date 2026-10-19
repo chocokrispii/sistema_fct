@@ -8,19 +8,27 @@ if (!is_string($requestPath)) {
     exit;
 }
 
-if ($requestPath === '/api/v1' || str_starts_with($requestPath, '/api/v1/')) {
-    $_GET['path'] = trim(rawurldecode(substr($requestPath, strlen('/api/v1'))), '/');
+$decodedPath = rawurldecode($requestPath);
+foreach (explode('/', $decodedPath) as $segment) {
+    if (str_starts_with($segment, '.')) {
+        http_response_code(404);
+        return true;
+    }
+}
+
+if ($decodedPath === '/api/v1' || str_starts_with($decodedPath, '/api/v1/')) {
+    $_GET['path'] = trim(substr($decodedPath, strlen('/api/v1')), '/');
     require __DIR__ . '/api.php';
     return true;
 }
 
-if ($requestPath === '/') {
+if ($decodedPath === '/') {
     require __DIR__ . '/index.php';
     return true;
 }
 
 $publicRoot = realpath(__DIR__);
-$requestedFile = realpath(__DIR__ . DIRECTORY_SEPARATOR . ltrim(rawurldecode($requestPath), '/\\'));
+$requestedFile = realpath(__DIR__ . DIRECTORY_SEPARATOR . ltrim($decodedPath, '/\\'));
 if (
     $publicRoot !== false
     && $requestedFile !== false

@@ -126,9 +126,16 @@ un nombre de archivo de vista o una consulta SQL.
 |---|---|---|---|
 | `inicio` | GET | Público | Página de bienvenida. |
 | `login` | GET, POST | Público | Formulario y autenticación. |
+| `recuperar` | GET, POST | Público | Solicita la recuperación de una cuenta. |
+| `restablecer` | GET, POST | Público | Valida el enlace y actualiza la contraseña. |
+| `recuperaciones` | GET | Administrador, Coordinador | Lista las solicitudes de recuperación pendientes. |
+| `verificar-recuperacion` | POST | Administrador, Coordinador | Marca como verificada una solicitud de recuperación. |
 | `logout` | POST | Cualquier rol autenticado | Finaliza la sesión. |
 | `registro-alumno` | GET, POST | Público | Alta del expediente y usuario de alumno. |
 | `registro-empresa` | GET, POST | Público | Alta del perfil de empresa y usuario. |
+| `portal-alumno` | GET | Alumno | Consulta el expediente propio. |
+| `perfil-alumno` | GET, POST | Alumno | Consulta y actualiza el perfil propio. |
+| `empresas-centro` | GET | Administrador, Coordinador | Lista las empresas registradas para el centro. |
 | `ofertas` | GET | Público | Lista ofertas aprobadas cuyo fin no ha pasado. |
 | `publicar-oferta` | GET, POST | Empresa | Consulta y crea ofertas propias. |
 | `sedes` | GET, POST | Empresa | Consulta y registra sedes de la empresa autenticada. |
@@ -138,6 +145,9 @@ un nombre de archivo de vista o una consulta SQL.
 | `asignaciones` | GET | Administrador, Coordinador, Observador | Lista asignaciones. |
 | `emparejar` | GET | Administrador, Coordinador | Ofertas vigentes aprobadas y candidatos compatibles. |
 | `mis-asignaciones` | GET | Alumno | Lista solo las prácticas vinculadas al usuario. |
+| `calificaciones` | GET | Administrador, Coordinador, Observador | Consulta y gestiona las calificaciones de prácticas. |
+| `mis-calificaciones` | GET | Alumno | Consulta las calificaciones propias. |
+| `guardar-calificacion` | POST | Administrador, Coordinador | Registra o actualiza una calificación. |
 | `asignar-alumno` | POST | Administrador, Coordinador | Crea una asignación sujeta a ciclo, disponibilidad y cupo. |
 | `cerrar-practica` | POST | Administrador, Coordinador | Cierra una asignación activa. |
 | `convenios` | GET, POST | Empresa | Registra un convenio y consulta el historial propio. |
@@ -145,7 +155,14 @@ un nombre de archivo de vista o una consulta SQL.
 | `resolver-convenio` | POST | Administrador, Coordinador | Aprueba o rechaza un convenio. |
 | `descargar-convenio` | GET | Administrador, Coordinador, Empresa | Descarga auditada; la empresa solo puede descargar el suyo. |
 | `usuarios` | GET, POST | Administrador | Lista usuarios internos y crea cuentas de personal. |
+| `api-tokens` | GET, POST | Administrador | Crea y revoca tokens de API. |
+| `pruebas-integracion` | GET, POST | Administrador | Ejecuta pruebas manuales de recepción y envío de webhooks. |
+| `webhook-inbox` | GET | Administrador | Alias de compatibilidad para consultar webhooks recibidos. |
+| `webhooks-recibidos` | GET | Administrador | Consulta los webhooks recibidos. |
+| `webhooks-enviados` | GET | Administrador | Consulta los webhooks enviados. |
+| `webhooks-empresa` | GET | Administrador | Consulta la actividad de webhooks por empresa. |
 | `estado-usuario` | POST | Administrador | Activa o desactiva una cuenta con restricciones. |
+| `eliminar-usuario` | POST | Administrador | Elimina una cuenta respetando las restricciones del sistema. |
 | `consultas` | GET | Administrador, Coordinador, Observador | Filtra ofertas y asignaciones relacionadas. |
 
 Las rutas son la autoridad del acceso del servidor. Ocultar o mostrar un enlace
@@ -158,8 +175,9 @@ en el menú no sustituye esta comprobación.
 `AuthController` presenta un formulario en GET y procesa credenciales en POST.
 `Usuario::obtenerPorEmail()` localiza el usuario; el controlador verifica el
 hash, rechaza una cuenta desactivada cuando existe la columna `activo`, regenera
-el identificador de sesión y guarda ID, correo y rol en la sesión. Las
-empresas son redirigidas a publicación de ofertas; los demás roles, a ofertas.
+el identificador de sesión y guarda ID, correo y rol en la sesión. Las empresas
+son redirigidas a publicación de ofertas, el alumnado a su expediente, los
+observadores a asignaciones y el personal administrador/coordinador al inicio.
 
 El cierre se realiza mediante POST, vacía los datos de sesión, invalida la
 cookie y destruye la sesión. El formulario lleva CSRF.
