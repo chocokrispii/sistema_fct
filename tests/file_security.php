@@ -6,6 +6,7 @@ require_once __DIR__ . '/../config/storage.php';
 require_once __DIR__ . '/../app/Core/FileScanner.php';
 require_once __DIR__ . '/../app/Core/PhpIni.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
+require_once __DIR__ . '/../app/Core/ApiToken.php';
 
 function assertFileSecurity(bool $condition, string $message): void
 {
@@ -48,6 +49,7 @@ assertFileSecurity(
 );
 assertFileSecurity(PhpIni::sizeToBytes('invalid') === 0, 'Un límite PHP inválido no se rechazó de forma segura.');
 assertFileSecurity(SpanishDataValidator::isDniNie('12345678Z'), 'Se rechazó un DNI válido.');
+assertFileSecurity(SpanishDataValidator::isDniNie('00000009D'), 'Se rechazó un DNI válido cuya letra de control es D.');
 assertFileSecurity(SpanishDataValidator::isDniNie('X-1234567-L'), 'Se rechazó un NIE válido con separadores.');
 assertFileSecurity(!SpanishDataValidator::isDniNie('12345678A'), 'Se aceptó un DNI con letra de control incorrecta.');
 assertFileSecurity(!SpanishDataValidator::isDniNie('X1234567A'), 'Se aceptó un NIE con letra de control incorrecta.');
@@ -62,6 +64,12 @@ assertFileSecurity(SpanishDataValidator::isSpanishPostcode('28013'), 'Se rechaz�
 assertFileSecurity(!SpanishDataValidator::isSpanishPostcode('53000'), 'Se aceptó un código postal fuera del rango provincial español.');
 assertFileSecurity(SpanishDataValidator::isPersonName('María O’Connor', 100), 'Se rechazó un nombre válido con acentos y apóstrofo.');
 assertFileSecurity(!SpanishDataValidator::isPersonName('María<script>', 100), 'Se aceptó contenido no permitido en el nombre.');
+$apiToken = ApiToken::issue();
+assertFileSecurity(
+    strlen($apiToken['plainText']) === 68
+        && hash_equals($apiToken['hash'], hash('sha256', $apiToken['plainText'])),
+    'El token de API no se generó o resumió con el formato esperado.'
+);
 
 $publicPath = realpath(__DIR__ . '/../public');
 $originalStorage = getenv('FCT_STORAGE_PATH');
@@ -127,7 +135,9 @@ try {
 }
 
 $originalScanner = getenv('FCT_CLAMSCAN');
+$originalClamdHost = getenv('FCT_CLAMD_HOST');
 putenv('FCT_CLAMSCAN');
+putenv('FCT_CLAMD_HOST');
 $scannerRejected = false;
 try {
     FileScanner::scan(__FILE__);
@@ -138,6 +148,11 @@ try {
         putenv('FCT_CLAMSCAN');
     } else {
         putenv('FCT_CLAMSCAN=' . $originalScanner);
+    }
+    if ($originalClamdHost === false) {
+        putenv('FCT_CLAMD_HOST');
+    } else {
+        putenv('FCT_CLAMD_HOST=' . $originalClamdHost);
     }
 }
 assertFileSecurity($scannerRejected, 'Se aceptó un archivo sin análisis antivirus configurado.');

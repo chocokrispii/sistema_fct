@@ -79,6 +79,7 @@ function recordWebhookResult(
     PDO $db,
     array $event,
     ?int $status,
+    ?string $responseBody,
     string $error,
     bool $delivered,
     bool $permanentFailure
@@ -92,6 +93,7 @@ function recordWebhookResult(
              failed_at = IF(:failed = 1, CURRENT_TIMESTAMP(), failed_at),
              next_attempt_at = IF(:retry = 1, TIMESTAMPADD(SECOND, :delay, CURRENT_TIMESTAMP()), next_attempt_at),
              http_status = :status,
+             response_body = :response_body,
              last_error = :error,
              locked_until = NULL,
              lock_token = NULL
@@ -103,6 +105,7 @@ function recordWebhookResult(
         'retry' => (!$delivered && !$permanentFailure) ? 1 : 0,
         'delay' => $retrySeconds,
         'status' => $status,
+        'response_body' => $responseBody,
         'error' => $error === '' ? null : substr($error, 0, 500),
         'event_id' => $event['event_id'],
         'token' => $event['lock_token'],
@@ -155,6 +158,7 @@ try {
         }
         $responseBytes = 0;
         $responseTooLarge = false;
+        $responseBody = '';
         curl_setopt_array($curl, [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $event['payload'],
@@ -165,12 +169,13 @@ try {
                 'X-FCT-Timestamp: ' . $timestamp,
                 'X-FCT-Signature: ' . $signature,
             ],
-            CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$responseBytes, &$responseTooLarge): int {
+            CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$responseBytes, &$responseTooLarge, &$responseBody): int {
                 $responseBytes += strlen($chunk);
                 if ($responseBytes > 16384) {
                     $responseTooLarge = true;
                     return 0;
                 }
+                $responseBody .= $chunk;
                 return strlen($chunk);
             },
             CURLOPT_CONNECTTIMEOUT => 3,
@@ -198,6 +203,7 @@ try {
             $db,
             $event,
             $networkError || $status === 0 ? null : $status,
+            $networkError ? null : $responseBody,
             $error,
             $success,
             $permanent

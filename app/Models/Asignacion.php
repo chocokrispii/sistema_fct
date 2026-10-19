@@ -148,7 +148,7 @@ class Asignacion
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function crear(int $ofertaId, int $alumnoId, int $coordinadorId, string $tutorEmpresa): void
+    public function crear(int $ofertaId, int $alumnoId, int $coordinadorId, string $tutorEmpresa): int
     {
         $this->db->beginTransaction();
         try {
@@ -160,7 +160,7 @@ class Asignacion
             $offer->execute(['id' => $ofertaId]);
             $row = $offer->fetch(PDO::FETCH_ASSOC);
             if (!$row || $row['estado'] !== 'Aprobada' || (int)$row['vigente'] !== 1) {
-                throw new RuntimeException('La oferta no existe, no está aprobada o ya no está vigente.');
+                throw new RuntimeException('La oferta no existe o no está aprobada.');
             }
 
             $capacity = $this->db->prepare(
@@ -239,6 +239,7 @@ class Asignacion
                 'alumno_id' => $alumnoId,
             ]);
             $this->db->commit();
+            return $asignacionId;
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();

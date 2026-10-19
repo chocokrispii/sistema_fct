@@ -220,7 +220,7 @@ class ConvenioController
 
     public function revisar(): void
     {
-        View::render('convenios/revisar', ['convenios' => $this->convenioModel->listar(null, 'Pendiente')]);
+        View::render('convenios/revisar', ['convenios' => $this->convenioModel->listar()]);
     }
 
     public function resolver(): void

@@ -27,8 +27,8 @@ $navItems = [['Inicio', 'index.php', 'inicio'], ['Ofertas de prácticas', 'index
 if ($rolActual === 'Empresa') {
     $navItems = array_merge($navItems, [['Publicar oferta', 'index.php?action=publicar-oferta', 'mas'], ['Sedes', 'index.php?action=sedes', 'sede'], ['Convenios', 'index.php?action=convenios', 'documento']]);
 } elseif (in_array($rolActual, ['Administrador', 'Coordinador'], true)) {
-    $navItems = array_merge($navItems, [['Revisar convenios', 'index.php?action=revisar-convenios', 'documento'], ['Revisar ofertas', 'index.php?action=revisar-ofertas', 'check'], ['Emparejar alumnos', 'index.php?action=emparejar', 'usuarios'], ['Asignaciones', 'index.php?action=asignaciones', 'calendario'], ['Consultas', 'index.php?action=consultas', 'buscar'], ['Calificaciones', 'index.php?action=calificaciones', 'estrella'], ['Recuperaciones', 'index.php?action=recuperaciones', 'refrescar']]);
-    if ($rolActual === 'Administrador') $navItems[] = ['Usuarios', 'index.php?action=usuarios', 'usuario'];
+    $navItems = array_merge($navItems, [['Empresas', 'index.php?action=empresas-centro', 'edificio'], ['Convenios', 'index.php?action=revisar-convenios', 'documento'], ['Revisar ofertas', 'index.php?action=revisar-ofertas', 'check'], ['Emparejar alumnos', 'index.php?action=emparejar', 'usuarios'], ['Asignaciones', 'index.php?action=asignaciones', 'calendario'], ['Consultas', 'index.php?action=consultas', 'buscar'], ['Calificaciones', 'index.php?action=calificaciones', 'estrella'], ['Recuperaciones', 'index.php?action=recuperaciones', 'refrescar']]);
+    if ($rolActual === 'Administrador') $navItems = array_merge($navItems, [['Usuarios', 'index.php?action=usuarios', 'usuario'], ['Tokens API', 'index.php?action=api-tokens', 'refrescar'], ['Pruebas API y webhooks', 'index.php?action=pruebas-integracion', 'refrescar'], ['Webhooks por empresa', 'index.php?action=webhooks-empresa', 'documento']]);
 } elseif ($rolActual === 'Observador') {
     $navItems = array_merge($navItems, [['Asignaciones', 'index.php?action=asignaciones', 'usuarios'], ['Consultas', 'index.php?action=consultas', 'buscar'], ['Calificaciones', 'index.php?action=calificaciones', 'estrella']]);
 } elseif ($rolActual === 'Alumno') {
@@ -47,7 +47,7 @@ $nombreUsuario = $_SESSION['nombre'] ?? $_SESSION['email'] ?? 'Usuario';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Sistema FCT</title>
-    <link rel="stylesheet" href="assets/css/style.css?v=20261014-d">
+    <link rel="stylesheet" href="assets/css/style.css?v=20261016-a">
 </head>
 
 <body data-role="<?= htmlspecialchars(strtolower($rolActual ?? 'publico'), ENT_QUOTES, 'UTF-8') ?>">
@@ -75,20 +75,20 @@ $nombreUsuario = $_SESSION['nombre'] ?? $_SESSION['email'] ?? 'Usuario';
           <div><strong><?= htmlspecialchars((string)$nombreUsuario, ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars($rolActual, ENT_QUOTES, 'UTF-8') ?></small></div>
           <svg class="fct-ico fct-ico--stroke app-user__chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </summary>
-        <div class="app-menu__panel" role="menu">
+        <div class="app-menu__panel">
           <div class="app-menu__head">
             <span class="app-user__avatar app-user__avatar--lg" aria-hidden="true"><?= $svg('usuario') ?></span>
             <div><strong><?= htmlspecialchars((string)$nombreUsuario, ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars((string)($_SESSION['email'] ?? $rolActual), ENT_QUOTES, 'UTF-8') ?></small></div>
           </div>
           <?php if ($rolActual === 'Alumno'): ?>
-          <a role="menuitem" href="index.php?action=portal-alumno"><?= $svg('expediente') ?><span>Mi expediente</span></a>
-          <a role="menuitem" href="index.php?action=perfil-alumno"><?= $svg('usuario') ?><span>Editar perfil</span></a>
+          <a href="index.php?action=portal-alumno"><?= $svg('expediente') ?><span>Mi expediente</span></a>
+          <a href="index.php?action=perfil-alumno"><?= $svg('usuario') ?><span>Editar perfil</span></a>
           <?php else: ?>
-          <a role="menuitem" href="index.php"><?= $svg('inicio') ?><span>Inicio</span></a>
+          <a href="index.php"><?= $svg('inicio') ?><span>Inicio</span></a>
           <?php endif; ?>
           <div class="app-menu__sep"></div>
-          <form method="POST" action="index.php?action=logout"><input type="hidden" name="_csrf" value="<?= $csrfToken ?>"><button type="submit" role="menuitem"><?= $svg('refrescar') ?><span>Cambiar de cuenta</span></button></form>
-          <form method="POST" action="index.php?action=logout"><input type="hidden" name="_csrf" value="<?= $csrfToken ?>"><button type="submit" role="menuitem" class="is-danger"><?= $svg('salir') ?><span>Cerrar sesión</span></button></form>
+          <form method="POST" action="index.php?action=logout"><input type="hidden" name="_csrf" value="<?= $csrfToken ?>"><button type="submit"><?= $svg('refrescar') ?><span>Cambiar de cuenta</span></button></form>
+          <form method="POST" action="index.php?action=logout"><input type="hidden" name="_csrf" value="<?= $csrfToken ?>"><button type="submit" class="is-danger"><?= $svg('salir') ?><span>Cerrar sesión</span></button></form>
         </div>
       </details>
       <?php else: ?>

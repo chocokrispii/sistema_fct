@@ -9,7 +9,7 @@
       clamav:
         condition: service_healthy
     environment:
-      FCT_DB_HOST: db
+      FCT_DB_HOST: ${FCT_DB_HOST:-db}
       FCT_DB_NAME: ${FCT_DB_NAME:-sistema_fct}
       FCT_DB_USER: ${FCT_DB_USER:-fct}
       FCT_DB_PASS: ${FCT_DB_PASS:-fct_local_dev}
@@ -22,6 +22,7 @@
     ports:
       - "${APP_PORT:-8080}:80"
     volumes:
+      - .:/var/www/html
       - fct_storage:/var/lib/fct/storage
     healthcheck:
       test:
@@ -53,6 +54,8 @@
       - ./database/migrations/005_horarios_y_calificaciones.sql:/docker-entrypoint-initdb.d/006-migration.sql:ro
       - ./database/migrations/006_alumno_codigo_postal.sql:/docker-entrypoint-initdb.d/007-migration.sql:ro
       - ./database/migrations/007_webhooks.sql:/docker-entrypoint-initdb.d/008-migration.sql:ro
+      - ./database/migrations/008_api_access_tokens.sql:/docker-entrypoint-initdb.d/009-migration.sql:ro
+      - ./database/migrations/009_webhook_responses.sql:/docker-entrypoint-initdb.d/010-migration.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -69,8 +72,8 @@
       TZ: UTC
       CLAMD_CONF_TCPAddr: 0.0.0.0
       CLAMD_CONF_TCPSocket: 3310
-    expose:
-      - "3310"
+    ports:
+      - "127.0.0.1:3310:3310"
     volumes:
       - clamav_db:/var/lib/clamav
     healthcheck:
