@@ -9,7 +9,7 @@
       clamav:
         condition: service_healthy
     environment:
-      FCT_DB_HOST: db
+      FCT_DB_HOST: ${FCT_DB_HOST:-db}
       FCT_DB_NAME: ${FCT_DB_NAME:-sistema_fct}
       FCT_DB_USER: ${FCT_DB_USER:-fct}
       FCT_DB_PASS: ${FCT_DB_PASS:-fct_local_dev}
@@ -22,6 +22,7 @@
     ports:
       - "${APP_PORT:-8080}:80"
     volumes:
+      - .:/var/www/html
       - fct_storage:/var/lib/fct/storage
     healthcheck:
       test:
@@ -62,8 +63,8 @@
       TZ: UTC
       CLAMD_CONF_TCPAddr: 0.0.0.0
       CLAMD_CONF_TCPSocket: 3310
-    expose:
-      - "3310"
+    ports:
+      - "127.0.0.1:3310:3310"
     volumes:
       - clamav_db:/var/lib/clamav
     healthcheck:

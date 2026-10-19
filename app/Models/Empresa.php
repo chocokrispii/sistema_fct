@@ -55,6 +55,17 @@ class Empresa {
         return $empresa ?: null;
     }
 
+    public function obtenerTodasParaCentro(): array
+    {
+        $stmt = $this->db->query(
+            'SELECT e.id, e.nombre_empresa, e.cif_empresa, u.email, u.activo
+             FROM empresas e
+             INNER JOIN usuarios u ON u.id = e.usuario_id AND u.rol = \'Empresa\'
+             ORDER BY e.nombre_empresa, e.id'
+        );
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function tieneConvenioParaFechas(int $empresaId, int $especialidadId, string $inicio, string $fin): bool
     {
         $stmt = $this->db->prepare(

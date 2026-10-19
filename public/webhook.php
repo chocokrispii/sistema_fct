@@ -45,8 +45,9 @@ $eventId = $_SERVER['HTTP_X_FCT_EVENT_ID'] ?? null;
 $timestamp = $_SERVER['HTTP_X_FCT_TIMESTAMP'] ?? null;
 $signature = $_SERVER['HTTP_X_FCT_SIGNATURE'] ?? null;
 try {
+    $db = getPDOConnection();
     $inserted = Webhook::receive(
-        getPDOConnection(),
+        $db,
         $body,
         is_string($eventId) ? $eventId : null,
         is_string($timestamp) ? $timestamp : null,
@@ -54,11 +55,19 @@ try {
         $secret
     );
     $decoded = json_decode($body, false, 32, JSON_THROW_ON_ERROR);
-    $respond($inserted ? 202 : 200, [
+    $responseStatus = $inserted ? 202 : 200;
+    $responseBody = [
         'received' => true,
         'duplicate' => !$inserted,
         'event_id' => $decoded->event_id,
-    ]);
+    ];
+    Webhook::recordInboundResponse(
+        $db,
+        $decoded->event_id,
+        $responseStatus,
+        json_encode($responseBody, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+    );
+    $respond($responseStatus, $responseBody);
 } catch (WebhookRequestException $exception) {
     $respond($exception->httpStatus, ['error' => $exception->getMessage()]);
 } catch (Throwable $exception) {

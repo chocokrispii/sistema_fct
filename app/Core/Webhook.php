@@ -33,6 +33,30 @@ final class Webhook
         if (!preg_match('/^[a-z][a-z0-9._-]{0,99}$/', $eventType)) {
             throw new InvalidArgumentException('El tipo de evento webhook no es válido.');
         }
+        $companyId = self::companyIdForEvent($db, $eventType, $data);
+        if ($companyId !== null) {
+            if (isset($data['empresa_id'])) {
+                $providedCompanyId = filter_var(
+                    $data['empresa_id'],
+                    FILTER_VALIDATE_INT,
+                    ['options' => ['min_range' => 1]]
+                );
+                if ($providedCompanyId === false || $providedCompanyId !== $companyId) {
+                    throw new InvalidArgumentException('El ID de empresa no coincide con el registro del evento.');
+                }
+            }
+            $data['empresa_id'] = $companyId;
+        } elseif (isset($data['empresa_id'])) {
+            $providedCompanyId = filter_var(
+                $data['empresa_id'],
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1]]
+            );
+            if ($providedCompanyId === false) {
+                throw new InvalidArgumentException('El ID de empresa del evento no es válido.');
+            }
+            $data['empresa_id'] = $providedCompanyId;
+        }
 
         $eventId = self::uuid();
         $payload = json_encode([
@@ -52,6 +76,58 @@ final class Webhook
             'event_type' => $eventType,
             'payload' => $payload,
         ]);
+    }
+
+    private static function companyIdForEvent(PDO $db, string $eventType, array $data): ?int
+    {
+        $lookups = [
+            'convenio.creado' => ['convenios', 'convenio_id'],
+            'convenio.revisado' => ['convenios', 'convenio_id'],
+            'oferta.creada' => ['empresa_especialidades_plazas', 'oferta_id'],
+            'oferta.revisada' => ['empresa_especialidades_plazas', 'oferta_id'],
+        ];
+
+        if (isset($lookups[$eventType])) {
+            [$table, $idField] = $lookups[$eventType];
+            $id = filter_var($data[$idField] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($id === false) {
+                throw new InvalidArgumentException('El evento de webhook no identifica un registro válido.');
+            }
+            $stmt = $db->prepare("SELECT empresa_id FROM $table WHERE id = :id");
+            $stmt->execute(['id' => $id]);
+            $companyId = $stmt->fetchColumn();
+            if ($companyId === false) {
+                throw new RuntimeException('No se pudo asociar el evento webhook a una empresa.');
+            }
+
+            return (int)$companyId;
+        }
+
+        if (in_array($eventType, ['practica.asignada', 'practica.cerrada'], true)) {
+            $assignmentId = filter_var(
+                $data['asignacion_id'] ?? null,
+                FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1]]
+            );
+            if ($assignmentId === false) {
+                throw new InvalidArgumentException('El evento de práctica no identifica una asignación válida.');
+            }
+            $stmt = $db->prepare(
+                'SELECT p.empresa_id
+                 FROM asignaciones_fct a
+                 INNER JOIN empresa_especialidades_plazas p ON p.id = a.oferta_id
+                 WHERE a.id = :id'
+            );
+            $stmt->execute(['id' => $assignmentId]);
+            $companyId = $stmt->fetchColumn();
+            if ($companyId === false) {
+                throw new RuntimeException('No se pudo asociar el evento de práctica a una empresa.');
+            }
+
+            return (int)$companyId;
+        }
+
+        return null;
     }
 
     public static function receive(
@@ -126,6 +202,27 @@ final class Webhook
                 return false;
             }
             throw $exception;
+        }
+    }
+
+    public static function recordInboundResponse(PDO $db, string $eventId, int $status, string $body): void
+    {
+        $stmt = $db->prepare(
+            'UPDATE webhook_inbox
+             SET response_status = :status, response_body = :body
+             WHERE event_id = :event_id'
+        );
+        $stmt->execute([
+            'status' => $status,
+            'body' => $body,
+            'event_id' => $eventId,
+        ]);
+        if ($stmt->rowCount() !== 1) {
+            $exists = $db->prepare('SELECT 1 FROM webhook_inbox WHERE event_id = :event_id');
+            $exists->execute(['event_id' => $eventId]);
+            if ($exists->fetchColumn() === false) {
+                throw new RuntimeException('No se encontró el evento entrante para guardar su respuesta.');
+            }
         }
     }
 
