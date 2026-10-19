@@ -102,6 +102,20 @@ $webhookTables = $db->query(
 assertTrue((int)$webhookTables === 2, 'Faltan tablas de entrada/salida webhook; ejecuta la migración 007.');
 
 $fixture = bin2hex(random_bytes(5));
+$testYear = (int)(new DateTimeImmutable())->format('Y') + 1;
+$availabilityStart = sprintf('%04d-03-01', $testYear);
+$availabilityEditStart = sprintf('%04d-04-01', $testYear);
+$availabilityEnd = sprintf('%04d-06-30', $testYear);
+$agreementSigned = sprintf('%04d-01-01', $testYear - 1);
+$agreementStart = sprintf('%04d-01-01', $testYear);
+$agreementEnd = sprintf('%04d-12-31', $testYear);
+$offerDateObject = new DateTimeImmutable($availabilityStart);
+while ($offerDateObject->format('N') !== '1') {
+    $offerDateObject = $offerDateObject->modify('+1 day');
+}
+$offerDate = $offerDateObject->modify('+14 days')->format('Y-m-d');
+$minorBirthDate = (new DateTimeImmutable('today'))->modify('-17 years')->format('Y-m-d');
+$underageBirthDate = (new DateTimeImmutable('today'))->modify('-15 years')->format('Y-m-d');
 $dniLetters = 'TRWAGMYFPDXBNJZSQVHLCKE';
 $firstDniNumber = 10000000 + hexdec(substr($fixture, 0, 6));
 $firstStudentDni = sprintf('%08d%s', $firstDniNumber, $dniLetters[$firstDniNumber % 23]);
@@ -517,7 +531,7 @@ try {
         'Una colisión de NSS debe explicar el motivo y dejar intacto el perfil.'
     );
     $db->prepare('UPDATE alumnos SET fecha_nacimiento = :nacimiento WHERE id = :id')
-        ->execute(['nacimiento' => '2010-01-01', 'id' => $createdStudents[1]]);
+        ->execute(['nacimiento' => $minorBirthDate, 'id' => $createdStudents[1]]);
     $legacyGuardian = $db->prepare(
         'INSERT INTO tutores_legales
             (alumno_id, nombre_completo, direccion, telefono, dni, numero_seguridad_social, correo)
@@ -546,7 +560,7 @@ try {
         'email' => $emails[2],
         'nombre' => 'Alumno',
         'apellidos' => 'Apellidos Legado',
-        'fecha_nacimiento' => '2010-01-01',
+        'fecha_nacimiento' => $minorBirthDate,
         'dni' => $secondStudentDni,
         'nss' => "NSS-$fixture-2",
         'telefono' => '612345679',
@@ -612,7 +626,7 @@ try {
         $emails[2],
         'Alumno',
         'Apellidos Legado',
-        '2010-01-01',
+        $minorBirthDate,
         $secondStudentDni,
         "NSS-$fixture-2",
         '612345679',
@@ -673,7 +687,7 @@ try {
         'telefono' => '612345671',
         'direccion' => 'Calle de prueba 1',
         'codigo_postal' => '28013',
-        'fecha_nacimiento' => '2010-01-01',
+        'fecha_nacimiento' => $minorBirthDate,
         'especialidad_id' => (string)$cycleId,
         'tutor_nombre' => 'Tutor de Prueba',
         'tutor_dni' => '12345678A',
@@ -791,7 +805,7 @@ try {
         'telefono' => '612345676',
         'direccion' => 'Calle de prueba 6',
         'codigo_postal' => '28013',
-        'fecha_nacimiento' => '2015-01-01',
+        'fecha_nacimiento' => $underageBirthDate,
         'especialidad_id' => (string)$cycleId,
         'tutor_nss' => 'NSS!',
     ];
@@ -885,7 +899,7 @@ try {
 
     $availability = $db->prepare(
         "INSERT INTO alumno_disponibilidad (alumno_id, fecha_inicio, fecha_fin, turno)
-         VALUES (:alumno, '2027-03-01', '2027-06-30', 'Indiferente')"
+         VALUES (:alumno, :inicio, :fin, 'Indiferente')"
     );
     $weeklySchedule = $db->prepare(
         "INSERT INTO alumno_disponibilidad_semanal
@@ -893,7 +907,11 @@ try {
          VALUES (:periodo, :dia_semana, :hora_inicio, :hora_fin)"
     );
     foreach ($createdStudents as $index => $studentId) {
-        $availability->execute(['alumno' => $studentId]);
+        $availability->execute([
+            'alumno' => $studentId,
+            'inicio' => $availabilityStart,
+            'fin' => $availabilityEnd,
+        ]);
         $weeklySchedule->execute([
             'periodo' => (int)$db->lastInsertId(),
             'dia_semana' => $index + 1,
@@ -926,8 +944,8 @@ try {
     );
     $_SERVER['REQUEST_METHOD'] = 'POST';
     $_POST = [
-        'fecha_inicio' => '2027-04-01',
-        'fecha_fin' => '2027-06-30',
+        'fecha_inicio' => $availabilityEditStart,
+        'fecha_fin' => $availabilityEnd,
         'turno' => 'Indiferente',
         'horarios' => [
             '1' => ['activo' => '1', 'hora_inicio' => '08:15', 'hora_fin' => '13:50'],
@@ -971,12 +989,15 @@ try {
 
     $agreement = $db->prepare(
         "INSERT INTO convenios (empresa_id, especialidad_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path, estado)
-         VALUES (:empresa, :especialidad, :numero, '2026-01-01', '2027-01-01', '2027-12-31', 'test-placeholder.pdf', 'Pendiente')"
+         VALUES (:empresa, :especialidad, :numero, :firma, :inicio, :fin, 'test-placeholder.pdf', 'Pendiente')"
     );
     $agreement->execute([
         'empresa' => $createdCompany,
         'especialidad' => $cycleId,
         'numero' => "AG-$fixture",
+        'firma' => $agreementSigned,
+        'inicio' => $agreementStart,
+        'fin' => $agreementEnd,
     ]);
     $agreementId = (int)$db->lastInsertId();
     assertTrue(
@@ -985,7 +1006,12 @@ try {
     );
     $companyModel = new Empresa($db);
     assertTrue(
-        $companyModel->tieneConvenioParaFechas($createdCompany, $cycleId, '2027-03-15', '2027-06-15'),
+        $companyModel->tieneConvenioParaFechas(
+            $createdCompany,
+            $cycleId,
+            $offerDate,
+            (new DateTimeImmutable($offerDate))->modify('+3 months')->format('Y-m-d')
+        ),
         'Un convenio aprobado del mismo ciclo y periodo debe cubrir la oferta.'
     );
     $duplicateAgreementRejected = false;
@@ -993,12 +1019,15 @@ try {
         $duplicate = $db->prepare(
             "INSERT INTO convenios
                 (empresa_id, especialidad_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path)
-             VALUES (:empresa, :especialidad, :numero, '2026-01-01', '2027-01-01', '2027-12-31', 'duplicate-placeholder.pdf')"
+             VALUES (:empresa, :especialidad, :numero, :firma, :inicio, :fin, 'duplicate-placeholder.pdf')"
         );
         $duplicate->execute([
             'empresa' => $createdCompany,
             'especialidad' => $cycleId,
             'numero' => "AG-DUP-$fixture",
+            'firma' => $agreementSigned,
+            'inicio' => $agreementStart,
+            'fin' => $agreementEnd,
         ]);
     } catch (PDOException $e) {
         $duplicateAgreementRejected = $e->getCode() === '23000';
@@ -1012,7 +1041,12 @@ try {
     )->fetchColumn();
     if ($otherCycleId > 0) {
         assertTrue(
-            !$companyModel->tieneConvenioParaFechas($createdCompany, $otherCycleId, '2027-03-15', '2027-06-15'),
+            !$companyModel->tieneConvenioParaFechas(
+                $createdCompany,
+                $otherCycleId,
+                $offerDate,
+                (new DateTimeImmutable($offerDate))->modify('+3 months')->format('Y-m-d')
+            ),
             'Un convenio de otro ciclo no debe cubrir la oferta.'
         );
     }
@@ -1029,9 +1063,14 @@ try {
     $offer = $db->prepare(
         "INSERT INTO empresa_especialidades_plazas
             (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno, estado)
-         VALUES (:empresa, :ciclo, 1, '2027-03-15', '2027-03-15', 'M', 'Pendiente')"
+         VALUES (:empresa, :ciclo, 1, :inicio, :fin, 'M', 'Pendiente')"
     );
-    $offer->execute(['empresa' => $createdCompany, 'ciclo' => $cycleId]);
+    $offer->execute([
+        'empresa' => $createdCompany,
+        'ciclo' => $cycleId,
+        'inicio' => $offerDate,
+        'fin' => $offerDate,
+    ]);
     $createdOffer = (int)$db->lastInsertId();
 
     $matching = new Oferta($db);
@@ -1133,8 +1172,8 @@ try {
     );
     $availabilityModel->reemplazar(
         $createdUsers[2],
-        '2027-03-01',
-        '2027-06-30',
+        $availabilityStart,
+        $availabilityEnd,
         'M',
         [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
     );
@@ -1153,10 +1192,15 @@ try {
     $paginationOffer = $db->prepare(
         "INSERT INTO empresa_especialidades_plazas
             (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno, estado)
-         VALUES (:empresa, :ciclo, 1, '2027-03-15', '2027-03-15', 'M', 'Aprobada')"
+         VALUES (:empresa, :ciclo, 1, :inicio, :fin, 'M', 'Aprobada')"
     );
     for ($index = 0; $index < 51; $index++) {
-        $paginationOffer->execute(['empresa' => $createdCompany, 'ciclo' => $cycleId]);
+        $paginationOffer->execute([
+            'empresa' => $createdCompany,
+            'ciclo' => $cycleId,
+            'inicio' => $offerDate,
+            'fin' => $offerDate,
+        ]);
         $createdPaginationOffers[] = (int)$db->lastInsertId();
     }
     $listedOfferIds = array_map(
@@ -1185,8 +1229,8 @@ try {
     $_GET = [
         'especialidad_id' => (string)$cycleId,
         'estado' => 'Aprobada',
-        'desde' => '2027-03-15',
-        'hasta' => '2027-03-15',
+        'desde' => $offerDate,
+        'hasta' => $offerDate,
         'pagina' => '1',
     ];
     ob_start();
@@ -1205,7 +1249,7 @@ try {
     assertTrue(
         str_contains($consultationPageTwo, 'Mostrando 51-')
             && str_contains($consultationPageTwo, 'Página 2 de')
-            && str_contains($consultationPageTwo, 'name="desde" value="2027-03-15"'),
+            && str_contains($consultationPageTwo, 'name="desde" value="' . $offerDate . '"'),
         'La segunda página debe mostrar resultados restantes y mantener filtros seleccionados.'
     );
     $_GET['pagina'] = '0';
@@ -1220,8 +1264,8 @@ try {
     $_GET = [];
     $availabilityModel->reemplazar(
         $createdUsers[1],
-        '2027-04-01',
-        '2027-06-30',
+        $availabilityEditStart,
+        $availabilityEnd,
         'T',
         [['dia_semana' => 2, 'hora_inicio' => '15:00:00', 'hora_fin' => '19:00:00']]
     );
@@ -1229,7 +1273,7 @@ try {
     $updatedWeekly = $availabilityModel->obtenerHorarioSemanalPorUsuario($createdUsers[1]);
     assertTrue(
         count($updatedAvailability) === 1
-            && $updatedAvailability[0]['fecha_inicio'] === '2027-04-01'
+            && $updatedAvailability[0]['fecha_inicio'] === $availabilityEditStart
             && $updatedAvailability[0]['turno'] === 'T'
             && count($updatedWeekly) === 1
             && (int)$updatedWeekly[0]['dia_semana'] === 2,
