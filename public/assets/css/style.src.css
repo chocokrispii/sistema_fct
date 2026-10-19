@@ -4,12 +4,12 @@
 :root{
   --navy:#0f1d3a; --navy-2:#13254a; --navy-line:rgba(255,255,255,.1);
   --blue:#1f6feb; --blue-2:#2b63d9; --blue-soft:#eaf2ff;
-  --ink:#0f1e3b; --text:#2c3a55; --muted:#6b7a93;
+  --ink:#0f1e3b; --text:#2c3a55; --muted:#5f6f86;
   --page:#f4f8fd; --surface:#fff; --line:#e5ecf6;
   --green:#0f9d73; --green-soft:#e6f7f0;
   --purple:#7c5cf0; --purple-soft:#f0ebff;
   --orange:#f08a24; --orange-soft:#fff1e3;
-  --red:#d64545; --amber:#b7791f;
+  --red:#c43b3b; --amber:#b7791f;
   --radius:12px; --shadow:0 2px 10px rgba(22,44,84,.05);
   --sidebar:240px; --topbar:58px;
   --font:Inter,"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -55,7 +55,7 @@ hr{border:0;border-top:1px solid var(--line);margin:1.5rem 0}
 .app-user__chev{width:16px;height:16px;color:#aebdd6}
 .app-main main{flex:1;width:100%;max-width:1500px;margin:0 auto;padding:22px 24px 28px}
 .app-main footer{padding:8px 16px 14px;text-align:center}
-.app-main footer p{margin:0;color:#97a5bd;font-size:.75rem}
+.app-main footer p{margin:0;color:#5f6f86;font-size:.75rem}
 
 /* ---------- Cabeceras de página ---------- */
 .student-portal__intro,.availability-page__intro,.assignments-page__intro,.matching-page__intro,.student-registration__intro,.company-registration__intro{margin-bottom:18px}
@@ -256,10 +256,10 @@ tbody tr:hover td{background:#fafcff}
 .fct-goal__icon{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:50%;background:#bfe9d6;color:#0f8f68}
 .fct-goal__icon .fct-ico{width:22px;height:22px}
 .fct-goal__body{position:relative;z-index:1}
-.fct-goal h3{margin:0 0 4px;color:#0f8f68;font-size:.9rem}
+.fct-goal h3{margin:0 0 4px;color:#0b7a58;font-size:.9rem}
 .fct-goal p{max-width:230px;margin:0 0 12px;color:#3d5a4f;font-size:.82rem}
-.fct-goal__btn{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:#0f8f68;color:#fff;font-size:.76rem;font-weight:600}
-.fct-goal__btn:hover{background:#0b7a58;color:#fff}
+.fct-goal__btn{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:#0b7a58;color:#fff;font-size:.76rem;font-weight:600}
+.fct-goal__btn:hover{background:#096847;color:#fff}
 .fct-goal__btn .fct-ico{width:14px;height:14px}
 .fct-goal__art{position:absolute;right:0;bottom:0;width:96px;height:64px;opacity:.9}
 .fct-goal__art .m1{fill:#8fd6b7}.fct-goal__art .m2{fill:#6cc7a2}.fct-goal__art .flag{fill:none;stroke:#0f8f68;stroke-width:2.5;stroke-linejoin:round}
