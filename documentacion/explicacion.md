@@ -444,23 +444,41 @@ se selecciona previamente: el fichero no crea por sí solo la base de datos.
 
 ### 9.2 Migraciones
 
-- [001_renombrar_nombre_especialidad.sql](database/migrations/001_renombrar_nombre_especialidad.sql):
+- [001_renombrar_nombre_especialidad.sql](../database/migrations/001_renombrar_nombre_especialidad.sql):
   cambia `nombre_specialidad` a `nombre_especialidad` y vuelve a crear el índice
   único. Usa `CHANGE`, compatible con MariaDB 10.4. Se aplica solo si la columna
   todavía tiene el nombre antiguo. No tiene control de idempotencia.
-- [002_fct_workflows.sql](database/migrations/002_fct_workflows.sql): añade
+- [002_fct_workflows.sql](../database/migrations/002_fct_workflows.sql): añade
   `usuarios.activo`, `empresas.persona_contacto`, fecha de nacimiento,
   información del tutor y estado/turno/datos de revisión de oferta. Crea
   `empresa_sedes`, `convenios`, `alumno_disponibilidad`, `asignaciones_fct` y
-  `auditoria`, con índices, ENUM y relaciones. Debe ejecutarse una sola vez tras
-  confirmar el esquema base y la columna corregida.
+  `auditoria`, con índices, ENUM y relaciones.
+- [003_login_y_recuperacion.sql](../database/migrations/003_login_y_recuperacion.sql):
+  crea las tablas de intentos de inicio de sesión y recuperación de cuentas.
+- [004_convenios_por_especialidad.sql](../database/migrations/004_convenios_por_especialidad.sql):
+  vincula convenios a ciclos formativos y añade la restricción única por empresa
+  y ciclo.
+- [005_horarios_y_calificaciones.sql](../database/migrations/005_horarios_y_calificaciones.sql):
+  crea las tablas de disponibilidad semanal y calificaciones finales.
+- [006_alumno_codigo_postal.sql](../database/migrations/006_alumno_codigo_postal.sql):
+  añade el código postal opcional para permitir completar perfiles existentes.
+- [007_webhooks.sql](../database/migrations/007_webhooks.sql): crea las bandejas
+  de eventos recibidos y pendientes de envío.
+- [008_api_access_tokens.sql](../database/migrations/008_api_access_tokens.sql):
+  crea el almacenamiento de tokens de acceso de la API; solo conserva sus
+  hashes.
+- [009_webhook_responses.sql](../database/migrations/009_webhook_responses.sql):
+  añade las columnas para conservar respuestas HTTP de recepción y envío.
 
 Ninguna migración elige la base de datos mediante `USE`; quien las ejecuta debe
 seleccionar explícitamente la base correcta en phpMyAdmin o en el cliente SQL.
+La migración `001` debe omitirse cuando la columna ya tenga el nombre corregido.
+Las migraciones `002`–`009` admiten volver a ejecutarse tras completarse
+correctamente, pero no reparan objetos preexistentes con definiciones distintas.
 
 ### 9.3 Seeds
 
-[001_sample_data.sql](database/seeds/001_sample_data.sql) inserta ciclos,
+[001_sample_data.sql](../database/seeds/001_sample_data.sql) inserta ciclos,
 cuentas, perfil de coordinador y empresa, una oferta, dos alumnos y tutor y
 direcciones. Sus cuentas de ejemplo usan hashes compatibles con la contraseña
 `password123`. Este archivo presupone que las tablas existen y que la columna de
@@ -531,13 +549,11 @@ La prueba debe ejecutarse contra una base desechable que ya tenga el esquema y
 las migraciones. El script verifica el prefijo, pero no crea ni elimina por sí
 mismo la base completa. No apuntar el entorno a la base de trabajo normal.
 
-En esta sesión se volvió a importar el dump en bases temporales independientes,
-se aplicaron las dos migraciones, se ejecutó la prueba de integración, se
-comprobó sintaxis PHP, y se hicieron pruebas HTTP de páginas públicas,
-autenticación y operaciones de registro/sede/disponibilidad con roles distintos.
-Las bases temporales fueron eliminadas. Estas comprobaciones no equivalen a
-pruebas de carga, auditoría de seguridad externa ni validación de despliegue
-productivo.
+Las pruebas registradas en el [informe histórico](../docs/informe_jornada_2026-10-07.md)
+corresponden a la revisión de aquella fecha; no son una garantía de que las
+pruebas se hayan ejecutado con cada cambio posterior. Ninguna prueba local
+sustituye las pruebas de carga, una auditoría de seguridad externa ni la
+validación del despliegue productivo.
 
 ## 12. Puesta en marcha resumida
 
@@ -547,68 +563,63 @@ productivo.
    `public/`, no la raíz del repositorio.
 3. Crear la base vacía `sistema_fct` desde phpMyAdmin.
 4. Importar `database/sistema_fct.sql`.
-5. Aplicar `001_renombrar_nombre_especialidad.sql` porque el dump conserva el
-   nombre antiguo de la columna.
-6. Aplicar una sola vez `002_fct_workflows.sql`.
-7. No cargar también el seed con los mismos registros.
-8. Ajustar `FCT_DB_HOST`, `FCT_DB_USER`, `FCT_DB_PASS` y `FCT_DB_NAME` si los
+5. Aplicar las migraciones `001`–`009` en orden; omitir la `001` solo si la
+   columna ya se llama `nombre_especialidad`.
+6. No cargar también el seed con los mismos registros.
+7. Ajustar `FCT_DB_HOST`, `FCT_DB_USER`, `FCT_DB_PASS` y `FCT_DB_NAME` si los
    valores XAMPP predeterminados no aplican. En un entorno real no usar root sin
    contraseña.
-9. Abrir la aplicación por Apache. En desarrollo se puede usar el servidor
-   integrado de PHP con `-t public`, pero no es servidor de producción.
+8. Abrir la aplicación por Apache. Para pruebas locales, el servidor integrado
+   de PHP debe arrancarse con `-t public public\dev-router.php` para aplicar las
+   mismas restricciones de archivos ocultos; no es un servidor de producción.
 
-La secuencia exacta de importación debe ejecutarse sobre una base vacía. Las
-migraciones no están diseñadas para repetirse. Para una base existente, primero
-hay que averiguar su versión de esquema y aplicar solo las migraciones
-pendientes.
+La secuencia inicial debe ejecutarse sobre una base vacía. Para una base
+existente, comprueba primero su esquema y aplica las migraciones pendientes; la
+`001` requiere atención especial porque no se puede volver a ejecutar después
+de que la columna haya cambiado de nombre.
 
 ## 13. Límites, decisiones pendientes y diferencias documentales
 
-1. **README con notas de una etapa anterior.** Su sección “Atención al volcado
-   inicial” dice que el dump no se ha tocado y que aún contiene la fila de
-   dirección que apunta a alumno 3. En el estado actual esa fila ya no está y
-   los hashes de las cuentas del dump sí se actualizaron. El texto del README
-   quedó desfasado; se deja señalado para que no se confunda con el SQL actual.
-2. **Informe histórico.** Las secciones 1–10 del informe describen una etapa
+1. **Informe histórico.** Las secciones 1–10 del informe describen una etapa
    previa: enumeran módulos como pendientes y anotan el estado de Git y pruebas
    de aquel momento. La sección 11 intenta actualizar algunos puntos, pero
    conserva la afirmación antigua de que el dump no se modificó y que la fila
    inválida sigue ahí. Debe leerse como registro histórico, no como inventario
    infalible del árbol actual.
-3. **Configuración Apache.** El repositorio no incluye un VirtualHost listo para
+2. **Configuración Apache.** El repositorio no incluye un VirtualHost listo para
    cada entorno. Sus `.htaccess` bloquean el árbol privado y habilitan `public/`;
    el despliegue debe servir solo `public/`, permitir las directivas necesarias
    y verificar la configuración efectiva del servidor.
-4. **JavaScript, imágenes y expedientes.** El JavaScript solo sirve a maquetas
+3. **JavaScript, imágenes y expedientes.** El JavaScript solo sirve a maquetas
    heredadas, limpia claves antiguas de `localStorage` y no participa en las
    rutas MVC. Hay directorios reservados y no existe un flujo de carga de
    expedientes ni interfaz de imágenes.
-5. **Sedes.** El código puede listarlas y añadirlas, pero no incluye editar,
+4. **Sedes.** El código puede listarlas y añadirlas, pero no incluye editar,
    eliminar ni desactivar sedes desde la interfaz.
-6. **Disponibilidad.** La interfaz conserva una única ventana continua porque
+5. **Disponibilidad.** La interfaz conserva una única ventana continua porque
    reemplaza todo el historial al guardar; confirmar si el negocio necesita
    permitir varios intervalos.
-7. **Cierre y reutilización de alumnos.** La asignación cerrada consume plaza en
+6. **Cierre y reutilización de alumnos.** La asignación cerrada consume plaza en
    su oferta pero no excluye al alumno de ofertas posteriores. Confirmar si se
    permite cursar más de una práctica.
-8. **Cobertura de convenios.** El formulario permite indicar fechas futuras;
+7. **Cobertura de convenios.** El formulario permite indicar fechas futuras;
    el servidor valida al enviarlo que un convenio aprobado cubra el periodo
    completo. No se confía en una comprobación de vigencia del lado del cliente.
-9. **Consultas.** Los filtros de fecha se aplican a fechas de inicio/fin como
+8. **Consultas.** Los filtros de fecha se aplican a fechas de inicio/fin como
    cotas de contenido, no mediante solapamiento de periodos. El listado puede
    repetir una oferta si hay más de una asignación.
-10. **Errores.** `storage/logs/` es un directorio placeholder; el proyecto usa
+9. **Errores.** `storage/logs/` es un directorio placeholder; el proyecto usa
     `error_log()` pero no configura explícitamente que PHP escriba ahí. El
     destino depende de la configuración de PHP/XAMPP.
-11. **Servicios de revisión y permisos.** Administrador y Coordinador revisan
+10. **Servicios de revisión y permisos.** Administrador y Coordinador revisan
     convenios/ofertas y pueden descargar cualquier convenio. Empresa solo
     descarga documentos de su propio perfil; Observador y Alumno no acceden a
     convenios. Las descargas permitidas y denegadas quedan auditadas.
-12. **Despliegue productivo.** Aún no se documentan HTTPS obligatorio,
+11. **Despliegue productivo.** Aún no se documentan HTTPS obligatorio,
     credenciales de base dedicadas, backups, rotación de logs, límites de
     `php.ini` para carga, recuperación de contraseña ni política formal de
     privacidad.
-13. **Control de versiones.** El estado consultado de la rama tiene cambios sin
+12. **Control de versiones.** El estado consultado de la rama tiene cambios sin
     commit; esta guía se añade como documento nuevo y no crea un commit ni
     publica cambios.
 
@@ -618,9 +629,8 @@ confirmarse antes de alterar el modelo.
 
 ## 14. Inventario de documentación y archivos auxiliares
 
-- [README.md](README.md): instalación, migraciones, uso de cuentas de ejemplo y
-  ejecución de pruebas; contiene algunas notas históricas desactualizadas,
-  enumeradas arriba.
+- [README.md](../README.md): instalación, migraciones, uso de cuentas de ejemplo y
+  ejecución de pruebas.
 - [docs/informe_jornada_2026-10-07.md](docs/informe_jornada_2026-10-07.md):
   cronología y decisiones históricas, incluida una lista antigua de pendientes
   y una sección de ampliación posterior.
