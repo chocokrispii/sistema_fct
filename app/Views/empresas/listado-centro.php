@@ -3,6 +3,7 @@
 <?php if ($empresas === []): ?>
     <p>No hay empresas registradas.</p>
 <?php else: ?>
+    <div class="table-responsive" role="region" aria-label="Empresas registradas" tabindex="0">
     <table>
         <thead>
             <tr><th>Empresa</th><th>CIF</th><th>Correo de la cuenta</th><th>Estado</th></tr>
@@ -18,4 +19,5 @@
             <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
 <?php endif; ?>

@@ -268,21 +268,14 @@ base. Las credenciales de cada entorno pueden ser distintas si ambas cuentas
 tienen permisos sobre esa base. Por defecto, Docker utiliza su propia base
 independiente.
 
-   ```powershell
-   $env:FCT_DB_NAME = "sistema_fct"
-   & "C:\xampp\php\php.exe" scripts\migrate.php
-   & "C:\xampp\php\php.exe" scripts\migrate.php --status
-   ```
-
-   El gestor aplica en orden todas las migraciones pendientes, registra el
-   nombre y el SHA-256 normalizado de cada archivo en `schema_migrations` y
-   omite las ya aplicadas. Si una instalación existente ya tiene el nombre
-   actual de la columna de especialidades pero no tiene registro, reconoce la
-   migración 001 como adoptada y completa su índice único si falta; las
-   migraciones restantes están preparadas para completar esquemas parciales.
-   Haz una copia de seguridad antes de ejecutarlo sobre una base con datos
-   existentes. Si una migración falla, el proceso se detiene sin registrarla
-   como aplicada; corrige el problema y vuelve a ejecutar el mismo comando.
+El gestor aplica en orden todas las migraciones pendientes, registra el nombre
+y el SHA-256 normalizado de cada archivo en `schema_migrations` y omite las ya
+aplicadas. Si una instalación existente ya tiene el nombre actual de la columna
+de especialidades pero no tiene registro, reconoce la migración 001 como
+adoptada y completa su índice único si falta. Haz una copia de seguridad antes
+de ejecutarlo sobre una base con datos existentes. Si una migración falla, el
+proceso se detiene sin registrarla como aplicada; corrige el problema y vuelve
+a ejecutar el mismo comando.
 
 El volcado y el gestor no seleccionan la base por sí mismos: configura
 `FCT_DB_NAME` y comprueba la salida antes de aplicar cambios. El dump actual
@@ -462,8 +455,9 @@ historial y conserva el registro de auditoría.
   borrado permanente con confirmación. Se impide borrar la propia cuenta, las
   cuentas con historial operativo y las referencias que la base de datos deba
   conservar; cada borrado se registra en auditoría.
-- **Consultas:** filtros por ciclo, estado y fechas, con un máximo de 500 filas.
-  El rol Observador dispone de acceso de lectura a las consultas y asignaciones.
+- **Consultas:** filtros por ciclo, estado y fechas, con paginación de 50
+  resultados por página. El rol Observador dispone de acceso de lectura a las
+  consultas y asignaciones.
 - **Auditoría:** registro de operaciones de revisión, asignación,
   administración y descargas de convenios permitidas o denegadas.
 
@@ -511,8 +505,11 @@ base con datos que quieras conservar.**
 
 Una forma sencilla de prepararla es crear `fct_test_local` en phpMyAdmin,
 importar en ella el dump base y ejecutar el gestor de migraciones. Al importar
-el dump, selecciona explícitamente `fct_test_local`. Después, desde PowerShell,
-ejecuta:
+el dump, selecciona explícitamente `fct_test_local`.
+
+El gestor aplica las migraciones pendientes; la suite necesita el esquema
+actualizado, incluida la columna de código postal, las bandejas de webhooks y
+las columnas de respuesta HTTP. Después, desde PowerShell, ejecuta:
 
 ```powershell
 $env:FCT_TEST_DB_NAME = "fct_test_local"

@@ -5,6 +5,8 @@ require_once __DIR__ . '/../Models/Oferta.php';
 require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
+require_once __DIR__ . '/../Models/Asignacion.php';
+require_once __DIR__ . '/../Models/Disponibilidad.php';
 require_once __DIR__ . '/../Core/Webhook.php';
 
 class OfertaController {
@@ -21,11 +23,55 @@ class OfertaController {
     }
 
     public function listar(): void {
-        $pagina = Paginacion::desdeEntrada($_GET['pagina'] ?? null);
-        $resultado = $this->ofertaModel->obtenerPaginaTodas(true, $pagina);
+        if (($_SESSION['rol'] ?? null) === 'Alumno') {
+            $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+            $hoy = date('Y-m-d');
+            $asignacionesActivas = (new Asignacion($this->db))->listarActivasPorUsuario($usuarioId) !== [];
+            $tieneDisponibilidad = (new Disponibilidad($this->db))
+                ->obtenerVigentesPorUsuario($usuarioId, $hoy) !== [];
+            $ofertas = [];
+            if (!$asignacionesActivas && $tieneDisponibilidad) {
+                $ofertasConPlazas = array_values(array_filter(
+                    array_map(static function (array $oferta): array {
+                        $oferta['plazas_disponibles'] = max(
+                            0,
+                            (int)$oferta['plazas_cuantas'] - (int)$oferta['asignadas']
+                        );
+                        return $oferta;
+                    }, $this->ofertaModel->obtenerVigentesConAsignaciones()),
+                    static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
+                ));
+                $idsCompatibles = array_fill_keys(
+                    $this->ofertaModel->obtenerIdsOfertasVigentesCompatibles(
+                        $usuarioId,
+                        array_map(static fn(array $oferta): int => (int)$oferta['id'], $ofertasConPlazas)
+                    ),
+                    true
+                );
+                $ofertas = array_values(array_filter(
+                    $ofertasConPlazas,
+                    static fn(array $oferta): bool => isset($idsCompatibles[(int)$oferta['id']])
+                ));
+            }
+            View::render('ofertas/listado', [
+                'ofertas' => $ofertas,
+                'soloCompatibles' => true,
+                'tieneAsignacionActiva' => $asignacionesActivas,
+                'tieneDisponibilidad' => $tieneDisponibilidad,
+            ]);
+            return;
+        }
+
+        $resultado = $this->ofertaModel->obtenerPaginaTodas(
+            true,
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
         View::render('ofertas/listado', [
             'ofertas' => $resultado['items'],
             'paginacion' => $resultado,
+            'soloCompatibles' => false,
+            'tieneAsignacionActiva' => false,
+            'tieneDisponibilidad' => false,
         ]);
     }
 

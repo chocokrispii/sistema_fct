@@ -9,6 +9,7 @@
 <?php if ($recuperaciones === []): ?>
     <p>No hay solicitudes.</p>
 <?php else: ?>
+<div class="table-responsive" role="region" aria-label="Recuperaciones pendientes" tabindex="0">
 <table>
     <thead><tr><th>Correo</th><th>Solicitada</th><th></th></tr></thead>
     <tbody>
@@ -27,4 +28,5 @@
         <?php endforeach; ?>
     </tbody>
 </table>
+</div>
 <?php endif; ?>

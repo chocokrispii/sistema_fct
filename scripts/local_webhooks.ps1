@@ -102,11 +102,11 @@ if (-not $loadedVariables.ContainsKey('FCT_DB_NAME')) {
 Push-Location $projectRoot
 try {
     if ($Mode -eq 'Server') {
-        & $php -S 127.0.0.1:8001 -t public
+        & $php -S 127.0.0.1:8001 -t public public\dev-router.php
     } elseif ($Mode -eq 'App') {
-        & $php -S 127.0.0.1:8002 -t public
+        & $php -S 127.0.0.1:8002 -t public public\dev-router.php
     } elseif ($Mode -eq 'Interface') {
-        & $php -S 127.0.0.1:8003 -t public
+        & $php -S 127.0.0.1:8003 -t public public\dev-router.php
     } elseif ($Mode -eq 'Dispatch') {
         $env:FCT_WEBHOOK_DISPATCH_ALLOW = '1'
         & $php scripts\dispatch_webhooks.php

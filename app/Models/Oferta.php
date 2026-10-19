@@ -61,14 +61,14 @@ class Oferta {
     public function obtenerTodas(bool $soloVigentes = false): array {
         $sql = self::SELECT_BASE
             . ($soloVigentes ? " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '')
-            . ' ORDER BY p.fecha_inicio';
+            . ' ORDER BY p.fecha_inicio, p.id';
         return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function obtenerVigentesConAsignaciones(): array
     {
         $stmt = $this->db->query(
-            "SELECT p.id, p.plazas_cuantas, p.fecha_inicio, p.fecha_fin, p.turno,
+            "SELECT p.id, p.empresa_id, p.especialidad_id, p.plazas_cuantas, p.fecha_inicio, p.fecha_fin, p.turno,
                     e.nombre_empresa, es.nombre_especialidad,
                     COALESCE(conteo.asignadas, 0) AS asignadas
              FROM empresa_especialidades_plazas p
@@ -81,7 +81,7 @@ class Oferta {
                  GROUP BY oferta_id
              ) conteo ON conteo.oferta_id = p.id
              WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
-             ORDER BY p.fecha_inicio"
+             ORDER BY p.fecha_inicio, p.id"
         );
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -169,24 +169,67 @@ class Oferta {
         return $candidatos;
     }
 
-    public function obtenerCandidatosVigentes(): array
+    public function obtenerCandidatosVigentes(?int $usuarioId = null): array
     {
         [$sql, $params] = $this->construirConsultaCandidatos(
             'p.fecha_fin >= CURDATE()',
             [],
-            true
+            true,
+            $usuarioId
         );
         $sql .= ' ORDER BY oferta_id, apellidos, nombre';
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        $candidatesByOffer = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $candidate) {
-            $offerId = (int)$candidate['oferta_id'];
-            unset($candidate['oferta_id']);
-            $candidatesByOffer[$offerId][] = $candidate;
+        $candidatosPorOferta = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $candidato) {
+            $ofertaId = (int)$candidato['oferta_id'];
+            unset($candidato['oferta_id']);
+            $candidatosPorOferta[$ofertaId][] = $candidato;
         }
 
-        return $candidatesByOffer;
+        return $candidatosPorOferta;
+    }
+
+    public function obtenerIdsOfertasVigentesCompatibles(int $usuarioId, ?array $ofertaIds = null): array
+    {
+        if ($ofertaIds === null) {
+            $ofertaIds = [];
+            foreach ($this->obtenerVigentesConAsignaciones() as $oferta) {
+                if ((int)$oferta['asignadas'] < (int)$oferta['plazas_cuantas']) {
+                    $ofertaIds[] = (int)$oferta['id'];
+                }
+            }
+        }
+        if ($ofertaIds === []) {
+            return [];
+        }
+
+        foreach ($ofertaIds as $ofertaId) {
+            if (!is_int($ofertaId) || $ofertaId < 1) {
+                throw new InvalidArgumentException('El identificador de oferta no es válido.');
+            }
+        }
+        $ofertaIds = array_values(array_unique($ofertaIds));
+        $placeholders = [];
+        $params = [];
+        foreach ($ofertaIds as $indice => $ofertaId) {
+            $placeholder = 'oferta_' . $indice;
+            $placeholders[] = ':' . $placeholder;
+            $params[$placeholder] = $ofertaId;
+        }
+        [$sql, $params] = $this->construirConsultaCandidatos(
+            'p.id IN (' . implode(', ', $placeholders) . ') AND p.fecha_fin >= CURDATE()',
+            $params,
+            true,
+            $usuarioId,
+            true
+        );
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return array_map(
+            static fn(array $fila): int => (int)$fila['oferta_id'],
+            $stmt->fetchAll(PDO::FETCH_ASSOC)
+        );
     }
 
     public function obtenerCandidatosPaginados(
@@ -313,7 +356,9 @@ class Oferta {
     private function construirConsultaCandidatos(
         string $filtro,
         array $params,
-        bool $soloOfertasConCapacidad = false
+        bool $soloOfertasConCapacidad = false,
+        ?int $usuarioId = null,
+        bool $soloIds = false
     ): array
     {
         $capacityJoin = $soloOfertasConCapacidad
@@ -327,7 +372,18 @@ class Oferta {
         $capacityCondition = $soloOfertasConCapacidad
             ? ' AND COALESCE(capacidad.asignadas, 0) < p.plazas_cuantas'
             : '';
-        $sql = "SELECT p.id AS oferta_id, a.id AS alumno_id, a.nombre, a.apellidos, a.correo, d.turno
+        $condicionUsuario = '';
+        if ($usuarioId !== null) {
+            $condicionUsuario = ' AND a.usuario_id = :usuario_id';
+            $params['usuario_id'] = $usuarioId;
+        }
+        $columnas = $soloIds
+            ? 'p.id AS oferta_id'
+            : 'p.id AS oferta_id, a.id AS alumno_id, a.nombre, a.apellidos, a.correo, d.turno';
+        $agrupacion = $soloIds
+            ? 'p.id'
+            : 'p.id, a.id, a.nombre, a.apellidos, a.correo, d.turno';
+        $sql = "SELECT {$columnas}
                 FROM empresa_especialidades_plazas p
                 INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
                 INNER JOIN alumno_disponibilidad d
@@ -354,12 +410,16 @@ class Oferta {
                 {$capacityJoin}
                 WHERE {$filtro}
                     AND p.estado = 'Aprobada'
+                    {$condicionUsuario}
                     AND NOT EXISTS (
                         SELECT 1 FROM asignaciones_fct af
                         WHERE af.alumno_id = a.id AND af.estado = 'Asignada'
                     )
                     {$capacityCondition}
-                GROUP BY p.id, a.id, a.nombre, a.apellidos, a.correo, d.turno";
+                GROUP BY {$agrupacion}";
+        if ($soloIds) {
+            $sql .= ' ORDER BY p.id';
+        }
         return [$sql, $params];
     }
 

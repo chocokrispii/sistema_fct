@@ -30,6 +30,7 @@
     <p role="status">No se encontraron resultados.</p>
 <?php endif; ?>
 <?php if ($rows !== []): ?>
+    <div class="table-responsive" role="region" aria-label="Resultados de consultas" tabindex="0">
     <table>
         <caption>Resultados de consultas y seguimiento</caption>
         <thead><tr><th scope="col">Empresa</th><th scope="col">Ciclo</th><th scope="col">Periodo</th><th scope="col">Oferta</th><th scope="col">Alumno asignado</th><th scope="col">Prácticas</th></tr></thead>
@@ -44,6 +45,7 @@
             </tr>
         <?php endforeach; ?></tbody>
     </table>
+    </div>
 <?php endif; ?>
 <?php if ($totalPaginas > 1): ?>
     <?php

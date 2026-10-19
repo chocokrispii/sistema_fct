@@ -11,7 +11,7 @@
         <fieldset class="availability-schedule">
             <legend>Disponibilidad semanal</legend>
             <p>Selecciona los días y el horario en el que puedes realizar las prácticas cada semana.</p>
-            <div class="availability-schedule__table-wrap">
+            <div class="availability-schedule__table-wrap" role="region" aria-label="Horario semanal de disponibilidad" tabindex="0">
                 <table class="availability-schedule__table">
                     <thead><tr><th>Día</th><th>Disponible</th><th>Desde</th><th>Hasta</th></tr></thead>
                     <tbody><?php foreach ($diasSemana as $dia => $nombreDia): ?>

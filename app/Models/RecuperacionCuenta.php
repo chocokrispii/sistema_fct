@@ -21,26 +21,45 @@ class RecuperacionCuenta
     public function solicitar(string $email, DateTimeImmutable $ahora): void
     {
         $this->limpiarAntiguas($ahora);
-        $usuario = (new Usuario($this->db))->obtenerPorEmail($email);
-        if ($usuario === null) {
-            return;
-        }
+        $this->db->beginTransaction();
+        try {
+            $usuario = $this->db->prepare(
+                'SELECT id FROM usuarios WHERE email = :email LIMIT 1 FOR UPDATE'
+            );
+            $usuario->execute(['email' => $email]);
+            $usuarioId = $usuario->fetchColumn();
+            if ($usuarioId === false) {
+                $this->db->commit();
+                return;
+            }
 
-        $abierta = $this->db->prepare(
-            'SELECT id FROM recuperaciones_cuenta
-             WHERE usuario_id = :usuario
-               AND (estado = \'Solicitada\' OR (estado = \'EnlaceEmitido\' AND expira >= :ahora))
-             LIMIT 1'
-        );
-        $abierta->execute(['usuario' => $usuario['id'], 'ahora' => $ahora->format('Y-m-d H:i:s')]);
-        if ($abierta->fetch()) {
-            return;
+            $abierta = $this->db->prepare(
+                'SELECT id FROM recuperaciones_cuenta
+                 WHERE usuario_id = :usuario
+                   AND (estado = \'Solicitada\' OR (estado = \'EnlaceEmitido\' AND expira >= :ahora))
+                 LIMIT 1'
+            );
+            $abierta->execute([
+                'usuario' => $usuarioId,
+                'ahora' => $ahora->format('Y-m-d H:i:s'),
+            ]);
+            if (!$abierta->fetch()) {
+                $insert = $this->db->prepare(
+                    'INSERT INTO recuperaciones_cuenta (usuario_id, estado, creada)
+                     VALUES (:usuario, \'Solicitada\', :creada)'
+                );
+                $insert->execute([
+                    'usuario' => $usuarioId,
+                    'creada' => $ahora->format('Y-m-d H:i:s'),
+                ]);
+            }
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
-
-        $insert = $this->db->prepare(
-            'INSERT INTO recuperaciones_cuenta (usuario_id, estado, creada) VALUES (:usuario, \'Solicitada\', :creada)'
-        );
-        $insert->execute(['usuario' => $usuario['id'], 'creada' => $ahora->format('Y-m-d H:i:s')]);
     }
 
     public function pendientes(): array
@@ -127,9 +146,11 @@ class RecuperacionCuenta
 
             (new Usuario($this->db))->cambiarContrasena((int)$fila['usuario_id'], $password);
             $update = $this->db->prepare(
-                'UPDATE recuperaciones_cuenta SET estado = \'Usada\', token_hash = NULL WHERE id = :id'
+                'UPDATE recuperaciones_cuenta
+                 SET estado = \'Usada\', token_hash = NULL
+                 WHERE usuario_id = :usuario AND estado IN (\'Solicitada\', \'EnlaceEmitido\')'
             );
-            $update->execute(['id' => $fila['id']]);
+            $update->execute(['usuario' => $fila['usuario_id']]);
             $this->db->commit();
             return $fila['email'];
         } catch (Throwable $e) {

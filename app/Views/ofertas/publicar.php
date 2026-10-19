@@ -25,6 +25,7 @@
 <?php if ($ofertas === []): ?>
     <p>Aún no has publicado ofertas.</p>
 <?php else: ?>
+    <div class="table-responsive" role="region" aria-label="Ofertas publicadas" tabindex="0">
     <table>
         <thead><tr><th>Ciclo</th><th>Plazas</th><th>Turno</th><th>Periodo</th><th>Estado</th><th>Observación</th></tr></thead>
         <tbody><?php foreach ($ofertas as $oferta): ?>
@@ -38,5 +39,6 @@
             </tr>
         <?php endforeach; ?></tbody>
     </table>
+    </div>
 <?php endif; ?>
 <?php require __DIR__ . '/../partials/paginacion.php'; ?>
