@@ -9,7 +9,7 @@ if (!is_string($requestPath)) {
 }
 
 $decodedPath = rawurldecode($requestPath);
-foreach (explode('/', $decodedPath) as $segment) {
+foreach (explode('/', str_replace('\\', '/', $decodedPath)) as $segment) {
     if (str_starts_with($segment, '.')) {
         http_response_code(404);
         return true;
