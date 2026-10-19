@@ -25,7 +25,7 @@
 </form>
 <h3>Historial de convenios</h3>
 <?php if ($convenios === []): ?><p>No hay convenios registrados.</p>
-<?php else: ?><table><thead><tr><th>Número</th><th>Ciclo</th><th>Fechas</th><th>Estado</th><th>Motivo</th><th>Documento</th></tr></thead><tbody>
+<?php else: ?><div class="table-responsive" role="region" aria-label="Historial de convenios" tabindex="0"><table><thead><tr><th>Número</th><th>Ciclo</th><th>Fechas</th><th>Estado</th><th>Motivo</th><th>Documento</th></tr></thead><tbody>
 <?php foreach ($convenios as $item): ?><tr>
     <td><?= htmlspecialchars($item['numero_convenio'], ENT_QUOTES, 'UTF-8') ?></td>
     <td><?= htmlspecialchars($item['nombre_especialidad'] ?? 'Sin clasificar (anterior)', ENT_QUOTES, 'UTF-8') ?></td>
@@ -33,4 +33,4 @@
     <td><?= htmlspecialchars($item['estado'], ENT_QUOTES, 'UTF-8') ?></td>
     <td><?= htmlspecialchars($item['motivo_revision'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
     <td><a href="index.php?action=descargar-convenio&id=<?= (int)$item['id'] ?>">Descargar PDF</a></td>
-</tr><?php endforeach; ?></tbody></table><?php endif; ?>
+</tr><?php endforeach; ?></tbody></table></div><?php endif; ?>

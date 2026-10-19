@@ -47,6 +47,7 @@
     <?php endif; ?>
 </form>
 <?php if ($usuarios !== []): ?>
+<div class="table-responsive" role="region" aria-label="Cuentas de usuario" tabindex="0">
 <table>
     <caption>Cuentas de usuario</caption>
     <thead><tr><th scope="col">Correo</th><th scope="col">Nombre</th><th scope="col">Rol</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead>
@@ -81,6 +82,7 @@
         </tr>
     <?php endforeach; ?></tbody>
 </table>
+</div>
 <?php else: ?>
     <p role="status">No hay cuentas que coincidan con los filtros actuales.</p>
 <?php endif; ?>
