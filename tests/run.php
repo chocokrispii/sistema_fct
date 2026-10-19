@@ -28,6 +28,7 @@ require_once __DIR__ . '/../app/Models/Alumno.php';
 require_once __DIR__ . '/../app/Models/Disponibilidad.php';
 require_once __DIR__ . '/../app/Models/Calificacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
+require_once __DIR__ . '/../app/Models/RecuperacionCuenta.php';
 require_once __DIR__ . '/../app/Models/Usuario.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
@@ -243,6 +244,54 @@ try {
     $createdUsers[] = (int)$db->lastInsertId();
     $addUser->execute(['email' => $emails[6], 'hash' => $roleHash, 'role' => 'Observador']);
     $createdUsers[] = (int)$db->lastInsertId();
+
+    $recoveryModel = new RecuperacionCuenta($db);
+    $recoveryNow = new DateTimeImmutable();
+    $recoveryModel->solicitar($emails[0], $recoveryNow);
+    $recoveryModel->solicitar($emails[0], $recoveryNow);
+    $recoveryCount = $db->prepare(
+        "SELECT COUNT(*) FROM recuperaciones_cuenta
+         WHERE usuario_id = :usuario AND estado = 'Solicitada'"
+    );
+    $recoveryCount->execute(['usuario' => $createdUsers[0]]);
+    assertTrue(
+        (int)$recoveryCount->fetchColumn() === 1,
+        'Las solicitudes repetidas de recuperación deben conservar una sola petición pendiente.'
+    );
+    $recoveryId = (int)$db->query(
+        "SELECT id FROM recuperaciones_cuenta
+         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Solicitada'"
+    )->fetchColumn();
+    $recoveryToken = $recoveryModel->emitirEnlace($recoveryId, $recoveryNow);
+    assertTrue(
+        is_string($recoveryToken) && strlen($recoveryToken) === 64
+            && $recoveryModel->vigente($recoveryToken, $recoveryNow),
+        'El enlace emitido debe ser aleatorio, de un solo uso y vigente.'
+    );
+    $legacyToken = bin2hex(random_bytes(32));
+    $legacyRecovery = $db->prepare(
+        "INSERT INTO recuperaciones_cuenta
+            (usuario_id, estado, token_hash, expira, creada)
+         VALUES (:usuario, 'EnlaceEmitido', :hash, :expira, :creada)"
+    );
+    $legacyRecovery->execute([
+        'usuario' => $createdUsers[0],
+        'hash' => hash('sha256', $legacyToken),
+        'expira' => $recoveryNow->modify('+30 minutes')->format('Y-m-d H:i:s'),
+        'creada' => $recoveryNow->format('Y-m-d H:i:s'),
+    ]);
+    assertTrue(
+        $recoveryModel->consumir($recoveryToken, 'ResetPassword123!', $recoveryNow) === $emails[0]
+            && !$recoveryModel->vigente($legacyToken, $recoveryNow)
+            && password_verify(
+                'ResetPassword123!',
+                (string)$db->query(
+                    'SELECT password_hash FROM usuarios WHERE id = ' . $createdUsers[0]
+                )->fetchColumn()
+            ),
+        'Restablecer una cuenta debe cambiar la contraseña e invalidar todos sus enlaces anteriores.'
+    );
+
     $coordinatorProfile = $db->prepare(
         'INSERT INTO coordinadores (usuario_id, nombre, apellidos) VALUES (:usuario, :nombre, :apellidos)'
     );
@@ -1645,7 +1694,7 @@ try {
     }
     assertTrue($csrfRejected, 'Un token CSRF incorrecto debe rechazarse.');
 
-    echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, paginación, disponibilidad, dashboard, calificaciones, usuarios, webhooks y CSRF.\n";
+    echo "OK: migraciones, perfiles, recuperación, validación española, convenios, ofertas, matching, paginación, disponibilidad, dashboard, calificaciones, usuarios, webhooks y CSRF.\n";
 } finally {
     foreach ($createdPaginationOffers as $paginationOfferId) {
         $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
