@@ -153,13 +153,14 @@ class Asignacion
         $this->db->beginTransaction();
         try {
             $offer = $this->db->prepare(
-                "SELECT p.id, p.plazas_cuantas, p.estado
+                "SELECT p.id, p.plazas_cuantas, p.estado,
+                        p.fecha_fin >= CURDATE() AS vigente
                  FROM empresa_especialidades_plazas p WHERE p.id = :id FOR UPDATE"
             );
             $offer->execute(['id' => $ofertaId]);
             $row = $offer->fetch(PDO::FETCH_ASSOC);
-            if (!$row || $row['estado'] !== 'Aprobada') {
-                throw new RuntimeException('La oferta no existe o no está aprobada.');
+            if (!$row || $row['estado'] !== 'Aprobada' || (int)$row['vigente'] !== 1) {
+                throw new RuntimeException('La oferta no existe, no está aprobada o ya no está vigente.');
             }
 
             $capacity = $this->db->prepare(

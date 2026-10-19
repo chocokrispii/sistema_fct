@@ -358,8 +358,9 @@ historial y conserva el registro de auditoría.
   borrado permanente con confirmación. Se impide borrar la propia cuenta, las
   cuentas con historial operativo y las referencias que la base de datos deba
   conservar; cada borrado se registra en auditoría.
-- **Consultas:** filtros por ciclo, estado y fechas, con un máximo de 500 filas.
-  El rol Observador dispone de acceso de lectura a las consultas y asignaciones.
+- **Consultas:** filtros por ciclo, estado y fechas, con paginación de 50
+  resultados por página. El rol Observador dispone de acceso de lectura a las
+  consultas y asignaciones.
 - **Auditoría:** registro de operaciones de revisión, asignación,
   administración y descargas de convenios permitidas o denegadas.
 

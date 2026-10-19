@@ -121,6 +121,7 @@ $createdUsers = [];
 $createdCompany = null;
 $createdStudents = [];
 $createdOffer = null;
+$createdExpiredOffer = null;
 $createdPaginationOffers = [];
 $createdAssignmentId = null;
 $createdCycleId = null;
@@ -1029,6 +1030,46 @@ try {
     );
 
     $assignments = new Asignacion($db);
+    $expiredOffer = $db->prepare(
+        "INSERT INTO empresa_especialidades_plazas
+            (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno, estado)
+         VALUES (:empresa, :ciclo, 1,
+            DATE_SUB(CURDATE(), INTERVAL 2 DAY),
+            DATE_SUB(CURDATE(), INTERVAL 1 DAY),
+            'Indiferente', 'Aprobada')"
+    );
+    $expiredOffer->execute(['empresa' => $createdCompany, 'ciclo' => $cycleId]);
+    $createdExpiredOffer = (int)$db->lastInsertId();
+    $expiredAvailability = $db->prepare(
+        "INSERT INTO alumno_disponibilidad (alumno_id, fecha_inicio, fecha_fin, turno)
+         VALUES (:alumno_id, DATE_SUB(CURDATE(), INTERVAL 2 DAY),
+            DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'Indiferente')"
+    );
+    $expiredAvailability->execute(['alumno_id' => $createdStudents[1]]);
+    $expiredAvailabilityId = (int)$db->lastInsertId();
+    $expiredWeeklyAvailability = $db->prepare(
+        "INSERT INTO alumno_disponibilidad_semanal
+            (disponibilidad_id, dia_semana, hora_inicio, hora_fin)
+         VALUES (:disponibilidad_id,
+            WEEKDAY(DATE_SUB(CURDATE(), INTERVAL 2 DAY)) + 1, '08:00:00', '14:00:00')"
+    );
+    $expiredWeeklyAvailability->execute(['disponibilidad_id' => $expiredAvailabilityId]);
+    $expiredAssignmentRejected = false;
+    try {
+        $assignments->crear(
+            $createdExpiredOffer,
+            $createdStudents[1],
+            $createdUsers[3],
+            'Tutor de empresa'
+        );
+    } catch (RuntimeException $e) {
+        $expiredAssignmentRejected = $e->getMessage()
+            === 'La oferta no existe, no está aprobada o ya no está vigente.';
+    }
+    assertTrue(
+        $expiredAssignmentRejected,
+        'Una oferta vencida debe rechazarse aunque el alumno conserve disponibilidad compatible.'
+    );
     $assignments->crear($createdOffer, $createdStudents[0], $createdUsers[3], 'Tutor de empresa');
     $assignmentId = (int)$db->query(
         'SELECT id FROM asignaciones_fct WHERE oferta_id = ' . $createdOffer . ' AND alumno_id = ' . $createdStudents[0]
@@ -1626,6 +1667,12 @@ try {
         $stmt->execute(['company' => $createdCompany]);
         $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
         $stmt->execute(['offer' => $createdOffer]);
+    }
+    if ($createdExpiredOffer !== null) {
+        $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');
+        $stmt->execute(['offer' => $createdExpiredOffer]);
+        $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
+        $stmt->execute(['offer' => $createdExpiredOffer]);
     }
     if ($createdStudents !== []) {
         $stmt = $db->prepare('DELETE FROM alumnos WHERE id = :id');

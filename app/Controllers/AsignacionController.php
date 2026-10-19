@@ -121,7 +121,7 @@ class AsignacionController
         } catch (Throwable $e) {
             error_log('No se pudo asignar alumno: ' . $e->getMessage());
             $safeMessages = [
-                'La oferta no existe o no está aprobada.',
+                'La oferta no existe, no está aprobada o ya no está vigente.',
                 'La oferta ya no tiene plazas disponibles.',
                 'No se encontró el expediente del alumno.',
                 'El alumno no cumple el ciclo, disponibilidad o turno de la oferta.',
