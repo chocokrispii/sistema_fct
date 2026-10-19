@@ -53,7 +53,7 @@ guardan en volúmenes Docker.
    ```
 
    Espera a que `db` y `clamav` estén saludables; en el primer arranque, ClamAV
-   puede tardar en descargar sus firmas. El dump base y las migraciones 001–006
+   puede tardar en descargar sus firmas. El dump base y las migraciones 001–009
    se importan una sola vez al inicializar un volumen de base de datos vacío.
    El seed crea cuentas ausentes con contraseñas aleatorias. Para establecer
    contraseñas elegidas explícitamente, pásalas mediante las variables
@@ -506,9 +506,11 @@ empiece por `fct_test_`. **No la ejecutes contra `sistema_fct` ni contra una
 base con datos que quieras conservar.**
 
 Una forma sencilla de prepararla es crear `fct_test_local` en phpMyAdmin,
-importar en ella el dump base y aplicar las migraciones `001` a `006` en orden,
-teniendo en cuenta que la `001` solo se ejecuta si la columna conserva el nombre
-antiguo y la `003` se ejecuta una sola vez. Al importar el dump, selecciona
+importar en ella el dump base y aplicar las migraciones `001` a `009` en orden.
+La suite necesita, entre otras, la columna de código postal de la migración
+`006`, las bandejas de webhooks de la `007` y las columnas de respuesta de la
+`009`. La migración `001` solo se ejecuta si la columna conserva el nombre
+antiguo; la `003` se ejecuta una sola vez. Al importar el dump, selecciona
 explícitamente `fct_test_local`. Después, desde PowerShell, ejecuta:
 
 ```powershell
