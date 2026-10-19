@@ -37,9 +37,17 @@ guardan en volúmenes Docker.
    docker compose up -d --build
    ```
 
-3. Las migraciones se aplican automáticamente al crear por primera vez el
-   volumen de la base de datos. Para generar cuentas de demostración, ejecuta
-   el seed explícitamente y guarda las contraseñas aleatorias que imprima:
+3. Al iniciar, el contenedor de la aplicación aplica las migraciones pendientes
+   y registra sus archivos y checksums en `schema_migrations`. El comando es
+   idempotente: las ya registradas se omiten y un cambio posterior de un archivo
+   aplicado se informa como error. Para consultar el estado:
+
+   ```powershell
+   docker compose exec app php scripts/migrate.php --status
+   ```
+
+   Para generar cuentas de demostración, ejecuta el seed explícitamente y
+   guarda las contraseñas aleatorias que imprima:
 
    ```powershell
    docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/crear_cuentas_demo.php
@@ -48,8 +56,9 @@ guardan en volúmenes Docker.
    ```
 
    Espera a que `db` y `clamav` estén saludables; en el primer arranque, ClamAV
-   puede tardar en descargar sus firmas. El dump base y las migraciones 001–006
-   se importan una sola vez al inicializar un volumen de base de datos vacío.
+   puede tardar en descargar sus firmas. MariaDB importa el esquema base solo
+   al inicializar un volumen vacío; la aplicación gestiona las migraciones tanto
+   en instalaciones nuevas como en volúmenes existentes.
    El seed crea cuentas ausentes con contraseñas aleatorias. Para establecer
    contraseñas elegidas explícitamente, pásalas mediante las variables
    `FCT_DEMO_PASSWORD_ADMINISTRADOR`, `FCT_DEMO_PASSWORD_COORDINADOR`,
@@ -209,39 +218,28 @@ incidente y elimínalo según la política del centro.
 3. Selecciona esa base e importa `database/sistema_fct.sql`. El volcado crea
    las tablas base y contiene registros de demostración; no crea la base de
    datos por sí solo.
-4. En phpMyAdmin, selecciona `sistema_fct` y ejecuta
-   `database/migrations/001_renombrar_nombre_especialidad.sql`. Esta migración
-   corrige el nombre antiguo `nombre_specialidad` a
-   `nombre_especialidad`.
-5. Ejecuta `database/migrations/002_fct_workflows.sql`. Añade estados de cuenta
-   y ofertas, datos de tutor y empresa, y las tablas de sedes, convenios,
-   disponibilidad, asignaciones y auditoría. La migración omite columnas,
-   índices y tablas ya existentes, para admitir volcados que incluyan parte de
-   esos cambios.
-6. Ejecuta `database/migrations/003_login_y_recuperacion.sql` para añadir el
-   control de intentos y las solicitudes de recuperación de cuentas.
-7. Ejecuta `database/migrations/004_convenios_por_especialidad.sql` para asociar
-   cada convenio a un ciclo formativo y limitarlo a uno por empresa y ciclo.
-   Los convenios preexistentes quedan sin clasificar (`especialidad_id = NULL`)
-   y no cubren ofertas; hay que asignarles manualmente el ciclo correcto antes
-   de volver a usarlos.
-8. Ejecuta `database/migrations/005_horarios_y_calificaciones.sql` para guardar
-   franjas semanales (día y horas) y notas finales asociadas a prácticas
-   cerradas.
-9. Ejecuta `database/migrations/006_alumno_codigo_postal.sql` para incorporar
-   el código postal necesario para editar y validar los datos personales del
-   alumnado.
-10. Ejecuta `database/migrations/007_webhooks.sql` para crear las bandejas de
-   entrada y salida de webhooks.
-11. Comprueba que las migraciones terminen sin error. La migración `001` no es
-   idempotente: omítela si la columna ya se llama `nombre_especialidad`. La
-   migración `002`, `004`, `005` y `006` pueden volver a ejecutarse para
-   completar un esquema parcial; la `007` crea tablas con `IF NOT EXISTS`.
-   Ejecuta la migración `003` una sola vez.
+4. En PowerShell, apunta la configuración a la base que acabas de importar y
+   ejecuta el gestor. Usa la ruta de PHP CLI de tu instalación:
 
-El volcado no selecciona la base con `USE`; elige explícitamente la base destino
-antes de importarlo. Las migraciones tampoco seleccionan una base. El dump
-actual contiene dos expedientes de alumno y direcciones que apuntan a registros
+   ```powershell
+   $env:FCT_DB_NAME = "sistema_fct"
+   & "C:\xampp\php\php.exe" scripts\migrate.php
+   & "C:\xampp\php\php.exe" scripts\migrate.php --status
+   ```
+
+   El gestor aplica en orden todas las migraciones pendientes, registra el
+   nombre y el SHA-256 normalizado de cada archivo en `schema_migrations` y
+   omite las ya aplicadas. Si una instalación existente ya tiene el nombre
+   actual de la columna de especialidades pero no tiene registro, reconoce la
+   migración 001 como adoptada y completa su índice único si falta; las
+   migraciones restantes están preparadas para completar esquemas parciales.
+   Haz una copia de seguridad antes de ejecutarlo sobre una base con datos
+   existentes. Si una migración falla, el proceso se detiene sin registrarla
+   como aplicada; corrige el problema y vuelve a ejecutar el mismo comando.
+
+El volcado y el gestor no seleccionan la base por sí mismos: configura
+`FCT_DB_NAME` y comprueba la salida antes de aplicar cambios. El dump actual
+contiene dos expedientes de alumno y direcciones que apuntan a registros
 existentes. No es necesario aplicar el seed para completar la instalación.
 
 ### 3. Configurar la conexión
@@ -406,14 +404,16 @@ empiece por `fct_test_`. **No la ejecutes contra `sistema_fct` ni contra una
 base con datos que quieras conservar.**
 
 Una forma sencilla de prepararla es crear `fct_test_local` en phpMyAdmin,
-importar en ella el dump base y aplicar las migraciones `001` a `006` en orden,
-teniendo en cuenta que la `001` solo se ejecuta si la columna conserva el nombre
-antiguo y la `003` se ejecuta una sola vez. Al importar el dump, selecciona
-explícitamente `fct_test_local`. Después, desde PowerShell, ejecuta:
+importar en ella el dump base y ejecutar el gestor de migraciones. Al importar
+el dump, selecciona explícitamente `fct_test_local`. Después, desde PowerShell,
+ejecuta:
 
 ```powershell
 $env:FCT_TEST_DB_NAME = "fct_test_local"
 $env:FCT_DB_NAME = $env:FCT_TEST_DB_NAME
+$env:FCT_DB_USER = "root"
+$env:FCT_DB_PASS = ""
+& "C:\xampp\php\php.exe" scripts\migrate.php
 & "C:\xampp\php\php.exe" tests\run.php
 ```
 

@@ -22,18 +22,19 @@ un convenio. No uses este buzón para enviar información personal o documentos.
 
 ## Migración
 
-En las bases existentes selecciona la base correcta y ejecuta una vez:
+El gestor `scripts/migrate.php` aplica en orden las migraciones pendientes y
+registra su versión y checksum en `schema_migrations`. En XAMPP, selecciona la
+base configurando `FCT_DB_NAME` y ejecuta:
 
 ```powershell
-& 'C:\xampp\mysql\bin\mysql.exe' -h 127.0.0.1 -uroot --database=sistema_fct < database\migrations\007_webhooks.sql
-& 'C:\xampp\mysql\bin\mysql.exe' -h 127.0.0.1 -uroot --database=fct_test_local < database\migrations\007_webhooks.sql
+$env:FCT_DB_NAME = "sistema_fct"
+& "C:\xampp\php\php.exe" scripts\migrate.php
 ```
 
-Sustituye los nombres por las bases de desarrollo y pruebas que uses. La
-migración crea `webhook_inbox` y `webhook_outbox` mediante `IF NOT EXISTS`; no
-borra datos existentes. Para nuevas instalaciones Docker Compose, la migración
-está enlazada en el orden de arranque inicial de MariaDB. Los volúmenes ya
-inicializados no vuelven a ejecutar scripts de inicialización automáticamente.
+Para Docker Compose, el contenedor de la aplicación ejecuta el mismo gestor
+antes de iniciar Apache. En ambos casos, consulta el estado con
+`php scripts/migrate.php --status`; el gestor no crea la base de datos ni
+selecciona otra base por ti.
 
 ## Configuración de secretos
 

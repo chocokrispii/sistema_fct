@@ -27,6 +27,7 @@ require_once __DIR__ . '/../app/Models/Disponibilidad.php';
 require_once __DIR__ . '/../app/Models/Calificacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
 require_once __DIR__ . '/../app/Models/Usuario.php';
+require_once __DIR__ . '/../app/Models/RecuperacionCuenta.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
 require_once __DIR__ . '/../app/Controllers/ConsultaController.php';
@@ -43,6 +44,57 @@ require_once __DIR__ . '/file_security.php';
 $db = getPDOConnection();
 $actualDatabase = $db->query('SELECT DATABASE()')->fetchColumn();
 assertTrue($actualDatabase === $testDatabase, 'La conexión no apunta a la base de prueba.');
+require_once __DIR__ . '/../scripts/migrate.php';
+$parsedSql = splitSqlStatements(
+    "INSERT INTO sample (value) VALUES ('one;two');\nSELECT `semi;colon` FROM sample;"
+);
+assertTrue(
+    count($parsedSql) === 2
+        && str_contains($parsedSql[0], 'one;two')
+        && str_contains($parsedSql[1], '`semi;colon`'),
+    'El gestor debe separar sentencias sin dividir los puntos y coma dentro de literales o identificadores.'
+);
+$migrationFiles = glob(__DIR__ . '/../database/migrations/[0-9][0-9][0-9]_*.sql');
+assertTrue(is_array($migrationFiles), 'No se pudieron enumerar las migraciones.');
+foreach ($migrationFiles as $migrationFile) {
+    $parsedMigration = splitSqlStatements((string)file_get_contents($migrationFile));
+    assertTrue($parsedMigration !== [], 'No se pudo analizar la migración ' . basename($migrationFile) . '.');
+}
+$appliedMigrations = $db->query('SELECT version, checksum FROM schema_migrations')->fetchAll(PDO::FETCH_KEY_PAIR);
+foreach ($migrationFiles as $migrationFile) {
+    $migrationVersion = basename($migrationFile);
+    $migrationChecksum = migrationChecksum($migrationFile);
+    assertTrue(
+        is_string($migrationChecksum)
+            && isset($appliedMigrations[$migrationVersion])
+            && hash_equals($appliedMigrations[$migrationVersion], $migrationChecksum),
+        "La migración $migrationVersion no está registrada o su checksum no coincide."
+    );
+}
+$baseTableCollations = $db->query(
+    "SELECT COUNT(*) FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME IN (
+           'alumnos', 'coordinadores', 'direcciones_telefonos', 'empresas',
+           'empresa_especialidades_plazas', 'especialidades', 'tutores_legales', 'usuarios'
+       )
+       AND TABLE_COLLATION <> 'utf8mb4_unicode_ci'"
+)->fetchColumn();
+assertTrue(
+    (int)$baseTableCollations === 0,
+    'Las tablas base deben usar utf8mb4_unicode_ci; ejecuta la migración 009.'
+);
+$offerConstraints = $db->query(
+    "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'empresa_especialidades_plazas'
+       AND CONSTRAINT_TYPE = 'CHECK'
+       AND CONSTRAINT_NAME IN ('chk_oferta_plazas_positivas', 'chk_oferta_fechas')"
+)->fetchColumn();
+assertTrue(
+    (int)$offerConstraints === 2,
+    'Faltan restricciones CHECK de las ofertas; ejecuta la migración 010.'
+);
 
 $demoUsers = $db->query(
     "SELECT email, password_hash FROM usuarios
@@ -240,6 +292,35 @@ try {
     $createdUsers[] = (int)$db->lastInsertId();
     $addUser->execute(['email' => $emails[6], 'hash' => $roleHash, 'role' => 'Observador']);
     $createdUsers[] = (int)$db->lastInsertId();
+
+    $recoveryIndex = $db->prepare(
+        "SELECT COUNT(*) FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = 'recuperaciones_cuenta'
+           AND INDEX_NAME = 'uq_recuperacion_token_hash' AND NON_UNIQUE = 0"
+    );
+    $recoveryIndex->execute(['schema' => $testDatabase]);
+    assertTrue((int)$recoveryIndex->fetchColumn() === 1, 'Falta el índice único para tokens de recuperación.');
+
+    $recoveryNow = new DateTimeImmutable('2026-10-16 12:00:00');
+    $oldRecovery = $db->prepare(
+        "INSERT INTO recuperaciones_cuenta (usuario_id, estado, creada)
+         VALUES (:usuario, 'Solicitada', :creada)"
+    );
+    $oldRecovery->execute([
+        'usuario' => $createdUsers[1],
+        'creada' => $recoveryNow->modify('-' . (RecuperacionCuenta::RETENCION_DIAS + 1) . ' days')->format('Y-m-d H:i:s'),
+    ]);
+    (new RecuperacionCuenta($db))->solicitar($emails[1], $recoveryNow);
+    $recoveryCount = $db->prepare(
+        "SELECT COUNT(*) FROM recuperaciones_cuenta
+         WHERE usuario_id = :usuario AND estado = 'Solicitada'"
+    );
+    $recoveryCount->execute(['usuario' => $createdUsers[1]]);
+    assertTrue(
+        (int)$recoveryCount->fetchColumn() === 1,
+        'La limpieza debe eliminar solicitudes antiguas sin bloquear una nueva solicitud.'
+    );
+
     $coordinatorProfile = $db->prepare(
         'INSERT INTO coordinadores (usuario_id, nombre, apellidos) VALUES (:usuario, :nombre, :apellidos)'
     );
@@ -296,6 +377,34 @@ try {
         'contacto' => 'Tutor de prueba',
     ]);
     $createdCompany = (int)$db->lastInsertId();
+
+    $invalidOfferInsert = $db->prepare(
+        "INSERT INTO empresa_especialidades_plazas
+            (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno, estado)
+         VALUES (:empresa, :ciclo, :plazas, :inicio, :fin, 'M', 'Pendiente')"
+    );
+    $invalidOfferRejected = [];
+    foreach ([
+        ['plazas' => 0, 'inicio' => '2027-03-15', 'fin' => '2027-03-15'],
+        ['plazas' => 1, 'inicio' => '2027-03-16', 'fin' => '2027-03-15'],
+    ] as $invalidOffer) {
+        try {
+            $invalidOfferInsert->execute([
+                'empresa' => $createdCompany,
+                'ciclo' => $cycleId,
+                'plazas' => $invalidOffer['plazas'],
+                'inicio' => $invalidOffer['inicio'],
+                'fin' => $invalidOffer['fin'],
+            ]);
+            $invalidOfferRejected[] = false;
+        } catch (PDOException) {
+            $invalidOfferRejected[] = true;
+        }
+    }
+    assertTrue(
+        $invalidOfferRejected === [true, true],
+        'La base debe rechazar ofertas sin plazas o con fechas incoherentes.'
+    );
 
     $studentInsert = $db->prepare(
         'INSERT INTO alumnos (usuario_id, nombre, apellidos, fecha_nacimiento, dni,

@@ -335,7 +335,7 @@ class Oferta {
                     AND d.fecha_inicio <= p.fecha_inicio
                     AND d.fecha_fin >= p.fecha_fin
                     AND (d.turno = 'Indiferente' OR p.turno = 'Indiferente'
-                         OR CAST(d.turno AS BINARY) = CAST(p.turno AS BINARY))
+                         OR d.turno = p.turno)
                     AND EXISTS (
                         SELECT 1
                         FROM alumno_disponibilidad_semanal ds

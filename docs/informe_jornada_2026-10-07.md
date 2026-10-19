@@ -401,8 +401,10 @@ comprobar en phpMyAdmin que terminó correctamente.
   ejecutó `tests/run.php`. Resultado: OK para revisión de convenios/ofertas,
   matching, límite de plazas, cierre de asignación y CSRF.
 - La prueba encontró una incompatibilidad de collation al comparar turnos del
-  esquema legado y la tabla nueva; se corrigió comparando las etiquetas de turno
-  como valores binarios y se repitió la prueba con resultado satisfactorio.
+  esquema legado y la tabla nueva; inicialmente se corrigió comparando las
+  etiquetas de turno como valores binarios. La migración
+  `009_unificar_collation_tablas_base.sql` unifica las collations y permite que
+  matching y asignaciones comparen las etiquetas directamente.
 - La base temporal y el volcado de estructura se eliminaron al terminar. No se
   ejecutaron migraciones sobre `sistema_fct` ni se alteró `database/sistema_fct.sql`.
 

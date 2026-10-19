@@ -24,4 +24,4 @@ WORKDIR /var/www/html
 
 EXPOSE 80
 
-CMD ["apache2-foreground"]
+CMD ["sh", "-c", "php scripts/migrate.php && exec apache2-foreground"]

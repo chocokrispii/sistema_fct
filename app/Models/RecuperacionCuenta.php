@@ -9,6 +9,7 @@ require_once __DIR__ . '/Usuario.php';
 class RecuperacionCuenta
 {
     public const VALIDEZ_MINUTOS = 30;
+    public const RETENCION_DIAS = 90;
 
     private PDO $db;
 
@@ -19,6 +20,7 @@ class RecuperacionCuenta
 
     public function solicitar(string $email, DateTimeImmutable $ahora): void
     {
+        $this->limpiarAntiguas($ahora);
         $usuario = (new Usuario($this->db))->obtenerPorEmail($email);
         if ($usuario === null) {
             return;
@@ -43,6 +45,7 @@ class RecuperacionCuenta
 
     public function pendientes(): array
     {
+        $this->limpiarAntiguas(new DateTimeImmutable());
         return $this->db->query(
             'SELECT r.id, u.email, r.creada
              FROM recuperaciones_cuenta r
@@ -50,6 +53,13 @@ class RecuperacionCuenta
              WHERE r.estado = \'Solicitada\'
              ORDER BY r.creada'
         )->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    private function limpiarAntiguas(DateTimeImmutable $ahora): void
+    {
+        $limite = $ahora->modify('-' . self::RETENCION_DIAS . ' days')->format('Y-m-d H:i:s');
+        $stmt = $this->db->prepare('DELETE FROM recuperaciones_cuenta WHERE creada < :limite');
+        $stmt->execute(['limite' => $limite]);
     }
 
     public function emitirEnlace(int $id, DateTimeImmutable $ahora): ?string
