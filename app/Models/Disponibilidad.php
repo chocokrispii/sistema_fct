@@ -11,7 +11,7 @@ class Disponibilidad
     public function obtenerPorUsuario(int $usuarioId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT d.id, d.fecha_inicio, d.fecha_fin, d.turno
+            'SELECT d.id, d.fecha_inicio, d.fecha_fin, d.turno, d.es_indiferente
              FROM alumno_disponibilidad d
              INNER JOIN alumnos a ON a.id = d.alumno_id
              WHERE a.usuario_id = :usuario_id
@@ -35,7 +35,14 @@ class Disponibilidad
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function reemplazar(int $usuarioId, string $inicio, string $fin, string $turno, array $horarios = []): void
+    public function reemplazar(
+        int $usuarioId,
+        string $inicio,
+        string $fin,
+        string $turno,
+        bool $esIndiferente,
+        array $horarios = []
+    ): void
     {
         $this->db->beginTransaction();
         try {
@@ -50,14 +57,16 @@ class Disponibilidad
             $delete->execute(['alumno_id' => $alumnoId]);
 
             $insert = $this->db->prepare(
-                'INSERT INTO alumno_disponibilidad (alumno_id, fecha_inicio, fecha_fin, turno)
-                 VALUES (:alumno_id, :inicio, :fin, :turno)'
+                'INSERT INTO alumno_disponibilidad
+                    (alumno_id, fecha_inicio, fecha_fin, turno, es_indiferente)
+                 VALUES (:alumno_id, :inicio, :fin, :turno, :es_indiferente)'
             );
             $insert->execute([
                 'alumno_id' => $alumnoId,
                 'inicio' => $inicio,
                 'fin' => $fin,
                 'turno' => $turno,
+                'es_indiferente' => $esIndiferente ? 1 : 0,
             ]);
             $disponibilidadId = (int)$this->db->lastInsertId();
 

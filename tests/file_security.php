@@ -6,6 +6,7 @@ require_once __DIR__ . '/../config/storage.php';
 require_once __DIR__ . '/../app/Core/FileScanner.php';
 require_once __DIR__ . '/../app/Core/PhpIni.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
+require_once __DIR__ . '/../app/Controllers/DevelopmentPreviewController.php';
 
 function assertFileSecurity(bool $condition, string $message): void
 {
@@ -39,6 +40,27 @@ assertFileSecurity(
         && $routes['guardar-calificacion']['roles'] === ['Administrador', 'Coordinador'],
     'La matriz de acceso a calificaciones no coincide con los permisos previstos.'
 );
+assertFileSecurity(
+    $routes['ofertas']['roles'] === ['Administrador', 'Coordinador', 'Observador', 'Empresa']
+        && !in_array('Alumno', $routes['ofertas']['roles'], true)
+        && $routes['empresa-asignada']['roles'] === ['Alumno'],
+    'La visibilidad de ofertas y datos de empresa asignada debe respetar el acceso del alumnado.'
+);
+assertFileSecurity(
+    $routes['revisar-oferta']['roles'] === ['Administrador']
+        && $routes['resolver-convenio']['roles'] === ['Administrador']
+        && $routes['auditar-convenios']['roles'] === ['Observador'],
+    'La resolución de ofertas/convenios y la consulta de auditoría deben tener roles separados.'
+);
+foreach ($routes as $name => $route) {
+    $methods = is_array($route['method']) ? $route['method'] : [$route['method']];
+    if (in_array('POST', $methods, true) && $name !== 'logout') {
+        assertFileSecurity(
+            !in_array('Observador', $route['roles'], true),
+            "El rol Observador no debe ejecutar mutaciones: $name."
+        );
+    }
+}
 assertFileSecurity(PhpIni::sizeToBytes('12M') === 12 * 1024 * 1024, 'No se interpretó el límite PHP de 12 MiB.');
 assertFileSecurity(PhpIni::sizeToBytes('512K') === 512 * 1024, 'No se interpretó un límite PHP en KiB.');
 assertFileSecurity(PhpIni::sizeToBytes('0') === PHP_INT_MAX, 'El límite PHP 0 debe representar tamaño ilimitado.');
@@ -58,7 +80,8 @@ $publicPath = realpath(__DIR__ . '/../public');
 $originalStorage = getenv('FCT_STORAGE_PATH');
 $hadDocumentRoot = array_key_exists('DOCUMENT_ROOT', $_SERVER);
 $originalDocumentRoot = $_SERVER['DOCUMENT_ROOT'] ?? null;
-$testStoragePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'fct-file-security-' . bin2hex(random_bytes(8));
+$testStoragePath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR
+    . 'fct-file-security-' . bin2hex(random_bytes(8));
 assertFileSecurity($publicPath !== false, 'No se pudo resolver el document root de prueba.');
 assertFileSecurity(mkdir($testStoragePath), 'No se pudo crear el almacenamiento temporal de prueba.');
 $_SERVER['DOCUMENT_ROOT'] = $publicPath;
@@ -118,19 +141,81 @@ try {
 }
 
 $originalScanner = getenv('FCT_CLAMSCAN');
+$originalClamdHost = getenv('FCT_CLAMD_HOST');
+$originalClamdPort = getenv('FCT_CLAMD_PORT');
+$originalClamavEnabled = getenv('FCT_CLAMAV_ENABLED');
+$originalAppEnvironment = getenv('APP_ENV');
 putenv('FCT_CLAMSCAN');
-$scannerRejected = false;
+putenv('FCT_CLAMD_HOST');
+putenv('FCT_CLAMD_PORT');
+putenv('FCT_CLAMAV_ENABLED');
+putenv('APP_ENV');
 try {
+    $scannerRejected = false;
+    try {
+        FileScanner::scan(__FILE__);
+    } catch (FileScannerUnavailableException) {
+        $scannerRejected = true;
+    }
+    assertFileSecurity($scannerRejected, 'Se aceptó un archivo sin análisis antivirus configurado.');
+
+    putenv('APP_ENV=development');
+    putenv('FCT_CLAMAV_ENABLED=false');
     FileScanner::scan(__FILE__);
-} catch (FileScannerUnavailableException) {
-    $scannerRejected = true;
+
+    putenv('APP_ENV=production');
+    $productionDisableRejected = false;
+    try {
+        FileScanner::scan(__FILE__);
+    } catch (FileScannerUnavailableException) {
+        $productionDisableRejected = true;
+    }
+    assertFileSecurity($productionDisableRejected, 'Se permitió desactivar ClamAV fuera del desarrollo local.');
+
+    putenv('APP_ENV');
+    $missingEnvironmentRejected = false;
+    try {
+        FileScanner::scan(__FILE__);
+    } catch (FileScannerUnavailableException) {
+        $missingEnvironmentRejected = true;
+    }
+    assertFileSecurity($missingEnvironmentRejected, 'Se permitió desactivar ClamAV sin un entorno local declarado.');
+
+    putenv('APP_ENV=development');
+    putenv('FCT_CLAMAV_ENABLED=off');
+    $invalidConfigurationRejected = false;
+    try {
+        FileScanner::scan(__FILE__);
+    } catch (FileScannerUnavailableException) {
+        $invalidConfigurationRejected = true;
+    }
+    assertFileSecurity($invalidConfigurationRejected, 'Se aceptó un valor inválido para FCT_CLAMAV_ENABLED.');
 } finally {
     if ($originalScanner === false) {
         putenv('FCT_CLAMSCAN');
     } else {
         putenv('FCT_CLAMSCAN=' . $originalScanner);
     }
+    if ($originalClamdHost === false) {
+        putenv('FCT_CLAMD_HOST');
+    } else {
+        putenv('FCT_CLAMD_HOST=' . $originalClamdHost);
+    }
+    if ($originalClamdPort === false) {
+        putenv('FCT_CLAMD_PORT');
+    } else {
+        putenv('FCT_CLAMD_PORT=' . $originalClamdPort);
+    }
+    if ($originalClamavEnabled === false) {
+        putenv('FCT_CLAMAV_ENABLED');
+    } else {
+        putenv('FCT_CLAMAV_ENABLED=' . $originalClamavEnabled);
+    }
+    if ($originalAppEnvironment === false) {
+        putenv('APP_ENV');
+    } else {
+        putenv('APP_ENV=' . $originalAppEnvironment);
+    }
 }
-assertFileSecurity($scannerRejected, 'Se aceptó un archivo sin análisis antivirus configurado.');
 
-echo "OK: validadores españoles, matriz de rutas, almacenamiento privado y rechazo sin antivirus.\n";
+echo "OK: validadores españoles, matriz de rutas, almacenamiento privado y política antivirus fail-closed.\n";

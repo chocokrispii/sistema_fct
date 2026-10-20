@@ -55,9 +55,13 @@ class ConsultaController
             $params['hasta'] = $filters['hasta']->format('Y-m-d');
         }
 
-        $sql = "SELECT p.id, p.estado, p.fecha_inicio, p.fecha_fin, p.plazas_cuantas, p.turno,
+        $anonimize = ($_SESSION['rol'] ?? null) === 'Observador';
+        $studentFields = $anonimize
+            ? "'Alumno anonimizado' AS alumno_nombre, '' AS apellidos"
+            : 'a.nombre AS alumno_nombre, a.apellidos';
+        $sql = "SELECT p.id, p.titulo, p.modalidad, p.ubicacion, p.estado, p.fecha_inicio, p.fecha_fin, p.plazas_cuantas, p.turno,
                        e.nombre_empresa, es.nombre_especialidad,
-                       a.nombre AS alumno_nombre, a.apellidos, af.estado AS estado_asignacion
+                       $studentFields, af.estado AS estado_asignacion
                 FROM empresa_especialidades_plazas p
                 INNER JOIN empresas e ON e.id = p.empresa_id
                 INNER JOIN especialidades es ON es.id = p.especialidad_id

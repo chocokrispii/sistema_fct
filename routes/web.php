@@ -1,8 +1,9 @@
 <?php
 
-return [
+$routes = [
     'inicio' => ['method' => 'GET', 'roles' => [], 'controller' => null, 'action' => null],
     'login' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => AuthController::class, 'action' => 'login'],
+    'session' => ['method' => 'GET', 'roles' => [], 'controller' => AuthController::class, 'action' => 'session'],
     'recuperar' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => RecuperacionController::class, 'action' => 'solicitar'],
     'restablecer' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => RecuperacionController::class, 'action' => 'restablecer'],
     'recuperaciones' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador'], 'controller' => RecuperacionController::class, 'action' => 'listar'],
@@ -12,11 +13,12 @@ return [
     'portal-alumno' => ['method' => 'GET', 'roles' => ['Alumno'], 'controller' => AlumnoController::class, 'action' => 'portal'],
     'perfil-alumno' => ['method' => ['GET', 'POST'], 'roles' => ['Alumno'], 'controller' => AlumnoController::class, 'action' => 'editarPerfil'],
     'registro-empresa' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => EmpresaController::class, 'action' => 'registrar'],
-    'ofertas' => ['method' => 'GET', 'roles' => [], 'controller' => OfertaController::class, 'action' => 'listar'],
+    'ofertas' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador', 'Empresa'], 'controller' => OfertaController::class, 'action' => 'listar'],
+    'empresa-asignada' => ['method' => 'GET', 'roles' => ['Alumno'], 'controller' => AsignacionController::class, 'action' => 'empresaAsignada'],
     'publicar-oferta' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => OfertaController::class, 'action' => 'publicar'],
     'sedes' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => EmpresaController::class, 'action' => 'sedes'],
     'revisar-ofertas' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador'], 'controller' => OfertaController::class, 'action' => 'revisar'],
-    'revisar-oferta' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => OfertaController::class, 'action' => 'resolverRevision'],
+    'revisar-oferta' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => OfertaController::class, 'action' => 'resolverRevision'],
     'disponibilidad' => ['method' => ['GET', 'POST'], 'roles' => ['Alumno'], 'controller' => DisponibilidadController::class, 'action' => 'gestionar'],
     'asignaciones' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador'], 'controller' => AsignacionController::class, 'action' => 'listar'],
     'emparejar' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador'], 'controller' => AsignacionController::class, 'action' => 'emparejar'],
@@ -28,10 +30,28 @@ return [
     'cerrar-practica' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => AsignacionController::class, 'action' => 'cerrar'],
     'convenios' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => ConvenioController::class, 'action' => 'gestionarEmpresa'],
     'revisar-convenios' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador'], 'controller' => ConvenioController::class, 'action' => 'revisar'],
-    'resolver-convenio' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => ConvenioController::class, 'action' => 'resolver'],
+    'auditar-convenios' => ['method' => 'GET', 'roles' => ['Observador'], 'controller' => ConvenioController::class, 'action' => 'auditar'],
+    'resolver-convenio' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => ConvenioController::class, 'action' => 'resolver'],
     'descargar-convenio' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Empresa'], 'controller' => ConvenioController::class, 'action' => 'descargar'],
     'usuarios' => ['method' => ['GET', 'POST'], 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'gestionar'],
     'estado-usuario' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'cambiarEstado'],
     'eliminar-usuario' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'eliminar'],
     'consultas' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador'], 'controller' => ConsultaController::class, 'action' => 'buscar'],
 ];
+
+if (DevelopmentPreviewController::isEnabled()) {
+    $routes['preview-disponibilidad'] = [
+        'method' => 'GET',
+        'roles' => [],
+        'controller' => DevelopmentPreviewController::class,
+        'action' => 'availability',
+    ];
+    $routes['preview-publicar-oferta'] = [
+        'method' => 'GET',
+        'roles' => [],
+        'controller' => DevelopmentPreviewController::class,
+        'action' => 'previewPublicarOferta',
+    ];
+}
+
+return $routes;

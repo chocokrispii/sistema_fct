@@ -5,6 +5,7 @@ require_once __DIR__ . '/../Models/Oferta.php';
 require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
+require_once __DIR__ . '/../Core/JsonResponse.php';
 
 class OfertaController {
     private PDO $db;
@@ -20,7 +21,7 @@ class OfertaController {
     }
 
     public function listar(): void {
-        $ofertas = $this->ofertaModel->obtenerTodas(true);
+        $ofertas = $this->withWeeklySchedules($this->ofertaModel->obtenerTodas(true));
         View::render('ofertas/listado', ['ofertas' => $ofertas]);
     }
 
@@ -41,8 +42,9 @@ class OfertaController {
         $empresaId = (int)$empresa['id'];
 
         $error = '';
+        $formValues = $this->formValues($_POST);
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $error = $this->procesarPublicacion($empresaId);
+            $error = $this->procesarPublicacion($empresaId, $_POST);
             if ($error === null) {
                 header('Location: index.php?action=publicar-oferta&publicada=1');
                 exit;
@@ -54,32 +56,74 @@ class OfertaController {
         View::render('ofertas/publicar', [
             'empresa' => $empresa,
             'error' => $error,
-            'ofertas' => $this->ofertaModel->obtenerPorEmpresa($empresaId),
+            'ofertas' => $this->withWeeklySchedules($this->ofertaModel->obtenerPorEmpresa($empresaId)),
             'especialidades' => $this->especialidadModel->obtenerTodas(),
+            'formValues' => $formValues,
         ]);
     }
 
     public function revisar(): void
     {
         View::render('ofertas/revisar', [
-            'ofertas' => $this->ofertaModel->obtenerPendientes(),
+            'ofertas' => $this->withWeeklySchedules($this->ofertaModel->obtenerPendientes()),
             'error' => is_string($_GET['error'] ?? null) ? $_GET['error'] : '',
         ]);
     }
 
     public function resolverRevision(): void
     {
-        $id = filter_var($_POST['oferta_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $decision = $_POST['decision'] ?? '';
-        $motivoRaw = $_POST['motivo'] ?? '';
+        if (($_SESSION['rol'] ?? null) !== 'Administrador') {
+            http_response_code(403);
+            if (JsonResponse::wantsJson()) {
+                JsonResponse::failure('Solo un administrador puede resolver ofertas.', 403);
+                return;
+            }
+            throw new RuntimeException('Solo un administrador puede resolver ofertas.');
+        }
+        $jsonRequest = JsonResponse::wantsJson();
+        $requestValues = $_POST;
+        $contentType = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+        if (str_contains($contentType, 'application/json')) {
+            try {
+                $decoded = json_decode((string)file_get_contents('php://input'), false, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                JsonResponse::failure('El cuerpo JSON no es válido.', 400);
+                return;
+            }
+            if (!$decoded instanceof stdClass) {
+                JsonResponse::failure('El cuerpo JSON debe ser un objeto de datos.', 400);
+                return;
+            }
+            $requestValues = get_object_vars($decoded);
+        }
+
+        $offerId = $requestValues['oferta_id'] ?? null;
+        $id = is_int($offerId) || is_string($offerId)
+            ? filter_var($offerId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+            : false;
+        $decisionValue = $requestValues['decision'] ?? '';
+        $decision = is_string($decisionValue) ? $decisionValue : '';
+        $motivoRaw = $requestValues['motivo'] ?? '';
         if (!is_string($motivoRaw)) {
+            if ($jsonRequest) {
+                JsonResponse::failure('El motivo de revisión no es válido.', 422);
+                return;
+            }
             throw new InvalidArgumentException('El motivo de revisión no es válido.');
         }
         $motivo = trim($motivoRaw);
         if ($id === false || !in_array($decision, ['Aprobada', 'Rechazada'], true)) {
+            if ($jsonRequest) {
+                JsonResponse::failure('La decisión de revisión no es válida.', 422);
+                return;
+            }
             throw new InvalidArgumentException('La decisión de revisión no es válida.');
         }
         if ($decision === 'Rechazada' && $motivo === '') {
+            if ($jsonRequest) {
+                JsonResponse::failure('Indica el motivo del rechazo.', 422);
+                return;
+            }
             throw new InvalidArgumentException('Indica el motivo del rechazo.');
         }
         $this->db->beginTransaction();
@@ -95,6 +139,27 @@ class OfertaController {
                 $offer = $stmt->fetch(PDO::FETCH_ASSOC);
                 $agreement = null;
                 if ($offer) {
+                    $shiftCheck = $this->db->prepare(
+                        'SELECT 1 FROM empresa_oferta_horarios_semanales oh
+                         WHERE oh.oferta_id = :id
+                           AND (
+                               DATEDIFF(:fin, :inicio) >= 6
+                               OR MOD(oh.dia_semana - 1 - WEEKDAY(:inicio_calculo) + 7, 7)
+                                  <= DATEDIFF(:rango_fin, :rango_inicio)
+                           )
+                         LIMIT 1'
+                    );
+                    $shiftCheck->execute([
+                        'id' => $id,
+                        'fin' => $offer['fecha_fin'],
+                        'inicio' => $offer['fecha_inicio'],
+                        'inicio_calculo' => $offer['fecha_inicio'],
+                        'rango_fin' => $offer['fecha_fin'],
+                        'rango_inicio' => $offer['fecha_inicio'],
+                    ]);
+                    if (!$shiftCheck->fetchColumn()) {
+                        throw new DomainException('No se puede aprobar una oferta sin un horario exacto aplicable a sus fechas.');
+                    }
                     $agreement = $this->db->prepare(
                         "SELECT 1 FROM convenios
                          WHERE empresa_id = :empresa_id AND especialidad_id = :especialidad_id
@@ -130,6 +195,10 @@ class OfertaController {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
+            if ($jsonRequest) {
+                JsonResponse::failure($e->getMessage(), 409);
+                return;
+            }
             header('Location: index.php?action=revisar-ofertas&error=' . rawurlencode($e->getMessage()));
             exit;
         } catch (Throwable $e) {
@@ -138,19 +207,73 @@ class OfertaController {
             }
             throw $e;
         }
+        if ($jsonRequest) {
+            JsonResponse::success([
+                'message' => 'La oferta se ha ' . ($decision === 'Aprobada' ? 'aprobado.' : 'rechazado.'),
+                'decision' => $decision,
+            ]);
+            return;
+        }
         header('Location: index.php?action=revisar-ofertas');
         exit;
     }
 
     /** Devuelve el mensaje de error o null si la oferta se ha creado. */
-    private function procesarPublicacion(int $empresaId): ?string {
-        $especialidadId = filter_var($_POST['especialidad_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $plazas = filter_var($_POST['plazas'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
-        $fechaInicioRaw = $_POST['fecha_inicio'] ?? '';
-        $fechaFinRaw = $_POST['fecha_fin'] ?? '';
-        $turno = $_POST['turno'] ?? '';
-        if (!is_string($fechaInicioRaw) || !is_string($fechaFinRaw) || !is_string($turno)) {
-            return 'Los datos de fecha y turno no son válidos.';
+    private function procesarPublicacion(int $empresaId, array $request): ?string {
+        $especialidadId = filter_var($request['especialidad_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $plazas = filter_var($request['plazas'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]]);
+        $fechaInicioRaw = $request['fecha_inicio'] ?? '';
+        $fechaFinRaw = $request['fecha_fin'] ?? '';
+        $horariosRaw = $request['horarios'] ?? null;
+        $tituloRaw = $request['titulo'] ?? null;
+        $descripcionRaw = $request['descripcion'] ?? null;
+        $turnoRaw = $request['turno'] ?? null;
+        $modalidadRaw = $request['modalidad'] ?? null;
+        $ubicacionRaw = $request['ubicacion'] ?? null;
+        $requisitosRaw = $request['requisitos'] ?? '';
+        $tecnologiasRaw = $request['tecnologias'] ?? '';
+        if (!is_string($fechaInicioRaw) || !is_string($fechaFinRaw) || !is_array($horariosRaw)) {
+            return 'Los datos de fecha y horario no son válidos.';
+        }
+        if (
+            !is_string($tituloRaw)
+            || !is_string($descripcionRaw)
+            || !is_string($turnoRaw)
+            || !is_string($modalidadRaw)
+            || !is_string($ubicacionRaw)
+            || !is_string($requisitosRaw)
+            || !is_string($tecnologiasRaw)
+        ) {
+            return 'Los detalles de la oferta no tienen un formato válido.';
+        }
+        $titulo = trim($tituloRaw);
+        $descripcion = trim($descripcionRaw);
+        $turno = $turnoRaw;
+        $modalidad = $modalidadRaw;
+        $ubicacion = trim($ubicacionRaw);
+        $requisitos = trim($requisitosRaw);
+        $tecnologias = $this->normalizeTechnologyTags($tecnologiasRaw);
+        if (
+            $titulo === ''
+            || preg_match('/\A.{1,150}\z/us', $titulo) !== 1
+            || preg_match('/\A.{1,2000}\z/us', $descripcion) !== 1
+        ) {
+            return 'Indica un título de hasta 150 caracteres y una descripción de hasta 2.000 caracteres.';
+        }
+        if (!in_array($turno, ['M', 'T', 'P', 'Indiferente'], true)) {
+            return 'Selecciona un tipo de turno válido.';
+        }
+        if (!in_array($modalidad, ['Presencial', 'Remoto', 'Híbrido'], true)) {
+            return 'Selecciona una modalidad válida.';
+        }
+        if (
+            ($modalidad !== 'Remoto' && $ubicacion === '')
+            || preg_match('/\A.{0,255}\z/us', $ubicacion) !== 1
+        ) {
+            return 'Indica una ubicación de hasta 255 caracteres para las modalidades presencial e híbrida.';
+        }
+        if (preg_match('/\A.{0,2000}\z/us', $requisitos) !== 1 || $tecnologias === false) {
+            return 'Los requisitos no pueden superar 2.000 caracteres y las tecnologías deben ser hasta 10 etiquetas de 50 caracteres.';
         }
         $fechaInicio = $this->parsearFecha($fechaInicioRaw);
         $fechaFin = $this->parsearFecha($fechaFinRaw);
@@ -171,8 +294,38 @@ class OfertaController {
         if ($fechaFin <= $fechaInicio) {
             return 'La fecha de fin debe ser posterior a la fecha de inicio.';
         }
-        if (!in_array($turno, ['M', 'T', 'Indiferente'], true)) {
-            return 'Selecciona un turno válido.';
+        $horarios = [];
+        foreach ($horariosRaw as $dia => $horario) {
+            $diaNumero = filter_var($dia, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 7]]);
+            if ($diaNumero === false || !is_array($horario)) {
+                return 'Selecciona días y horarios semanales válidos.';
+            }
+            $activo = $horario['activo'] ?? '';
+            if (!in_array($activo, ['', '1'], true)) {
+                return 'Selecciona días y horarios semanales válidos.';
+            }
+            if ($activo !== '1') {
+                continue;
+            }
+            $horaInicio = $horario['hora_inicio'] ?? null;
+            $horaFin = $horario['hora_fin'] ?? null;
+            if (
+                !is_string($horaInicio)
+                || !is_string($horaFin)
+                || preg_match('/^(?:[01]\d|2[0-3]):(?:[0-5][05])$/', $horaInicio) !== 1
+                || preg_match('/^(?:[01]\d|2[0-3]):(?:[0-5][05])$/', $horaFin) !== 1
+                || $horaFin <= $horaInicio
+            ) {
+                return 'Cada día seleccionado necesita una hora válida en intervalos de cinco minutos.';
+            }
+            $horarios[] = [
+                'dia_semana' => (int)$diaNumero,
+                'hora_inicio' => $horaInicio . ':00',
+                'hora_fin' => $horaFin . ':00',
+            ];
+        }
+        if ($horarios === []) {
+            return 'Selecciona al menos un día y una franja horaria semanal.';
         }
         if (!$this->empresaModel->tieneConvenioParaFechas(
             $empresaId,
@@ -191,7 +344,14 @@ class OfertaController {
                 $plazas,
                 $fechaInicio->format('Y-m-d'),
                 $fechaFin->format('Y-m-d'),
-                $turno
+                $titulo,
+                $descripcion,
+                $turno,
+                $modalidad,
+                $ubicacion !== '' ? $ubicacion : null,
+                $requisitos !== '' ? $requisitos : null,
+                $tecnologias !== '' ? $tecnologias : null,
+                $horarios
             );
             if ($ofertaId < 1) {
                 $this->db->rollBack();
@@ -223,4 +383,51 @@ class OfertaController {
         return $fecha;
     }
 
+    private function withWeeklySchedules(array $offers): array
+    {
+        foreach ($offers as &$offer) {
+            $offer['horarios'] = $this->ofertaModel->obtenerHorarioSemanal((int)$offer['id']);
+        }
+        unset($offer);
+        return $offers;
+    }
+
+    private function formValues(array $request): array
+    {
+        $fields = ['titulo', 'descripcion', 'especialidad_id', 'plazas', 'fecha_inicio', 'fecha_fin', 'turno', 'modalidad', 'ubicacion', 'requisitos', 'tecnologias'];
+        $values = [];
+        foreach ($fields as $field) {
+            $values[$field] = isset($request[$field]) && is_string($request[$field])
+                ? $request[$field]
+                : '';
+        }
+
+        return $values;
+    }
+
+    private function normalizeTechnologyTags(string $value): string|false
+    {
+        $value = trim($value);
+        if (preg_match('/\A.{0,500}\z/us', $value) !== 1) {
+            return false;
+        }
+        if ($value === '') {
+            return '';
+        }
+
+        $tags = array_values(array_unique(array_filter(
+            array_map('trim', explode(',', $value)),
+            static fn(string $tag): bool => $tag !== ''
+        )));
+        if (count($tags) > 10) {
+            return false;
+        }
+        foreach ($tags as $tag) {
+            if (preg_match('/\A.{1,50}\z/us', $tag) !== 1) {
+                return false;
+            }
+        }
+
+        return implode(', ', $tags);
+    }
 }

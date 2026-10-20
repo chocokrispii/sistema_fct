@@ -5,6 +5,7 @@ require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/FileScanner.php';
+require_once __DIR__ . '/../Core/JsonResponse.php';
 require_once __DIR__ . '/../Core/PhpIni.php';
 require_once __DIR__ . '/../../config/storage.php';
 
@@ -211,28 +212,86 @@ class ConvenioController
 
     public function revisar(): void
     {
-        View::render('convenios/revisar', ['convenios' => $this->convenioModel->listar(null, 'Pendiente')]);
+        View::render('convenios/revisar', [
+            'convenios' => $this->convenioModel->listar(null, 'Pendiente'),
+            'puedeResolver' => ($_SESSION['rol'] ?? null) === 'Administrador',
+        ]);
+    }
+
+    public function auditar(): void
+    {
+        View::render('convenios/observador', [
+            'convenios' => $this->convenioModel->listarParaObservador(),
+        ]);
     }
 
     public function resolver(): void
     {
-        $id = filter_var($_POST['convenio_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $decision = $_POST['decision'] ?? '';
-        $motivoRaw = $_POST['motivo'] ?? '';
+        if (($_SESSION['rol'] ?? null) !== 'Administrador') {
+            http_response_code(403);
+            if (JsonResponse::wantsJson()) {
+                JsonResponse::failure('Solo un administrador puede resolver convenios.', 403);
+                return;
+            }
+            throw new RuntimeException('Solo un administrador puede resolver convenios.');
+        }
+        $jsonRequest = JsonResponse::wantsJson();
+        $requestValues = $_POST;
+        $contentType = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+        if (str_contains($contentType, 'application/json')) {
+            try {
+                $decoded = json_decode((string)file_get_contents('php://input'), false, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                JsonResponse::failure('El cuerpo JSON no es válido.', 400);
+                return;
+            }
+            if (!$decoded instanceof stdClass) {
+                JsonResponse::failure('El cuerpo JSON debe ser un objeto de datos.', 400);
+                return;
+            }
+            $requestValues = get_object_vars($decoded);
+        }
+
+        $convenioId = $requestValues['convenio_id'] ?? null;
+        $id = is_int($convenioId) || is_string($convenioId)
+            ? filter_var($convenioId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+            : false;
+        $decisionValue = $requestValues['decision'] ?? '';
+        $decision = is_string($decisionValue) ? $decisionValue : '';
+        $motivoRaw = $requestValues['motivo'] ?? '';
         if (!is_string($motivoRaw)) {
+            if ($jsonRequest) {
+                JsonResponse::failure('El motivo de revisión no es válido.', 422);
+                return;
+            }
             throw new InvalidArgumentException('El motivo de revisión no es válido.');
         }
         $motivo = trim($motivoRaw);
         if ($id === false || !in_array($decision, ['Aprobado', 'Rechazado'], true)) {
+            if ($jsonRequest) {
+                JsonResponse::failure('La decisión de revisión no es válida.', 422);
+                return;
+            }
             throw new InvalidArgumentException('La decisión de revisión no es válida.');
         }
         if ($decision === 'Rechazado' && $motivo === '') {
+            if ($jsonRequest) {
+                JsonResponse::failure('Indica el motivo del rechazo.', 422);
+                return;
+            }
             throw new InvalidArgumentException('Indica el motivo del rechazo.');
+        }
+        if (preg_match('/\A.{501}/us', $motivo) !== 0) {
+            if ($jsonRequest) {
+                JsonResponse::failure('El motivo de revisión no puede superar los 500 caracteres.', 422);
+                return;
+            }
+            throw new InvalidArgumentException('El motivo de revisión no puede superar los 500 caracteres.');
         }
         $this->db->beginTransaction();
         try {
             if (!$this->convenioModel->resolver((int)$id, $decision, $motivo, (int)$_SESSION['usuario_id'])) {
-                throw new RuntimeException('El convenio ya fue revisado o no existe.');
+                throw new DomainException('El convenio ya fue revisado o no existe.');
             }
             (new Auditoria($this->db))->registrar(
                 (int)$_SESSION['usuario_id'],
@@ -242,11 +301,27 @@ class ConvenioController
                 'estado=' . $decision
             );
             $this->db->commit();
+        } catch (DomainException $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            if ($jsonRequest) {
+                JsonResponse::failure($e->getMessage(), 409);
+                return;
+            }
+            throw $e;
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
             throw $e;
+        }
+        if ($jsonRequest) {
+            JsonResponse::success([
+                'message' => 'El convenio se ha ' . ($decision === 'Aprobado' ? 'aprobado.' : 'rechazado.'),
+                'decision' => $decision,
+            ]);
+            return;
         }
         header('Location: index.php?action=revisar-convenios');
         exit;

@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/Core/PhpIni.php';
 require_once __DIR__ . '/../app/Core/View.php';
+require_once __DIR__ . '/../app/Core/FrontendAssets.php';
+require_once __DIR__ . '/../app/Core/JsonResponse.php';
 require_once __DIR__ . '/../app/Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
 require_once __DIR__ . '/../app/Controllers/AuthController.php';
@@ -13,6 +15,7 @@ require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
 require_once __DIR__ . '/../app/Controllers/EmpresaController.php';
 require_once __DIR__ . '/../app/Controllers/OfertaController.php';
 require_once __DIR__ . '/../app/Controllers/DisponibilidadController.php';
+require_once __DIR__ . '/../app/Controllers/DevelopmentPreviewController.php';
 require_once __DIR__ . '/../app/Controllers/AsignacionController.php';
 require_once __DIR__ . '/../app/Controllers/CalificacionController.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
@@ -43,7 +46,13 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Cache-Control: no-store');
-header("Content-Security-Policy: default-src 'self'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'");
+$viteOrigin = FrontendAssets::developmentOrigin();
+$contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
+if ($viteOrigin !== null) {
+    $viteWebSocketOrigin = 'ws://' . substr($viteOrigin, strlen('http://'));
+    $contentSecurityPolicy = "default-src 'self'; script-src 'self' $viteOrigin; style-src 'self' $viteOrigin 'unsafe-inline'; connect-src 'self' $viteOrigin $viteWebSocketOrigin; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
+}
+header('Content-Security-Policy: ' . $contentSecurityPolicy);
 
 $action = $_GET['action'] ?? 'inicio';
 $routes = require __DIR__ . '/../routes/web.php';
@@ -83,8 +92,17 @@ try {
     if (http_response_code() < 400) {
         http_response_code(500);
     }
-    View::render('errors/generic', ['status' => http_response_code()]);
+    if (JsonResponse::wantsJson()) {
+        JsonResponse::failure('No se pudo completar la solicitud.', http_response_code());
+    } else {
+        View::render('errors/generic', ['status' => http_response_code()]);
+    }
 }
 
 $contenido = ob_get_clean();
+if (JsonResponse::hasSent()) {
+    echo $contenido;
+    exit;
+}
+
 require __DIR__ . '/../app/Views/layouts/main.php';

@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.docker.example
+node_modules
+public/build
 storage/*
 !storage/.htaccess
 tests

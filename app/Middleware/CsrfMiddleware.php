@@ -13,7 +13,7 @@ final class CsrfMiddleware
 
     public static function verify(): void
     {
-        $submitted = $_POST['_csrf'] ?? '';
+        $submitted = $_POST['_csrf'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
         $expected = $_SESSION['csrf_token'] ?? '';
 
         if (!is_string($submitted) || !is_string($expected) || $expected === '' || !hash_equals($expected, $submitted)) {

@@ -45,7 +45,6 @@
                         <?php foreach ($disponibilidades as $item): ?>
                             <li>
                                 <strong><?= htmlspecialchars($item['fecha_inicio'] . ' – ' . $item['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></strong>
-                                <span><?= htmlspecialchars($item['turno'] === 'M' ? 'Mañana' : ($item['turno'] === 'T' ? 'Tarde' : 'Indiferente'), ENT_QUOTES, 'UTF-8') ?></span>
                             </li>
                         <?php endforeach; ?>
                     </ul>
@@ -72,9 +71,12 @@
                         <p>Asignaciones realizadas por el centro.</p>
                     </div>
                 </div>
+                <?php if (array_filter($asignaciones, static fn(array $item): bool => $item['estado'] === 'Asignada') !== []): ?>
+                    <div data-vue-island="AssignedCompany"></div>
+                <?php endif; ?>
                 <?php if ($asignaciones === []): ?>
                     <p>No tienes prácticas asignadas actualmente.</p>
-                    <a class="student-portal__text-action" href="index.php?action=ofertas">Consultar ofertas públicas</a>
+                    <p>Solo se muestran datos de empresa cuando el centro confirma una asignación.</p>
                 <?php else: ?>
                     <ul class="student-portal__list">
                         <?php foreach ($asignaciones as $item): ?>

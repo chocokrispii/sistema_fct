@@ -6,6 +6,7 @@ require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Disponibilidad.php';
 require_once __DIR__ . '/../Models/Asignacion.php';
 require_once __DIR__ . '/../Models/Calificacion.php';
+require_once __DIR__ . '/../Core/JsonResponse.php';
 require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 
 class AlumnoController
@@ -272,12 +273,30 @@ class AlumnoController
         $values['tutor_telefono'] = $guardianData['telefono'] ?? '';
         $values['tutor_correo'] = $guardianData['correo'] ?? '';
         $error = '';
+        $errorStatus = 422;
         $fieldErrors = [];
         $tutorData = null;
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $jsonRequest = JsonResponse::wantsJson();
+            $contentType = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+            $requestValues = $_POST;
+            if (str_contains($contentType, 'application/json')) {
+                try {
+                    $decoded = json_decode((string)file_get_contents('php://input'), false, 512, JSON_THROW_ON_ERROR);
+                } catch (JsonException) {
+                    JsonResponse::failure('El cuerpo JSON no es válido.', 400);
+                    return;
+                }
+                if (!$decoded instanceof stdClass) {
+                    JsonResponse::failure('El cuerpo JSON debe ser un objeto de datos.', 400);
+                    return;
+                }
+                $requestValues = get_object_vars($decoded);
+            }
+
             foreach ($values as $field => $_value) {
-                $posted = $_POST[$field] ?? '';
+                $posted = $requestValues[$field] ?? '';
                 if (!is_string($posted)) {
                     $error = 'Revisa los datos del formulario; todos los campos deben ser texto válido.';
                     break;
@@ -378,16 +397,29 @@ class AlumnoController
                         $tutorData
                     );
                     $_SESSION['email'] = $values['email'];
+                    if ($jsonRequest) {
+                        JsonResponse::success(['message' => 'Tus datos se han actualizado.']);
+                        return;
+                    }
                     header('Location: index.php?action=perfil-alumno&guardado=1');
                     exit;
                 } catch (PDOException $exception) {
                     if ((string)$exception->getCode() === '23000') {
                         $error = 'El correo o DNI/NIE indicado ya está asociado a otra cuenta.';
+                        $errorStatus = 409;
                     } else {
                         error_log('Error al actualizar perfil de alumno: ' . $exception->getMessage());
                         $error = 'No se pudo guardar el expediente. Inténtalo de nuevo o contacta con el centro.';
+                        $errorStatus = 500;
                     }
                 }
+            }
+            if ($jsonRequest) {
+                JsonResponse::failure(
+                    $error !== '' ? $error : 'Revisa los campos indicados y vuelve a intentarlo.',
+                    $errorStatus
+                );
+                return;
             }
         }
 

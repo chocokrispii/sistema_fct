@@ -1,0 +1,250 @@
+@page {
+    size: A4;
+    margin: 18mm 17mm 19mm;
+}
+
+:root {
+    color-scheme: light;
+    --navy: #112b43;
+    --teal: #087f82;
+    --aqua: #20a4a0;
+    --ink: #26394a;
+    --muted: #536b7d;
+    --pale: #eaf4f5;
+    --line: #d5e1e8;
+    --paper: #ffffff;
+}
+
+html {
+    font-family: "Aptos", "Segoe UI", Arial, sans-serif;
+    color: var(--ink);
+    font-size: 10pt;
+    line-height: 1.55;
+    background: #fff;
+}
+
+body {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 0;
+}
+
+h1 {
+    color: #fff;
+    font-size: 29pt;
+    line-height: 1.1;
+    letter-spacing: -0.5pt;
+    margin: 0 -17mm 22pt;
+    padding: 24pt 17mm 21pt;
+    background: linear-gradient(115deg, var(--navy) 0%, #174e67 62%, var(--teal) 100%);
+    border-bottom: 4pt solid var(--aqua);
+    box-shadow: 0 5pt 13pt rgb(17 43 67 / 16%);
+    break-after: avoid-page;
+}
+
+h2 {
+    color: var(--navy);
+    font-size: 16pt;
+    line-height: 1.25;
+    margin: 24pt 0 10pt;
+    padding: 7pt 10pt 7pt 11pt;
+    background: linear-gradient(90deg, #e4f2f2, #f5f9fa 78%);
+    border-left: 3pt solid var(--teal);
+    border-radius: 0 5pt 5pt 0;
+    break-after: avoid-page;
+}
+
+h3 {
+    color: var(--teal);
+    font-size: 12pt;
+    margin: 17pt 0 7pt;
+    padding-bottom: 3pt;
+    border-bottom: 0.6pt solid var(--line);
+    break-after: avoid-page;
+}
+
+p {
+    margin: 0 0 9pt;
+    orphans: 3;
+    widows: 3;
+}
+
+a {
+    color: #075f73;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+strong {
+    color: var(--navy);
+}
+
+ul,
+ol {
+    padding-left: 22pt;
+    margin: 4pt 0 12pt;
+}
+
+li {
+    padding-left: 3pt;
+    margin: 0 0 5pt;
+}
+
+li::marker {
+    color: var(--teal);
+    font-weight: 700;
+}
+
+code {
+    font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+    font-size: 8.3pt;
+    color: #12465b;
+    background: #e8f3f5;
+    padding: 1.5pt 3.5pt;
+    border-radius: 2pt;
+    overflow-wrap: anywhere;
+}
+
+pre {
+    font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+    font-size: 8pt;
+    line-height: 1.4;
+    color: #f6fbff;
+    background: #10283a;
+    border: 0.7pt solid #31536a;
+    border-left: 4pt solid var(--aqua);
+    border-radius: 5pt;
+    padding: 11pt 13pt;
+    margin: 9pt 0 15pt;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    box-shadow: 0 3pt 8pt rgb(16 40 58 / 13%);
+    break-inside: avoid;
+}
+
+pre code {
+    color: #f6fbff !important;
+    background: transparent !important;
+    padding: 0;
+    border-radius: 0;
+    font-size: inherit;
+}
+
+pre code span,
+pre code span[class],
+pre.sourceCode code span,
+pre.sourceCode code span[class],
+div.sourceCode pre code span,
+div.sourceCode pre code span[class] {
+    color: #f6fbff !important;
+    background: transparent !important;
+    text-decoration: none !important;
+}
+
+pre.sourceCode,
+div.sourceCode pre {
+    color: #f6fbff;
+    background: #10283a;
+}
+
+blockquote {
+    color: #354f62;
+    margin: 12pt 0;
+    padding: 9pt 13pt;
+    background: linear-gradient(100deg, var(--pale), #f5f9fa);
+    border-left: 3pt solid var(--teal);
+    border-radius: 0 5pt 5pt 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10pt 0 16pt;
+    font-size: 9pt;
+    break-inside: avoid;
+}
+
+thead {
+    display: table-header-group;
+}
+
+th {
+    background: linear-gradient(100deg, var(--navy), #24556a);
+    color: #fff;
+    text-align: left;
+    font-weight: 700;
+}
+
+th,
+td {
+    border: 0.6pt solid var(--line);
+    padding: 6pt 8pt;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+tbody tr:nth-child(even) {
+    background: #f3f7f8;
+}
+
+tbody tr:hover {
+    background: #e5f2f2;
+}
+
+hr {
+    border: 0;
+    border-top: 1.2pt solid var(--line);
+    margin: 16pt 0;
+}
+
+@media screen {
+    body {
+        max-width: 820px;
+        padding: 48px 64px;
+        background: var(--paper);
+        box-shadow: 0 8px 32px rgb(23 50 77 / 14%);
+        border-radius: 8px;
+    }
+
+    html {
+        background:
+            radial-gradient(ellipse at 12% 4%, rgb(32 164 160 / 11%), transparent 27%),
+            linear-gradient(140deg, #eaf0f4, #f7f9fa 52%, #e5eff0);
+        padding: 28px 16px;
+    }
+}
+
+@media print {
+    html,
+    body {
+        background: #fff;
+    }
+
+    body {
+        max-width: none;
+    }
+
+    pre,
+    pre.sourceCode,
+    div.sourceCode pre {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    h1,
+    h2,
+    th,
+    blockquote {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    a {
+        color: #075f73;
+    }
+
+    h2,
+    h3 {
+        break-after: avoid-page;
+    }
+}
