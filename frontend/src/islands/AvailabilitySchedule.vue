@@ -9,7 +9,7 @@ import type {
     SavedAvailabilitySchedule,
 } from '../types/availability';
 
-const props = defineProps<{ state: string; preview?: string }>();
+const props = defineProps<{ state: string; preview?: boolean }>();
 const initial = JSON.parse(props.state) as AvailabilityIslandState;
 const days = reactive(initial.days.map((day) => ({ ...day })));
 const selectedCount = computed(() => days.filter((day) => day.active).length);
@@ -90,7 +90,7 @@ async function save(target: HTMLFormElement): Promise<void> {
     if (status.value === 'saving') {
         return;
     }
-    if (props.preview === 'true') {
+    if (props.preview === true) {
         status.value = 'saved';
         announcement.value = 'Vista previa: los cambios son locales y no se guardaron.';
         return;
@@ -249,7 +249,7 @@ onBeforeUnmount(() => {
                 </table>
             </div>
         </fieldset>
-        <p v-if="status === 'saved' && props.preview !== 'true'" class="message message-success" role="status">Disponibilidad guardada con éxito.</p>
+        <p v-if="status === 'saved' && props.preview !== true" class="message message-success" role="status">Disponibilidad guardada con éxito.</p>
         <p v-if="error" class="message message-error" role="alert">{{ error }}</p>
     </div>
 </template>

@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../Core/JsonResponse.php';
 
 final class AuthMiddleware
 {
@@ -15,6 +16,10 @@ final class AuthMiddleware
             if ($route === 'descargar-convenio') {
                 self::auditDeniedDownload(null, 'autenticacion_requerida');
             }
+            if (JsonResponse::wantsJson()) {
+                http_response_code(401);
+                throw new RuntimeException('Se requiere autenticación para acceder a esta sección.');
+            }
             header('Location: index.php?action=login');
             exit;
         }
@@ -28,6 +33,10 @@ final class AuthMiddleware
             }
             $_SESSION = [];
             session_destroy();
+            if (JsonResponse::wantsJson()) {
+                http_response_code(401);
+                throw new RuntimeException('La cuenta no está activa.');
+            }
             header('Location: index.php?action=login');
             exit;
         }

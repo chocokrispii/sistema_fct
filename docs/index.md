@@ -77,11 +77,11 @@ La guía para Administradores explica la consola de la API propia y cómo consul
 - **Calificaciones:** Administrador y Coordinador pueden registrar una nota de 0 a 10 con hasta dos decimales; el alumno consulta las suyas.
 - **Roles:** las acciones y permisos se declaran en `routes/web.php`. El perfil Observador es de solo lectura, con anonimización y sin documentos privados. Consulta [Roles y permisos](/roles_y_permisos).
 - **Tema:** el selector claro/oscuro respeta la preferencia del sistema hasta que se elige un tema, y guarda la elección manual en el navegador.
-- **Documentos:** el escaneo ClamAV es fail-closed cuando está habilitado. El bypass exige `FCT_CLAMAV_ENABLED=false` y `APP_ENV=development`, y queda registrado; no se permite en otros entornos. Consulta [seguridad y antivirus](/seguridad_y_antivirus).
+- **Documentos:** el escaneo ClamAV es fail-closed cuando está habilitado. Compose usa `APP_ENV=production` y escaneo habilitado por defecto. El bypass exige definir `FCT_CLAMAV_ENABLED=false` y un `APP_ENV` de `development`, `test` o `testing`; se registra en el log. Consulta [seguridad y antivirus](/seguridad_y_antivirus).
 
 ## Navegación de la documentación
 
-Empieza por [arquitectura y ciclo de vida](/flujo-de-datos), explora el [diagrama completo](/diagrama-completo), consulta [roles y permisos](/roles_y_permisos), la [disponibilidad](/componentes/disponibilidad), [seguridad y antivirus](/seguridad_y_antivirus), o la [guía del código para no técnicos](/guia-del-codigo-para-no-tecnicos). El `README.md` de la raíz contiene instalación, desarrollo, pruebas y solución de problemas en mayor detalle.
+Empieza por [arquitectura y ciclo de vida](/flujo-de-datos), explora el [diagrama completo](/diagrama-completo), consulta [roles y permisos](/roles_y_permisos), la [API REST tokenizada](/api-rest), la [disponibilidad](/componentes/disponibilidad), [seguridad y antivirus](/seguridad_y_antivirus), o la [guía del código para no técnicos](/guia-del-codigo-para-no-tecnicos). El `README.md` de la raíz contiene instalación, desarrollo, pruebas y solución de problemas en mayor detalle.
 
 ## Desarrollo del frontend y documentación
 

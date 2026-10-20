@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/Core/ApiToken.php';
+require_once __DIR__ . '/../app/Core/JsonResponse.php';
+require_once __DIR__ . '/../app/Core/ApiResponseAdapter.php';
+require_once __DIR__ . '/../app/Core/ApiRolePolicy.php';
 require_once __DIR__ . '/../app/Core/PhpIni.php';
 require_once __DIR__ . '/../app/Core/Webhook.php';
 require_once __DIR__ . '/../app/Models/Auditoria.php';
@@ -20,18 +23,38 @@ header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 
 $respond = static function (int $status, array $body): never {
-    http_response_code($status);
-    echo json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    JsonResponse::success(ApiResponseAdapter::successData($body), $status);
     exit;
 };
-$fail = static function (int $status, string $code, string $message) use ($respond): never {
-    $respond($status, ['error' => ['code' => $code, 'message' => $message]]);
+$fail = static function (int $status, string $code, string $message): never {
+    header('X-API-Error-Code: ' . $code);
+    JsonResponse::failure($message, $status);
+    exit;
+};
+$authorizationHeader = static function (): ?string {
+    foreach ([
+        $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+        $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null,
+    ] as $authorization) {
+        if (is_string($authorization) && $authorization !== '') {
+            return $authorization;
+        }
+    }
+
+    if (function_exists('getallheaders')) {
+        foreach (getallheaders() as $name => $value) {
+            if (is_string($name) && strcasecmp($name, 'Authorization') === 0 && is_string($value)) {
+                return $value;
+            }
+        }
+    }
+
+    return null;
 };
 
 try {
     $db = getPDOConnection();
-    $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? null;
-    $identity = ApiToken::authenticate($db, is_string($authorization) ? $authorization : null);
+    $identity = ApiToken::authenticate($db, $authorizationHeader());
     if ($identity === null) {
         header('WWW-Authenticate: Bearer');
         $fail(401, 'unauthorized', 'Se requiere un token Bearer válido y activo.');
@@ -137,11 +160,11 @@ try {
         apiCreateAgreement($db, $userId, $companyId, $respond, $fail);
     }
     if ($method === 'PATCH' && $id !== null && $resource === 'ofertas') {
-        apiRequireRole($role, ['Administrador', 'Coordinador'], $fail);
+        apiRequireRole($role, ApiRolePolicy::reviewRoles($resource), $fail);
         apiReviewOffer($db, $id, $userId, $respond, $fail);
     }
     if ($method === 'PATCH' && $id !== null && $resource === 'convenios') {
-        apiRequireRole($role, ['Administrador', 'Coordinador'], $fail);
+        apiRequireRole($role, ApiRolePolicy::reviewRoles($resource), $fail);
         apiReviewAgreement($db, $id, $userId, $respond, $fail);
     }
     if ($method === 'PATCH' && $id !== null && $resource === 'asignaciones') {
@@ -363,13 +386,87 @@ function apiCreateOffer(PDO $db, int $userId, ?int $companyId, Closure $respond,
     $start = apiDate($input['fecha_inicio'] ?? null);
     $end = apiDate($input['fecha_fin'] ?? null);
     $shift = $input['turno'] ?? 'Indiferente';
+    $title = $input['titulo'] ?? 'Oferta FCT';
+    $description = $input['descripcion'] ?? '';
+    $modality = $input['modalidad'] ?? 'Presencial';
+    $location = $input['ubicacion'] ?? '';
+    $requirements = $input['requisitos_tecnologicos'] ?? $input['requisitos'] ?? '';
+    $technologies = $input['tecnologias'] ?? '';
+    $weeklyHoursRaw = $input['horarios'] ?? [];
     if ($specialtyId === false || $seats === false || $start === null || $end === null || $end <= $start
-        || $start < new DateTimeImmutable('today') || !in_array($shift, ['M', 'T', 'Indiferente'], true)) {
+        || $start < new DateTimeImmutable('today') || !is_string($shift)
+        || !in_array($shift, ['M', 'T', 'P', 'Indiferente'], true)
+        || !is_string($title) || preg_match('/\A.{1,150}\z/us', trim($title)) !== 1
+        || !is_string($description) || preg_match('/\A.{0,2000}\z/us', $description) !== 1
+        || !is_string($modality) || !in_array($modality, ['Presencial', 'Remoto', 'Híbrido'], true)
+        || !is_string($location) || preg_match('/\A.{0,255}\z/us', trim($location)) !== 1
+        || !is_string($requirements) || preg_match('/\A.{0,2000}\z/us', $requirements) !== 1
+        || !is_string($technologies) || preg_match('/\A.{0,500}\z/us', $technologies) !== 1
+        || !is_array($weeklyHoursRaw)) {
         $fail(422, 'invalid_offer', 'Ciclo, plazas, fechas o turno no válidos.');
     }
-    $specialty = $db->prepare('SELECT 1 FROM especialidades WHERE id = :id');
+    if (
+        array_key_exists('modalidad', $input)
+        && $modality !== 'Remoto'
+        && trim($location) === ''
+    ) {
+        $fail(422, 'invalid_offer', 'Indica la ubicación para las modalidades presencial e híbrida.');
+    }
+
+    $title = trim($title);
+    $description = trim($description);
+    $location = trim($location);
+    $requirements = trim($requirements);
+    $technologyTags = [];
+    if ($technologies !== '') {
+        foreach (explode(',', $technologies) as $tag) {
+            $tag = trim($tag);
+            if ($tag === '') {
+                continue;
+            }
+            if (mb_strlen($tag) > 50 || count($technologyTags) >= 10) {
+                $fail(422, 'invalid_offer', 'Las tecnologías admiten hasta 10 etiquetas de 50 caracteres.');
+            }
+            $technologyTags[$tag] = $tag;
+        }
+    }
+    $technologies = implode(', ', array_values($technologyTags));
+
+    $weeklyHours = [];
+    $usedDays = [];
+    foreach ($weeklyHoursRaw as $weeklyHour) {
+        if (!is_array($weeklyHour)) {
+            $fail(422, 'invalid_offer', 'Los horarios deben ser una lista de días y franjas horarias.');
+        }
+        $day = filter_var($weeklyHour['dia_semana'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 7]]);
+        $timeStart = $weeklyHour['hora_inicio'] ?? null;
+        $timeEnd = $weeklyHour['hora_fin'] ?? null;
+        if (
+            $day === false
+            || isset($usedDays[$day])
+            || !is_string($timeStart)
+            || !is_string($timeEnd)
+            || preg_match('/\A(?:[01]\d|2[0-3]):(?:[0-5][05])\z/', $timeStart) !== 1
+            || preg_match('/\A(?:[01]\d|2[0-3]):(?:[0-5][05])\z/', $timeEnd) !== 1
+            || $timeEnd <= $timeStart
+        ) {
+            $fail(422, 'invalid_offer', 'Cada día debe tener una franja válida en intervalos de cinco minutos.');
+        }
+        $usedDays[$day] = true;
+        $weeklyHours[] = [
+            'dia_semana' => (int)$day,
+            'hora_inicio' => $timeStart . ':00',
+            'hora_fin' => $timeEnd . ':00',
+        ];
+    }
+    if (array_key_exists('horarios', $input) && $weeklyHours === []) {
+        $fail(422, 'invalid_offer', 'Selecciona al menos un horario semanal.');
+    }
+
+    $specialty = $db->prepare('SELECT nombre_especialidad FROM especialidades WHERE id = :id');
     $specialty->execute(['id' => $specialtyId]);
-    if (!$specialty->fetchColumn()) {
+    $cycleName = $specialty->fetchColumn();
+    if (!is_string($cycleName)) {
         $fail(422, 'invalid_offer', 'El ciclo formativo no existe.');
     }
     $agreement = $db->prepare(
@@ -390,8 +487,10 @@ function apiCreateOffer(PDO $db, int $userId, ?int $companyId, Closure $respond,
     try {
         $stmt = $db->prepare(
             'INSERT INTO empresa_especialidades_plazas
-                (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno)
-             VALUES (:company_id, :specialty_id, :seats, :start_date, :end_date, :shift)'
+                (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin,
+                 titulo, descripcion, turno, modalidad, ubicacion, requisitos, tecnologias)
+             VALUES (:company_id, :specialty_id, :seats, :start_date, :end_date,
+                 :title, :description, :shift, :modality, :location, :requirements, :technologies)'
         );
         $stmt->execute([
             'company_id' => $companyId,
@@ -399,19 +498,49 @@ function apiCreateOffer(PDO $db, int $userId, ?int $companyId, Closure $respond,
             'seats' => $seats,
             'start_date' => $start->format('Y-m-d'),
             'end_date' => $end->format('Y-m-d'),
+            'title' => $title,
+            'description' => $description,
             'shift' => $shift,
+            'modality' => $modality,
+            'location' => $location !== '' ? $location : null,
+            'requirements' => $requirements !== '' ? $requirements : null,
+            'technologies' => $technologies !== '' ? $technologies : null,
         ]);
         $offerId = (int)$db->lastInsertId();
+        if ($weeklyHours !== []) {
+            $insertSchedule = $db->prepare(
+                'INSERT INTO empresa_oferta_horarios_semanales
+                    (oferta_id, dia_semana, hora_inicio, hora_fin)
+                 VALUES (:offer_id, :day, :start, :end)'
+            );
+            foreach ($weeklyHours as $weeklyHour) {
+                $insertSchedule->execute([
+                    'offer_id' => $offerId,
+                    'day' => $weeklyHour['dia_semana'],
+                    'start' => $weeklyHour['hora_inicio'],
+                    'end' => $weeklyHour['hora_fin'],
+                ]);
+            }
+        }
+        $cycleName = (string)$cycleName;
         (new Auditoria($db))->registrar($userId, 'oferta.creada', 'ofertas', $offerId);
         Webhook::enqueue($db, 'oferta.creada', [
             'oferta_id' => $offerId,
             'empresa_id' => $companyId,
             'especialidad_id' => (int)$specialtyId,
+            'ciclo' => $cycleName,
             'estado' => 'Pendiente',
             'plazas' => (int)$seats,
             'fecha_inicio' => $start->format('Y-m-d'),
             'fecha_fin' => $end->format('Y-m-d'),
+            'titulo' => $title,
+            'descripcion' => $description,
             'turno' => $shift,
+            'modalidad' => $modality,
+            'ubicacion' => $location !== '' ? $location : null,
+            'requisitos_tecnologicos' => $requirements !== '' ? $requirements : null,
+            'tecnologias' => $technologies !== '' ? $technologies : null,
+            'horarios' => $weeklyHours,
         ]);
         $db->commit();
     } catch (Throwable $exception) {

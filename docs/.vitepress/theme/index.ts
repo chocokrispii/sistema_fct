@@ -1,10 +1,14 @@
 import DefaultTheme from 'vitepress/theme'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, type App } from 'vue'
 import { useData } from 'vitepress'
+import MermaidLazy from './MermaidLazy.vue'
 import './custom.css'
 
 export default {
   extends: DefaultTheme,
+  enhanceApp({ app }: { app: App }) {
+    app.component('MermaidLazy', MermaidLazy)
+  },
   Layout: defineComponent({
     name: 'DocumentationLayout',
     setup() {

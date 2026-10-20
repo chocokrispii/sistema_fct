@@ -22,11 +22,14 @@ final class FileScanner
             }
             if ($enabled === 'false') {
                 $appEnvironment = getenv('APP_ENV');
-                if (is_string($appEnvironment) && strtolower(trim($appEnvironment)) === 'development') {
-                    error_log('PASSED_DEV_MOCK: archivo no escaneado; bypass explícito en desarrollo local (FCT_CLAMAV_ENABLED=false).');
+                if (
+                    is_string($appEnvironment)
+                    && in_array(strtolower(trim($appEnvironment)), ['development', 'test', 'testing'], true)
+                ) {
+                    error_log('PASSED_DEV_MOCK: archivo no escaneado; bypass explícito en desarrollo/pruebas (FCT_CLAMAV_ENABLED=false).');
                     return;
                 }
-                throw new FileScannerUnavailableException('El análisis antivirus solo puede desactivarse en desarrollo.');
+                throw new FileScannerUnavailableException('El análisis antivirus solo puede desactivarse en desarrollo o pruebas.');
             }
         }
 

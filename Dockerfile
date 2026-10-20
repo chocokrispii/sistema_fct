@@ -7,8 +7,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY tsconfig.json vite.config.ts ./
+COPY tsconfig.json vite.config.ts postcss.config.cjs ./
 COPY frontend ./frontend
+COPY public/assets/css ./public/assets/css
 RUN npm run build
 
 FROM php:8.2-apache

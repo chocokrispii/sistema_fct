@@ -22,7 +22,7 @@ Set-Location .\Practicas_Desarrollo
 Copy-Item .env.example .env
 ```
 
-La plantilla define `PMA_PORT=8082`, `APP_ENV=development` y `FCT_CLAMAV_ENABLED=false`. El último valor omite explícitamente el escaneo para facilitar pruebas locales y no es válido fuera de desarrollo. Para probar el antivirus, cámbialo a `true`.
+La plantilla local define `PMA_PORT=8082`, `APP_ENV=development` y `FCT_CLAMAV_ENABLED=false`. Ese último valor omite explícitamente el escaneo para facilitar pruebas locales; el bypass sólo se acepta con `APP_ENV=development`, `test` o `testing`. Si no se definen variables, Compose usa `APP_ENV=production` y mantiene el análisis habilitado (`FCT_CLAMAV_ENABLED=true`).
 
 Inicia los servicios y genera cuentas demo:
 
@@ -34,23 +34,49 @@ docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 ap
 
 El generador imprime contraseñas aleatorias una sola vez y renueva las anteriores en cada ejecución. Guárdalas de forma segura. No ejecutes la semilla en producción.
 
+## Antivirus local
+
+Compose inicia el servicio ClamAV y la aplicación se conecta a `clamav:3310` dentro de la red Docker. Para que las cargas se analicen, establece `FCT_CLAMAV_ENABLED=true` en `.env` y espera a que `docker compose ps` muestre ClamAV como `healthy`. El primer arranque puede tardar mientras se descargan las firmas. Si se habilita el análisis y ClamAV no responde, las cargas se rechazan.
+
+Para desarrollo sin antivirus, define ambos valores `APP_ENV=development` y `FCT_CLAMAV_ENABLED=false`; el servidor registra que omitió el análisis. El mismo bypass se acepta para los entornos `test` y `testing`, pero no en entornos compartidos o de producción. Compose publica el puerto del scanner sólo en `127.0.0.1:3310` para pruebas locales; no lo expongas en una interfaz de red pública.
+
 ## Direcciones locales
 
 | Servicio | URL |
 |---|---|
-| Aplicación PHP | `http://localhost:8080` |
-| phpMyAdmin | `http://localhost:8082` |
+| Aplicación PHP | `http://localhost:8080` (configurable con `APP_PORT`) |
+| phpMyAdmin | `http://localhost:8082` (configurable con `PMA_PORT`, sólo loopback) |
+| MariaDB desde el host | `127.0.0.1:3307` (mapeo fijo en `docker-compose.yml`) |
+| ClamAV desde el host, para pruebas | `127.0.0.1:3310` (sólo loopback) |
 | Vista previa de disponibilidad | `http://localhost:8080/index.php?action=preview-disponibilidad` |
 | Vista previa de oferta | `http://localhost:8080/dev/preview-publicar-oferta` |
-| Vite HMR (opcional) | `http://localhost:5173` |
+| Vite HMR (opcional) | `http://localhost:5173` (`npm run dev` o perfil `frontend-dev`) |
+| Portal VitePress (opcional) | `http://localhost:5174` (`npm run docs:dev -- --port 5174`) |
 
-La vista previa sólo se registra en `APP_ENV=development`. Consulta [Disponibilidad](/componentes/disponibilidad) para el flujo de guardado.
+Las vistas previas (`preview-disponibilidad` y `preview-publicar-oferta`) sólo se registran cuando `APP_ENV` es `development` o `local` (`DevelopmentPreviewController::isEnabled()`); con cualquier otro valor, incluido el `production` de reserva de Compose, las rutas no existen. No confundas este criterio con el bypass de ClamAV, que sólo acepta `development`, `test` o `testing` (no `local`). El puerto de MariaDB no tiene variable `.env`; para cambiarlo, edita el mapeo `127.0.0.1:3307:3306` en Compose. Consulta [Disponibilidad](/componentes/disponibilidad) para el flujo de guardado.
+
+Para instalar dependencias Node y servir el portal de documentación:
+
+```powershell
+npm ci
+npm run docs:dev -- --port 5174
+```
+
+La documentación se compila con `npm run docs:build`. VitePress puede escoger otro puerto si el solicitado está ocupado.
 
 ## Cambios de esquema y migraciones
 
-En un volumen nuevo, MariaDB aplica automáticamente el esquema y las migraciones numeradas desde `database/migrations/`. En una base existente no repitas las migraciones antiguas indiscriminadamente. Para añadir DAM, ejecuta `009_desarrollo_aplicaciones_multiplataforma.sql` una vez; para añadir los nuevos campos persistidos de oferta (título, descripción, turno, modalidad, ubicación, requisitos y tecnologías), aplica `010_detalles_ofertas.sql`. Ambas migraciones son idempotentes.
+En un volumen nuevo, MariaDB importa `database/sistema_fct.sql` y Compose ejecuta las migraciones listadas explícitamente en `docker-compose.yml`. Varias líneas de migración tienen prefijos numéricos repetidos; identifica cada archivo por su nombre completo, no sólo por el número.
 
-Si se necesita reinicializar completamente el entorno local, primero guarda cualquier dato que quieras conservar. `docker compose down -v` elimina la base de datos, los documentos privados, las firmas ClamAV y otros volúmenes del proyecto. Después:
+En una base ya inicializada no repitas migraciones indiscriminadamente ni reimportes el esquema. Aplica sólo las pendientes y en el orden que corresponda a esa base:
+
+- `009_desarrollo_aplicaciones_multiplataforma.sql` añade DAM si aún no existe.
+- `010_detalles_ofertas.sql` añade los campos persistidos de título, descripción, modalidad, ubicación, requisitos y tecnologías.
+- `007_webhooks.sql` crea las bandejas `webhook_inbox` y `webhook_outbox`; `008_api_access_tokens.sql` crea la tabla de tokens API; `009_webhook_responses.sql` añade las columnas de respuesta HTTP y se ejecuta una sola vez.
+
+Las dos primeras son idempotentes; `009_webhook_responses.sql` contiene `ALTER TABLE` no condicional y no debe repetirse cuando las columnas ya existen. Para las migraciones de webhook y tokens, consulta [Integraciones y webhooks](/webhooks). Los scripts de inicialización de Compose no vuelven a ejecutarse al arrancar un volumen existente.
+
+Si se necesita reinicializar completamente el entorno local, primero respalda cualquier dato que quieras conservar. **`docker compose down -v` es destructivo:** elimina la base de datos, los documentos privados, las firmas ClamAV y los volúmenes de dependencias Node del proyecto. Después:
 
 ```powershell
 docker compose down -v
@@ -58,4 +84,4 @@ docker compose up -d --build
 docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/crear_cuentas_demo.php
 ```
 
-Para el detalle de las migraciones y la alternativa que conserva otros volúmenes, consulta la sección de restablecimiento de base de datos en `README.md`.
+La inicialización completa sólo debe usarse en una instalación local desechable. Para reiniciar únicamente MariaDB y conservar otros volúmenes, sigue la alternativa más segura de [restablecimiento de base de datos en el README](https://github.com/campusedx/Practicas_Desarrollo/blob/main/README.md#restablecimiento-de-base-de-datos-por-cambios-de-esquema-o-migraciones).

@@ -30,8 +30,8 @@ services:
       db:
         condition: service_healthy
     environment:
-      APP_ENV: ${APP_ENV:-development}
-      FCT_DB_HOST: ${FCT_DB_HOST:-db}
+      APP_ENV: ${APP_ENV:-production}
+      FCT_DB_HOST: db
       FCT_DB_NAME: ${FCT_DB_NAME:-sistema_fct}
       FCT_DB_USER: ${FCT_DB_USER:-fct}
       FCT_DB_PASS: ${FCT_DB_PASS:-fct_local_dev}
@@ -40,6 +40,9 @@ services:
       FCT_CLAMD_HOST: clamav
       FCT_CLAMD_PORT: 3310
       FCT_VITE_DEV_SERVER: ${FCT_VITE_DEV_SERVER:-}
+      FCT_WEBHOOK_INBOUND_SECRET: ${FCT_WEBHOOK_INBOUND_SECRET:-}
+      FCT_WEBHOOK_OUTBOUND_URL: ${FCT_WEBHOOK_OUTBOUND_URL:-}
+      FCT_WEBHOOK_OUTBOUND_SECRET: ${FCT_WEBHOOK_OUTBOUND_SECRET:-}
     ports:
       - "${APP_PORT:-8080}:80"
     volumes:
@@ -81,7 +84,8 @@ services:
       - ./database/migrations/009_desarrollo_aplicaciones_multiplataforma.sql:/docker-entrypoint-initdb.d/010-migration.sql:ro
       - ./database/migrations/010_detalles_ofertas.sql:/docker-entrypoint-initdb.d/011-migration.sql:ro
       - ./database/migrations/007_webhooks.sql:/docker-entrypoint-initdb.d/012-webhooks.sql:ro
-      - ./database/migrations/009_webhook_responses.sql:/docker-entrypoint-initdb.d/013-webhook-responses.sql:ro
+      - ./database/migrations/008_api_access_tokens.sql:/docker-entrypoint-initdb.d/013-api-access-tokens.sql:ro
+      - ./database/migrations/009_webhook_responses.sql:/docker-entrypoint-initdb.d/014-webhook-responses.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -107,7 +111,16 @@ services:
           AND COLUMN_NAME = 'titulo')
           AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_especialidades_plazas'
-          AND COLUMN_NAME = 'modalidad'), 1, 0)")" = "1"
+          AND COLUMN_NAME = 'modalidad')
+          AND EXISTS (SELECT 1 FROM information_schema.TABLES
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_inbox')
+          AND EXISTS (SELECT 1 FROM information_schema.TABLES
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_outbox')
+          AND EXISTS (SELECT 1 FROM information_schema.TABLES
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'api_access_tokens')
+          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_outbox'
+          AND COLUMN_NAME = 'response_body'), 1, 0)")" = "1"
       interval: 10s
       timeout: 5s
       retries: 10
