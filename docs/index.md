@@ -63,6 +63,13 @@ Los puertos pueden cambiar en la configuración local. La URL por sí sola no co
 
 Para parar el entorno sin borrar la información persistida, usa `docker compose down`. **No uses `docker compose down -v` como una operación rutinaria:** elimina todos los volúmenes del proyecto, incluida la base de datos, los archivos privados, las firmas antivirus y las dependencias Docker. Si de verdad se requiere una inicialización desde cero, guarda primero lo que necesites y sigue el procedimiento destructivo y la alternativa sólo-DB de la sección «Restablecimiento de Base de Datos por Cambios de Esquema o Migraciones» del `README.md`.
 
+## Integraciones
+
+La guía para Administradores explica la consola de la API propia y cómo consultar los historiales de webhooks recibidos y enviados agrupados por empresa:
+
+- [Leer la Guía de Integraciones](/integraciones)
+- [Descargar la Guía de Integraciones en PDF](/guia-integraciones.pdf)
+
 ## Funciones clave de FCT
 
 - **Disponibilidad del alumno:** elige periodo, define franjas exactas por día o activa la opción indiferente para aceptar cualquier turno. El guardado explícito muestra su estado y errores de forma reactiva; sin JavaScript permanece el formulario PHP.

@@ -22,6 +22,14 @@ una regla de reescritura en la configuración del servidor antes de usar el
 alias. Las rutas de esta API están implementadas en `public/api.php`, no en
 `routes/web.php`.
 
+Por defecto, el lanzador local usa MariaDB de XAMPP. Para que las solicitudes
+hechas desde esta API y desde la aplicación Docker vean los mismos datos,
+configura `.env.local` para conectarse a MariaDB Docker por
+`127.0.0.1;port=3307` y copia `FCT_DB_NAME`, `FCT_DB_USER` y `FCT_DB_PASS` de
+`.env`. Después inicia el lanzador con `-Mode All`. Ambas aplicaciones
+compartirán la misma base en tiempo real; esto no copia ni fusiona los registros
+que ya existan únicamente en la otra base de datos.
+
 Antes de usarla en una base ya existente, importa la migración:
 
 ```powershell

@@ -71,18 +71,35 @@ $rng.Dispose()
 ```
 
 Guárdalo en `.env.local`, archivo excluido de Git. Usa el mismo valor para
-entrada y salida porque el worker local entregará al propio endpoint:
+entrada y salida porque el worker local entregará al propio endpoint. Para usar
+la base de XAMPP, conserva `FCT_DB_HOST=127.0.0.1`; si Docker debe ser la base
+compartida por la aplicación local de `8002` y Docker, usa
+`FCT_DB_HOST=127.0.0.1;port=3307` y copia también `FCT_DB_NAME`, `FCT_DB_USER` y
+`FCT_DB_PASS` de `.env`:
 
 ```powershell
+$envLines = Get-Content -LiteralPath .env
+foreach ($line in $envLines) {
+    if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+    }
+}
+
 $secret = 'PEGA_AQUI_EL_SECRETO_GENERADO'
 @"
-FCT_DB_HOST=127.0.0.1
-FCT_DB_NAME=sistema_fct
+FCT_DB_HOST=127.0.0.1;port=3307
+FCT_DB_NAME=$env:FCT_DB_NAME
+FCT_DB_USER=$env:FCT_DB_USER
+FCT_DB_PASS=$env:FCT_DB_PASS
 FCT_WEBHOOK_INBOUND_SECRET=$secret
 FCT_WEBHOOK_OUTBOUND_SECRET=$secret
 FCT_WEBHOOK_OUTBOUND_URL=http://127.0.0.1:8001/webhook.php
 "@ | Set-Content -LiteralPath .env.local -Encoding ascii
 ```
+
+El bloque carga las variables de conexión de `.env` sin mostrarlas y crea
+`.env.local` para que la aplicación XAMPP use la base de Docker. No publiques
+ni compartas `.env.local`.
 
 El lanzador local lee el archivo sin imprimir el secreto. Inicia de una vez
 el receptor, la aplicación y la interfaz local:
@@ -94,10 +111,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.p
 
 Abre la aplicación en `http://127.0.0.1:8002/index.php`, la interfaz de prueba
 en `http://127.0.0.1:8003/webhook_test.php` y el receptor en
-`http://127.0.0.1:8001/webhook.php`. La aplicación principal usa la misma base
-local de XAMPP; úsala para crear o revisar ofertas, convenios o prácticas.
-El modo `All` verifica los puertos y las páginas antes de informar que el
-entorno está listo.
+`http://127.0.0.1:8001/webhook.php`. La aplicación local usa la base indicada
+por `.env.local`; con `127.0.0.1;port=3307` comparte en tiempo real la base de
+Docker. El modo `All` verifica los puertos y las páginas antes de informar que
+el entorno está listo.
 
 Para detener los servidores iniciados por el lanzador:
 
@@ -119,6 +136,15 @@ El worker debe indicar `Entregado` y el endpoint registrará el evento en
 servidores locales escuchan solo en `127.0.0.1`. No compartas `.env.local` ni
 incluyas el secreto en capturas o logs; esta configuración no modifica Apache
 ni variables globales de Windows.
+
+Para probar sin un receptor externo, inicia el lanzador y, con sesión de
+Administrador, abre `http://127.0.0.1:8002/index.php?action=pruebas-integracion`.
+La sección de webhooks recibe un evento sintético firmado y puede encolar y
+entregar otro a `127.0.0.1:8001`; ambos recorridos usan datos ficticios y las
+respuestas indican el estado HTTP. Para validar la API local, el mismo panel
+permite enviar `GET` con un token creado en **Tokens API**. Revoca ese token al
+terminar las pruebas. Las solicitudes `POST` y `PATCH` escriben en la base
+compartida y no se revierten automáticamente.
 
 Para Docker, añade las variables requeridas a un `.env` local ignorado por Git
 y reinicia el servicio de aplicación. No copies secretos en
@@ -159,6 +185,14 @@ Con sesión de Administrador, usa las páginas **Webhooks recibidos** y
 cada dirección, sus JSON, estados y respuestas HTTP. Los datos se muestran
 escapados como texto y ambas páginas son de solo lectura. Las respuestas de
 eventos anteriores a la migración 009 no se conservan y se indican como tales.
+
+La pestaña **Integraciones** del menú de Administrador presenta la API propia,
+los webhooks recibidos y los enviados en secciones separadas. Los dos
+historiales se agrupan y ordenan por empresa; los eventos sin un `empresa_id`
+válido aparecen en **Sin empresa identificada**. Dentro de cada empresa, los
+eventos más recientes se muestran primero.
+La [Guía de Integraciones](./integraciones.md) describe el uso del panel y
+también está disponible en [PDF](./guia-integraciones.pdf).
 
 La página **Webhooks por empresa** reúne por separado los eventos enviados y
 recibidos de una empresa seleccionada. Los eventos salientes de convenios,

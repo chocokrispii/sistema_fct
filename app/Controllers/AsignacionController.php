@@ -17,6 +17,7 @@ class AsignacionController
 
     public function listar(): void
     {
+        $anonimizarAlumnado = ($_SESSION['rol'] ?? null) === 'Observador';
         $resultado = $this->model->obtenerPagina(
             false,
             0,
@@ -26,7 +27,7 @@ class AsignacionController
         );
         View::render('asignaciones/listado', [
             'soloPropias' => false,
-            'anonimizarAlumnado' => ($_SESSION['rol'] ?? null) === 'Observador',
+            'anonimizarAlumnado' => $anonimizarAlumnado,
             'puedeGestionar' => in_array($_SESSION['rol'], ['Administrador', 'Coordinador'], true),
             'asignaciones' => $resultado['items'],
             'paginacion' => $resultado,

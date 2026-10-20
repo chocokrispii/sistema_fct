@@ -35,6 +35,7 @@ $routes = [
     'descargar-convenio' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Empresa'], 'controller' => ConvenioController::class, 'action' => 'descargar'],
     'usuarios' => ['method' => ['GET', 'POST'], 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'gestionar'],
     'api-tokens' => ['method' => ['GET', 'POST'], 'roles' => ['Administrador'], 'controller' => ApiTokenAdminController::class, 'action' => 'gestionar'],
+    'integraciones' => ['method' => 'GET', 'roles' => ['Administrador'], 'controller' => IntegrationHubController::class, 'action' => 'mostrar'],
     'pruebas-integracion' => ['method' => ['GET', 'POST'], 'roles' => ['Administrador'], 'controller' => IntegrationTestController::class, 'action' => 'gestionar'],
     'webhook-inbox' => ['method' => 'GET', 'roles' => ['Administrador'], 'controller' => WebhookInboxController::class, 'action' => 'listarRecibidos'],
     'webhooks-recibidos' => ['method' => 'GET', 'roles' => ['Administrador'], 'controller' => WebhookInboxController::class, 'action' => 'listarRecibidos'],
