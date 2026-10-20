@@ -225,33 +225,6 @@ class Oferta {
         return $this->obtenerPagina("p.estado = 'Pendiente'", [], 'p.fecha_inicio, p.id', $pagina, $porPagina);
     }
 
-    private function obtenerPagina(string $where, array $params, string $orderBy, int $pagina, int $porPagina): array
-    {
-        $countSql = 'SELECT COUNT(*) FROM empresa_especialidades_plazas p';
-        if ($where !== '') {
-            $countSql .= ' WHERE ' . $where;
-        }
-        $count = $this->db->prepare($countSql);
-        $count->execute($params);
-        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
-
-        $sql = self::SELECT_BASE;
-        if ($where !== '') {
-            $sql .= ' WHERE ' . $where;
-        }
-        $sql .= ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset';
-        $stmt = $this->db->prepare($sql);
-        foreach ($params as $name => $value) {
-            $stmt->bindValue(':' . $name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
-        }
-        $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
-        $stmt->execute();
-        $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        return $paginacion;
-    }
-
     public function resolver(int $ofertaId, string $estado, string $motivo, int $revisorId): bool
     {
         if (!in_array($estado, ['Aprobada', 'Rechazada'], true)) {
@@ -275,7 +248,10 @@ class Oferta {
 
     public function contarAsignacionesPorOferta(array $ofertaIds): array
     {
-        $ofertaIds = array_values(array_unique(array_map('intval', $ofertaIds)));
+        $ofertaIds = array_values(array_unique(array_filter(
+            array_map('intval', $ofertaIds),
+            static fn(int $id): bool => $id > 0
+        )));
         if ($ofertaIds === []) {
             return [];
         }
@@ -295,25 +271,6 @@ class Oferta {
         }
 
         return $conteos;
-    }
-
-    /**
-     * @param int[] $ofertaIds
-     * @param array<int, int> $paginas Página solicitada por oferta.
-     * @return array<int, array<string, mixed>> Paginación y 'candidatos' por oferta.
-     */
-    public function obtenerCandidatosPaginados(array $ofertaIds, array $paginas, int $porPagina = 5): array
-    {
-        $resultado = [];
-        foreach ($ofertaIds as $ofertaId) {
-            $ofertaId = (int)$ofertaId;
-            $candidatos = $this->obtenerCandidatos($ofertaId);
-            $paginacion = Paginacion::calcular(count($candidatos), (int)($paginas[$ofertaId] ?? 1), $porPagina);
-            $paginacion['candidatos'] = array_slice($candidatos, $paginacion['offset'], $porPagina);
-            $resultado[$ofertaId] = $paginacion;
-        }
-
-        return $resultado;
     }
 
     public function obtenerCandidatos(int $ofertaId): array
@@ -366,40 +323,6 @@ class Oferta {
         $stmt->execute(['oferta_id' => $ofertaId]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    public function contarAsignacionesPorOferta(array $ofertaIds): array
-    {
-        $ids = array_values(array_unique(array_filter(
-            array_map('intval', $ofertaIds),
-            static fn(int $id): bool => $id > 0
-        )));
-        if ($ids === []) {
-            return [];
-        }
-
-        $placeholders = [];
-        $params = [];
-        foreach ($ids as $index => $id) {
-            $name = 'oferta_' . $index;
-            $placeholders[] = ':' . $name;
-            $params[$name] = $id;
-        }
-        $stmt = $this->db->prepare(
-            "SELECT oferta_id, COUNT(*) AS total
-             FROM asignaciones_fct
-             WHERE oferta_id IN (" . implode(', ', $placeholders) . ")
-               AND estado IN ('Asignada', 'Cerrada')
-             GROUP BY oferta_id"
-        );
-        $stmt->execute($params);
-
-        $totales = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $totales[(int)$row['oferta_id']] = (int)$row['total'];
-        }
-
-        return $totales;
     }
 
     public function obtenerCandidatosPaginados(array $ofertaIds, array $paginas, int $porPagina = 10): array
