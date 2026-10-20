@@ -22,6 +22,7 @@ export default withMermaid(defineConfig({
           { text: 'Sistema FCT', link: '/' },
           { text: 'Instalación', link: '/instalacion' },
           { text: 'Guía para no técnicos', link: '/guia-del-codigo-para-no-tecnicos' },
+          { text: 'Guía de Integraciones', link: '/integraciones' },
         ],
       },
       {

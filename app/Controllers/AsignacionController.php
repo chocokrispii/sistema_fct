@@ -17,16 +17,20 @@ class AsignacionController
 
     public function listar(): void
     {
+        $anonimizarAlumnado = ($_SESSION['rol'] ?? null) === 'Observador';
         $resultado = $this->model->obtenerPagina(
             false,
             0,
-            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null),
+            20,
+            $anonimizarAlumnado
         );
         View::render('asignaciones/listado', [
             'soloPropias' => false,
-            'anonimizarAlumnado' => ($_SESSION['rol'] ?? null) === 'Observador',
+            'anonimizarAlumnado' => $anonimizarAlumnado,
             'puedeGestionar' => in_array($_SESSION['rol'], ['Administrador', 'Coordinador'], true),
-            'asignaciones' => $this->model->listar(false, 0, ($_SESSION['rol'] ?? null) === 'Observador'),
+            'asignaciones' => $resultado['items'],
+            'paginacion' => $resultado,
             'error' => '',
         ]);
     }
@@ -77,12 +81,9 @@ class AsignacionController
         $paginasCandidatos = [];
 
         foreach ($ofertas as &$oferta) {
+            $ofertaId = (int)$oferta['id'];
             $oferta['horarios'] = $ofertaModel->obtenerHorarioSemanal((int)$oferta['id']);
-            $stmt = $this->db->prepare(
-                "SELECT COUNT(*) FROM asignaciones_fct WHERE oferta_id = :id AND estado IN ('Asignada', 'Cerrada')"
-            );
-            $stmt->execute(['id' => $oferta['id']]);
-            $oferta['asignadas'] = (int)$stmt->fetchColumn();
+            $oferta['asignadas'] = $asignadasPorOferta[$ofertaId] ?? 0;
             $oferta['plazas_disponibles'] = max(0, (int)$oferta['plazas_cuantas'] - $oferta['asignadas']);
             $oferta['candidatos'] = [];
             if ($oferta['plazas_disponibles'] > 0) {

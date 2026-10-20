@@ -12,6 +12,14 @@ http://localhost/Practicas_Desarrollo/public/api/v1/
 Con el lanzador local de webhooks (`scripts\local_webhooks.ps1 -Mode All`), la
 URL base es `http://127.0.0.1:8002/api/v1/`.
 
+Por defecto, el lanzador local usa MariaDB de XAMPP. Para que las solicitudes
+hechas desde esta API y desde la aplicación Docker vean los mismos datos,
+configura `.env.local` para conectarse a MariaDB Docker por
+`127.0.0.1;port=3307` y copia `FCT_DB_NAME`, `FCT_DB_USER` y `FCT_DB_PASS` de
+`.env`. Después inicia el lanzador con `-Mode All`. Ambas aplicaciones
+compartirán la misma base en tiempo real; esto no copia ni fusiona los registros
+que ya existan únicamente en la otra base de datos.
+
 Antes de usarla en una base ya existente, importa la migración:
 
 ```powershell
@@ -26,11 +34,30 @@ de Empresa a su empresa y los de Alumno a su propio expediente. Desactivar o
 eliminar la cuenta invalida sus tokens; el administrador también puede
 revocarlos explícitamente. En la base solo se guarda el hash SHA-256.
 
-En Docker, Administración también dispone de **Pruebas API y webhooks** para
-introducir el token y enviar manualmente solicitudes GET, POST y PATCH desde la
-interfaz. El token solo se usa en la solicitud del navegador y no se guarda en
-el servidor. Las operaciones POST y PATCH modifican la base de datos actual;
-usa únicamente registros de prueba y revisa el cuerpo antes de confirmar.
+La pestaña **Integraciones** del menú de Administrador reúne la consola para
+probar esta API y los historiales separados de webhooks recibidos y enviados.
+El panel de tokens sigue disponible desde la propia consola.
+Consulta también la [Guía de Integraciones](./integraciones.md) o su
+[versión PDF](./guia-integraciones.pdf).
+
+Con la sesión de Administrador, el panel **Pruebas API y webhooks** está
+disponible tanto en Docker (`http://localhost:8080/index.php?action=pruebas-integracion`)
+como en la aplicación local (`http://127.0.0.1:8002/index.php?action=pruebas-integracion`).
+Para una prueba local de lectura:
+
+1. Abre **Tokens API** en `http://127.0.0.1:8002/index.php?action=api-tokens`,
+   crea un token de prueba para una cuenta activa y guárdalo temporalmente de
+   forma segura. El token completo sólo se muestra una vez.
+2. Abre el panel de pruebas, introduce el token, selecciona `GET` y un recurso
+   (`alumnos`, `empresas`, `ofertas`, `convenios` o `asignaciones`) y envía la
+   solicitud. No hace falta confirmar escrituras para `GET`; la respuesta
+   muestra el estado HTTP y el JSON paginado.
+3. Cuando termines, revoca el token desde **Tokens API**.
+
+El token sólo se usa en la solicitud del navegador y se borra del campo al
+enviarla; no se guarda en el servidor. Las operaciones `POST` y `PATCH`
+modifican la base compartida actual, de modo que usa únicamente datos ficticios
+y confirma el contenido antes de enviarlas.
 
 Envía el token en cada solicitud:
 

@@ -31,7 +31,7 @@ services:
         condition: service_healthy
     environment:
       APP_ENV: ${APP_ENV:-development}
-      FCT_DB_HOST: db
+      FCT_DB_HOST: ${FCT_DB_HOST:-db}
       FCT_DB_NAME: ${FCT_DB_NAME:-sistema_fct}
       FCT_DB_USER: ${FCT_DB_USER:-fct}
       FCT_DB_PASS: ${FCT_DB_PASS:-fct_local_dev}
@@ -80,6 +80,8 @@ services:
       - ./database/migrations/008_disponibilidad_indiferente.sql:/docker-entrypoint-initdb.d/009-migration.sql:ro
       - ./database/migrations/009_desarrollo_aplicaciones_multiplataforma.sql:/docker-entrypoint-initdb.d/010-migration.sql:ro
       - ./database/migrations/010_detalles_ofertas.sql:/docker-entrypoint-initdb.d/011-migration.sql:ro
+      - ./database/migrations/007_webhooks.sql:/docker-entrypoint-initdb.d/012-webhooks.sql:ro
+      - ./database/migrations/009_webhook_responses.sql:/docker-entrypoint-initdb.d/013-webhook-responses.sql:ro
     healthcheck:
       test:
         - CMD-SHELL

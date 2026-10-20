@@ -63,7 +63,8 @@ class OfertaController {
             Paginacion::desdeEntrada($_GET['pagina'] ?? null)
         );
         View::render('ofertas/revisar', [
-            'ofertas' => $this->withWeeklySchedules($this->ofertaModel->obtenerPendientes()),
+            'ofertas' => $this->withWeeklySchedules($resultado['items']),
+            'paginacion' => $resultado,
             'error' => is_string($_GET['error'] ?? null) ? $_GET['error'] : '',
         ]);
     }

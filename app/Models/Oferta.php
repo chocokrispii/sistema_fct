@@ -16,6 +16,49 @@ class Oferta {
          INNER JOIN empresas e ON e.id = p.empresa_id
          INNER JOIN especialidades es ON es.id = p.especialidad_id';
 
+    private const FROM_CANDIDATOS =
+        'FROM empresa_especialidades_plazas p
+         INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
+         INNER JOIN alumno_disponibilidad d
+            ON d.alumno_id = a.id
+            AND d.fecha_inicio <= p.fecha_inicio
+            AND d.fecha_fin >= p.fecha_fin
+            AND EXISTS (
+                SELECT 1
+                FROM empresa_oferta_horarios_semanales oh
+                WHERE oh.oferta_id = p.id
+                    AND (
+                        DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
+                        OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
+                            <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
+                    )
+            )
+            AND (
+                d.es_indiferente = TRUE
+                OR NOT EXISTS (
+                    SELECT 1 FROM empresa_oferta_horarios_semanales oh
+                    WHERE oh.oferta_id = p.id
+                        AND (
+                            DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
+                            OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
+                                <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
+                        )
+                        AND NOT EXISTS (
+                            SELECT 1 FROM alumno_disponibilidad_semanal ds
+                            WHERE ds.disponibilidad_id = d.id
+                                AND ds.dia_semana = oh.dia_semana
+                                AND ds.hora_inicio <= oh.hora_inicio
+                                AND ds.hora_fin >= oh.hora_fin
+                        )
+                )
+            )
+         WHERE p.id = :oferta_id
+            AND p.estado = \'Aprobada\'
+            AND NOT EXISTS (
+                SELECT 1 FROM asignaciones_fct af
+                WHERE af.alumno_id = a.id AND af.estado = \'Asignada\'
+            )';
+
     public function __construct(?PDO $db = null) {
         $this->db = $db ?? getPDOConnection();
     }
@@ -137,7 +180,13 @@ class Oferta {
 
     public function obtenerPaginaTodas(bool $soloVigentes, int $pagina, int $porPagina = 20): array
     {
-        $where = $soloVigentes ? "p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '';
+        $where = $soloVigentes
+            ? "p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
+               AND EXISTS (
+                   SELECT 1 FROM empresa_oferta_horarios_semanales oh
+                   WHERE oh.oferta_id = p.id
+               )"
+            : '';
         return $this->obtenerPagina($where, [], 'p.fecha_inicio, p.id', $pagina, $porPagina);
     }
 
@@ -150,6 +199,33 @@ class Oferta {
     public function obtenerPaginaPendientes(int $pagina, int $porPagina = 20): array
     {
         return $this->obtenerPagina("p.estado = 'Pendiente'", [], 'p.fecha_inicio, p.id', $pagina, $porPagina);
+    }
+
+    private function obtenerPagina(string $where, array $params, string $orderBy, int $pagina, int $porPagina): array
+    {
+        $countSql = 'SELECT COUNT(*) FROM empresa_especialidades_plazas p';
+        if ($where !== '') {
+            $countSql .= ' WHERE ' . $where;
+        }
+        $count = $this->db->prepare($countSql);
+        $count->execute($params);
+        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
+
+        $sql = self::SELECT_BASE;
+        if ($where !== '') {
+            $sql .= ' WHERE ' . $where;
+        }
+        $sql .= ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset';
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $name => $value) {
+            $stmt->bindValue(':' . $name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
+        $stmt->execute();
+        $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return $paginacion;
     }
 
     public function resolver(int $ofertaId, string $estado, string $motivo, int $revisorId): bool
@@ -175,52 +251,82 @@ class Oferta {
 
     public function obtenerCandidatos(int $ofertaId): array
     {
-        $sql = "SELECT a.id AS alumno_id, a.nombre, a.apellidos, a.correo
-                FROM empresa_especialidades_plazas p
-                INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
-                INNER JOIN alumno_disponibilidad d
-                    ON d.alumno_id = a.id
-                    AND d.fecha_inicio <= p.fecha_inicio
-                    AND d.fecha_fin >= p.fecha_fin
-                    AND EXISTS (
-                        SELECT 1
-                        FROM empresa_oferta_horarios_semanales oh
-                        WHERE oh.oferta_id = p.id
-                            AND (
-                                DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                                OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
-                                    <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
-                            )
-                    )
-                    AND (
-                        d.es_indiferente = TRUE
-                        OR NOT EXISTS (
-                            SELECT 1 FROM empresa_oferta_horarios_semanales oh
-                            WHERE oh.oferta_id = p.id
-                                AND (
-                                    DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                                    OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
-                                        <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
-                                )
-                                AND NOT EXISTS (
-                                    SELECT 1 FROM alumno_disponibilidad_semanal ds
-                                    WHERE ds.disponibilidad_id = d.id
-                                        AND ds.dia_semana = oh.dia_semana
-                                        AND ds.hora_inicio <= oh.hora_inicio
-                                        AND ds.hora_fin >= oh.hora_fin
-                                )
-                        )
-                    )
-                WHERE p.id IN (" . implode(', ', $placeholders) . ")
-                    AND p.estado = 'Aprobada'
-                    AND NOT EXISTS (
-                        SELECT 1 FROM asignaciones_fct af
-                        WHERE af.alumno_id = a.id AND af.estado = 'Asignada'
-                    )
-                GROUP BY a.id, a.nombre, a.apellidos, a.correo
-                ORDER BY a.apellidos, a.nombre";
+        $sql = 'SELECT a.id AS alumno_id, a.nombre, a.apellidos, a.correo '
+            . self::FROM_CANDIDATOS
+            . ' GROUP BY a.id, a.nombre, a.apellidos, a.correo
+               ORDER BY a.apellidos, a.nombre';
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['oferta_id' => $ofertaId]);
+
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function contarAsignacionesPorOferta(array $ofertaIds): array
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $ofertaIds),
+            static fn(int $id): bool => $id > 0
+        )));
+        if ($ids === []) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [];
+        foreach ($ids as $index => $id) {
+            $name = 'oferta_' . $index;
+            $placeholders[] = ':' . $name;
+            $params[$name] = $id;
+        }
+        $stmt = $this->db->prepare(
+            "SELECT oferta_id, COUNT(*) AS total
+             FROM asignaciones_fct
+             WHERE oferta_id IN (" . implode(', ', $placeholders) . ")
+               AND estado IN ('Asignada', 'Cerrada')
+             GROUP BY oferta_id"
+        );
+        $stmt->execute($params);
+
+        $totales = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $totales[(int)$row['oferta_id']] = (int)$row['total'];
+        }
+
+        return $totales;
+    }
+
+    public function obtenerCandidatosPaginados(array $ofertaIds, array $paginas, int $porPagina = 10): array
+    {
+        $resultados = [];
+        foreach ($ofertaIds as $ofertaId) {
+            $ofertaId = filter_var($ofertaId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($ofertaId === false) {
+                continue;
+            }
+
+            $count = $this->db->prepare('SELECT COUNT(DISTINCT a.id) ' . self::FROM_CANDIDATOS);
+            $count->execute(['oferta_id' => $ofertaId]);
+            $paginacion = Paginacion::calcular(
+                (int)$count->fetchColumn(),
+                Paginacion::desdeEntrada($paginas[$ofertaId] ?? null),
+                $porPagina
+            );
+
+            $stmt = $this->db->prepare(
+                'SELECT a.id AS alumno_id, a.nombre, a.apellidos, a.correo '
+                . self::FROM_CANDIDATOS
+                . ' GROUP BY a.id, a.nombre, a.apellidos, a.correo
+                   ORDER BY a.apellidos, a.nombre
+                   LIMIT :limite OFFSET :offset'
+            );
+            $stmt->bindValue(':oferta_id', $ofertaId, PDO::PARAM_INT);
+            $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
+            $stmt->execute();
+            $paginacion['candidatos'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $resultados[$ofertaId] = $paginacion;
+        }
+
+        return $resultados;
     }
 }
