@@ -42,8 +42,9 @@
                                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
                                     <input type="hidden" name="asignacion_id" value="<?= (int)$item['asignacion_id'] ?>">
                                     <label>Nota (0–10)
-                                        <input type="number" name="nota" min="0" max="10" step="0.01" value="<?= $item['nota'] !== null ? htmlspecialchars((string)$item['nota'], ENT_QUOTES, 'UTF-8') : '' ?>" required>
+                                        <input type="text" name="nota" inputmode="decimal" maxlength="5" pattern="(?:10(?:[.,]0{1,2})?|[0-9](?:[.,][0-9]{1,2})?)" value="<?= $item['nota'] !== null ? htmlspecialchars((string)$item['nota'], ENT_QUOTES, 'UTF-8') : '' ?>" required>
                                     </label>
+                                    <div data-vue-island="GradeForm" data-prop-csrf="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>"></div>
                                     <label>Observaciones
                                         <textarea name="observaciones" maxlength="2000" rows="3"><?= htmlspecialchars($item['observaciones'] ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
                                     </label>

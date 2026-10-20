@@ -1,13 +1,33 @@
 {
-  "name": "proyecto",
+  "name": "sistema-fct-frontend",
   "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Frontend progresivo Vue 3 y TypeScript integrado con el MVC PHP del Sistema FCT.",
+  "engines": {
+    "node": ">=22 <25"
+  },
   "scripts": {
-    "docker:watch": "MSYS_NO_PATHCONV=1 docker run --rm -v \"$(pwd)\":/app -w /app node:lts-alpine npx postcss public/assets/css/style.src.css -o public/assets/css/style.css --watch"
+    "dev": "vite --host 0.0.0.0",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "check": "npm run build",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "dependencies": {
+    "pinia": "^4.1.0",
+    "vue": "^3.5.13"
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
-    "postcss-cli": "^11.0.0",
-    "postcss-nested": "^6.0.1"
+    "@vitejs/plugin-vue": "^5.2.1",
+    "debug": "^4.4.3",
+    "mermaid": "^11.17.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17",
+    "vue-tsc": "^2.2.0"
   }
 }

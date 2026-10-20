@@ -6,5 +6,6 @@ php_value post_max_size 12M
 php_value max_file_uploads 1
 php_value max_input_time 60
 php_flag display_errors Off
+
 RewriteEngine On
-RewriteRule ^api/v1/?(.*)$ api.php?path=$1 [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},QSA,L]
+RewriteRule ^dev/preview-publicar-oferta/?$ index.php?action=preview-publicar-oferta [QSA,L]

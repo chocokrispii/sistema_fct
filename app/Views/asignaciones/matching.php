@@ -2,7 +2,7 @@
     <div class="matching-page__intro">
         <span class="student-registration__eyebrow">Gestión del centro</span>
         <h2 id="matching-title">Emparejamiento y asignación</h2>
-        <p>El sistema muestra alumnos cuyo ciclo, fechas, turno y horario semanal coinciden con ofertas aprobadas. La asignación se confirma de forma transaccional y vuelve a validar el cupo antes de guardar.</p>
+        <p>El sistema muestra alumnos cuyo ciclo, periodo y horarios exactos cubren todas las franjas semanales de las ofertas aprobadas. La asignación vuelve a validar cada requisito dentro de una transacción.</p>
         <a class="student-portal__text-action" href="index.php?action=asignaciones">Consultar asignaciones activas</a>
     </div>
 
@@ -26,14 +26,14 @@
                     </div>
                     <dl class="matching-card__details">
                         <div><dt>Periodo</dt><dd><?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></dd></div>
-                        <div><dt>Turno</dt><dd><?= htmlspecialchars($oferta['turno'] === 'M' ? 'Mañana' : ($oferta['turno'] === 'T' ? 'Tarde' : 'Indiferente'), ENT_QUOTES, 'UTF-8') ?></dd></div>
+                        <div><dt>Horario semanal</dt><dd><?php if ($oferta['horarios'] === []): ?>No hay horarios exactos registrados<?php else: ?><?php foreach ($oferta['horarios'] as $shift): ?><?= htmlspecialchars(['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][(int)$shift['dia_semana']] . ' ' . substr($shift['hora_inicio'], 0, 5) . '–' . substr($shift['hora_fin'], 0, 5), ENT_QUOTES, 'UTF-8') ?><br><?php endforeach; ?><?php endif; ?></dd></div>
                         <div><dt>Plazas cubiertas</dt><dd><?= (int)$oferta['asignadas'] ?> de <?= (int)$oferta['plazas_cuantas'] ?></dd></div>
                     </dl>
 
                     <?php if ($oferta['plazas_disponibles'] === 0): ?>
                         <p class="matching-card__empty">La oferta ya no tiene plazas disponibles.</p>
                     <?php elseif ($oferta['candidatos'] === []): ?>
-                        <p class="matching-card__empty">No hay alumnos disponibles que cumplan el ciclo, las fechas y el turno de esta oferta.</p>
+                        <p class="matching-card__empty">No hay alumnos disponibles que cubran completamente los horarios exactos de esta oferta.</p>
                     <?php else: ?>
                         <h4>Candidatos compatibles</h4>
                         <div class="matching-card__candidates">
@@ -42,10 +42,14 @@
                                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
                                     <input type="hidden" name="oferta_id" value="<?= (int)$oferta['id'] ?>">
                                     <input type="hidden" name="alumno_id" value="<?= (int)$candidato['alumno_id'] ?>">
+                                    <div data-vue-island="AssignStudent"
+                                         data-prop-csrf="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>"
+                                         data-prop-oferta-id="<?= (int)$oferta['id'] ?>"
+                                         data-prop-alumno-id="<?= (int)$candidato['alumno_id'] ?>"></div>
                                     <div class="matching-card__student">
                                         <strong><?= htmlspecialchars($candidato['nombre'] . ' ' . $candidato['apellidos'], ENT_QUOTES, 'UTF-8') ?></strong>
                                         <span><?= htmlspecialchars($candidato['correo'], ENT_QUOTES, 'UTF-8') ?></span>
-                                        <span>Turno disponible: <?= htmlspecialchars($candidato['turno'] === 'M' ? 'Mañana' : ($candidato['turno'] === 'T' ? 'Tarde' : 'Indiferente'), ENT_QUOTES, 'UTF-8') ?></span>
+                                        <span>Horario compatible con todas las franjas de la oferta</span>
                                     </div>
                                     <label>Tutor de empresa
                                         <input type="text" name="tutor_empresa" maxlength="150" autocomplete="name" required>

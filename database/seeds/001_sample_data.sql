@@ -24,7 +24,8 @@ INSERT INTO empresas (id, usuario_id, nombre_empresa, cif_empresa, pagina_web, c
 
 -- 5. INSERTAR OFERTA DE PLAZAS
 INSERT INTO empresa_especialidades_plazas (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin) VALUES
-(1, 1, 2, '2027-03-01', '2027-06-15');
+(1, 1, 2, '2027-03-01', '2027-06-15'),
+(1, 2, 1, '2027-03-01', '2027-06-15');
 
 -- 6. INSERTAR ALUMNOS (Aquí se corrigió la coma de la línea 35)
 INSERT INTO alumnos (id, usuario_id, nombre, apellidos, fecha_nacimiento, dni, numero_seguridad_social, correo, especialidad_id) VALUES

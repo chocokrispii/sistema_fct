@@ -14,6 +14,22 @@ final class FileScanner
 {
     public static function scan(string $file): void
     {
+        $enabled = getenv('FCT_CLAMAV_ENABLED');
+        if (is_string($enabled) && trim($enabled) !== '') {
+            $enabled = strtolower(trim($enabled));
+            if (!in_array($enabled, ['true', 'false'], true)) {
+                throw new FileScannerUnavailableException('La configuración del análisis antivirus no es válida.');
+            }
+            if ($enabled === 'false') {
+                $appEnvironment = getenv('APP_ENV');
+                if (is_string($appEnvironment) && strtolower(trim($appEnvironment)) === 'development') {
+                    error_log('PASSED_DEV_MOCK: archivo no escaneado; bypass explícito en desarrollo local (FCT_CLAMAV_ENABLED=false).');
+                    return;
+                }
+                throw new FileScannerUnavailableException('El análisis antivirus solo puede desactivarse en desarrollo.');
+            }
+        }
+
         $clamdHost = getenv('FCT_CLAMD_HOST');
         if (is_string($clamdHost) && trim($clamdHost) !== '') {
             self::scanWithClamd($file, trim($clamdHost));

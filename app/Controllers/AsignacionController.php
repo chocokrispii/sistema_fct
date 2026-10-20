@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../Models/Asignacion.php';
 require_once __DIR__ . '/../Models/Oferta.php';
+require_once __DIR__ . '/../Core/JsonResponse.php';
 
 class AsignacionController
 {
@@ -23,9 +24,9 @@ class AsignacionController
         );
         View::render('asignaciones/listado', [
             'soloPropias' => false,
+            'anonimizarAlumnado' => ($_SESSION['rol'] ?? null) === 'Observador',
             'puedeGestionar' => in_array($_SESSION['rol'], ['Administrador', 'Coordinador'], true),
-            'asignaciones' => $resultado['items'],
-            'paginacion' => $resultado,
+            'asignaciones' => $this->model->listar(false, 0, ($_SESSION['rol'] ?? null) === 'Observador'),
             'error' => '',
         ]);
     }
@@ -39,11 +40,22 @@ class AsignacionController
         );
         View::render('asignaciones/listado', [
             'soloPropias' => true,
+            'anonimizarAlumnado' => false,
             'puedeGestionar' => false,
             'asignaciones' => $resultado['items'],
             'paginacion' => $resultado,
             'error' => '',
         ]);
+    }
+
+    public function empresaAsignada(): void
+    {
+        $company = $this->model->obtenerEmpresaAsignada((int)$_SESSION['usuario_id']);
+        if ($company === null) {
+            JsonResponse::failure('No tienes una práctica activa asignada.', 404);
+            return;
+        }
+        JsonResponse::success($company);
     }
 
     public function emparejar(): void
@@ -65,8 +77,12 @@ class AsignacionController
         $paginasCandidatos = [];
 
         foreach ($ofertas as &$oferta) {
-            $ofertaId = (int)$oferta['id'];
-            $oferta['asignadas'] = $asignadasPorOferta[$ofertaId] ?? 0;
+            $oferta['horarios'] = $ofertaModel->obtenerHorarioSemanal((int)$oferta['id']);
+            $stmt = $this->db->prepare(
+                "SELECT COUNT(*) FROM asignaciones_fct WHERE oferta_id = :id AND estado IN ('Asignada', 'Cerrada')"
+            );
+            $stmt->execute(['id' => $oferta['id']]);
+            $oferta['asignadas'] = (int)$stmt->fetchColumn();
             $oferta['plazas_disponibles'] = max(0, (int)$oferta['plazas_cuantas'] - $oferta['asignadas']);
             $oferta['candidatos'] = [];
             if ($oferta['plazas_disponibles'] > 0) {
@@ -100,14 +116,45 @@ class AsignacionController
 
     public function asignar(): void
     {
-        $offerId = filter_var($_POST['oferta_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $studentId = filter_var($_POST['alumno_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $tutorRaw = $_POST['tutor_empresa'] ?? '';
+        $jsonRequest = JsonResponse::wantsJson();
+        $requestValues = $_POST;
+        $contentType = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+        if (str_contains($contentType, 'application/json')) {
+            try {
+                $decoded = json_decode((string)file_get_contents('php://input'), false, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                JsonResponse::failure('El cuerpo JSON no es válido.', 400);
+                return;
+            }
+            if (!$decoded instanceof stdClass) {
+                JsonResponse::failure('El cuerpo JSON debe ser un objeto de datos.', 400);
+                return;
+            }
+            $requestValues = get_object_vars($decoded);
+        }
+
+        $offerValue = $requestValues['oferta_id'] ?? null;
+        $studentValue = $requestValues['alumno_id'] ?? null;
+        $offerId = is_int($offerValue) || is_string($offerValue)
+            ? filter_var($offerValue, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+            : false;
+        $studentId = is_int($studentValue) || is_string($studentValue)
+            ? filter_var($studentValue, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+            : false;
+        $tutorRaw = $requestValues['tutor_empresa'] ?? '';
         if (!is_string($tutorRaw)) {
+            if ($jsonRequest) {
+                JsonResponse::failure('El tutor de empresa no es válido.', 422);
+                return;
+            }
             throw new InvalidArgumentException('El tutor de empresa no es válido.');
         }
         $tutor = trim($tutorRaw);
         if ($offerId === false || $studentId === false || $tutor === '' || mb_strlen($tutor) > 150) {
+            if ($jsonRequest) {
+                JsonResponse::failure('Revisa los datos de la asignación y el tutor de empresa.', 422);
+                return;
+            }
             throw new InvalidArgumentException('Revisa los datos de la asignación y el tutor de empresa.');
         }
 
@@ -124,15 +171,26 @@ class AsignacionController
                 'La oferta no existe o no está aprobada.',
                 'La oferta ya no tiene plazas disponibles.',
                 'No se encontró el expediente del alumno.',
-                'El alumno no cumple el ciclo, disponibilidad o turno de la oferta.',
+                'El alumno no cumple el ciclo, disponibilidad o cobertura horaria de la oferta.',
             ];
             $message = in_array($e->getMessage(), $safeMessages, true)
                 ? $e->getMessage()
                 : 'No se pudo completar la asignación. Inténtalo de nuevo.';
+            if ($jsonRequest) {
+                $status = $e instanceof DomainException
+                    ? 422
+                    : (in_array($e->getMessage(), $safeMessages, true) ? 409 : 500);
+                JsonResponse::failure($message, $status);
+                return;
+            }
             header('Location: index.php?action=emparejar&error=' . rawurlencode($message));
             exit;
         }
 
+        if ($jsonRequest) {
+            JsonResponse::success(['message' => 'El alumno se ha asignado correctamente.'], 201);
+            return;
+        }
         header('Location: index.php?action=asignaciones');
         exit;
     }

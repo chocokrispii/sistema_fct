@@ -1,4 +1,27 @@
-﻿services:
+services:
+  frontend-dev:
+    image: node:22-alpine
+    profiles:
+      - frontend-dev
+    working_dir: /workspace
+    command:
+      ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0 --strictPort"]
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+    volumes:
+      - .:/workspace
+      - frontend_node_modules:/workspace/node_modules
+
+  node:
+    image: node:22-alpine
+    profiles:
+      - tools
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+    command: ["sh", "-c", "npm ci && npm run build"]
+
   app:
     build:
       context: .
@@ -6,19 +29,17 @@
     depends_on:
       db:
         condition: service_healthy
-      clamav:
-        condition: service_healthy
     environment:
-      FCT_DB_HOST: ${FCT_DB_HOST:-db}
+      APP_ENV: ${APP_ENV:-development}
+      FCT_DB_HOST: db
       FCT_DB_NAME: ${FCT_DB_NAME:-sistema_fct}
       FCT_DB_USER: ${FCT_DB_USER:-fct}
       FCT_DB_PASS: ${FCT_DB_PASS:-fct_local_dev}
       FCT_STORAGE_PATH: /var/lib/fct/storage
+      FCT_CLAMAV_ENABLED: ${FCT_CLAMAV_ENABLED:-true}
       FCT_CLAMD_HOST: clamav
       FCT_CLAMD_PORT: 3310
-      FCT_WEBHOOK_INBOUND_SECRET: ${FCT_WEBHOOK_INBOUND_SECRET:-}
-      FCT_WEBHOOK_OUTBOUND_URL: ${FCT_WEBHOOK_OUTBOUND_URL:-}
-      FCT_WEBHOOK_OUTBOUND_SECRET: ${FCT_WEBHOOK_OUTBOUND_SECRET:-}
+      FCT_VITE_DEV_SERVER: ${FCT_VITE_DEV_SERVER:-}
     ports:
       - "${APP_PORT:-8080}:80"
     volumes:
@@ -38,6 +59,8 @@
 
   db:
     image: mariadb:10.4.32
+    ports:
+      - "127.0.0.1:3307:3306"
     environment:
       MARIADB_DATABASE: ${FCT_DB_NAME:-sistema_fct}
       MARIADB_USER: ${FCT_DB_USER:-fct}
@@ -53,17 +76,53 @@
       - ./database/migrations/004_convenios_por_especialidad.sql:/docker-entrypoint-initdb.d/005-migration.sql:ro
       - ./database/migrations/005_horarios_y_calificaciones.sql:/docker-entrypoint-initdb.d/006-migration.sql:ro
       - ./database/migrations/006_alumno_codigo_postal.sql:/docker-entrypoint-initdb.d/007-migration.sql:ro
-      - ./database/migrations/007_webhooks.sql:/docker-entrypoint-initdb.d/008-migration.sql:ro
-      - ./database/migrations/008_api_access_tokens.sql:/docker-entrypoint-initdb.d/009-migration.sql:ro
-      - ./database/migrations/009_webhook_responses.sql:/docker-entrypoint-initdb.d/010-migration.sql:ro
+      - ./database/migrations/007_horarios_ofertas.sql:/docker-entrypoint-initdb.d/008-migration.sql:ro
+      - ./database/migrations/008_disponibilidad_indiferente.sql:/docker-entrypoint-initdb.d/009-migration.sql:ro
+      - ./database/migrations/009_desarrollo_aplicaciones_multiplataforma.sql:/docker-entrypoint-initdb.d/010-migration.sql:ro
+      - ./database/migrations/010_detalles_ofertas.sql:/docker-entrypoint-initdb.d/011-migration.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
-        - mariadb-admin ping --host=127.0.0.1 --user=root --password="$${MARIADB_ROOT_PASSWORD}" --silent
+        - >-
+          test "$$(mariadb --protocol=TCP --host=127.0.0.1
+          --user="$${MARIADB_USER}" --password="$${MARIADB_PASSWORD}"
+          "$${MARIADB_DATABASE}" --batch --skip-column-names
+          --execute="SELECT IF(
+          EXISTS (SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alumnos'
+          AND COLUMN_NAME = 'codigo_postal')
+          AND EXISTS (SELECT 1 FROM information_schema.TABLES
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'calificaciones_fct')
+          AND EXISTS (SELECT 1 FROM information_schema.TABLES
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_oferta_horarios_semanales')
+          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alumno_disponibilidad'
+          AND COLUMN_NAME = 'es_indiferente')
+          AND EXISTS (SELECT 1 FROM information_schema.TABLES
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'especialidades')
+          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_especialidades_plazas'
+          AND COLUMN_NAME = 'titulo')
+          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_especialidades_plazas'
+          AND COLUMN_NAME = 'modalidad'), 1, 0)")" = "1"
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
+    restart: unless-stopped
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 0
+    ports:
+      - "127.0.0.1:${PMA_PORT:-8082}:80"
     restart: unless-stopped
 
   clamav:
@@ -88,3 +147,5 @@ volumes:
   db_data:
   clamav_db:
   fct_storage:
+  node_modules:
+  frontend_node_modules:

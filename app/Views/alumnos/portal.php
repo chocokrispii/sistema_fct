@@ -76,8 +76,7 @@ $turnoTxt = static fn(string $t): string => $t === 'M' ? 'Mañana' : ($t === 'T'
                     <ul class="student-portal__list">
                         <?php foreach ($disponibilidades as $item): ?>
                             <li>
-                                <strong><?= $h($item['fecha_inicio'] . ' – ' . $item['fecha_fin']) ?></strong>
-                                <span class="status-badge"><?= $h($turnoTxt((string)$item['turno'])) ?></span>
+                                <strong><?= htmlspecialchars($item['fecha_inicio'] . ' – ' . $item['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></strong>
                             </li>
                         <?php endforeach; ?>
                     </ul>
@@ -105,9 +104,12 @@ $turnoTxt = static fn(string $t): string => $t === 'M' ? 'Mañana' : ($t === 'T'
                         <p>Asignaciones realizadas por el centro.</p>
                     </div>
                 </div>
+                <?php if (array_filter($asignaciones, static fn(array $item): bool => $item['estado'] === 'Asignada') !== []): ?>
+                    <div data-vue-island="AssignedCompany"></div>
+                <?php endif; ?>
                 <?php if ($asignaciones === []): ?>
-                    <p class="sp-empty">No tienes prácticas asignadas actualmente.</p>
-                    <a class="sp-card__cta" href="index.php?action=ofertas">Consultar ofertas públicas</a>
+                    <p>No tienes prácticas asignadas actualmente.</p>
+                    <p>Solo se muestran datos de empresa cuando el centro confirma una asignación.</p>
                 <?php else: ?>
                     <ul class="student-portal__list">
                         <?php foreach ($asignaciones as $item): ?>

@@ -6,16 +6,34 @@
 <?php else: ?>
     <?php foreach ($ofertas as $oferta): ?>
         <section class="review-card">
-            <h3><?= htmlspecialchars($oferta['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?> — <?= htmlspecialchars($oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></h3>
-            <p><?= (int)$oferta['plazas_cuantas'] ?> plazas · Turno <?= htmlspecialchars($oferta['turno'], ENT_QUOTES, 'UTF-8') ?> ·
-                <?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></p>
-            <form class="review-decision" method="POST" action="index.php?action=revisar-oferta">
+            <?php $turnLabel = ['M' => 'Mañana', 'T' => 'Tarde', 'P' => 'Partido', 'Indiferente' => 'Indiferente'][$oferta['turno']] ?? 'Sin especificar'; ?>
+            <span class="offer-create__eyebrow"><?= htmlspecialchars($oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars($oferta['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></span>
+            <h3><?= htmlspecialchars($oferta['titulo'] ?? 'Oferta FCT', ENT_QUOTES, 'UTF-8') ?></h3>
+            <?php if (!empty($oferta['descripcion'])): ?><p><?= nl2br(htmlspecialchars($oferta['descripcion'], ENT_QUOTES, 'UTF-8')) ?></p><?php endif; ?>
+            <p><?= (int)$oferta['plazas_cuantas'] ?> plazas ·
+                <?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?> ·
+                <span class="status-badge status-badge--neutral"><?= htmlspecialchars($turnLabel, ENT_QUOTES, 'UTF-8') ?></span> ·
+                <span class="status-badge status-badge--neutral"><?= htmlspecialchars($oferta['modalidad'], ENT_QUOTES, 'UTF-8') ?></span></p>
+            <?php if (!empty($oferta['ubicacion'])): ?><p><strong>Ubicación:</strong> <?= htmlspecialchars($oferta['ubicacion'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+            <?php if (!empty($oferta['requisitos'])): ?><p><strong>Requisitos:</strong> <?= nl2br(htmlspecialchars($oferta['requisitos'], ENT_QUOTES, 'UTF-8')) ?></p><?php endif; ?>
+            <?php if (!empty($oferta['tecnologias'])): ?><p><strong>Tecnologías:</strong> <?= htmlspecialchars($oferta['tecnologias'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+            <ul><?php foreach ($oferta['horarios'] as $shift): ?>
+                <li><?= htmlspecialchars(['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][(int)$shift['dia_semana']] . ': ' . substr($shift['hora_inicio'], 0, 5) . '–' . substr($shift['hora_fin'], 0, 5), ENT_QUOTES, 'UTF-8') ?></li>
+            <?php endforeach; ?></ul>
+            <?php if ($oferta['horarios'] === []): ?><p class="message message-error">Oferta histórica sin horario exacto; no se puede aprobar hasta volver a publicarla con franjas semanales.</p><?php endif; ?>
+            <?php if (($_SESSION['rol'] ?? null) === 'Administrador'): ?><form class="review-decision" method="POST" action="index.php?action=revisar-oferta">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="oferta_id" value="<?= (int)$oferta['id'] ?>">
+                <div
+                    data-vue-island="ReviewOfferDecision"
+                    data-prop-csrf="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>"
+                    data-prop-offer-id="<?= (int)$oferta['id'] ?>"
+                ></div>
                 <label>Motivo u observación <input type="text" name="motivo" maxlength="500"></label>
                 <button name="decision" value="Aprobada" type="submit">Aprobar</button>
                 <button name="decision" value="Rechazada" type="submit">Rechazar</button>
             </form>
+            <?php else: ?><p>La resolución de ofertas está reservada a administración.</p><?php endif; ?>
         </section>
     <?php endforeach; ?>
 <?php endif; ?>

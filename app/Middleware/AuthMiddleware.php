@@ -8,6 +8,10 @@ final class AuthMiddleware
     {
         $userId = filter_var($_SESSION['usuario_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($userId === false) {
+            if ($route === 'ofertas') {
+                http_response_code(403);
+                throw new RuntimeException('Inicia sesión con una cuenta autorizada para consultar ofertas.');
+            }
             if ($route === 'descargar-convenio') {
                 self::auditDeniedDownload(null, 'autenticacion_requerida');
             }

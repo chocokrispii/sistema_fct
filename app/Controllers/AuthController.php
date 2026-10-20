@@ -3,6 +3,7 @@
 
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/IntentoLogin.php';
+require_once __DIR__ . '/../Core/JsonResponse.php';
 
 class AuthController {
     /** Mismo coste que password_hash por defecto: el correo inexistente tarda igual que uno real. */
@@ -20,16 +21,26 @@ class AuthController {
             return;
         }
 
-        $emailRaw = $_POST['email'] ?? '';
-        $password = $_POST['password'] ?? '';
+        if (JsonResponse::wantsJson()) {
+            $input = json_decode((string)file_get_contents('php://input'), true);
+            if (!is_array($input)) {
+                JsonResponse::failure('El cuerpo JSON de inicio de sesión no es válido.', 400);
+                return;
+            }
+        } else {
+            $input = $_POST;
+        }
+
+        $emailRaw = $input['email'] ?? '';
+        $password = $input['password'] ?? '';
         if (!is_string($emailRaw) || !is_string($password)) {
-            $this->mostrarFormulario('Los datos de acceso no tienen un formato válido.');
+            $this->mostrarFormulario('Los datos de acceso no tienen un formato válido.', 422);
             return;
         }
         $email = trim($emailRaw);
 
         if ($email === '' || $password === '') {
-            $this->mostrarFormulario('Por favor completa todos los campos.');
+            $this->mostrarFormulario('Por favor completa todos los campos.', 422);
             return;
         }
 
@@ -37,13 +48,15 @@ class AuthController {
         $ip = is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
         $ahora = new DateTimeImmutable();
         if ($intentos->estaBloqueado($email, $ip, $ahora)) {
-            http_response_code(429);
-            $this->mostrarFormulario('Demasiados intentos fallidos. Espera ' . IntentoLogin::VENTANA_MINUTOS . ' minutos y vuelve a intentarlo.');
+            $this->mostrarFormulario(
+                'Demasiados intentos fallidos. Espera ' . IntentoLogin::VENTANA_MINUTOS . ' minutos y vuelve a intentarlo.',
+                429
+            );
             return;
         }
         if (strlen($password) > 72) {
             $intentos->registrarFallo($email, $ip, $ahora);
-            $this->mostrarFormulario('La contraseña no puede superar 72 caracteres.');
+            $this->mostrarFormulario('La contraseña no puede superar 72 caracteres.', 422);
             return;
         }
 
@@ -52,12 +65,12 @@ class AuthController {
 
         if (!$usuario || !$correcta) {
             $intentos->registrarFallo($email, $ip, $ahora);
-            $this->mostrarFormulario('Credenciales incorrectas.');
+            $this->mostrarFormulario('Credenciales incorrectas.', 401);
             return;
         }
         $intentos->limpiar($email);
         if (isset($usuario['activo']) && (int)$usuario['activo'] !== 1) {
-            $this->mostrarFormulario('La cuenta está desactivada. Contacta con el centro educativo.');
+            $this->mostrarFormulario('La cuenta está desactivada. Contacta con el centro educativo.', 403);
             return;
         }
 
@@ -66,6 +79,14 @@ class AuthController {
         $_SESSION['usuario_id'] = (int)$usuario['id'];
         $_SESSION['email']      = $usuario['email'];
         $_SESSION['rol']        = $usuario['rol'];
+
+        if (JsonResponse::wantsJson()) {
+            JsonResponse::success([
+                'user' => $this->sessionUser($usuario),
+                'csrfToken' => CsrfMiddleware::token(),
+            ]);
+            return;
+        }
 
         $destino = match ($usuario['rol']) {
             'Empresa' => 'publicar-oferta',
@@ -77,6 +98,33 @@ class AuthController {
         exit;
     }
 
+    public function session(): void
+    {
+        $userId = filter_var($_SESSION['usuario_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $user = null;
+
+        if ($userId !== false) {
+            $stmt = getPDOConnection()->prepare(
+                'SELECT id, email, rol, activo FROM usuarios WHERE id = :id'
+            );
+            $stmt->execute(['id' => $userId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (is_array($row) && (int)$row['activo'] === 1) {
+                $_SESSION['email'] = $row['email'];
+                $_SESSION['rol'] = $row['rol'];
+                $user = $this->sessionUser($row);
+            } else {
+                $_SESSION = [];
+                session_regenerate_id(true);
+            }
+        }
+
+        JsonResponse::success([
+            'user' => $user,
+            'csrfToken' => CsrfMiddleware::token(),
+        ]);
+    }
+
     public function logout(): void {
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
@@ -85,11 +133,31 @@ class AuthController {
         }
         session_destroy();
 
+        if (JsonResponse::wantsJson()) {
+            JsonResponse::success(['user' => null]);
+            return;
+        }
+
         header('Location: index.php?action=login');
         exit;
     }
 
-    private function mostrarFormulario(string $error = ''): void {
+    private function sessionUser(array $user): array
+    {
+        return [
+            'id' => (int)$user['id'],
+            'email' => (string)$user['email'],
+            'rol' => (string)$user['rol'],
+            'activo' => (bool)$user['activo'],
+        ];
+    }
+
+    private function mostrarFormulario(string $error = '', int $status = 200): void {
+        if (JsonResponse::wantsJson()) {
+            JsonResponse::failure($error, $status);
+            return;
+        }
+
         View::render('auth/login', ['error' => $error]);
     }
 }
