@@ -14,6 +14,7 @@ if (getenv('FCT_DB_NAME') !== $testDatabase) {
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/Core/Webhook.php';
+require_once __DIR__ . '/../app/Core/ApiToken.php';
 require_once __DIR__ . '/../app/Core/View.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
 require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
@@ -133,6 +134,7 @@ $createdOffer = null;
 $createdAssignmentId = null;
 $createdCycleId = null;
 $webhookEventId = null;
+$availabilityWebhookEventId = null;
 
 try {
     $webhookEventId = 'test-' . bin2hex(random_bytes(12));
@@ -670,14 +672,35 @@ try {
             && ($savedAvailabilityResponse['data']['savedSchedule']['dias'][0]['hora_inicio'] ?? null) === '09:15:00',
         'El guardado JSON debe devolver el horario persistido con los datos que consume la isla de lectura.'
     );
-    $availabilityModel->reemplazar(
-        $createdUsers[1],
-        '2027-03-01',
-        '2027-06-30',
-        'M',
-        false,
-        [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
+    putenv('FCT_WEBHOOK_OUTBOUND_URL=https://receiver.example.test/webhooks');
+    try {
+        $availabilityModel->reemplazar(
+            $createdUsers[1],
+            '2027-03-01',
+            '2027-06-30',
+            'M',
+            false,
+            [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
+        );
+    } finally {
+        putenv('FCT_WEBHOOK_OUTBOUND_URL');
+    }
+    $availabilityEvent = $db->query(
+        "SELECT event_id, payload FROM webhook_outbox
+         WHERE event_type = 'student.availability_updated'
+         ORDER BY created_at DESC LIMIT 1"
+    )->fetch(PDO::FETCH_ASSOC);
+    $availabilityPayload = is_array($availabilityEvent)
+        ? json_decode($availabilityEvent['payload'], true, 16, JSON_THROW_ON_ERROR)
+        : null;
+    assertTrue(
+        is_array($availabilityEvent)
+            && is_array($availabilityPayload)
+            && ($availabilityPayload['data']['student_id'] ?? null) === $createdStudents[0]
+            && ($availabilityPayload['data']['horarios'][0]['hora_inicio'] ?? null) === '08:00:00',
+        'El cambio de disponibilidad debe dejar su evento firmado pendiente en la outbox transaccional.'
     );
+    $availabilityWebhookEventId = $availabilityEvent['event_id'];
     $_SERVER['REQUEST_METHOD'] = 'GET';
     unset($_SERVER['HTTP_ACCEPT']);
     $_POST = [];
@@ -1057,6 +1080,10 @@ try {
     if ($webhookEventId !== null) {
         $stmt = $db->prepare('DELETE FROM webhook_inbox WHERE event_id = :event_id');
         $stmt->execute(['event_id' => $webhookEventId]);
+    }
+    if ($availabilityWebhookEventId !== null) {
+        $stmt = $db->prepare('DELETE FROM webhook_outbox WHERE event_id = :event_id');
+        $stmt->execute(['event_id' => $availabilityWebhookEventId]);
     }
     if ($createdOffer !== null) {
         $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');

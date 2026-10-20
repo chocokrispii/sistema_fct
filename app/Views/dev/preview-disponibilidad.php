@@ -16,7 +16,7 @@
         <div
             data-vue-island="AvailabilitySchedule"
             data-prop-state="<?= htmlspecialchars($serializedState, ENT_QUOTES, 'UTF-8') ?>"
-            data-prop-preview="true"
+            data-prop-preview
         >
             <fieldset class="availability-schedule__indifferent">
                 <legend>Preferencia horaria</legend>

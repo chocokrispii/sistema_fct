@@ -15,16 +15,16 @@ Esta hoja cruza las acciones declaradas en `routes/web.php` con sus controladore
 
 ## Resumen visual
 
-El inventario cubre **34 acciones de ruta**: **8 completadas (23,5%)**, **4 en progreso (11,8%)** y **22 pendientes (64,7%)**. El porcentaje mide filas de acciones del catálogo, no esfuerzo ni cobertura funcional; las cadenas de abajo muestran orden de lectura y dependencias documentadas, no nuevas rutas.
+El inventario cubre **42 acciones de ruta**: **8 completadas (19,0%)**, **5 en progreso (11,9%)** y **29 pendientes (69,0%)**. El porcentaje mide filas de acciones del catálogo, no esfuerzo ni cobertura funcional; las cadenas de abajo muestran orden de lectura y dependencias documentadas, no nuevas rutas. Las vistas previas `preview-disponibilidad` y `preview-publicar-oferta` sólo se registran con `APP_ENV` `development` o `local` y quedan fuera del inventario.
 
 ```mermaid
 flowchart TB
-    start["Mapa de migración<br/>34 acciones"]:::summary
+    start["Mapa de migración<br/>42 acciones"]:::summary
     auth["Auth y sesión<br/>4 de 6 completas · 67%"]:::mixed
-    student["Portal del alumno<br/>1 de 5 completas · 20%"]:::mixed
-    company["Empresa y convenios<br/>2 de 10 completas · 20%"]:::mixed
+    student["Portal del alumno<br/>1 de 6 completas · 17%"]:::mixed
+    company["Empresa y convenios<br/>2 de 11 completas · 18%"]:::mixed
     internship["Prácticas y calificaciones<br/>1 de 7 completas · 14%"]:::mixed
-    admin["Administración<br/>0 de 6 completas · 0%"]:::pending
+    admin["Administración<br/>0 de 12 completas · 0%"]:::pending
 
     start --> auth --> student --> company --> internship --> admin
 
@@ -62,8 +62,9 @@ flowchart TB
 flowchart TB
     profile["perfil-alumno<br/>COMPLETED"]:::completed
     availability["disponibilidad<br/>IN_PROGRESS"]:::inprogress
+    assigned["empresa-asignada<br/>IN_PROGRESS"]:::inprogress
     studentRead["registro · portal · mis-asignaciones<br/>mis-calificaciones<br/>PENDING"]:::pending
-    profile --> availability --> studentRead
+    profile --> availability --> assigned --> studentRead
     classDef completed fill:#e8f7ee,stroke:#29804b,color:#174b2b,stroke-width:2px
     classDef inprogress fill:#fff9df,stroke:#9b7b00,color:#493b00,stroke-width:2px
     classDef pending fill:#f1f3f5,stroke:#868e96,color:#343a40,stroke-width:2px
@@ -94,7 +95,8 @@ flowchart TB
 flowchart TB
     review["revisar-convenios · resolver-convenio<br/>COMPLETED"]:::completed
     file["convenios · descargar-convenio<br/>PENDING: interfaz PHP segura"]:::pending
-    review --> file
+    audit["auditar-convenios<br/>PENDING: lectura PHP"]:::pending
+    review --> file --> audit
     classDef completed fill:#e8f7ee,stroke:#29804b,color:#174b2b,stroke-width:2px
     classDef inprogress fill:#fff9df,stroke:#9b7b00,color:#493b00,stroke-width:2px
     classDef pending fill:#f1f3f5,stroke:#868e96,color:#343a40,stroke-width:2px
@@ -129,7 +131,9 @@ flowchart TB
     account["usuarios · estado-usuario<br/>PENDING"]:::pending
     delete["eliminar-usuario<br/>IN_PROGRESS"]:::inprogress
     queries["consultas<br/>PENDING"]:::pending
-    account --> delete --> queries
+    tokens["api-tokens · pruebas-integracion<br/>PENDING"]:::pending
+    webhooks["webhook-inbox · webhooks-recibidos<br/>webhooks-enviados · webhooks-empresa<br/>PENDING"]:::pending
+    account --> delete --> queries --> tokens --> webhooks
     classDef completed fill:#e8f7ee,stroke:#29804b,color:#174b2b,stroke-width:2px
     classDef inprogress fill:#fff9df,stroke:#9b7b00,color:#493b00,stroke-width:2px
     classDef pending fill:#f1f3f5,stroke:#868e96,color:#343a40,stroke-width:2px
@@ -164,6 +168,7 @@ flowchart TB
 | Asignaciones | `GET asignaciones` | PENDING | Listado HTML PHP | Mantener lectura PHP; Vue sólo para mutaciones interactivas | Roles Administrador/Coordinador/Observador | P2 |
 | Asignaciones | `GET emparejar` | PENDING | Matching PHP calcula capacidad y candidatos compatibles | Mantener matching PHP; mejoras Vue desacopladas del cálculo autoritativo | Requiere oferta aprobada, disponibilidad/ciclo/turno y plazas | P1 |
 | Portal del alumno | `GET mis-asignaciones` | PENDING | Vista de sólo lectura PHP | Mantener render PHP; enriquecer progresivamente si aporta valor | Filtrado por usuario de sesión | P3 |
+| Portal del alumno | `GET empresa-asignada` | IN_PROGRESS | Isla `AssignedCompany` (montada en `portal.php` si hay una asignación `Asignada`) consume `AsignacionController::empresaAsignada` por JSON con `requestApi`; sin store Pinia | Centralizar estado y tipos en un store Pinia; mantener el listado PHP de asignaciones como render inicial | Sólo rol Alumno; identidad de sesión sin ID de cliente; 404 si no hay práctica activa; sin datos de contacto privados | P3 |
 | Calificaciones | `GET calificaciones` | PENDING | Listado PHP | Mantener render PHP; mejora interactiva aislada | Roles de lectura definidos en la ruta | P2 |
 | Calificaciones | `GET mis-calificaciones` | PENDING | Listado PHP de sólo lectura | Mantener render PHP | Filtrado estricto por sesión | P3 |
 | Calificaciones | `POST guardar-calificacion` | PENDING | Formulario PHP y redirección con error | Isla JSON/Pinia y fallback | Sólo prácticas cerradas; nota 0–10; CSRF y auditoría | P1 |
@@ -173,10 +178,17 @@ flowchart TB
 | Convenios | `GET revisar-convenios` | COMPLETED | Vista PHP con isla `ReviewAgreementDecision` y store Pinia | Mantener fallback y autorización existentes | Roles Administrador/Coordinador | P3 |
 | Convenios | `POST resolver-convenio` | COMPLETED | JSON `JsonResponse`, isla Vue y Pinia; fallback HTML | Mantener transacción y contrato actual | Sólo estado Pendiente; auditoría transaccional | P3 |
 | Convenios | `GET descargar-convenio` | PENDING | Descarga PHP protegida, flujo binario no JSON | Mantener descarga en servidor; no exponer documentos a Vue/public | Autorización por propietario/rol y ruta privada de almacenamiento | P3 — no convertir a JSON |
+| Convenios | `GET auditar-convenios` | PENDING | Vista PHP `convenios/observador` con `Convenio::listarParaObservador`; sin isla | Mantener lectura PHP | Sólo rol Observador; metadatos anonimizados, sin enlaces ni descargas de PDF | P3 |
 | Administración | `GET, POST usuarios` | PENDING | Gestión PHP síncrona | Isla JSON/Pinia para creación/cambios con fallback | Rol Administrador; integridad referencial | P2 |
 | Administración | `POST estado-usuario` | PENDING | Formulario PHP síncrono | Isla JSON/Pinia y fallback | Rol Administrador; no permitir desactivar cuenta protegida | P2 |
 | Administración | `POST eliminar-usuario` | IN_PROGRESS | Confirmación `UserDeleteDialog` en Vue; mutación todavía HTML/PHP | Añadir contrato JSON y store sólo si se preservan confirmación y fallback | Rol Administrador, restricciones referenciales y auditoría | P2 |
 | Administración | `GET consultas` | PENDING | Búsqueda/reportes renderizados por PHP | Mantener lectura PHP; aplicar mejora Vue sólo para búsqueda interactiva | Autorización por roles; limitar campos y resultados | P3 |
+| Administración | `GET, POST api-tokens` | PENDING | Formularios PHP (`ApiTokenAdminController::gestionar`, vista `admin/api_tokens`); sin isla | Mantener lectura PHP; las mutaciones siguen en formulario PHP con CSRF | Sólo Administrador; se guarda `token_hash` y el valor en claro se muestra una vez al crearlo; la revocación fija `revoked_at` | P3 |
+| Administración | `GET, POST pruebas-integracion` | PENDING | Formularios PHP (`IntegrationTestController::gestionar`, vista `admin/integration_test`); sin isla | Mantener lectura PHP; las pruebas siguen en formulario PHP con CSRF | Sólo Administrador; eventos sintéticos de recepción y envío; requiere los secretos de webhook configurados | P3 |
+| Administración | `GET webhook-inbox` | PENDING | Listado PHP de `webhook_inbox` (`WebhookInboxController::listarRecibidos`, vista `admin/webhooks_received`); sin isla | Mantener lectura PHP | Sólo Administrador; últimos 50 eventos; misma acción de controlador que `webhooks-recibidos` | P3 |
+| Administración | `GET webhooks-recibidos` | PENDING | Listado PHP de `webhook_inbox` (`WebhookInboxController::listarRecibidos`, vista `admin/webhooks_received`); sin isla | Mantener lectura PHP | Sólo Administrador; últimos 50 eventos | P3 |
+| Administración | `GET webhooks-enviados` | PENDING | Listado PHP de `webhook_outbox` (`WebhookInboxController::listarEnviados`, vista `admin/webhooks_sent`); sin isla | Mantener lectura PHP | Sólo Administrador; últimos 50 eventos | P3 |
+| Administración | `GET webhooks-empresa` | PENDING | Listado PHP filtrado por `empresa_id` (`WebhookCompanyActivityController::listar`, vista `admin/webhooks_company`); sin isla | Mantener lectura PHP | Sólo Administrador; `empresa_id` validado contra `empresas`; hasta 50 eventos por sentido | P3 |
 
 > Nota: `logout` está declarado una sola vez en `routes/web.php`; aparece en el dominio de sesión y no representa dos acciones distintas. La ruta `descargar-convenio` y la carga de `convenios` se mantienen deliberadamente como PHP por su manejo seguro de archivos.
 
@@ -194,4 +206,4 @@ flowchart TB
 - Cambiar el nodo de Mermaid al mismo tiempo que el estado de su módulo; reflejar dependencias reales, no sólo orden de implementación.
 - Mantener JSON bajo `JsonResponse`, envío de `X-CSRF-Token`, autorización de `routes/web.php` y formularios HTML con `_csrf`.
 - Para cambios de archivos, mantener ClamAV fail-closed y `FCT_STORAGE_PATH`; no incorporar PDFs al flujo de islas.
-- Ejecutar `npm run typecheck`, `npm run build`, `npm run docs:build` y `php -l` sobre cada controlador PHP modificado.
+- Ejecutar `npm run typecheck`, `npm run build`, `npm run docs:build` y un lint con PHP 8.2 sobre cada controlador PHP modificado (`docker compose run --rm --no-deps -T app php -l <ruta>`).

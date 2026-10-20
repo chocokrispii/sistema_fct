@@ -15,7 +15,10 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
 
     <title>Sistema FCT</title>
     <script src="assets/js/theme-init.js"></script>
-    <link rel="stylesheet" href="assets/css/style.css?v=<?= (int)filemtime(__DIR__ . '/../../../public/assets/css/style.css') ?>">
+    <?php /* En desarrollo Vite inyecta el CSS vía JS (módulo diferido): se enlaza aquí para evitar el parpadeo sin estilos. */ ?>
+    <?php if (!FrontendAssets::isEnabled() || FrontendAssets::developmentOrigin() !== null): ?>
+        <link rel="stylesheet" href="assets/css/style.css?v=<?= (int)filemtime(__DIR__ . '/../../../public/assets/css/style.css') ?>">
+    <?php endif; ?>
     <script src="assets/js/password-toggle.js" defer></script>
     <?= FrontendAssets::render($contenido . $themeIsland) ?>
 </head>

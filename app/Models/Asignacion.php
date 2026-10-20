@@ -24,6 +24,15 @@ class Asignacion
 
     public function listar(bool $soloPropias = false, int $usuarioId = 0, bool $anonimizarAlumnado = false): array
     {
+        [$sql, $params] = $this->consultaListado($soloPropias, $usuarioId, $anonimizarAlumnado);
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    private function consultaListado(bool $soloPropias, int $usuarioId, bool $anonimizarAlumnado): array
+    {
         $studentFields = $anonimizarAlumnado
             ? "'Alumno anonimizado' AS alumno_nombre, '' AS apellidos, NULL AS alumno_correo, NULL AS alumno_id"
             : 'a.id AS alumno_id, a.nombre AS alumno_nombre, a.apellidos, a.correo AS alumno_correo';
@@ -48,6 +57,37 @@ class Asignacion
         $sql .= ' ORDER BY af.fecha_asignacion DESC, af.id DESC';
 
         return [$sql, $params];
+    }
+
+    public function obtenerPagina(
+        bool $soloPropias,
+        int $usuarioId,
+        int $pagina,
+        int $porPagina = 20,
+        bool $anonimizarAlumnado = false
+    ): array {
+        $where = $soloPropias ? ' WHERE a.usuario_id = :usuario_id' : '';
+        $params = $soloPropias ? ['usuario_id' => $usuarioId] : [];
+        $count = $this->db->prepare(
+            'SELECT COUNT(*)
+             FROM asignaciones_fct af
+             INNER JOIN alumnos a ON a.id = af.alumno_id'
+             . $where
+        );
+        $count->execute($params);
+        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
+
+        [$sql, $listParams] = $this->consultaListado($soloPropias, $usuarioId, $anonimizarAlumnado);
+        $items = $this->db->prepare($sql . ' LIMIT :limite OFFSET :offset');
+        foreach ($listParams as $name => $value) {
+            $items->bindValue(':' . $name, $value, PDO::PARAM_INT);
+        }
+        $items->bindValue(':limite', $porPagina, PDO::PARAM_INT);
+        $items->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
+        $items->execute();
+        $paginacion['items'] = $items->fetchAll(PDO::FETCH_ASSOC);
+
+        return $paginacion;
     }
 
     public function contarActivasPorUsuario(int $usuarioId): int

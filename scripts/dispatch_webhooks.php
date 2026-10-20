@@ -28,6 +28,79 @@ function validateWebhookDestination(string $destination): void
     }
 }
 
+function resolveWebhookDestination(string $destination): array
+{
+    $parts = parse_url($destination);
+    if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+        throw new RuntimeException('FCT_WEBHOOK_OUTBOUND_URL no es válida.');
+    }
+
+    $scheme = strtolower($parts['scheme']);
+    $host = strtolower(rtrim(trim($parts['host'], '[]'), '.'));
+    $port = (int)($parts['port'] ?? ($scheme === 'https' ? 443 : 80));
+    $localHosts = ['localhost', '127.0.0.1', '::1'];
+    if ($scheme === 'http' && in_array($host, $localHosts, true)) {
+        return [];
+    }
+
+    $isPublicAddress = static function (string $address): bool {
+        if (filter_var(
+            $address,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        ) === false) {
+            return false;
+        }
+
+        $packed = inet_pton($address);
+        if ($packed === false) {
+            return false;
+        }
+        if (strlen($packed) === 4) {
+            $octets = array_values(unpack('C4', $packed));
+            if ($octets[0] === 100 && $octets[1] >= 64 && $octets[1] <= 127) {
+                return false;
+            }
+        }
+
+        return true;
+    };
+
+    if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+        if (!$isPublicAddress($host)) {
+            throw new RuntimeException('El destino webhook debe resolver a direcciones IP públicas.');
+        }
+        return [];
+    }
+
+    if (preg_match('/\A(?:0x[0-9a-f]+|[0-9]+)(?:\.(?:0x[0-9a-f]+|[0-9]+))*\z/i', $host) === 1) {
+        throw new RuntimeException('El destino webhook no puede usar una dirección IP numérica no canónica.');
+    }
+
+    $records = dns_get_record($host, DNS_A | DNS_AAAA);
+    if (!is_array($records) || $records === []) {
+        throw new RuntimeException('No se pudo resolver el destino webhook.');
+    }
+
+    $addresses = [];
+    foreach ($records as $record) {
+        $address = $record['ip'] ?? $record['ipv6'] ?? null;
+        if (!is_string($address)) {
+            continue;
+        }
+        if (!$isPublicAddress($address)) {
+            throw new RuntimeException('El destino webhook debe resolver únicamente a direcciones IP públicas.');
+        }
+        $addresses[] = $address;
+    }
+    $addresses = array_values(array_unique($addresses));
+    if ($addresses === []) {
+        throw new RuntimeException('El destino webhook no tiene registros públicos A o AAAA.');
+    }
+
+    return $addresses;
+}
+
 function claimWebhook(PDO $db, ?string $eventId = null): ?array
 {
     $db->beginTransaction();
@@ -124,6 +197,7 @@ try {
         throw new RuntimeException('Configura FCT_WEBHOOK_OUTBOUND_URL antes de enviar eventos.');
     }
     validateWebhookDestination($destination);
+    $resolvedAddresses = resolveWebhookDestination($destination);
     $secret = Webhook::secretFromEnvironment('FCT_WEBHOOK_OUTBOUND_SECRET');
     if (!extension_loaded('curl')) {
         throw new RuntimeException('La extensión PHP cURL es necesaria para enviar webhooks.');
@@ -159,7 +233,7 @@ try {
         $responseBytes = 0;
         $responseTooLarge = false;
         $responseBody = '';
-        curl_setopt_array($curl, [
+        $curlOptions = [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $event['payload'],
             CURLOPT_HTTPHEADER => [
@@ -185,7 +259,22 @@ try {
             CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
-        ]);
+            CURLOPT_PROXY => '',
+        ];
+        if ($resolvedAddresses !== []) {
+            $destinationParts = parse_url($destination);
+            if (!is_array($destinationParts) || !isset($destinationParts['host'])) {
+                throw new RuntimeException('FCT_WEBHOOK_OUTBOUND_URL no es válida.');
+            }
+            $host = strtolower(rtrim(trim($destinationParts['host'], '[]'), '.'));
+            $port = (int)($destinationParts['port'] ?? 443);
+            $curlOptions[CURLOPT_RESOLVE] = array_map(
+                static fn(string $address): string => $host . ':' . $port . ':'
+                    . (str_contains($address, ':') ? '[' . $address . ']' : $address),
+                $resolvedAddresses
+            );
+        }
+        curl_setopt_array($curl, $curlOptions);
         $response = curl_exec($curl);
         $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         $networkError = $response === false;

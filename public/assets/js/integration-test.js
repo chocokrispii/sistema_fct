@@ -96,7 +96,13 @@
             } catch {
                 formatted = responseText || '(respuesta vacía)';
             }
-            status.textContent = 'HTTP ' + result.status + (result.ok ? ' · solicitud completada' : ' · revisa el error devuelto');
+            const errorCode = result.headers.get('X-API-Error-Code');
+            const statusDetail = result.ok
+                ? ' · solicitud completada'
+                : errorCode
+                    ? ' · ' + errorCode
+                    : ' · revisa el error devuelto';
+            status.textContent = 'HTTP ' + result.status + statusDetail;
             response.textContent = formatted;
         } catch (error) {
             status.textContent = 'No se pudo conectar con la API: ' + (error instanceof Error ? error.message : 'error de red');

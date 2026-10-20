@@ -338,6 +338,15 @@ class OfertaController {
             return 'Necesitas un convenio aprobado para ese ciclo y vigente durante todo el periodo de la oferta.';
         }
 
+        $cicloStmt = $this->db->prepare(
+            'SELECT nombre_especialidad FROM especialidades WHERE id = :id'
+        );
+        $cicloStmt->execute(['id' => $especialidadId]);
+        $ciclo = $cicloStmt->fetchColumn();
+        if (!is_string($ciclo)) {
+            return 'El ciclo formativo seleccionado ya no está disponible.';
+        }
+
         $this->db->beginTransaction();
         try {
             $ofertaId = $this->ofertaModel->crearOferta(
@@ -369,11 +378,19 @@ class OfertaController {
                 'oferta_id' => $ofertaId,
                 'empresa_id' => $empresaId,
                 'especialidad_id' => (int)$especialidadId,
+                'ciclo' => $ciclo,
                 'estado' => 'Pendiente',
                 'plazas' => (int)$plazas,
                 'fecha_inicio' => $fechaInicio->format('Y-m-d'),
                 'fecha_fin' => $fechaFin->format('Y-m-d'),
                 'turno' => $turno,
+                'titulo' => $titulo,
+                'descripcion' => $descripcion,
+                'modalidad' => $modalidad,
+                'ubicacion' => $ubicacion !== '' ? $ubicacion : null,
+                'requisitos_tecnologicos' => $requisitos !== '' ? $requisitos : null,
+                'tecnologias' => $tecnologias !== '' ? $tecnologias : null,
+                'horarios' => $horarios,
             ]);
             $this->db->commit();
             return null;

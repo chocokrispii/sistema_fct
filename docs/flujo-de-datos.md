@@ -168,7 +168,7 @@ Para roles y alcance de lectura, consulta [Roles y permisos](/roles_y_permisos).
 
 ### Disponibilidad del antivirus en desarrollo
 
-`FileScanner` analiza el archivo por TCP INSTREAM cuando `FCT_CLAMAV_ENABLED=true` (valor requerido en producción). En desarrollo local únicamente, `FCT_CLAMAV_ENABLED=false` con `APP_ENV=development` permite omitir el scanner y escribe una advertencia en el log; no es una recuperación automática ante fallos de ClamAV. Cuando el escaneo está habilitado, ClamAV no disponible, firmas antiguas, timeout o respuesta `FOUND` rechazan la carga. Para probar el fallo, fija `FCT_CLAMAV_ENABLED=true` y detén temporalmente el servicio en una instalación desechable. No expongas el puerto del scanner ni uses archivos de prueba infectados fuera de un entorno aislado. Consulta [seguridad y antivirus](/seguridad_y_antivirus).
+`FileScanner` analiza el archivo por TCP INSTREAM cuando `FCT_CLAMAV_ENABLED=true` (valor de reserva requerido en producción). En un entorno local sin antivirus, `FCT_CLAMAV_ENABLED=false` sólo permite omitir el scanner si `APP_ENV` es `development`, `test` o `testing`; configura ambos valores explícitamente y el sistema escribe una advertencia en el log. No es una recuperación automática ante fallos de ClamAV. Compose usa `APP_ENV=production` y mantiene el escaneo habilitado si no se definen variables. Cuando el escaneo está habilitado, ClamAV no disponible, firmas antiguas, timeout o respuesta `FOUND` rechazan la carga. Para probar el fallo, fija `FCT_CLAMAV_ENABLED=true` y detén temporalmente el servicio en una instalación desechable. No expongas el puerto del scanner ni uses archivos de prueba infectados fuera de un entorno aislado. Consulta [seguridad y antivirus](/seguridad_y_antivirus).
 
 ## Catálogo de rutas HTTP
 
@@ -203,6 +203,13 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 | Consultas y administración | `consultas` | GET | Administrador, Coordinador, Observador |
 |  | `usuarios` | GET, POST | Administrador |
 |  | `estado-usuario`, `eliminar-usuario` | POST | Administrador |
+| Integraciones | `api-tokens` | GET, POST | Administrador; emite (el valor en claro se muestra una vez) y revoca tokens de la API |
+|  | `pruebas-integracion` | GET, POST | Administrador; pruebas sintéticas de recepción y envío de webhooks |
+|  | `webhook-inbox`, `webhooks-recibidos` | GET | Administrador; ambas acciones ejecutan `WebhookInboxController::listarRecibidos` (últimos 50 eventos de `webhook_inbox`) |
+|  | `webhooks-enviados` | GET | Administrador; últimos 50 eventos de `webhook_outbox` |
+|  | `webhooks-empresa` | GET | Administrador; actividad de webhooks filtrada por `empresa_id` |
+
+`routes/web.php` declara 42 acciones estáticas, todas recogidas arriba. Además, `preview-disponibilidad` y `preview-publicar-oferta` (públicas, GET, vistas de desarrollo) se registran sólo cuando `APP_ENV` es `development` o `local`; no forman parte del catálogo de producción.
 
 La definición completa del rol de auditoría y sus límites está en [Roles y permisos](/roles_y_permisos).
 

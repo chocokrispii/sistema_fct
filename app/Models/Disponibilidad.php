@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../Core/Webhook.php';
 
 class Disponibilidad
 {
@@ -97,6 +98,15 @@ class Disponibilidad
                     'hora_fin' => $horario['hora_fin'],
                 ]);
             }
+
+            Webhook::enqueue($this->db, 'student.availability_updated', [
+                'student_id' => (int)$alumnoId,
+                'fecha_inicio' => $inicio,
+                'fecha_fin' => $fin,
+                'turno' => $turno,
+                'es_indiferente' => $esIndiferente,
+                'horarios' => array_values($horarios),
+            ]);
 
             $this->db->commit();
         } catch (Throwable $e) {
