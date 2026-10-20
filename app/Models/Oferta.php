@@ -29,7 +29,7 @@ class Oferta {
                 WHERE oh.oferta_id = p.id
                     AND (
                         DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                        OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
+                        OR MOD(CAST(oh.dia_semana AS SIGNED) - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
                             <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
                     )
             )
@@ -40,7 +40,7 @@ class Oferta {
                     WHERE oh.oferta_id = p.id
                         AND (
                             DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                            OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
+                            OR MOD(CAST(oh.dia_semana AS SIGNED) - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
                                 <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
                         )
                         AND NOT EXISTS (
@@ -130,30 +130,6 @@ class Oferta {
         $stmt = $this->db->prepare(self::SELECT_BASE . ' WHERE p.empresa_id = :empresa_id ORDER BY p.fecha_inicio DESC');
         $stmt->execute(['empresa_id' => $empresaId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    private function obtenerPagina(string $where, array $params, string $orderBy, int $pagina, int $porPagina): array
-    {
-        $whereSql = $where !== '' ? ' WHERE ' . $where : '';
-        $count = $this->db->prepare(
-            'SELECT COUNT(*)
-             FROM empresa_especialidades_plazas p
-             INNER JOIN empresas e ON e.id = p.empresa_id
-             INNER JOIN especialidades es ON es.id = p.especialidad_id' . $whereSql
-        );
-        $count->execute($params);
-        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
-
-        $stmt = $this->db->prepare(self::SELECT_BASE . $whereSql . ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset');
-        foreach ($params as $name => $value) {
-            $stmt->bindValue(':' . $name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
-        }
-        $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
-        $stmt->execute();
-        $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        return $paginacion;
     }
 
     public function obtenerPaginaPorEmpresa(int $empresaId, int $pagina, int $porPagina = 20): array
