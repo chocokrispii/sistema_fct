@@ -78,30 +78,26 @@ class AlumnoController
             return;
         }
 
-        if (
-            !filter_var($email, FILTER_VALIDATE_EMAIL)
-            || strlen($email) > 100
-            || strlen($password) < 12
-            || strlen($password) > 72
-            || trim($password) === ''
-            || $nombre === ''
-            || !SpanishDataValidator::isPersonName($nombre, 50)
-            || $apellidos === ''
-            || !SpanishDataValidator::isPersonName($apellidos, 100)
-            || $dni === ''
-            || mb_strlen($dni) > 20
-            || !SpanishDataValidator::isDniNie($dni)
-            || $nss === ''
-            || preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $nss) !== 1
-            || $telefono === ''
-            || !SpanishDataValidator::isSpanishPhone($telefono)
-            || $direccion === ''
-            || mb_strlen($direccion) > 255
-            || !SpanishDataValidator::isSpanishPostcode($codigoPostal)
-            || preg_match('/[\p{Cc}]/u', $direccion) === 1
-            || $especialidadId === false
-        ) {
-            $this->mostrarFormulario('Completa correctamente todos los campos. Comprueba el DNI/NIE, teléfono y código postal.');
+        $validaciones = [
+            'correo electrónico' => SpanishDataValidator::isEmail($email),
+            'contraseña (12–72 caracteres)' => strlen($password) >= 12
+                && strlen($password) <= 72
+                && trim($password) !== '',
+            'nombre' => $nombre !== '' && SpanishDataValidator::isPersonName($nombre, 50),
+            'apellidos' => $apellidos !== '' && SpanishDataValidator::isPersonName($apellidos, 100),
+            'DNI/NIE' => $dni !== '' && mb_strlen($dni) <= 20 && SpanishDataValidator::isDniNie($dni),
+            'número de Seguridad Social' => $nss !== ''
+                && preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $nss) === 1,
+            'teléfono' => $telefono !== '' && SpanishDataValidator::isSpanishPhone($telefono),
+            'dirección' => $direccion !== ''
+                && mb_strlen($direccion) <= 255
+                && preg_match('/[\p{Cc}]/u', $direccion) !== 1,
+            'código postal' => SpanishDataValidator::isSpanishPostcode($codigoPostal),
+            'ciclo formativo' => $especialidadId !== false,
+        ];
+        $camposInvalidos = array_keys($validaciones, false, true);
+        if ($camposInvalidos !== []) {
+            $this->mostrarFormulario('Revisa estos campos: ' . implode(', ', $camposInvalidos) . '.');
             return;
         }
 
@@ -220,6 +216,13 @@ class AlumnoController
     {
         $usuarioId = (int)$_SESSION['usuario_id'];
         $alumno = $this->alumnoModel->obtenerPorUsuario($usuarioId);
+        $resultadoAsignaciones = $alumno
+            ? (new Asignacion($this->db))->obtenerPagina(
+                true,
+                $usuarioId,
+                Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+            )
+            : ['items' => [], 'total' => 0];
 
         View::render('alumnos/portal', [
             'alumno' => $alumno,
@@ -229,9 +232,9 @@ class AlumnoController
             'horarioSemanal' => $alumno
                 ? (new Disponibilidad($this->db))->obtenerHorarioSemanalPorUsuario($usuarioId)
                 : [],
-            'asignaciones' => $alumno
-                ? (new Asignacion($this->db))->listar(true, $usuarioId)
-                : [],
+            'asignaciones' => $resultadoAsignaciones['items'],
+            'totalAsignaciones' => $resultadoAsignaciones['total'],
+            'paginacion' => $resultadoAsignaciones,
             'calificaciones' => $alumno
                 ? (new Calificacion($this->db))->listar(true, $usuarioId)
                 : [],

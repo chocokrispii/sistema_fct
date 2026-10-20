@@ -59,8 +59,21 @@
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
+                    <?php if (isset($oferta['paginacionCandidatos'])): ?>
+                        <?php
+                        $paginacion = $oferta['paginacionCandidatos'] + [
+                            'parametro' => 'candidatos_pagina',
+                            'clave' => (int)$oferta['id'],
+                        ];
+                        require __DIR__ . '/../partials/paginacion.php';
+                        ?>
+                    <?php endif; ?>
                 </section>
             <?php endforeach; ?>
         </div>
+        <?php
+        $paginacion = $paginacionOfertas;
+        require __DIR__ . '/../partials/paginacion.php';
+        ?>
     <?php endif; ?>
 </section>

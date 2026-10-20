@@ -2,6 +2,7 @@
 // app/Models/Oferta.php
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../Core/Paginacion.php';
 
 class Oferta {
     private PDO $db;
@@ -88,6 +89,11 @@ class Oferta {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function obtenerPaginaPorEmpresa(int $empresaId, int $pagina, int $porPagina = 20): array
+    {
+        return $this->obtenerPagina('p.empresa_id = :empresa_id', ['empresa_id' => $empresaId], 'p.fecha_inicio DESC, p.id DESC', $pagina, $porPagina);
+    }
+
     public function obtenerTodas(bool $soloVigentes = false): array {
         $sql = self::SELECT_BASE
             . ($soloVigentes
@@ -101,10 +107,49 @@ class Oferta {
         return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function obtenerResumenVigentes(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT COUNT(*) AS total_ofertas, COUNT(DISTINCT empresa_id) AS total_empresas
+             FROM empresa_especialidades_plazas
+             WHERE estado = 'Aprobada' AND fecha_fin >= CURDATE()"
+        );
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function obtenerRecientesVigentes(int $limite = 4): array
+    {
+        if ($limite < 1 || $limite > 20) {
+            throw new InvalidArgumentException('El límite de ofertas recientes debe estar entre 1 y 20.');
+        }
+
+        $stmt = $this->db->prepare(
+            self::SELECT_BASE
+            . " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
+               ORDER BY p.fecha_inicio, p.id LIMIT :limite"
+        );
+        $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function obtenerPaginaTodas(bool $soloVigentes, int $pagina, int $porPagina = 20): array
+    {
+        $where = $soloVigentes ? "p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '';
+        return $this->obtenerPagina($where, [], 'p.fecha_inicio, p.id', $pagina, $porPagina);
+    }
+
     public function obtenerPendientes(): array
     {
         $stmt = $this->db->query(self::SELECT_BASE . " WHERE p.estado = 'Pendiente' ORDER BY p.fecha_inicio");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function obtenerPaginaPendientes(int $pagina, int $porPagina = 20): array
+    {
+        return $this->obtenerPagina("p.estado = 'Pendiente'", [], 'p.fecha_inicio, p.id', $pagina, $porPagina);
     }
 
     public function resolver(int $ofertaId, string $estado, string $motivo, int $revisorId): bool
@@ -166,7 +211,7 @@ class Oferta {
                                 )
                         )
                     )
-                WHERE p.id = :oferta_id
+                WHERE p.id IN (" . implode(', ', $placeholders) . ")
                     AND p.estado = 'Aprobada'
                     AND NOT EXISTS (
                         SELECT 1 FROM asignaciones_fct af

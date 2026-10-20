@@ -1,10 +1,10 @@
-<h2>Convenios pendientes de revisión</h2>
-<p>Comprueba el documento y que el convenio corresponda al ciclo indicado antes de decidir.</p>
-<?php if ($convenios === []): ?><p>No hay convenios pendientes.</p>
+<h2>Convenios registrados</h2>
+<p>Consulta los documentos y el estado de cada convenio. Los pendientes pueden aprobarse o rechazarse desde aquí.</p>
+<?php if ($convenios === []): ?><p>No hay convenios registrados.</p>
 <?php else: foreach ($convenios as $item): ?>
     <section class="review-card">
         <h3><?= htmlspecialchars($item['nombre_empresa'] . ' — ' . $item['numero_convenio'] . ' — ' . ($item['nombre_especialidad'] ?? 'Sin clasificar (anterior)'), ENT_QUOTES, 'UTF-8') ?></h3>
-        <p>Firma <?= htmlspecialchars($item['fecha_firma'], ENT_QUOTES, 'UTF-8') ?> · Vigencia
+        <p>Estado: <?= htmlspecialchars($item['estado'], ENT_QUOTES, 'UTF-8') ?> · Firma <?= htmlspecialchars($item['fecha_firma'], ENT_QUOTES, 'UTF-8') ?> · Vigencia
             <?= htmlspecialchars($item['fecha_inicio'] . ' – ' . $item['fecha_fin'], ENT_QUOTES, 'UTF-8') ?>
             <?php if ($item['nombre_sede']): ?> · Sede <?= htmlspecialchars($item['nombre_sede'], ENT_QUOTES, 'UTF-8') ?><?php endif; ?>
         </p>

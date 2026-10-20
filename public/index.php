@@ -9,6 +9,7 @@ require_once __DIR__ . '/../app/Core/FrontendAssets.php';
 require_once __DIR__ . '/../app/Core/JsonResponse.php';
 require_once __DIR__ . '/../app/Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
+require_once __DIR__ . '/../app/Controllers/InicioController.php';
 require_once __DIR__ . '/../app/Controllers/AuthController.php';
 require_once __DIR__ . '/../app/Controllers/RecuperacionController.php';
 require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
@@ -21,6 +22,10 @@ require_once __DIR__ . '/../app/Controllers/CalificacionController.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
 require_once __DIR__ . '/../app/Controllers/UsuarioAdminController.php';
 require_once __DIR__ . '/../app/Controllers/ConsultaController.php';
+require_once __DIR__ . '/../app/Controllers/ApiTokenAdminController.php';
+require_once __DIR__ . '/../app/Controllers/IntegrationTestController.php';
+require_once __DIR__ . '/../app/Controllers/WebhookInboxController.php';
+require_once __DIR__ . '/../app/Controllers/WebhookCompanyActivityController.php';
 
 $contentLength = $_SERVER['CONTENT_LENGTH'] ?? null;
 if (

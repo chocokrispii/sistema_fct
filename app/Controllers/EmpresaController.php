@@ -95,6 +95,13 @@ class EmpresaController {
         View::render('empresas/registro', ['error' => $error]);
     }
 
+    public function listarParaCentro(): void
+    {
+        View::render('empresas/listado-centro', [
+            'empresas' => $this->empresaModel->obtenerTodasParaCentro(),
+        ]);
+    }
+
     public function sedes(): void
     {
         $empresa = $this->empresaModel->obtenerPorUsuarioId((int)$_SESSION['usuario_id']);

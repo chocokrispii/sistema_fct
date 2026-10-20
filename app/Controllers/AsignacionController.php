@@ -17,6 +17,11 @@ class AsignacionController
 
     public function listar(): void
     {
+        $resultado = $this->model->obtenerPagina(
+            false,
+            0,
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
         View::render('asignaciones/listado', [
             'soloPropias' => false,
             'anonimizarAlumnado' => ($_SESSION['rol'] ?? null) === 'Observador',
@@ -28,11 +33,17 @@ class AsignacionController
 
     public function misAsignaciones(): void
     {
+        $resultado = $this->model->obtenerPagina(
+            true,
+            (int)$_SESSION['usuario_id'],
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
         View::render('asignaciones/listado', [
             'soloPropias' => true,
             'anonimizarAlumnado' => false,
             'puedeGestionar' => false,
-            'asignaciones' => $this->model->listar(true, (int)$_SESSION['usuario_id']),
+            'asignaciones' => $resultado['items'],
+            'paginacion' => $resultado,
             'error' => '',
         ]);
     }
@@ -52,7 +63,19 @@ class AsignacionController
         $errorRaw = $_GET['error'] ?? '';
         $error = is_string($errorRaw) ? $errorRaw : '';
         $ofertaModel = new Oferta($this->db);
-        $ofertas = $ofertaModel->obtenerTodas(true);
+        $resultado = $ofertaModel->obtenerPaginaTodas(
+            true,
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null),
+            10
+        );
+        $ofertas = $resultado['items'];
+        $ofertaIds = array_map(static fn(array $oferta): int => (int)$oferta['id'], $ofertas);
+        $asignadasPorOferta = $ofertaModel->contarAsignacionesPorOferta($ofertaIds);
+        $paginasCandidatosRaw = $_GET['candidatos_pagina'] ?? [];
+        $paginasCandidatosRaw = is_array($paginasCandidatosRaw) ? $paginasCandidatosRaw : [];
+        $ofertaIdsConPlazas = [];
+        $paginasCandidatos = [];
+
         foreach ($ofertas as &$oferta) {
             $oferta['horarios'] = $ofertaModel->obtenerHorarioSemanal((int)$oferta['id']);
             $stmt = $this->db->prepare(
@@ -61,14 +84,32 @@ class AsignacionController
             $stmt->execute(['id' => $oferta['id']]);
             $oferta['asignadas'] = (int)$stmt->fetchColumn();
             $oferta['plazas_disponibles'] = max(0, (int)$oferta['plazas_cuantas'] - $oferta['asignadas']);
-            $oferta['candidatos'] = $oferta['plazas_disponibles'] > 0
-                ? $ofertaModel->obtenerCandidatos((int)$oferta['id'])
-                : [];
+            $oferta['candidatos'] = [];
+            if ($oferta['plazas_disponibles'] > 0) {
+                $ofertaIdsConPlazas[] = $ofertaId;
+                $paginasCandidatos[$ofertaId] = Paginacion::desdeEntrada(
+                    $paginasCandidatosRaw[$ofertaId] ?? null
+                );
+            }
+        }
+        unset($oferta);
+
+        $candidatosPorOferta = $ofertaModel->obtenerCandidatosPaginados(
+            $ofertaIdsConPlazas,
+            $paginasCandidatos
+        );
+        foreach ($ofertas as &$oferta) {
+            $ofertaId = (int)$oferta['id'];
+            if (isset($candidatosPorOferta[$ofertaId])) {
+                $oferta['candidatos'] = $candidatosPorOferta[$ofertaId]['candidatos'];
+                $oferta['paginacionCandidatos'] = $candidatosPorOferta[$ofertaId];
+            }
         }
         unset($oferta);
 
         View::render('asignaciones/matching', [
             'ofertas' => $ofertas,
+            'paginacionOfertas' => $resultado,
             'error' => $error,
         ]);
     }

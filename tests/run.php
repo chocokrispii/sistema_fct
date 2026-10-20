@@ -13,6 +13,7 @@ if (getenv('FCT_DB_NAME') !== $testDatabase) {
 }
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../app/Core/Webhook.php';
 require_once __DIR__ . '/../app/Core/View.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
 require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
@@ -25,10 +26,12 @@ require_once __DIR__ . '/../app/Models/Alumno.php';
 require_once __DIR__ . '/../app/Models/Disponibilidad.php';
 require_once __DIR__ . '/../app/Models/Calificacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
+require_once __DIR__ . '/../app/Models/Empresa.php';
 require_once __DIR__ . '/../app/Models/Usuario.php';
 require_once __DIR__ . '/../app/Models/Especialidad.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
+require_once __DIR__ . '/../app/Controllers/WebhookCompanyActivityController.php';
 
 function assertTrue(bool $condition, string $message): void
 {
@@ -98,6 +101,18 @@ foreach ($required as $name => $definition) {
     ]);
     assertTrue((int)$stmt->fetchColumn() === 1, "Falta columna requerida para las migraciones: $name.");
 }
+$webhookTables = $db->query(
+    "SELECT COUNT(*) FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('webhook_inbox', 'webhook_outbox')"
+)->fetchColumn();
+assertTrue((int)$webhookTables === 2, 'Faltan tablas de entrada/salida webhook; ejecuta la migración 007.');
+$webhookResponseColumns = $db->query(
+    "SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND ((TABLE_NAME = 'webhook_inbox' AND COLUMN_NAME IN ('response_status', 'response_body'))
+         OR (TABLE_NAME = 'webhook_outbox' AND COLUMN_NAME = 'response_body'))"
+)->fetchColumn();
+assertTrue((int)$webhookResponseColumns === 3, 'Faltan columnas para conservar las respuestas webhook; ejecuta la migración 009.');
 
 $fixture = bin2hex(random_bytes(5));
 $emails = [
@@ -117,8 +132,141 @@ $createdStudents = [];
 $createdOffer = null;
 $createdAssignmentId = null;
 $createdCycleId = null;
+$webhookEventId = null;
 
 try {
+    $webhookEventId = 'test-' . bin2hex(random_bytes(12));
+    $webhookBody = json_encode([
+        'event_id' => $webhookEventId,
+        'event' => 'prueba.integracion',
+        'version' => 1,
+        'occurred_at' => gmdate('Y-m-d\TH:i:s\Z'),
+        'data' => (object)['registro_id' => 123],
+    ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    $webhookTimestamp = (string)time();
+    $webhookSecret = bin2hex(random_bytes(32));
+    $webhookSignature = 'sha256=' . hash_hmac(
+        'sha256',
+        $webhookTimestamp . '.' . $webhookBody,
+        $webhookSecret
+    );
+    assertTrue(
+        Webhook::receive(
+            $db,
+            $webhookBody,
+            $webhookEventId,
+            $webhookTimestamp,
+            $webhookSignature,
+            $webhookSecret
+        ),
+        'Un webhook firmado nuevo debe registrarse.'
+    );
+    Webhook::recordInboundResponse(
+        $db,
+        $webhookEventId,
+        202,
+        json_encode(['received' => true, 'duplicate' => false, 'event_id' => $webhookEventId], JSON_THROW_ON_ERROR)
+    );
+    $storedResponse = $db->prepare(
+        'SELECT response_status, response_body FROM webhook_inbox WHERE event_id = :event_id'
+    );
+    $storedResponse->execute(['event_id' => $webhookEventId]);
+    $storedResponseRow = $storedResponse->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_array($storedResponseRow)
+            && (int)$storedResponseRow['response_status'] === 202
+            && is_string($storedResponseRow['response_body'])
+            && json_decode($storedResponseRow['response_body'], true, 16, JSON_THROW_ON_ERROR)['duplicate'] === false,
+        'La respuesta HTTP inicial del webhook entrante debe conservarse.'
+    );
+    assertTrue(
+        !Webhook::receive(
+            $db,
+            $webhookBody,
+            $webhookEventId,
+            $webhookTimestamp,
+            $webhookSignature,
+            $webhookSecret
+        ),
+        'Un webhook ya recibido debe detectarse como duplicado.'
+    );
+    Webhook::recordInboundResponse(
+        $db,
+        $webhookEventId,
+        200,
+        json_encode(['received' => true, 'duplicate' => true, 'event_id' => $webhookEventId], JSON_THROW_ON_ERROR)
+    );
+    $storedResponse->execute(['event_id' => $webhookEventId]);
+    $storedDuplicateResponse = $storedResponse->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_array($storedDuplicateResponse)
+            && (int)$storedDuplicateResponse['response_status'] === 200
+            && is_string($storedDuplicateResponse['response_body'])
+            && json_decode($storedDuplicateResponse['response_body'], true, 16, JSON_THROW_ON_ERROR)['duplicate'] === true,
+        'La respuesta de un webhook duplicado debe conservarse como respuesta más reciente.'
+    );
+    $webhookSignatureRejected = false;
+    try {
+        Webhook::receive(
+            $db,
+            $webhookBody,
+            'another-' . $webhookEventId,
+            $webhookTimestamp,
+            'sha256=' . str_repeat('0', 64),
+            $webhookSecret
+        );
+    } catch (WebhookRequestException $exception) {
+        $webhookSignatureRejected = $exception->httpStatus === 401;
+    }
+    assertTrue($webhookSignatureRejected, 'Un webhook con firma HMAC incorrecta debe rechazarse.');
+    $conflictingPayload = json_decode($webhookBody, false, 16, JSON_THROW_ON_ERROR);
+    $conflictingPayload->data->registro_id = 124;
+    $conflictingBody = json_encode(
+        $conflictingPayload,
+        JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+    );
+    $conflictingSignature = 'sha256=' . hash_hmac(
+        'sha256',
+        $webhookTimestamp . '.' . $conflictingBody,
+        $webhookSecret
+    );
+    $webhookConflictRejected = false;
+    try {
+        Webhook::receive(
+            $db,
+            $conflictingBody,
+            $webhookEventId,
+            $webhookTimestamp,
+            $conflictingSignature,
+            $webhookSecret
+        );
+    } catch (WebhookRequestException $exception) {
+        $webhookConflictRejected = $exception->httpStatus === 409;
+    }
+    assertTrue($webhookConflictRejected, 'Un event_id reutilizado con distinto contenido debe rechazarse.');
+
+    putenv('FCT_WEBHOOK_OUTBOUND_URL=https://receiver.example.test/webhooks');
+    $db->beginTransaction();
+    try {
+        Webhook::enqueue($db, 'prueba.transaccional', ['registro_id' => 123]);
+        $queued = $db->query(
+            "SELECT event_type, payload FROM webhook_outbox
+             WHERE event_type = 'prueba.transaccional'
+             ORDER BY created_at DESC LIMIT 1"
+        )->fetch(PDO::FETCH_ASSOC);
+        assertTrue(
+            $queued !== false
+                && $queued['event_type'] === 'prueba.transaccional'
+                && json_decode($queued['payload'], true, 16, JSON_THROW_ON_ERROR)['data']['registro_id'] === 123,
+            'El evento saliente debe guardarse como JSON en la transacción local.'
+        );
+    } finally {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        putenv('FCT_WEBHOOK_OUTBOUND_URL');
+    }
+
     $roleHash = password_hash('TestPassword123!', PASSWORD_DEFAULT);
     $addUser = $db->prepare('INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :hash, :role)');
     $addUser->execute(['email' => $emails[0], 'hash' => $roleHash, 'role' => 'Empresa']);
@@ -191,6 +339,19 @@ try {
         'contacto' => 'Tutor de prueba',
     ]);
     $createdCompany = (int)$db->lastInsertId();
+    $listedCompanies = (new Empresa($db))->obtenerTodasParaCentro();
+    $listedTestCompany = array_values(array_filter(
+        $listedCompanies,
+        static fn(array $company): bool => (int)$company['id'] === $createdCompany
+    ))[0] ?? null;
+    assertTrue(
+        $listedTestCompany !== null
+            && $listedTestCompany['nombre_empresa'] === "Test Company $fixture"
+            && $listedTestCompany['cif_empresa'] === $cifs[0]
+            && $listedTestCompany['email'] === $emails[0]
+            && (int)$listedTestCompany['activo'] === 1,
+        'El directorio del centro debe listar los perfiles de empresa con su cuenta y estado.'
+    );
 
     $studentInsert = $db->prepare(
         'INSERT INTO alumnos (usuario_id, nombre, apellidos, fecha_nacimiento, dni,
@@ -892,6 +1053,11 @@ try {
 
     echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, disponibilidad, calificaciones, usuarios y CSRF.\n";
 } finally {
+    putenv('FCT_WEBHOOK_OUTBOUND_URL');
+    if ($webhookEventId !== null) {
+        $stmt = $db->prepare('DELETE FROM webhook_inbox WHERE event_id = :event_id');
+        $stmt->execute(['event_id' => $webhookEventId]);
+    }
     if ($createdOffer !== null) {
         $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');
         $stmt->execute(['offer' => $createdOffer]);

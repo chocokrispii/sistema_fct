@@ -40,6 +40,21 @@ class Calificacion
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function obtenerNotaMediaPorUsuario(int $usuarioId): ?float
+    {
+        $stmt = $this->db->prepare(
+            'SELECT AVG(c.nota)
+             FROM calificaciones_fct c
+             INNER JOIN asignaciones_fct af ON af.id = c.asignacion_id
+             INNER JOIN alumnos a ON a.id = af.alumno_id
+             WHERE a.usuario_id = :usuario_id'
+        );
+        $stmt->execute(['usuario_id' => $usuarioId]);
+        $notaMedia = $stmt->fetchColumn();
+
+        return $notaMedia === false || $notaMedia === null ? null : (float)$notaMedia;
+    }
+
     public function guardar(int $asignacionId, int $usuarioId, float $nota, string $observaciones): void
     {
         if (

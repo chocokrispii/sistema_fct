@@ -43,6 +43,7 @@ services:
     ports:
       - "${APP_PORT:-8080}:80"
     volumes:
+      - .:/var/www/html
       - fct_storage:/var/lib/fct/storage
     healthcheck:
       test:
@@ -107,8 +108,8 @@ services:
           AND COLUMN_NAME = 'modalidad'), 1, 0)")" = "1"
       interval: 10s
       timeout: 5s
-      retries: 30
-      start_period: 60s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   phpmyadmin:
@@ -130,8 +131,8 @@ services:
       TZ: UTC
       CLAMD_CONF_TCPAddr: 0.0.0.0
       CLAMD_CONF_TCPSocket: 3310
-    expose:
-      - "3310"
+    ports:
+      - "127.0.0.1:3310:3310"
     volumes:
       - clamav_db:/var/lib/clamav
     healthcheck:

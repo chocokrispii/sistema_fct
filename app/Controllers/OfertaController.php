@@ -26,15 +26,6 @@ class OfertaController {
     }
 
     public function publicar(): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        if (($_SESSION['rol'] ?? '') !== 'Empresa') {
-            header('Location: index.php?action=login');
-            exit;
-        }
-
         $empresa = $this->empresaModel->obtenerPorUsuarioId((int)$_SESSION['usuario_id']);
         if ($empresa === null) {
             throw new RuntimeException('Tu usuario no tiene un perfil de empresa asociado.');
@@ -53,6 +44,10 @@ class OfertaController {
             $error = '';
         }
 
+        $resultadoOfertas = $this->ofertaModel->obtenerPaginaPorEmpresa(
+            $empresaId,
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
         View::render('ofertas/publicar', [
             'empresa' => $empresa,
             'error' => $error,
@@ -64,6 +59,9 @@ class OfertaController {
 
     public function revisar(): void
     {
+        $resultado = $this->ofertaModel->obtenerPaginaPendientes(
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
         View::render('ofertas/revisar', [
             'ofertas' => $this->withWeeklySchedules($this->ofertaModel->obtenerPendientes()),
             'error' => is_string($_GET['error'] ?? null) ? $_GET['error'] : '',
@@ -190,6 +188,10 @@ class OfertaController {
                 (int)$id,
                 'estado=' . $decision
             );
+            Webhook::enqueue($this->db, 'oferta.revisada', [
+                'oferta_id' => (int)$id,
+                'estado' => $decision,
+            ]);
             $this->db->commit();
         } catch (DomainException $e) {
             if ($this->db->inTransaction()) {
@@ -363,6 +365,16 @@ class OfertaController {
                 'ofertas',
                 $ofertaId
             );
+            Webhook::enqueue($this->db, 'oferta.creada', [
+                'oferta_id' => $ofertaId,
+                'empresa_id' => $empresaId,
+                'especialidad_id' => (int)$especialidadId,
+                'estado' => 'Pendiente',
+                'plazas' => (int)$plazas,
+                'fecha_inicio' => $fechaInicio->format('Y-m-d'),
+                'fecha_fin' => $fechaFin->format('Y-m-d'),
+                'turno' => $turno,
+            ]);
             $this->db->commit();
             return null;
         } catch (Throwable $e) {

@@ -85,15 +85,10 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
             </nav>
         </details>
     </header>
-
-    <main>
-        <?= $contenido ?>
-    </main>
-
-    <footer>
-        <p>Gestión de Formación en Centros de Trabajo</p>
-    </footer>
-
+    <main><?= $contenido ?></main>
+    <footer><p>Gestión de Formación en Centros de Trabajo</p></footer>
+  </div>
+</div>
+<script src="assets/js/app-menu.js" defer></script>
 </body>
-
 </html>
