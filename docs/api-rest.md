@@ -38,7 +38,7 @@ La pestaña **Integraciones** del menú de Administrador reúne la consola para
 probar esta API y los historiales separados de webhooks recibidos y enviados.
 El panel de tokens sigue disponible desde la propia consola.
 Consulta también la [Guía de Integraciones](./integraciones.md) o su
-[versión PDF](./guia-integraciones.pdf).
+[versión PDF](/guia-integraciones.pdf).
 
 Con la sesión de Administrador, el panel **Pruebas API y webhooks** está
 disponible tanto en Docker (`http://localhost:8080/index.php?action=pruebas-integracion`)

@@ -439,7 +439,7 @@ Para volver a inicializar la base de datos tras cambios de esquema o migraciones
 
 ## Más información
 
-- [Guía de Integraciones en PDF](docs/guia-integraciones.pdf)
+- [Guía de Integraciones en PDF](docs/public/guia-integraciones.pdf)
 - [Guía de Integraciones editable](docs/integraciones.md)
 - [Hoja de ruta de migración](docs/roadmap.md)
 - [Flujo de datos y ciclo de vida](docs/flujo-de-datos.md)

@@ -2,7 +2,7 @@
 
 **Sistema FCT · Uso administrativo**
 
-[Descargar esta guía en PDF](./guia-integraciones.pdf)
+[Descargar esta guía en PDF](/guia-integraciones.pdf)
 
 Esta guía explica cómo usar la pestaña **Integraciones** para consultar la API REST propia y revisar los webhooks recibidos y enviados, agrupados por empresa.
 
@@ -10,8 +10,8 @@ Esta guía explica cómo usar la pestaña **Integraciones** para consultar la AP
 
 La pestaña está disponible exclusivamente para cuentas con rol **Administrador**. Inicia sesión y selecciónala en el menú principal, o abre directamente:
 
-- Aplicación local XAMPP: <http://127.0.0.1:8002/index.php?action=integraciones>
-- Aplicación Docker: <http://localhost:8080/index.php?action=integraciones>
+- Aplicación local XAMPP: `http://127.0.0.1:8002/index.php?action=integraciones`
+- Aplicación Docker: `http://localhost:8080/index.php?action=integraciones`
 
 La autorización se comprueba también en el servidor: conocer o copiar la dirección no permite el acceso a otros roles.
 
@@ -66,7 +66,7 @@ La pestaña muestra como máximo los **500 eventos más recientes de cada histor
 
 Las pruebas manuales de recepción y envío están en **Pruebas API y webhooks**, una página administrativa aparte. En el entorno XAMPP, se abre desde:
 
-<http://127.0.0.1:8002/index.php?action=pruebas-integracion>
+`http://127.0.0.1:8002/index.php?action=pruebas-integracion`
 
 Las pruebas utilizan eventos ficticios y el receptor local. No configuran un servicio externo. Los eventos pueden quedar archivados en las bandejas de entrada y salida; evita introducir información personal. Para detalles de firma, configuración y ejecución del worker, consulta [Webhooks](./webhooks.md).
 

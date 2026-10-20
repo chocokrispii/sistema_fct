@@ -14,6 +14,7 @@ export default withMermaid(defineConfig({
       { text: 'Hoja de ruta de migración', link: '/roadmap' },
       { text: 'Roles y permisos', link: '/roles_y_permisos' },
       { text: 'Rutas y Contratos API', link: '/flujo-de-datos#catalogo-de-rutas-http' },
+      { text: 'Integraciones', link: '/integraciones' },
     ],
     sidebar: [
       {
