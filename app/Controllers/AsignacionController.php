@@ -23,7 +23,7 @@ class AsignacionController
             0,
             Paginacion::desdeEntrada($_GET['pagina'] ?? null),
             20,
-            $anonimizarAlumnado
+            ($_SESSION['rol'] ?? null) === 'Observador'
         );
         View::render('asignaciones/listado', [
             'soloPropias' => false,
@@ -82,7 +82,7 @@ class AsignacionController
 
         foreach ($ofertas as &$oferta) {
             $ofertaId = (int)$oferta['id'];
-            $oferta['horarios'] = $ofertaModel->obtenerHorarioSemanal((int)$oferta['id']);
+            $oferta['horarios'] = $ofertaModel->obtenerHorarioSemanal($ofertaId);
             $oferta['asignadas'] = $asignadasPorOferta[$ofertaId] ?? 0;
             $oferta['plazas_disponibles'] = max(0, (int)$oferta['plazas_cuantas'] - $oferta['asignadas']);
             $oferta['candidatos'] = [];

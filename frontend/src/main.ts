@@ -1,5 +1,6 @@
 import { createApp, type Component } from 'vue';
 import { createPinia } from 'pinia';
+import '../../public/assets/css/style.css';
 
 const islands = import.meta.glob<{ default: Component }>('./islands/*.vue', {
     eager: true,
