@@ -30,6 +30,7 @@ $routes = [
     'cerrar-practica' => ['method' => 'POST', 'roles' => ['Administrador', 'Coordinador'], 'controller' => AsignacionController::class, 'action' => 'cerrar'],
     'convenios' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => ConvenioController::class, 'action' => 'gestionarEmpresa'],
     'revisar-convenios' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador'], 'controller' => ConvenioController::class, 'action' => 'revisar'],
+    'archivo-convenios' => ['method' => 'GET', 'roles' => ['Administrador'], 'controller' => ConvenioController::class, 'action' => 'archivo'],
     'auditar-convenios' => ['method' => 'GET', 'roles' => ['Observador'], 'controller' => ConvenioController::class, 'action' => 'auditar'],
     'resolver-convenio' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => ConvenioController::class, 'action' => 'resolver'],
     'descargar-convenio' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Empresa'], 'controller' => ConvenioController::class, 'action' => 'descargar'],

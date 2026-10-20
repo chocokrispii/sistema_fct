@@ -1414,6 +1414,20 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
     color: var(--color-primary);
 }
 
+.offer-review-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.offer-review-card p,
+.offer-review-card h3,
+.offer-review-card li,
+.offer-review-card .offer-create__eyebrow {
+    overflow-wrap: anywhere;
+}
+
 .review-decision {
     grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: end;

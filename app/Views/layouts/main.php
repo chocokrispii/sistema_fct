@@ -58,6 +58,7 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                 <a href="index.php?action=recuperaciones">Recuperaciones</a>
                 <?php if ($rolActual === 'Administrador'): ?>
                     <a href="index.php?action=usuarios">Usuarios</a>
+                    <a href="index.php?action=archivo-convenios">Archivo de convenios</a>
                     <a href="index.php?action=integraciones">Integraciones</a>
                 <?php endif; ?>
             <?php elseif ($rolActual === 'Observador'): ?>

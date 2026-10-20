@@ -131,6 +131,7 @@ $createdUsers = [];
 $createdCompany = null;
 $createdStudents = [];
 $createdOffer = null;
+$createdAgreementId = null;
 $createdAssignmentId = null;
 $createdCycleId = null;
 $webhookEventId = null;
@@ -319,6 +320,22 @@ try {
     );
     $deniedDownload->execute(['usuario' => $createdUsers[3]]);
     assertTrue((int)$deniedDownload->fetchColumn() === 1, 'La denegación directa a un observador debe quedar auditada.');
+    $archiveRoute = (require __DIR__ . '/../routes/web.php')['archivo-convenios'] ?? null;
+    assertTrue(
+        is_array($archiveRoute)
+            && $archiveRoute['method'] === 'GET'
+            && $archiveRoute['roles'] === ['Administrador']
+            && $archiveRoute['controller'] === ConvenioController::class
+            && $archiveRoute['action'] === 'archivo',
+        'El archivo de convenios debe estar reservado a administradores.'
+    );
+    $archiveDenied = false;
+    try {
+        (new ConvenioController($db))->archivo();
+    } catch (RuntimeException) {
+        $archiveDenied = http_response_code() === 403;
+    }
+    assertTrue($archiveDenied, 'Un observador no debe acceder al archivo de convenios.');
     $_SESSION = [];
     http_response_code(200);
 
@@ -739,9 +756,36 @@ try {
         'numero' => "AG-$fixture",
     ]);
     $agreementId = (int)$db->lastInsertId();
+    $createdAgreementId = $agreementId;
     assertTrue(
         (new Convenio($db))->resolver($agreementId, 'Aprobado', '', $createdUsers[3]),
         'Un convenio pendiente debe poder aprobarse.'
+    );
+    (new Auditoria($db))->registrar(
+        $createdUsers[3],
+        'convenio.revisado',
+        'convenios',
+        $agreementId,
+        'estado=Aprobado'
+    );
+    $agreementModel = new Convenio($db);
+    $archivedAgreement = array_values(array_filter(
+        $agreementModel->listarArchivo(),
+        static fn(array $item): bool => (int)$item['id'] === $agreementId
+    ))[0] ?? null;
+    assertTrue(
+        $archivedAgreement !== null
+            && $archivedAgreement['estado'] === 'Aprobado'
+            && $archivedAgreement['nombre_revisor'] === "Coordinadora Álvarez O'Connor",
+        'El archivo debe mostrar el convenio aprobado y su revisor.'
+    );
+    assertTrue(
+        count(array_filter(
+            $agreementModel->listarEventosArchivo(),
+            static fn(array $event): bool => (int)$event['convenio_id'] === $agreementId
+                && $event['evento'] === 'convenio.revisado'
+        )) === 1,
+        'El archivo debe incluir los eventos de auditoría del convenio.'
     );
     $companyModel = new Empresa($db);
     assertTrue(
@@ -1077,6 +1121,10 @@ try {
     echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, disponibilidad, calificaciones, usuarios y CSRF.\n";
 } finally {
     putenv('FCT_WEBHOOK_OUTBOUND_URL');
+    if ($createdAgreementId !== null) {
+        $stmt = $db->prepare('DELETE FROM auditoria WHERE entidad = :entidad AND entidad_id = :id');
+        $stmt->execute(['entidad' => 'convenios', 'id' => $createdAgreementId]);
+    }
     if ($webhookEventId !== null) {
         $stmt = $db->prepare('DELETE FROM webhook_inbox WHERE event_id = :event_id');
         $stmt->execute(['event_id' => $webhookEventId]);

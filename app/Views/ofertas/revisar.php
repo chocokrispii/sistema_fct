@@ -5,7 +5,7 @@
     <p>No hay ofertas pendientes.</p>
 <?php else: ?>
     <?php foreach ($ofertas as $oferta): ?>
-        <section class="review-card">
+        <section class="review-card offer-review-card">
             <?php $turnLabel = ['M' => 'Mañana', 'T' => 'Tarde', 'P' => 'Partido', 'Indiferente' => 'Indiferente'][$oferta['turno']] ?? 'Sin especificar'; ?>
             <span class="offer-create__eyebrow"><?= htmlspecialchars($oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars($oferta['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></span>
             <h3><?= htmlspecialchars($oferta['titulo'] ?? 'Oferta FCT', ENT_QUOTES, 'UTF-8') ?></h3>
