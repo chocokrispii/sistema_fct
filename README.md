@@ -52,7 +52,7 @@ Crea `.env` con los valores locales de referencia; Compose lo carga automáticam
 Copy-Item .env.example .env
 ```
 
-Abre `.env` para cambiar puertos o contraseñas si entran en conflicto con otros servicios:
+Abre `.env` para cambiar puertos, seleccionar la base de datos y ajustar las credenciales locales:
 
 ```powershell
 notepad .env
@@ -66,6 +66,7 @@ Variables incluidas en la plantilla:
 | `APP_ENV` | `development` | Entorno de ejecución; el bypass de ClamAV sólo se permite con este valor. |
 | `FCT_CLAMAV_ENABLED` | `false` en las plantillas locales | `false` omite explícitamente el escaneo sólo en desarrollo; usa `true` para probar ClamAV. |
 | `PMA_PORT` | `8082` | Puerto local de phpMyAdmin; se publica sólo en `127.0.0.1`. |
+| `FCT_DB_HOST` | `db` | Servidor MariaDB usado por la aplicación. Usa `host.docker.internal` para conectar Docker con MariaDB de XAMPP en Windows. |
 | `FCT_DB_NAME` | `sistema_fct` | Base de datos de desarrollo. |
 | `FCT_DB_USER` | `fct` | Usuario que utiliza la aplicación y el formulario de acceso de phpMyAdmin. |
 | `FCT_DB_PASS` | `fct_local_dev` | Contraseña del usuario de aplicación MariaDB. |
@@ -74,6 +75,22 @@ Variables incluidas en la plantilla:
 | `VITE_PORT` | `5173` | Puerto de Vite cuando se ejecuta desde el perfil Docker `frontend-dev`. |
 
 Los valores de `.env.example` son exclusivamente para desarrollo local; sustitúyelos por claves propias y no compartas ni confirmes `.env`.
+
+Para conservar una base de datos existente en XAMPP mientras ejecutas PHP en Docker, configura en `.env` `FCT_DB_HOST=host.docker.internal` y establece `FCT_DB_NAME`, `FCT_DB_USER` y `FCT_DB_PASS` con los valores de esa instalación. No uses `localhost` como host: dentro del contenedor se refiere al propio contenedor, no a Windows. Inicia MySQL en XAMPP y asegúrate de que el usuario tenga permisos sobre la base seleccionada. Después recrea sólo la aplicación para que tome la configuración:
+
+```powershell
+docker compose up -d --force-recreate app
+```
+
+Este modo comparte los datos de XAMPP y no importa ni borra su base de datos. El servicio MariaDB de Docker puede seguir ejecutándose, pero la aplicación usa el host configurado en `FCT_DB_HOST`.
+
+Para que la aplicación local de pruebas en `http://127.0.0.1:8002/index.php` comparta en tiempo real los datos de Docker, configura en `.env.local` `FCT_DB_HOST=127.0.0.1;port=3307` y usa el mismo `FCT_DB_NAME`, `FCT_DB_USER` y `FCT_DB_PASS` de `.env`. El puerto `3307` es el puerto de MariaDB Docker publicado sólo en la máquina local. El lanzador `scripts\local_webhooks.ps1` carga estas variables para PHP de XAMPP; las dos aplicaciones consultan y actualizan así la misma base, sin una copia periódica ni una fusión de bases. Arranca el entorno con:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode All
+```
+
+Elige una sola instalación de MariaDB como fuente de datos para ambas aplicaciones; no apuntes una de ellas a XAMPP y la otra a Docker si necesitas que los cambios sean compartidos.
 
 Compose crea automáticamente el volumen privado `fct_storage` y lo monta como `/var/lib/fct/storage`, que es el valor de `FCT_STORAGE_PATH` dentro del contenedor. El Dockerfile prepara el directorio y sus permisos; no se debe mover a `public/`.
 
@@ -115,7 +132,7 @@ Los volúmenes de base de datos, archivos subidos, firmas ClamAV y dependencias 
 
 ## 5. Base de datos, cuentas de desarrollo y phpMyAdmin
 
-En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica, en orden, las migraciones de `database/migrations/001_...sql` a `010_...sql`. La migración 008 añade el indicador de disponibilidad horaria indiferente; la 009 incorpora DAM a las especialidades existentes; la 010 añade detalles persistidos a las ofertas. La inicialización oficial de MariaDB sólo procesa esos archivos cuando crea una base de datos nueva; no vuelve a ejecutarlos en cada arranque.
+En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql`, aplica las migraciones principales 001–010 y después crea las bandejas webhook y sus columnas de respuesta HTTP con `007_webhooks.sql` y `009_webhook_responses.sql`. La migración 008 añade el indicador de disponibilidad horaria indiferente; la 009 incorpora DAM a las especialidades existentes; la 010 añade detalles persistidos a las ofertas. La inicialización oficial de MariaDB sólo procesa esos archivos cuando crea una base de datos nueva; no vuelve a ejecutarlos en cada arranque.
 
 Las ofertas históricas aprobadas no tienen horas exactas inferibles a partir de sus antiguos turnos amplios; se excluyen del matching y del catálogo hasta republicarlas con horario semanal. No asignes horarios aproximados automáticamente.
 
@@ -228,6 +245,8 @@ Si necesitas comprobar el comportamiento de fallo cerrado, establece `FCT_CLAMAV
 | Portal VitePress | <http://localhost:5174> con el comando de desarrollo de documentación |
 
 El acceso a páginas y acciones dentro de la aplicación continúa gobernado por `routes/web.php` y el rol de la sesión; conocer la URL no concede permisos.
+
+La pestaña **Integraciones**, visible sólo para Administrador, reúne la consola de la API propia y los historiales de webhooks recibidos y enviados, agrupados por empresa.
 
 ## 8. Frontend y Vite HMR
 
@@ -420,6 +439,8 @@ Para volver a inicializar la base de datos tras cambios de esquema o migraciones
 
 ## Más información
 
+- [Guía de Integraciones en PDF](docs/guia-integraciones.pdf)
+- [Guía de Integraciones editable](docs/integraciones.md)
 - [Hoja de ruta de migración](docs/roadmap.md)
 - [Flujo de datos y ciclo de vida](docs/flujo-de-datos.md)
 - [Diagrama completo de arquitectura](docs/diagrama-completo.md)
