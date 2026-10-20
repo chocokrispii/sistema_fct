@@ -1,3 +1,16 @@
+<?php
+$vueProfileState = [
+    'values' => $values,
+    'fieldErrors' => $fieldErrors,
+    'error' => $error,
+    'guardado' => $guardado,
+    'csrf' => CsrfMiddleware::token(),
+];
+?>
+<div
+    data-vue-island="StudentProfile"
+    data-prop-state="<?= htmlspecialchars(json_encode($vueProfileState, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_THROW_ON_ERROR), ENT_QUOTES, 'UTF-8') ?>"
+>
 <section class="student-registration" aria-labelledby="student-profile-title">
     <div class="student-registration__intro">
         <span class="student-registration__eyebrow">Área de alumnado</span>
@@ -9,7 +22,7 @@
     <?php if ($error !== ''): ?><p class="message message-error student-registration__error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 
     <form class="student-registration__form" method="POST" action="index.php?action=perfil-alumno" data-student-profile>
-        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($vueProfileState['csrf'], ENT_QUOTES, 'UTF-8') ?>">
         <fieldset class="student-registration__section">
             <legend>Datos personales</legend>
             <div class="student-registration__grid">
@@ -107,4 +120,4 @@
         </div>
     </form>
 </section>
-<script src="assets/js/alumno-profile.js" defer></script>
+</div>

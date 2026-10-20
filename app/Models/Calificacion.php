@@ -9,11 +9,15 @@ class Calificacion
     {
     }
 
-    public function listar(bool $soloPropias = false, int $usuarioId = 0): array
+    public function listar(bool $soloPropias = false, int $usuarioId = 0, bool $anonimizarAlumnado = false): array
     {
-        $sql = "SELECT af.id AS asignacion_id, af.estado AS estado_asignacion,
-                       af.fecha_asignacion, af.fecha_cierre, af.tutor_empresa,
-                       a.nombre AS alumno_nombre, a.apellidos, a.correo AS alumno_correo,
+        $studentFields = $anonimizarAlumnado
+            ? "'Alumno anonimizado' AS alumno_nombre, '' AS apellidos, NULL AS alumno_correo"
+            : 'a.nombre AS alumno_nombre, a.apellidos, a.correo AS alumno_correo';
+        $assignmentField = $anonimizarAlumnado ? 'NULL AS asignacion_id' : 'af.id AS asignacion_id';
+        $sql = "SELECT $assignmentField, af.estado AS estado_asignacion,
+                       af.fecha_asignacion, af.fecha_cierre,
+                       $studentFields,
                        e.nombre_empresa, es.nombre_especialidad, p.fecha_inicio, p.fecha_fin,
                        c.nota, c.observaciones, c.calificada_en, c.actualizada_en
                 FROM asignaciones_fct af
@@ -28,7 +32,9 @@ class Calificacion
             $sql .= ' WHERE u.id = :usuario_id';
             $params['usuario_id'] = $usuarioId;
         }
-        $sql .= ' ORDER BY af.fecha_cierre DESC, a.apellidos, a.nombre';
+        $sql .= $anonimizarAlumnado
+            ? ' ORDER BY af.fecha_cierre DESC, af.id'
+            : ' ORDER BY af.fecha_cierre DESC, a.apellidos, a.nombre';
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -51,7 +57,13 @@ class Calificacion
 
     public function guardar(int $asignacionId, int $usuarioId, float $nota, string $observaciones): void
     {
-        if (!is_finite($nota) || $nota < 0 || $nota > 10 || mb_strlen($observaciones) > 2000) {
+        if (
+            !is_finite($nota)
+            || $nota < 0
+            || $nota > 10
+            || abs($nota - round($nota, 2)) > 0.000000001
+            || mb_strlen($observaciones) > 2000
+        ) {
             throw new InvalidArgumentException('La nota o las observaciones no tienen un valor permitido.');
         }
         $this->db->beginTransaction();

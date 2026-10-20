@@ -8,8 +8,12 @@
     <p class="message message-success">Contraseña actualizada. Ya puedes iniciar sesión.</p>
 <?php endif; ?>
 <h2>Iniciar sesión</h2>
+<?php $csrfToken = CsrfMiddleware::token(); ?>
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=login">
-    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
+    <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+    <?php if (FrontendAssets::isEnabled()): ?>
+        <div data-vue-island="AuthLoginEnhancement" data-prop-csrf-token="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>"></div>
+    <?php endif; ?>
     <label for="login-email">Correo electrónico</label>
     <input id="login-email" type="email" name="email" autocomplete="username" required>
     <label for="login-password">Contraseña</label>

@@ -22,9 +22,10 @@ convenios, publicar y revisar ofertas de prácticas, registrar disponibilidad,
 proponer candidatos, asignar plazas y consultar el estado de las prácticas.
 
 La aplicación usa PHP 8.2, PDO, MariaDB/MySQL compatible con MariaDB 10.4 y
-XAMPP. No hay framework PHP, Composer ni dependencias de npm. El árbol conserva
-una maqueta HTML heredada y su JavaScript auxiliar, pero las rutas actuales usan
-vistas PHP y no dependen de esos archivos.
+XAMPP. No usa un framework PHP ni dependencias de Composer; el frontend sí usa
+Vue, Vite y dependencias npm. El árbol conserva una maqueta HTML heredada y su
+JavaScript auxiliar, pero las rutas actuales usan vistas PHP y no dependen de
+esos archivos.
 
 Los roles reconocidos por la base de datos son:
 
@@ -126,6 +127,7 @@ un nombre de archivo de vista o una consulta SQL.
 |---|---|---|---|
 | `inicio` | GET | Público | Página de bienvenida. |
 | `login` | GET, POST | Público | Formulario y autenticación. |
+| `session` | GET | Público | Consulta el estado de la sesión para el cliente. |
 | `recuperar` | GET, POST | Público | Solicita la recuperación de una cuenta. |
 | `restablecer` | GET, POST | Público | Valida el enlace y actualiza la contraseña. |
 | `recuperaciones` | GET | Administrador, Coordinador | Lista las solicitudes de recuperación pendientes. |
@@ -135,27 +137,32 @@ un nombre de archivo de vista o una consulta SQL.
 | `registro-empresa` | GET, POST | Público | Alta del perfil de empresa y usuario. |
 | `portal-alumno` | GET | Alumno | Consulta el expediente propio. |
 | `perfil-alumno` | GET, POST | Alumno | Consulta y actualiza el perfil propio. |
-| `empresas-centro` | GET | Administrador, Coordinador | Lista las empresas registradas para el centro. |
-| `ofertas` | GET | Público | Lista ofertas aprobadas cuyo fin no ha pasado. |
+| `ofertas` | GET | Administrador, Coordinador, Observador, Empresa | Lista ofertas según el rol autenticado. |
+| `empresa-asignada` | GET | Alumno | Consulta la empresa de la práctica propia asignada. |
 | `publicar-oferta` | GET, POST | Empresa | Consulta y crea ofertas propias. |
+| `nueva-oferta` | GET, POST | Administrador, Coordinador | Crea una oferta para una empresa. |
 | `sedes` | GET, POST | Empresa | Consulta y registra sedes de la empresa autenticada. |
 | `revisar-ofertas` | GET | Administrador, Coordinador | Lista ofertas pendientes. |
-| `revisar-oferta` | POST | Administrador, Coordinador | Aprueba o rechaza una oferta. |
+| `revisar-oferta` | POST | Administrador | Aprueba o rechaza una oferta. |
 | `disponibilidad` | GET, POST | Alumno | Muestra y reemplaza la disponibilidad propia. |
 | `asignaciones` | GET | Administrador, Coordinador, Observador | Lista asignaciones. |
 | `emparejar` | GET | Administrador, Coordinador | Ofertas vigentes aprobadas y candidatos compatibles. |
 | `mis-asignaciones` | GET | Alumno | Lista solo las prácticas vinculadas al usuario. |
-| `calificaciones` | GET | Administrador, Coordinador, Observador | Consulta y gestiona las calificaciones de prácticas. |
+| `calificaciones` | GET | Administrador, Coordinador, Observador | Consulta las calificaciones de prácticas. |
 | `mis-calificaciones` | GET | Alumno | Consulta las calificaciones propias. |
 | `guardar-calificacion` | POST | Administrador, Coordinador | Registra o actualiza una calificación. |
 | `asignar-alumno` | POST | Administrador, Coordinador | Crea una asignación sujeta a ciclo, disponibilidad y cupo. |
 | `cerrar-practica` | POST | Administrador, Coordinador | Cierra una asignación activa. |
 | `convenios` | GET, POST | Empresa | Registra un convenio y consulta el historial propio. |
+| `modificar-convenios` | GET | Administrador, Coordinador | Consulta convenios que puede modificar el centro. |
+| `editar-convenio` | GET, POST | Empresa, Administrador, Coordinador | Consulta o actualiza un convenio con las restricciones del rol y su estado. |
 | `revisar-convenios` | GET | Administrador, Coordinador | Lista convenios pendientes. |
-| `resolver-convenio` | POST | Administrador, Coordinador | Aprueba o rechaza un convenio. |
+| `auditar-convenios` | GET | Observador | Consulta la auditoría de convenios. |
+| `resolver-convenio` | POST | Administrador | Aprueba o rechaza un convenio. |
 | `descargar-convenio` | GET | Administrador, Coordinador, Empresa | Descarga auditada; la empresa solo puede descargar el suyo. |
 | `usuarios` | GET, POST | Administrador | Lista usuarios internos y crea cuentas de personal. |
 | `api-tokens` | GET, POST | Administrador | Crea y revoca tokens de API. |
+| `integraciones` | GET | Administrador | Abre el panel de integraciones. |
 | `pruebas-integracion` | GET, POST | Administrador | Ejecuta pruebas manuales de recepción y envío de webhooks. |
 | `webhook-inbox` | GET | Administrador | Alias de compatibilidad para consultar webhooks recibidos. |
 | `webhooks-recibidos` | GET | Administrador | Consulta los webhooks recibidos. |
@@ -167,6 +174,9 @@ un nombre de archivo de vista o una consulta SQL.
 
 Las rutas son la autoridad del acceso del servidor. Ocultar o mostrar un enlace
 en el menú no sustituye esta comprobación.
+
+Las vistas previas `preview-disponibilidad` y `preview-publicar-oferta` se
+añaden al mapa únicamente cuando `APP_ENV` es `development` o `local`.
 
 ## 7. Recorrido de los módulos
 

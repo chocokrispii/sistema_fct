@@ -19,20 +19,19 @@
         <div class="matching-page__empty">
             <h3>No hay asignaciones para mostrar</h3>
             <p><?= $soloPropias ? 'Cuando el centro te asigne a una oferta, los detalles aparecerán aquí.' : 'Las asignaciones creadas mediante el emparejamiento aparecerán aquí.' ?></p>
-            <?php if ($soloPropias): ?><a href="index.php?action=ofertas">Consultar ofertas públicas</a><?php endif; ?>
         </div>
     <?php else: ?>
         <div class="assignments-table-wrap" role="region" aria-label="Listado de asignaciones" tabindex="0">
             <table class="assignments-table">
-                <thead><tr><?php if (!$soloPropias): ?><th>Alumno</th><?php endif; ?><th>Empresa</th><th>Ciclo</th><th>Periodo</th><th>Tutor de empresa</th><th>Estado</th><?php if ($puedeGestionar): ?><th>Acciones</th><?php endif; ?></tr></thead>
+                <thead><tr><?php if (!$soloPropias): ?><th>Alumno</th><?php endif; ?><th>Empresa</th><th>Ciclo</th><th>Periodo</th><?php if (!$anonimizarAlumnado): ?><th>Tutor de empresa</th><?php endif; ?><th>Estado</th><?php if ($puedeGestionar): ?><th>Acciones</th><?php endif; ?></tr></thead>
                 <tbody><?php foreach ($asignaciones as $item): ?>
                     <?php $estadoModifier = $item['estado'] === 'Asignada' ? 'active' : ($item['estado'] === 'Cerrada' ? 'closed' : 'cancelled'); ?>
                     <tr>
-                        <?php if (!$soloPropias): ?><td><?= htmlspecialchars($item['alumno_nombre'] . ' ' . $item['apellidos'], ENT_QUOTES, 'UTF-8') ?><small><?= htmlspecialchars($item['alumno_correo'], ENT_QUOTES, 'UTF-8') ?></small></td><?php endif; ?>
+                        <?php if (!$soloPropias): ?><td><?= htmlspecialchars($item['alumno_nombre'] . ' ' . $item['apellidos'], ENT_QUOTES, 'UTF-8') ?><?php if (!$anonimizarAlumnado): ?><small><?= htmlspecialchars($item['alumno_correo'], ENT_QUOTES, 'UTF-8') ?></small><?php endif; ?></td><?php endif; ?>
                         <td><?= htmlspecialchars($item['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
                         <td><?= htmlspecialchars($item['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></td>
                         <td><?= htmlspecialchars($item['fecha_inicio'] . ' – ' . $item['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($item['tutor_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
+                        <?php if (!$anonimizarAlumnado): ?><td><?= htmlspecialchars($item['tutor_empresa'] ?? '', ENT_QUOTES, 'UTF-8') ?></td><?php endif; ?>
                         <td><span class="status-badge status-badge--<?= $estadoModifier ?>"><?= htmlspecialchars($item['estado'], ENT_QUOTES, 'UTF-8') ?></span></td>
                         <?php if ($puedeGestionar): ?><td>
                             <?php if ($item['estado'] === 'Asignada'): ?>

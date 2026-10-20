@@ -81,6 +81,10 @@ class ConsultaController
                  LEFT JOIN asignaciones_fct af ON af.oferta_id = p.id AND af.estado <> 'Cancelada'
                  LEFT JOIN alumnos a ON a.id = af.alumno_id";
         $whereSql = '';
+        $anonimize = ($_SESSION['rol'] ?? null) === 'Observador';
+        $studentFields = $anonimize
+            ? "'Alumno anonimizado' AS alumno_nombre, '' AS apellidos"
+            : 'a.nombre AS alumno_nombre, a.apellidos';
         if ($where !== []) {
             $whereSql = ' WHERE ' . implode(' AND ', $where);
         }
@@ -96,9 +100,9 @@ class ConsultaController
             $totalPaginas = max(1, (int)ceil($totalFilas / self::FILAS_POR_PAGINA));
             $pagina = min((int)$paginaSolicitada, $totalPaginas);
             $offset = ($pagina - 1) * self::FILAS_POR_PAGINA;
-            $sql = "SELECT p.id, p.estado, p.fecha_inicio, p.fecha_fin, p.plazas_cuantas, p.turno,
+            $sql = "SELECT p.id, p.titulo, p.modalidad, p.ubicacion, p.estado, p.fecha_inicio, p.fecha_fin, p.plazas_cuantas, p.turno,
                            e.nombre_empresa, es.nombre_especialidad,
-                           a.nombre AS alumno_nombre, a.apellidos, af.estado AS estado_asignacion
+                           $studentFields, af.estado AS estado_asignacion
                     $from$whereSql
                     ORDER BY p.fecha_inicio DESC, e.nombre_empresa, p.id, af.id
                     LIMIT :limite OFFSET :offset";

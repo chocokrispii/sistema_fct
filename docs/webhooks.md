@@ -11,8 +11,8 @@ un sistema externo:
   También conserva la respuesta HTTP más reciente para inspeccionar si el
   emisor recibió `202` o una respuesta de duplicado `200`.
 - **Envío:** cuando se configura `FCT_WEBHOOK_OUTBOUND_URL`, los cambios de
-  ofertas, convenios y prácticas añaden un evento JSON a `webhook_outbox` en
-  la misma transacción que el cambio. Un proceso CLI separado entrega la cola
+  ofertas, convenios, prácticas y disponibilidad añaden un evento JSON a
+  `webhook_outbox` en la misma transacción que el cambio. Un proceso CLI separado entrega la cola
   y programa reintentos si el receptor no está disponible. Conserva el código
   HTTP y el cuerpo de la respuesta del receptor, con un límite de 16 KiB.
 
@@ -71,18 +71,35 @@ $rng.Dispose()
 ```
 
 Guárdalo en `.env.local`, archivo excluido de Git. Usa el mismo valor para
-entrada y salida porque el worker local entregará al propio endpoint:
+entrada y salida porque el worker local entregará al propio endpoint. Para usar
+la base de XAMPP, conserva `FCT_DB_HOST=127.0.0.1`; si Docker debe ser la base
+compartida por la aplicación local de `8002` y Docker, usa
+`FCT_DB_HOST=127.0.0.1;port=3307` y copia también `FCT_DB_NAME`, `FCT_DB_USER` y
+`FCT_DB_PASS` de `.env`:
 
 ```powershell
+$envLines = Get-Content -LiteralPath .env
+foreach ($line in $envLines) {
+    if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+    }
+}
+
 $secret = 'PEGA_AQUI_EL_SECRETO_GENERADO'
 @"
-FCT_DB_HOST=127.0.0.1
-FCT_DB_NAME=sistema_fct
+FCT_DB_HOST=127.0.0.1;port=3307
+FCT_DB_NAME=$env:FCT_DB_NAME
+FCT_DB_USER=$env:FCT_DB_USER
+FCT_DB_PASS=$env:FCT_DB_PASS
 FCT_WEBHOOK_INBOUND_SECRET=$secret
 FCT_WEBHOOK_OUTBOUND_SECRET=$secret
 FCT_WEBHOOK_OUTBOUND_URL=http://127.0.0.1:8001/webhook.php
 "@ | Set-Content -LiteralPath .env.local -Encoding ascii
 ```
+
+El bloque carga las variables de conexión de `.env` sin mostrarlas y crea
+`.env.local` para que la aplicación XAMPP use la base de Docker. No publiques
+ni compartas `.env.local`.
 
 El lanzador local lee el archivo sin imprimir el secreto. Inicia de una vez
 el receptor, la aplicación y la interfaz local:
@@ -94,10 +111,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.p
 
 Abre la aplicación en `http://127.0.0.1:8002/index.php`, la interfaz de prueba
 en `http://127.0.0.1:8003/webhook_test.php` y el receptor en
-`http://127.0.0.1:8001/webhook.php`. La aplicación principal usa la misma base
-local de XAMPP; úsala para crear o revisar ofertas, convenios o prácticas.
-El modo `All` verifica los puertos y las páginas antes de informar que el
-entorno está listo.
+`http://127.0.0.1:8001/webhook.php`. La aplicación local usa la base indicada
+por `.env.local`; con `127.0.0.1;port=3307` comparte en tiempo real la base de
+Docker. El modo `All` verifica los puertos y las páginas antes de informar que
+el entorno está listo.
 
 Para detener los servidores iniciados por el lanzador:
 
@@ -120,6 +137,15 @@ servidores locales escuchan solo en `127.0.0.1`. No compartas `.env.local` ni
 incluyas el secreto en capturas o logs; esta configuración no modifica Apache
 ni variables globales de Windows.
 
+Para probar sin un receptor externo, inicia el lanzador y, con sesión de
+Administrador, abre `http://127.0.0.1:8002/index.php?action=pruebas-integracion`.
+La sección de webhooks recibe un evento sintético firmado y puede encolar y
+entregar otro a `127.0.0.1:8001`; ambos recorridos usan datos ficticios y las
+respuestas indican el estado HTTP. Para validar la API local, el mismo panel
+permite enviar `GET` con un token creado en **Tokens API**. Revoca ese token al
+terminar las pruebas. Las solicitudes `POST` y `PATCH` escriben en la base
+compartida y no se revierten automáticamente.
+
 Para Docker, añade las variables requeridas a un `.env` local ignorado por Git
 y reinicia el servicio de aplicación. No copies secretos en
 `.env.docker.example`.
@@ -136,17 +162,37 @@ y el identificador del evento. En el lanzador local de XAMPP, la aplicación
 de `8002` envía las pruebas al receptor de `8001`; en Docker se usa el endpoint
 local del contenedor.
 
+Estas pruebas del servidor y la ejecución del despachador requieren que PHP
+tenga habilitada la extensión cURL. En la imagen Docker actual está disponible:
+`docker compose exec -T app php -m` lista `curl` (la imagen base
+`php:8.2-apache` la incluye). Si cambias la imagen base, repite `php -m` dentro
+del contenedor antes de ejecutar las pruebas; en el lanzador local de XAMPP,
+comprueba la extensión del PHP de XAMPP. El panel de API que envía
+solicitudes directamente desde el navegador no depende de esa extensión.
+
 El panel de API de esa página envía las solicitudes desde el navegador y borra
 el token del campo después de cada petición. Las operaciones POST/PATCH sí
 escriben en la base actual y requieren confirmación en pantalla; no tienen
 borrado automático. No uses datos personales ni ejecutes escrituras que no
-quieras conservar.
+quieras conservar. Ese probador usa el alias `/api/v1/`: funciona con el
+servidor local del lanzador, pero el Apache incluido en Docker no configura
+esa reescritura. En Docker, usa `public/api.php?path=...` o configura la regla
+antes de usar el probador. Consulta [API REST](/api-rest) para las rutas y el
+contrato de respuestas.
 
 Con sesión de Administrador, usa las páginas **Webhooks recibidos** y
 **Webhooks enviados** para consultar por separado los últimos 50 eventos de
 cada dirección, sus JSON, estados y respuestas HTTP. Los datos se muestran
 escapados como texto y ambas páginas son de solo lectura. Las respuestas de
 eventos anteriores a la migración 009 no se conservan y se indican como tales.
+
+La pestaña **Integraciones** del menú de Administrador presenta la API propia,
+los webhooks recibidos y los enviados en secciones separadas. Los dos
+historiales se agrupan y ordenan por empresa; los eventos sin un `empresa_id`
+válido aparecen en **Sin empresa identificada**. Dentro de cada empresa, los
+eventos más recientes se muestran primero.
+La [Guía de Integraciones](./integraciones.md) describe el uso del panel y
+también está disponible en [PDF](./guia-integraciones.pdf).
 
 La página **Webhooks por empresa** reúne por separado los eventos enviados y
 recibidos de una empresa seleccionada. Los eventos salientes de convenios,
@@ -172,20 +218,26 @@ lectura; no procesa el contenido de los webhooks entrantes.
 
 ## Endpoint entrante
 
-URL local con el servidor de desarrollo PHP:
+Con el lanzador local `scripts/local_webhooks.ps1 -Mode All`, el receptor
+escucha en loopback en el puerto 8001; la aplicación MVC usa el puerto 8002 y
+la interfaz manual el 8003:
 
 ```text
-http://127.0.0.1:8000/webhook.php
+http://127.0.0.1:8001/webhook.php
 ```
 
-URL del entorno público (solo después de configurar TLS y el servidor):
+Si se ejecuta un servidor PHP local distinto, usa la URL y el puerto en que
+publique `public/webhook.php`. URL del entorno público (solo después de
+configurar TLS y el servidor):
 
 ```text
 https://tu-dominio.example/webhook.php
 ```
 
 Solo acepta `POST`, `Content-Type: application/json` y un cuerpo de hasta
-64 KiB. El sobre requerido es:
+64 KiB. El cuerpo debe incluir `event_id`, `event`, `version` y `data`; el
+campo `occurred_at` es opcional (se muestra en el ejemplo como metadato del
+emisor):
 
 ```json
 {
@@ -242,8 +294,9 @@ una orden.
 ### Probar recepción mediante PowerShell
 
 Primero configura `FCT_WEBHOOK_INBOUND_SECRET` en el proceso PHP que sirve la
-aplicación y arranca el servidor. En otra ventana define la misma clave como
-`$secret`, prepara un evento sintético y firma exactamente el cuerpo enviado:
+aplicación y arranca el servidor o el lanzador local. En otra ventana define
+la misma clave como `$secret`, prepara un evento sintético y firma exactamente
+el cuerpo enviado:
 
 ```powershell
 $secret = 'PEGA_AQUI_EL_MISMO_SECRETO_LOCAL_DE_32_BYTES_O_MAS'
@@ -270,7 +323,7 @@ $headers = @{
     'X-FCT-Signature' = $signature
 }
 Invoke-RestMethod -Method Post `
-    -Uri 'http://127.0.0.1:8000/webhook.php' `
+    -Uri 'http://127.0.0.1:8001/webhook.php' `
     -ContentType 'application/json' `
     -Headers $headers `
     -Body $body
@@ -287,10 +340,9 @@ registro sin mostrar el JSON:
 
 ### Probar recepción desde Chrome (solo local)
 
-Con el servidor local de webhooks escuchando en `127.0.0.1:8001`, abre estas
-direcciones en dos pestañas:
+Con el lanzador local activo, abre estas direcciones en dos pestañas:
 
-- Aplicación FCT: `http://127.0.0.1:8001/`
+- Aplicación FCT: `http://127.0.0.1:8002/index.php`
 - Herramienta visual de recepción y envío: `http://127.0.0.1:8003/webhook_test.php`
 
 En la herramienta, deja el tipo `prueba.integracion` y la referencia
@@ -331,6 +383,7 @@ La primera versión encola estos cambios:
 | `oferta.revisada` | El centro aprueba o rechaza una oferta | `oferta_id`, estado |
 | `practica.asignada` | Se confirma una asignación | `asignacion_id`, `oferta_id`, `alumno_id` |
 | `practica.cerrada` | Se cierra una práctica | `asignacion_id` |
+| `student.availability_updated` | El alumno guarda su disponibilidad | `student_id`, `fecha_inicio`, `fecha_fin`, `turno`, `es_indiferente`, `horarios` |
 
 La aplicación guarda cada evento saliente en la misma transacción que el
 cambio de negocio. Si el cambio se revierte, el evento tampoco queda encolado.
@@ -383,11 +436,15 @@ $env:FCT_WEBHOOK_DISPATCH_ALLOW = '1'
 Remove-Item Env:FCT_WEBHOOK_DISPATCH_ALLOW
 ```
 
-El worker requiere CLI, una confirmación `FCT_WEBHOOK_DISPATCH_ALLOW=1`, URL
-válida y un secreto con al menos 32 caracteres. Solo permite HTTPS, salvo
-HTTP contra localhost para desarrollo. No sigue redirecciones, valida TLS y
-limita conexión/solicitud a tres/diez segundos. Procesa hasta 25 eventos por
-ejecución; se puede ajustar con `FCT_WEBHOOK_DISPATCH_LIMIT` entre 1 y 100.
+El worker requiere CLI, la extensión PHP cURL, una confirmación
+`FCT_WEBHOOK_DISPATCH_ALLOW=1`, URL válida y un secreto con al menos 32
+caracteres. Solo permite HTTPS, salvo HTTP contra localhost para desarrollo.
+No sigue redirecciones, valida TLS y limita conexión/solicitud a tres/diez
+segundos. Procesa hasta 25 eventos por ejecución; se puede ajustar con
+`FCT_WEBHOOK_DISPATCH_LIMIT` entre 1 y 100. En la imagen Docker actual cURL
+está disponible (`docker compose exec -T app php -m` lista `curl`; la imagen base
+`php:8.2-apache` la incluye). Si cambias la imagen base, repite `php -m`; con un
+PHP de XAMPP u otro runtime, comprueba que la extensión esté habilitada.
 Una respuesta `2xx` marca la entrega como correcta; los errores temporales y
 de red se reintentan con espera exponencial, hasta 12 intentos. Errores
 permanentes `3xx` y `4xx` (excepto `408`, `425` y `429`) quedan en la cola como
@@ -422,8 +479,10 @@ eliminan o se revierten.
 
 ## Límites conocidos
 
-- No hay pantalla administrativa para configurar destinos, rotar secretos o
-  consultar el buzón.
+- No hay pantalla administrativa para configurar destinos ni rotar secretos:
+  la URL y las claves se gestionan mediante variables de entorno. Sí existen
+  páginas de solo lectura **Webhooks recibidos**, **Webhooks enviados** y
+  **Webhooks por empresa** para consultar eventos y respuestas.
 - No hay endpoint para importar o consultar registros académicos. La recepción
   valida y archiva la notificación, pero un flujo de importación necesitaría un
   contrato de datos, mapeo de identidades, permisos y reglas de validación

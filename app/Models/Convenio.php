@@ -77,6 +77,19 @@ class Convenio
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function listarParaObservador(): array
+    {
+        $stmt = $this->db->query(
+            'SELECT e.nombre_empresa, es.nombre_especialidad, c.fecha_firma, c.fecha_inicio,
+                    c.fecha_fin, c.estado
+             FROM convenios c
+             INNER JOIN empresas e ON e.id = c.empresa_id
+             LEFT JOIN especialidades es ON es.id = c.especialidad_id
+             ORDER BY c.creado_en DESC'
+        );
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function obtener(int $id): ?array
     {
         $stmt = $this->db->prepare('SELECT * FROM convenios WHERE id = :id');

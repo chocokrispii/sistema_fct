@@ -1,20 +1,42 @@
 # Sistema FCT
 
-Aplicación web para gestionar prácticas de Formación en Centros de Trabajo
-(FCT): cuentas y perfiles, sedes y convenios de empresa, ofertas, disponibilidad
-del alumnado, asignaciones y consultas. Está desarrollada en PHP con una
-arquitectura MVC propia, sin framework ni dependencias de Composer.
+[![PHP 8.2](https://img.shields.io/badge/PHP-8.2-777BB4?logo=php&logoColor=white)](https://www.php.net/)
+[![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org/)
+[![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![MariaDB](https://img.shields.io/badge/MariaDB-10.4-003545?logo=mariadb&logoColor=white)](https://mariadb.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+[![ClamAV](https://img.shields.io/badge/ClamAV-INSTREAM-CC0000)](https://www.clamav.net/)
+[![Pinia](https://img.shields.io/badge/Pinia-state-FFD859)](https://pinia.vuejs.org/)
 
-## Requisitos
+Guía de incorporación y operaciones de desarrollo para el Sistema FCT, una aplicación web híbrida que gestiona prácticas de Formación en Centros de Trabajo (FCT).
 
-- XAMPP con Apache, MariaDB/MySQL y PHP 8.2 o compatible.
-- Extensiones PHP `PDO_MYSQL`, `fileinfo` y `mbstring` habilitadas. Se usan
-  sesiones, la función de carga de archivos y `proc_open` para el análisis.
-- ClamAV con `clamscan` configurado para permitir cargas de convenios; si no
-  está disponible, la aplicación rechaza las cargas.
-- Git, si se va a clonar el repositorio.
+> Docker Compose es el entorno de desarrollo recomendado. Esta configuración no es un despliegue de producción: los puertos y secretos de ejemplo son locales y deben cambiarse antes de compartir el entorno.
 
-## Inicio con Docker Compose
+## Inicio rápido
+
+Con Git y Docker Desktop instalados, cuatro comandos dejan la aplicación funcionando en <http://localhost:8080>:
+
+```powershell
+git clone https://github.com/campusedx/Practicas_Desarrollo.git
+Set-Location .\Practicas_Desarrollo
+Copy-Item .env.example .env
+docker compose up -d --build
+```
+
+## Índice
+
+1. [Tecnologías](#1-tecnologías)
+2. [Requisitos previos](#2-requisitos-previos)
+3. [Preparar el entorno](#3-preparar-el-entorno)
+4. [Iniciar y detener la infraestructura](#4-iniciar-y-detener-la-infraestructura)
+5. [Base de datos, cuentas de desarrollo y phpMyAdmin](#5-base-de-datos-cuentas-de-desarrollo-y-phpmyadmin)
+6. [Recorrido funcional](#6-recorrido-funcional-disponibilidad-matching-y-seguimiento)
+7. [Acceso a la aplicación y herramientas](#7-acceso-a-la-aplicación-y-herramientas)
+8. [Frontend y Vite HMR](#8-frontend-y-vite-hmr)
+9. [Portal de documentación VitePress](#9-portal-de-documentación-vitepress)
+10. [Verificaciones y pruebas](#10-verificaciones-y-pruebas)
+11. [Solución de problemas frecuentes](#11-solución-de-problemas-frecuentes)
+- [Instalación local con XAMPP](#instalación-local-con-xampp)
 
 Docker Compose ejecuta PHP 8.2 con Apache, MariaDB 10.4.32 y el servicio oficial
 ClamAV. El código del proyecto se monta desde la carpeta local, por lo que los
@@ -32,7 +54,7 @@ guardan en volúmenes Docker.
 1. Copia la plantilla de entorno:
 
    ```powershell
-   Copy-Item .env.docker.example .env
+   Copy-Item .env.example .env
    ```
 
 2. Construye y arranca los servicios:
@@ -173,12 +195,12 @@ Copy-Item config\clamav\freshclam.conf.example "C:\ProgramData\ClamAV\freshclam.
 & "C:\Program Files\ClamAV\freshclam.exe" --config-file="C:\ProgramData\ClamAV\freshclam.conf"
 ```
 
-Configura las variables anteriores en Apache para este método nativo. Mantén el almacenamiento privado con permisos de
-modificación solo para la identidad que ejecuta Apache, y lectura restringida;
-no concedas escritura a `Usuarios autentificados`. Programa `freshclam` para
-actualizar las firmas al menos cada dos horas. En la instalación local se usa
-una tarea del usuario que ejecuta Apache, con actualización disponible al
-iniciar sesión:
+Configura las variables anteriores en Apache para este método nativo. Mantén el
+almacenamiento privado con permisos de modificación solo para la identidad que
+ejecuta Apache y lectura restringida; no concedas escritura a
+`Usuarios autentificados`. Programa `freshclam` para actualizar las firmas al
+menos cada dos horas. En la instalación local se usa una tarea del usuario que
+ejecuta Apache, con actualización disponible al iniciar sesión:
 
 ```powershell
 $action = New-ScheduledTaskAction -Execute "C:\Program Files\ClamAV\freshclam.exe" -Argument '--config-file="C:\ProgramData\ClamAV\freshclam.conf"' -WorkingDirectory "C:\ProgramData\ClamAV"
@@ -231,15 +253,54 @@ Los PDFs pasan por validación de extensión, MIME y tamaño y, antes de persist
 por ClamAV. En el lanzador local de XAMPP se usa el servicio Docker ClamAV en
 `127.0.0.1:3310`; para otra instalación XAMPP, `FCT_CLAMSCAN` debe señalar al
 ejecutable confiable con ruta absoluta. En Docker se usa `FCT_CLAMD_HOST` y el
-protocolo TCP de ClamD.
-Si el antivirus no está configurado, no se puede contactar, tiene firmas con
-más de tres días o no puede completar el análisis, la carga falla cerrada.
-Mantén ClamAV instalado y sus firmas actualizadas, supervisa los fallos del
-análisis y examina el almacenamiento existente antes de habilitar este flujo.
-Si se detecta malware, no publiques el documento: aíslalo, registra el
-incidente y elimínalo según la política del centro.
+protocolo TCP de ClamD. Si el antivirus no está configurado, no se puede
+contactar, tiene firmas con más de tres días o no puede completar el análisis,
+la carga falla cerrada. Mantén ClamAV instalado y sus firmas actualizadas,
+supervisa los fallos del análisis y examina el almacenamiento existente antes
+de habilitar este flujo. Si se detecta malware, no publiques el documento:
+aíslalo, registra el incidente y elimínalo según la política del centro.
 
-### 2. Crear e importar la base
+## 1. Tecnologías
+
+- **Backend:** PHP 8.2, Apache y arquitectura MVC personalizada.
+- **Frontend:** Vue 3, TypeScript, Pinia y Vite como islas progresivas sobre vistas HTML renderizadas por PHP.
+- **Persistencia:** MariaDB 10.4 mediante PDO y consultas preparadas.
+- **Seguridad de archivos:** ClamAV (TCP INSTREAM); los documentos se guardan en almacenamiento privado, fuera de `public/`.
+- **Infraestructura:** Docker Compose v2 con volúmenes persistentes para la base de datos, almacenamiento y firmas antivirus.
+- **Documentación:** portal VitePress con diagramas Mermaid.
+
+## 2. Requisitos previos
+
+- Git.
+- Docker Desktop actualizado con Docker Compose v2 (`docker compose`, no el ejecutable antiguo `docker-compose`).
+- Node.js 22–24 y npm para ejecutar Vite, pruebas de tipos o VitePress directamente en el host.
+- PowerShell 5.1 o posterior para los comandos de esta guía en Windows.
+
+El contenedor `app` incluye PHP 8.2, Apache y las extensiones PDO MySQL y mbstring; no es necesario instalar PHP en Windows para el flujo Docker.
+
+La arquitectura se organiza en tres capas: presentación (HTML/PHP y pequeñas islas Vue), aplicación (rutas, middleware, controladores y reglas PHP) y datos (MariaDB y almacenamiento privado). Vue no sustituye la navegación MVC ni la autorización del servidor.
+
+## 3. Preparar el entorno
+
+Clona el repositorio:
+
+```powershell
+git clone https://github.com/campusedx/Practicas_Desarrollo.git
+```
+
+Entra en la carpeta recién creada:
+
+```powershell
+Set-Location .\Practicas_Desarrollo
+```
+
+Crea `.env` con los valores locales de referencia; Compose lo carga automáticamente desde la raíz:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+### Crear la base de datos en XAMPP
 
 1. Inicia Apache y MySQL desde el panel de XAMPP.
 2. En phpMyAdmin, crea una base de datos vacía llamada `sistema_fct` con
@@ -262,11 +323,12 @@ incidente y elimínalo según la política del centro.
    manualmente además del gestor. Los convenios existentes que no tengan ciclo
    asignado quedan sin clasificar y deben revisarse antes de volver a usarlos.
 
-Para que Docker y los servidores locales de XAMPP utilicen los mismos datos,
-`FCT_DB_HOST` de `.env` y `.env.local` debe apuntar al mismo MariaDB y a la misma
-base. Las credenciales de cada entorno pueden ser distintas si ambas cuentas
-tienen permisos sobre esa base. Por defecto, Docker utiliza su propia base
-independiente.
+Para configurar los puertos, seleccionar la base de datos de Compose o ajustar
+las credenciales locales, abre `.env`:
+
+```powershell
+notepad .env
+```
 
 El gestor aplica en orden todas las migraciones pendientes, registra el nombre
 y el SHA-256 normalizado de cada archivo en `schema_migrations` y omite las ya
@@ -282,241 +344,348 @@ El volcado y el gestor no seleccionan la base por sí mismos: configura
 contiene dos expedientes de alumno y direcciones que apuntan a registros
 existentes. No es necesario aplicar el seed para completar la instalación.
 
-### 3. Configurar la conexión
+Variables incluidas en la plantilla:
 
-La conexión PDO se configura en `config/database.php`. Los valores locales
-predeterminados de XAMPP son:
+| Variable | Predeterminado | Uso |
+|---|---:|---|
+| `APP_PORT` | `8080` | Puerto HTTP de PHP/Apache en el host. |
+| `APP_ENV` | `development` en `.env.example`; `production` si Compose no recibe un valor | Entorno de ejecución; el bypass de ClamAV sólo se permite en `development`, `test` o `testing`. |
+| `FCT_CLAMAV_ENABLED` | `false` en las plantillas locales; `true` si Compose no recibe un valor | `false` omite el escaneo sólo con `APP_ENV=development`, `test` o `testing`; usa `true` para escanear. |
+| `PMA_PORT` | `8082` | Puerto local de phpMyAdmin; se publica sólo en `127.0.0.1`. |
+| `FCT_DB_HOST` | `db` | Servidor MariaDB usado por la aplicación. Usa `host.docker.internal` para conectar Docker con MariaDB de XAMPP en Windows. |
+| `FCT_DB_NAME` | `sistema_fct` | Base de datos de desarrollo. |
+| `FCT_DB_USER` | `fct` | Usuario que utiliza la aplicación y el formulario de acceso de phpMyAdmin. |
+| `FCT_DB_PASS` | `fct_local_dev` | Contraseña del usuario de aplicación MariaDB. |
+| `MARIADB_ROOT_PASSWORD` | `root_local_dev` | Contraseña administrativa de MariaDB, reservada para tareas locales de administración. |
+| `FCT_VITE_DEV_SERVER` | vacío | URL pública del servidor Vite que PHP debe incluir durante desarrollo, por ejemplo `http://localhost:5173`. |
+| `VITE_PORT` | `5173` | Puerto de Vite cuando se ejecuta desde el perfil Docker `frontend-dev`. |
 
-| Variable | Valor predeterminado |
-|---|---|
-| `FCT_DB_HOST` | `localhost` |
-| `FCT_DB_USER` | `root` |
-| `FCT_DB_PASS` | Cadena vacía |
-| `FCT_DB_NAME` | `sistema_fct` |
+Los valores de `.env.example` son exclusivamente para desarrollo local; sustitúyelos por claves propias y no compartas ni confirmes `.env`.
 
-Si se usan otros datos, define las variables de entorno para el proceso que
-ejecuta PHP/Apache. Configurarlas solo en una terminal no garantiza que el
-servicio Apache de XAMPP las herede. En un entorno real crea un usuario MariaDB
-con permisos limitados y no uses `root` sin contraseña.
+Para conservar una base de datos existente en XAMPP mientras ejecutas PHP en Docker, configura en `.env` `FCT_DB_HOST=host.docker.internal` y establece `FCT_DB_NAME`, `FCT_DB_USER` y `FCT_DB_PASS` con los valores de esa instalación. No uses `localhost` como host: dentro del contenedor se refiere al propio contenedor, no a Windows. Inicia MySQL en XAMPP y asegúrate de que el usuario tenga permisos sobre la base seleccionada. Después recrea sólo la aplicación para que tome la configuración:
 
-## Integración por API y webhooks
+```powershell
+docker compose up -d --force-recreate app
+```
 
-La API REST versionada está en `public/api.php` y usa la ruta `/api/v1/`;
-consulta la [guía REST](docs/api-rest.md) para sus recursos, permisos y
-autenticación. El administrador puede emitir y revocar tokens Bearer en
-**Tokens API**. Ejecuta `database/migrations/008_api_access_tokens.sql` en las
-bases existentes antes de crear tokens.
+Este modo comparte los datos de XAMPP y no importa ni borra su base de datos. El servicio MariaDB de Docker puede seguir ejecutándose, pero la aplicación usa el host configurado en `FCT_DB_HOST`.
 
-El endpoint `public/webhook.php` acepta `POST` con un objeto JSON firmado y
-registra el evento en `webhook_inbox`; no cambia alumnos, empresas, ofertas,
-convenios ni prácticas. La aplicación encola eventos de ofertas, convenios y
-prácticas en `webhook_outbox` dentro de la transacción que guarda el cambio. El
-worker `scripts/dispatch_webhooks.php` los envía al destino configurado y
-reintenta errores temporales.
-
-Ejecuta `database/migrations/007_webhooks.sql` en las bases ya existentes.
-Configura los secretos y la URL como variables de entorno del proceso PHP que
-atiende Apache, no en el repositorio. Los secretos deben tener al menos 32
-caracteres aleatorios. Los ejemplos de contrato, firma HMAC, instalación y
-pruebas locales están en [docs/webhooks.md](docs/webhooks.md).
-
-Para ver la aplicación y la interfaz local de webhooks juntas en XAMPP, inicia
-Apache y MySQL y ejecuta:
+Para que la aplicación local de pruebas en `http://127.0.0.1:8002/index.php` comparta en tiempo real los datos de Docker, configura en `.env.local` `FCT_DB_HOST=127.0.0.1;port=3307` y usa el mismo `FCT_DB_NAME`, `FCT_DB_USER` y `FCT_DB_PASS` de `.env`. El puerto `3307` es el puerto de MariaDB Docker publicado sólo en la máquina local. El lanzador `scripts\local_webhooks.ps1` carga estas variables para PHP de XAMPP; las dos aplicaciones consultan y actualizan así la misma base, sin una copia periódica ni una fusión de bases. Arranca el entorno con:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode All
 ```
 
-Abre `http://127.0.0.1:8002/index.php` para la aplicación y
-`http://127.0.0.1:8003/webhook_test.php` para las pruebas; el receptor local
-usa `http://127.0.0.1:8001/webhook.php`. Detén únicamente esos servidores con
-el mismo comando y `-Mode Stop`. Las instrucciones detalladas están en
-[docs/webhooks.md](docs/webhooks.md).
-Al ejecutar el lanzador, XAMPP usa `FCT_STORAGE_PATH` si se define en
-`.env.local`; en caso contrario, crea el almacenamiento privado
-`%LOCALAPPDATA%\FCT\storage`.
-La API REST local usa `http://127.0.0.1:8002/api/v1/`.
-La guía para iniciar y probar el entorno local está disponible en
-[PDF](docs/guia-entorno-local.pdf) y en [HTML](docs/guia-entorno-local.html).
-En Docker, el panel **Pruebas API y webhooks** está disponible para
-Administración en `index.php?action=pruebas-integracion`. Las solicitudes
-POST/PATCH de la API modifican la base actual tras confirmación; las pruebas
-salientes de webhook de ese panel se envían únicamente al receptor local.
+Elige una sola instalación de MariaDB como fuente de datos para ambas aplicaciones; no apuntes una de ellas a XAMPP y la otra a Docker si necesitas que los cambios sean compartidos.
 
-## Cuentas de demostración
+Compose crea automáticamente el volumen privado `fct_storage` y lo monta como `/var/lib/fct/storage`, que es el valor de `FCT_STORAGE_PATH` dentro del contenedor. El Dockerfile prepara el directorio y sus permisos; no se debe mover a `public/`.
 
-El volcado incluye estas cuentas, todas con la contraseña `password123`:
+Si ejecutas PHP directamente con XAMPP en vez de Docker, configura `FCT_STORAGE_PATH` como una ruta absoluta a un directorio existente, con permisos de escritura para Apache y separado del document root. La aplicación rechaza rutas inexistentes o dentro de `public/`.
 
-| Rol | Correo |
-|---|---|
-| Administrador | `admin@centro.com` |
-| Coordinador | `coordinador@centro.com` |
-| Empresa | `empresa.tech@gmail.com` |
-| Alumno | `alumno.menor@alumno.com` |
-| Alumno | `alumno.mayor@alumno.com` |
+## 4. Iniciar y detener la infraestructura
 
-Úsalas únicamente en desarrollo. Las cuentas creadas desde los formularios
-requieren una contraseña de 12 a 72 caracteres. La oferta que viene en el dump no
-tiene estado aprobado hasta que se gestione conforme al esquema migrado. Para
-probar el flujo de empresa, registra y aprueba un convenio que cubra las fechas
-de la oferta antes de aprobarla.
-
-El dump base no trae una cuenta Observador y las contraseñas de las cuentas
-antiguas pueden no coincidir con el hash importado. Para crear cuentas locales
-operativas para los cinco roles, ejecuta desde PowerShell después de aplicar
-todas las migraciones:
+Construye la imagen de la aplicación e inicia Apache/PHP, MariaDB, ClamAV y phpMyAdmin en segundo plano:
 
 ```powershell
-$env:FCT_ENABLE_DEMO_SEED = "1"
-& "C:\xampp\php\php.exe" scripts\crear_cuentas_demo.php
-Remove-Item Env:FCT_ENABLE_DEMO_SEED
+docker compose up -d --build
 ```
 
-El script solo funciona con PHP CLI y la base `sistema_fct` en `localhost`; en
-Docker requiere la confirmación adicional `FCT_DEMO_SEED_ALLOW_DOCKER=1` y solo
-admite el host de servicio `db`. Crea perfiles de prueba para Coordinador,
-Empresa y Alumno; imprime las contraseñas aleatorias de las cuentas nuevas una
-sola vez y no cambia cuentas ya existentes, salvo que se habilite
-explícitamente `FCT_DEMO_SEED_RESET_PASSWORDS=1` y se pase una nueva contraseña
-por variable de entorno. No lo ejecutes en una instalación publicada y elimina
-o cambia estas cuentas antes de desplegar.
-
-Para cargar un conjunto persistente de empresas, alumnos disponibles, ofertas
-aprobadas y convenios sintéticos (con documentos PDF explícitamente marcados
-como demostración), ejecuta `scripts/seed_datos_sinteticos.php` después de
-aplicar las migraciones. Es idempotente y solo admite `sistema_fct` local o
-Docker con confirmación explícita. En XAMPP, desde PowerShell:
+Comprueba que los servicios estén activos y revisa su estado de salud:
 
 ```powershell
-foreach ($line in Get-Content .env.local) {
-    if ($line -match '^([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
-        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
-    }
+docker compose ps
+```
+
+ClamAV puede tardar varios minutos en descargar sus primeras firmas. El contenedor `app` espera a que MariaDB esté saludable, pero puede iniciar mientras ClamAV prepara sus firmas; si el análisis está habilitado, una carga se rechazará hasta que el antivirus responda correctamente. Consulta su salida si todavía está inicializando:
+
+```powershell
+docker compose logs --tail=50 clamav
+```
+
+Comprueba que el almacenamiento privado exista y sea escribible por PHP:
+
+```powershell
+docker compose exec app sh -c 'test -d "$FCT_STORAGE_PATH" && test -w "$FCT_STORAGE_PATH"'
+```
+
+Abre la aplicación en <http://localhost:8080>. Para detener los contenedores sin borrar datos:
+
+```powershell
+docker compose down
+```
+
+Los volúmenes de base de datos, archivos subidos, firmas ClamAV y dependencias Docker persisten al detener los contenedores.
+
+## 5. Base de datos, cuentas de desarrollo y phpMyAdmin
+
+En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica las migraciones de dominio, disponibilidad y ofertas, además de las tablas de webhooks, tokens API y sus respuestas. Los nombres de algunas migraciones comparten prefijo porque proceden de líneas de trabajo paralelas; Compose les asigna nombres de inicialización únicos para conservar el orden y evitar colisiones. La inicialización oficial de MariaDB sólo procesa estos archivos al crear una base de datos nueva; no vuelve a ejecutarlos en cada arranque.
+
+Las ofertas históricas aprobadas no tienen horas exactas inferibles a partir de sus antiguos turnos amplios; se excluyen del matching y del catálogo hasta republicarlas con horario semanal. No asignes horarios aproximados automáticamente.
+
+Para una base ya inicializada, no vuelvas a importar el esquema ni ejecutes migraciones existentes indiscriminadamente: varias no son idempotentes. Examina `docker compose ps` y los registros de MariaDB antes de diagnosticar una instalación incompleta. `009_desarrollo_aplicaciones_multiplataforma.sql` es idempotente y puede aplicarse a una base existente para añadir DAM. Para un entorno nuevo creado fuera de Compose, ejecuta el esquema y las migraciones una sola vez, en orden, contra esa base vacía.
+
+**Procedimiento para esquema y migraciones manuales.** No canalices los archivos con `Get-Content -Raw … | docker compose exec …`: en Windows PowerShell 5.1, `$OutputEncoding` es US-ASCII y `Get-Content` lee como ANSI un UTF-8 sin BOM, de modo que los caracteres no ASCII llegan corruptos. Por ejemplo, `ENUM('Presencial','Remoto','Híbrido')` de `010_detalles_ofertas.sql` llegaría como `H??brido`. En su lugar, copia el archivo al contenedor `db` y ejecútalo desde allí:
+
+```powershell
+docker compose cp (Resolve-Path .\database\sistema_fct.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+Las comillas simples impiden que PowerShell expanda las variables: las resuelve `sh` dentro del contenedor. El `#` final convierte en comentario el `\r` que PowerShell 5.1 añade a la entrada estándar; sin él, ese `\r` pasa a formar parte de la ruta y `sh` responde `cannot open /tmp/migracion.sql`. `docker compose cp` escribe su progreso por stderr, y PowerShell 5.1 puede mostrarlo como `NativeCommandError`: decide el resultado con `$LASTEXITCODE`, no con ese texto. Este bloque carga el esquema inicial en la base seleccionada por las variables de Compose; úsalo sólo si el esquema aún no existe. Para aplicar todas las migraciones SQL en orden alfabético sobre esa base vacía:
+
+```powershell
+foreach ($migration in Get-ChildItem .\database\migrations\*.sql | Sort-Object Name) {
+    docker compose cp $migration.FullName db:/tmp/migracion.sql
+    'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+    if ($LASTEXITCODE -ne 0) { throw "Falló la migración $($migration.Name)" }
 }
-$env:FCT_ENABLE_DEMO_SEED = "1"
-$env:FCT_STORAGE_PATH = Join-Path $env:LOCALAPPDATA "FCT\storage"
-New-Item -ItemType Directory -Force -Path $env:FCT_STORAGE_PATH | Out-Null
-& "C:\xampp\php\php.exe" scripts\seed_datos_sinteticos.php
-Remove-Item Env:FCT_ENABLE_DEMO_SEED
 ```
 
-En Docker, usa el segundo comando del bloque de inicio de Docker Compose anterior.
-La interfaz pública muestra las ofertas aprobadas en `index.php?action=ofertas`;
-Administración/Coordinación puede consultar empresas en
-`index.php?action=empresas-centro`, candidatos en `index.php?action=emparejar`
-y convenios en `index.php?action=revisar-convenios`. Los datos de XAMPP y Docker
-son independientes y el seed debe ejecutarse una vez en cada base que se quiera
-visualizar. Las cuentas sintéticas usan correos `example.invalid` y claves
-aleatorias no mostradas; no son cuentas de acceso.
-Al iniciar sesión, cada rol aterriza en un módulo propio; el menú ofrece el
-resto de pantallas autorizadas. El alumnado puede gestionar su horario semanal
-y consultar las notas de prácticas finalizadas; Administradores y Coordinadores
-registran o actualizan notas de 0 a 10 tras cerrar una práctica; Observadores
-solo las consultan.
+Cada migración se aplica una sola vez y en orden; no ejecutes este bucle sobre un volumen que ya haya recibido esas migraciones durante la inicialización de Compose. En particular, `009_webhook_responses.sql` no es idempotente (es un `ALTER TABLE` que falla si las columnas ya existen).
 
-Las cuentas `admin@centro.com`, `coordinador@centro.com`,
-`empresa.tech@gmail.com`, `alumno.mayor@alumno.com` y
-`alumno.menor@alumno.com` pertenecen al conjunto heredado del dump, no a las
-cuentas `demo.*@fct.local`. No las borres automáticamente ni ejecutes el seed
-de ejemplo sobre una base que ya contiene datos: las cuentas antiguas pueden
-tener ofertas, asignaciones u otras referencias históricas. Desactiva cuentas
-que no deban iniciar sesión; usa el borrado permanente solo para cuentas sin
-historial y conserva el registro de auditoría.
-
-## Funcionalidades y flujos
-
-- **Acceso y seguridad:** login/logout, sesiones, control por rol y token CSRF
-  en todas las peticiones POST.
-- **Empresas:** Administración y Coordinación pueden consultar el directorio
-  de empresas registradas y el estado de sus cuentas.
-- **Alumno:** registro con expediente y tutor legal para menores de edad;
-  portal privado con sus datos de expediente, disponibilidad y prácticas;
-  edición del perfil con validación de DNI/NIE, teléfono, correo y código postal;
-  el perfil permite completar o corregir los datos del tutor legal de menores,
-  incluso en expedientes heredados incompletos;
-  actualización de disponibilidad por periodo, turno y franja semanal por día
-  en intervalos de diez minutos;
-  consulta de prácticas propias y sus calificaciones finales.
-- **Empresa:** registro, gestión de sedes, carga de convenios PDF y publicación
-  de ofertas asociadas al perfil autenticado. Se registra como máximo un
-  convenio por ciclo formativo, y solo cubre ofertas del mismo ciclo. Puede
-  corregir convenios pendientes o rechazados; al guardarlos vuelven a revisión.
-  Los convenios aprobados no se pueden modificar.
-- **Revisión del centro:** Administradores y Coordinadores revisan convenios y
-  ofertas. Una oferta solo puede aprobarse cuando un convenio aprobado cubre
-  todo su periodo. También pueden crear ofertas para una empresa indicando
-  nombre, lugar, ciclo, vacantes, turno y periodo; las nuevas ofertas quedan
-  pendientes de revisión. Pueden modificar convenios pendientes, rechazados y
-  aprobados desde el menú; al guardar, cualquier convenio modificado vuelve a
-  revisión. Las empresas solo pueden modificar sus convenios pendientes o
-  rechazados.
-- **Matching y asignaciones:** búsqueda de alumnos compatibles por ciclo,
-  fechas, turno y horario semanal compatible; asignación transaccional con control de
-  plazas; cierre de prácticas. Las pantallas heredadas de asignaciones y
-  portada redirigen a sus equivalentes MVC; no guardan ni muestran datos de
-  ejemplo.
-- **Calificaciones:** calificación final de prácticas cerradas con nota de
-  0–10, observaciones y auditoría del usuario evaluador; acceso de lectura para
-  el propio alumno y para el Observador.
-- **Administración:** gestión de cuentas internas, activación/desactivación y
-  borrado permanente con confirmación. Se impide borrar la propia cuenta, las
-  cuentas con historial operativo y las referencias que la base de datos deba
-  conservar; cada borrado se registra en auditoría.
-- **Consultas:** filtros por ciclo, estado y fechas, con paginación de 50
-  resultados por página. El rol Observador dispone de acceso de lectura a las
-  consultas y asignaciones.
-- **Auditoría:** registro de operaciones de revisión, asignación,
-  administración y descargas de convenios permitidas o denegadas.
-
-### Matriz de acceso aplicada
-
-El middleware de rutas es el control de acceso del servidor; los enlaces de la
-interfaz no conceden permisos. Las rutas de descarga se autorizan así:
-
-| Rol | Convenios PDF |
-|---|---|
-| Administrador | Lectura de cualquier convenio |
-| Coordinador | Lectura de cualquier convenio |
-| Empresa | Solo convenios de su propio perfil |
-| Observador | Sin acceso a convenios |
-| Alumno | Sin acceso a convenios |
-
-Observador conserva únicamente el acceso de lectura establecido para consultas,
-asignaciones y calificaciones. Las denegaciones y descargas autorizadas de convenios se anotan
-en `auditoria` con el usuario, convenio y resultado; no se guardan rutas físicas
-ni contenido del documento en el detalle.
-
-Los PDFs se guardan fuera de `public/` y se sirven como adjuntos desde la ruta
-autenticada; no se exponen rutas ni nombres físicos. El proyecto no implementa
-cargas de documentos de expedientes. La recuperación de contraseñas requiere
-verificación manual del centro y no envía correos automáticamente.
-
-La disponibilidad semanal se persiste por día con una franja horaria por día,
-vinculada al periodo y turno de disponibilidad. La calificación final solo se
-puede registrar para una práctica cerrada; se persisten la nota, observaciones,
-evaluador y marcas de tiempo.
-
-## Prueba de integración
-
-La prueba `tests/file_security.php` comprueba la matriz de acceso, el almacenamiento
-privado y que la carga se rechaza cuando falta el antivirus; no necesita una
-base de datos y puede ejecutarse con:
+Para una base existente que ya tiene las migraciones de dominio hasta la 006, aplica `007_horarios_ofertas.sql` y `008_disponibilidad_indiferente.sql` en orden, y sólo si no se aplicaron previamente:
 
 ```powershell
-& "C:\xampp\php\php.exe" tests\file_security.php
+docker compose cp (Resolve-Path .\database\migrations\007_horarios_ofertas.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
 ```
 
-`tests/run.php` modifica datos y exige una base desechable cuyo nombre
-empiece por `fct_test_`. **No la ejecutes contra `sistema_fct` ni contra una
-base con datos que quieras conservar.**
+Este procedimiento crea la tabla de horarios exactos de las ofertas sin volver a ejecutar migraciones antiguas; reinicia el servicio `app` después de aplicarlo para que su comprobación de salud detecte la tabla.
 
-Una forma sencilla de prepararla es crear `fct_test_local` en phpMyAdmin,
-importar en ella el dump base y ejecutar el gestor de migraciones. Al importar
-el dump, selecciona explícitamente `fct_test_local`.
+Para una base que ya recibió `007_horarios_ofertas.sql`, aplica únicamente el campo de disponibilidad indiferente:
 
-El gestor aplica las migraciones pendientes; la suite necesita el esquema
-actualizado, incluida la columna de código postal, las bandejas de webhooks y
-las columnas de respuesta HTTP. Después, desde PowerShell, ejecuta:
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\008_disponibilidad_indiferente.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+`008_disponibilidad_indiferente.sql` añade `es_indiferente` de forma idempotente y migra el valor anterior de `turno` sólo la primera vez; `009_desarrollo_aplicaciones_multiplataforma.sql` inserta DAM si aún no existe. En una base que ya recibió la primera, aplica la segunda para habilitar DAM:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\009_desarrollo_aplicaciones_multiplataforma.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+El matching omite la cobertura horaria diaria para el alumnado indiferente, pero sigue exigiendo fechas, ciclo, oferta aprobada con franjas y capacidad.
+
+`010_detalles_ofertas.sql` añade título, descripción, turno, modalidad, ubicación, requisitos y tecnologías a las ofertas existentes. En una base que ya recibió `009_desarrollo_aplicaciones_multiplataforma.sql`, aplícala una vez:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\010_detalles_ofertas.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+La migración es idempotente. Los datos de ofertas históricas reciben valores predeterminados compatibles; una descripción/ubicación no se inventa para esos registros. Después de aplicarla, comprueba con una consulta de solo lectura que `modalidad` conserva `Híbrido` (la columna debe mostrar `enum('Presencial','Remoto','Híbrido')`):
+
+```powershell
+'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e "SHOW COLUMNS FROM empresa_especialidades_plazas LIKE ''modalidad''" #' | docker compose exec -T db sh -s
+```
+
+Las migraciones `007_webhooks.sql`, `008_api_access_tokens.sql` y `009_webhook_responses.sql` también se aplican al crear un volumen nuevo; Compose las ejecuta con nombres de inicialización únicos después de las migraciones de dominio. Si conservas una base creada antes de la integración de webhooks, aplica esas tres migraciones una sola vez, en ese orden y con el procedimiento `docker compose cp` descrito arriba, antes de desplegar el nuevo código. La última es un `ALTER TABLE` y no debe ejecutarse de nuevo si ya existen las columnas de respuesta.
+
+Genera las cinco cuentas de prueba actuales (Administrador, Coordinador, Observador, Empresa y Alumno) sólo en la base local autorizada:
+
+```powershell
+docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/crear_cuentas_demo.php
+```
+
+El script imprime contraseñas aleatorias una sola vez. **Cada ejecución renueva todas las contraseñas demo y deja inválidas las anteriores**; guarda la salida de forma segura. También crea para el alumno demo disponibilidad de lunes a viernes, de 09:00 a 17:00, con franjas exactas. No ejecutes este comando en producción. `database/seeds/001_sample_data.sql` es un conjunto legado de datos de muestra y no se ejecuta automáticamente ni sustituye al generador seguro de cuentas.
+
+Consulta [la matriz de roles y permisos](docs/roles_y_permisos.md) para conocer el acceso restringido al catálogo y el alcance de solo lectura del perfil Observador.
+
+Abre phpMyAdmin en <http://localhost:8082>. Inicia sesión con el servidor `db`, puerto `3306`, base `sistema_fct` y las credenciales `FCT_DB_USER`/`FCT_DB_PASS` de `.env` (por defecto, `fct`). El usuario `root` y `MARIADB_ROOT_PASSWORD` deben reservarse para administración local cuando sea necesaria; no uses phpMyAdmin para exponer el servicio a la red.
+
+El puerto MariaDB publicado para clientes del host es `127.0.0.1:3307`; dentro de Compose, la aplicación y phpMyAdmin se conectan al nombre de servicio `db:3306`.
+
+## 6. Recorrido funcional: disponibilidad, matching y seguimiento
+
+El sistema compara ofertas y expedientes del mismo ciclo formativo, por ejemplo DAW con DAW y DAM con DAM. Para que una asignación sea válida, la oferta debe estar aprobada, tener franjas semanales publicadas y plazas disponibles; el periodo de disponibilidad del alumno debe cubrir el periodo completo de la oferta. El servidor vuelve a validar todos esos criterios al asignar, aunque la pantalla ya haya mostrado candidatos.
+
+Los ciclos soportados incluyen **DAW** (Desarrollo de Aplicaciones Web) y **DAM** (Desarrollo de Aplicaciones Multiplataforma). La especialidad se relaciona por ID en la base de datos, y `009_desarrollo_aplicaciones_multiplataforma.sql` incorpora DAM sin duplicarlo. Una oferta guarda un único ciclo para preservar el matching actual.
+
+La publicación recoge título, descripción, plazas, fechas, turno, franjas semanales de cinco minutos, modalidad, ubicación, requisitos y tecnologías. La modalidad presencial e híbrida requiere ubicación. La revisión y los listados muestran los detalles persistidos; el matching sigue usando la misma relación por ciclo, fechas y horarios.
+
+En el portal del alumno, la disponibilidad tiene tres pasos de configuración:
+
+1. Indica las fechas de inicio y fin del periodo.
+2. Elige una de estas opciones horarias:
+   - **Franjas exactas:** marca cada día y define su hora de inicio y fin. Puedes aplicar un horario general a varios días y luego editar cada día.
+   - **Disponibilidad indiferente:** indica que aceptas cualquier horario de oferta; las franjas por día quedan desactivadas. Fechas y ciclo siguen siendo obligatorios.
+3. Envía el formulario para guardar. La isla Vue muestra de forma reactiva el estado de guardado o el error; no guarda cambios automáticamente. Sin JavaScript, el formulario HTML/PHP mantiene el envío y la validación del servidor.
+
+Con franjas exactas, cada intervalo ofertado `[inicio, fin]` debe quedar contenido en un intervalo de disponibilidad del mismo día (`disponibilidad.inicio <= oferta.inicio` y `disponibilidad.fin >= oferta.fin`). La opción indiferente omite únicamente esa comparación horaria: no omite el ciclo, las fechas, la aprobación, las franjas publicadas ni el control de plazas. Las ofertas históricas sin horarios semanales exactos no participan en el matching hasta volver a publicarse con su horario.
+
+Administrador y Coordinador registran calificaciones de prácticas cerradas; se admiten notas de **0.00 a 10.00**, con hasta dos decimales y sin caracteres alfanuméricos. El alumno consulta sus propias notas. El tema claro/oscuro se administra mediante Pinia, conserva la elección en `localStorage` y ofrece un selector visual SVG. El perfil Observador es de solo lectura y recibe datos anonimizados, sin acceso a documentos privados. La política completa está en [Roles y permisos](docs/roles_y_permisos.md).
+
+| Rol | Permisos principales |
+|---|---|
+| Administrador | Gestión de usuarios, ofertas/convenios y decisiones de revisión; asignaciones y calificaciones. |
+| Coordinador | Seguimiento, asignaciones, cierre de prácticas, calificaciones y consultas; no aprueba ofertas o convenios mediante las rutas MVC. |
+| Observador | Sólo lectura, con datos anonimizados y sin documentos privados; `POST /logout` sólo invalida su sesión. |
+| Alumno | Su perfil, disponibilidad, asignaciones y calificaciones, más información de su empresa asignada. |
+| Empresa | Sus convenios, sedes y ofertas; no decide sus revisiones. |
+| Invitado | Inicio, registro, autenticación y recuperación; las áreas protegidas requieren sesión. |
+
+El botón de tema claro/oscuro sigue la preferencia del sistema si todavía no hay una elección guardada; al cambiarlo manualmente, la elección queda en el almacenamiento local del navegador.
+
+La matriz anterior describe la navegación MVC protegida por `routes/web.php`.
+`public/api.php` es una API tokenizada separada y aplica su propia matriz; en
+la implementación actual, las revisiones de ofertas y convenios también están
+reservadas a Administrador. Comparte el sobre JSON de éxito/error de
+`JsonResponse`: éxito `{ "success": true, "data": T }` y error
+`{ "success": false, "error": "..." }`. En las listas, la paginación va en
+`data.items` y `data.meta`; los códigos de error se envían en
+`X-API-Error-Code`. Consulta [API REST](docs/api-rest.md)
+antes de emitir tokens o integrar clientes; las vistas anonimizadas de
+Observador del MVC no equivalen a la salida REST.
+
+### Antivirus en desarrollo local
+
+Compose ejecuta ClamAV y PHP se conecta a él por la red interna del proyecto. Si no se definen variables de entorno, Compose usa `APP_ENV=production` y `FCT_CLAMAV_ENABLED=true`; las plantillas locales pueden reemplazarlos explícitamente. Para pruebas locales sin antivirus, define ambos `APP_ENV=development` y `FCT_CLAMAV_ENABLED=false`; el modo de bypass registra una advertencia y también se admite en los entornos `test` y `testing`. Para probar el escaneo real, establece `FCT_CLAMAV_ENABLED=true` y espera a que `docker compose ps` muestre `clamav` saludable. En producción, deja el escaneo habilitado: configuración inválida, fallo de conexión, firmas caducadas, timeout o detección de amenaza rechazan la carga.
+
+Si necesitas comprobar el comportamiento de fallo cerrado, establece `FCT_CLAMAV_ENABLED=true`, detén ClamAV sólo en un entorno local desechable (`docker compose stop clamav`), confirma que una carga se rechaza y vuelve a iniciarlo (`docker compose up -d clamav`). No desactives el análisis fuera de desarrollo ni expongas el puerto interno del scanner.
+
+## 7. Acceso a la aplicación y herramientas
+
+| Servicio | Dirección local |
+|---|---|
+| Aplicación PHP | <http://localhost:8080> (o `APP_PORT`) |
+| phpMyAdmin | <http://localhost:8082> (o `PMA_PORT`) |
+| Vista previa de disponibilidad (entornos `development` o `local`) | <http://localhost:8080/index.php?action=preview-disponibilidad> |
+| Vista previa de publicar oferta (entornos `development` o `local`) | `http://localhost:8080/dev/preview-publicar-oferta` |
+| Vite HMR | <http://localhost:5173> cuando se inicia el frontend |
+| Portal VitePress | <http://localhost:5174> con el comando de desarrollo de documentación |
+
+El acceso a páginas y acciones dentro de la aplicación continúa gobernado por `routes/web.php` y el rol de la sesión; conocer la URL no concede permisos.
+
+La pestaña **Integraciones**, visible sólo para Administrador, reúne la consola de la API propia y los historiales de webhooks recibidos y enviados, agrupados por empresa.
+
+## 8. Frontend y Vite HMR
+
+Instala las dependencias fijadas en `package-lock.json` para trabajar con Vite y Vue desde el host:
+
+```powershell
+npm ci
+```
+
+Define la URL del servidor Vite en `.env` para que las vistas PHP incluyan el cliente HMR y los módulos frontend durante desarrollo:
+
+```dotenv
+FCT_VITE_DEV_SERVER=http://localhost:5173
+```
+
+Aplica el cambio de entorno recreando el servicio PHP si ya estaba iniciado:
+
+```powershell
+docker compose up -d app
+```
+
+Inicia Vite en el puerto usado en la URL anterior:
+
+```powershell
+npm run dev
+```
+
+Vite sirve HMR en <http://localhost:5173>. Si el puerto está ocupado, libera el puerto o cambia `VITE_PORT` (perfil Docker) y `FCT_VITE_DEV_SERVER` para que la URL configurada coincida con la URL accesible desde el navegador.
+
+También puedes iniciar el servidor Vite en un contenedor con el perfil opcional:
+
+```powershell
+docker compose --profile frontend-dev up -d
+```
+
+El perfil instala dependencias con `npm ci`, ejecuta Vite escuchando en todas las interfaces del contenedor y publica `VITE_PORT` (5173 por defecto). Para regresar al bundle de producción incluido en la imagen, detén el perfil y vacía `FCT_VITE_DEV_SERVER` en `.env`.
+
+Las vistas siguen renderizándose en PHP y conservan sus formularios como fallback; Vue se monta sólo en elementos marcados `data-vue-island`. Las acciones JSON del MVC usan el contrato `{ success, data }` / `{ success, error }`, envían `X-CSRF-Token` y no reemplazan la navegación MVC por rutas SPA. La API tokenizada de `public/api.php` conserva ese sobre discriminado y añade `items`/`meta` en las listas; consulta [API REST](docs/api-rest.md).
+
+### CSS compartido y PostCSS
+
+`frontend/src/main.ts` importa la hoja activa `public/assets/css/style.css`, por lo que Vite aplica el PostCSS configurado en `postcss.config.js` (`postcss-nested` y Autoprefixer; `vite.config.ts` lo referencia en `css.postcss`) y publica el CSS junto al bundle de Vue. En la imagen Docker, la etapa `frontend-build` del `Dockerfile` copia `postcss.config.js` y `public/assets/css` (además de `tsconfig.json`, `vite.config.ts` y `frontend`) antes de ejecutar `npm run build`; sin esa configuración, Vite omite PostCSS sin error y el bundle se generaría sin reglas anidadas resueltas ni prefijos, por lo que conviene que ambos archivos sigan en esa etapa. El layout PHP carga el CSS compilado desde el manifiesto de Vite en producción. En desarrollo (`FCT_VITE_DEV_SERVER` definido) Vite inyecta el CSS mediante JavaScript, que se ejecuta de forma diferida; para evitar un parpadeo sin estilos al cambiar de pantalla, `app/Views/layouts/main.php` enlaza además `assets/css/style.css` de forma bloqueante en el `<head>`. Si no hay bundle ni servidor HMR, ese mismo enlace actúa como fallback. Vite ya minifica los assets de producción; no se añade Tailwind ni CSSnano porque el proyecto no usa esas herramientas.
+
+Verifica ambos lados del pipeline después de tocar los estilos:
+
+```powershell
+npm run typecheck
+npm run build
+npm run docs:build
+```
+
+### Webhooks para integraciones externas
+
+La integración actual usa un destino saliente único configurable por entorno, no una tabla de endpoints registrados por usuario. Configura en `.env` `FCT_WEBHOOK_OUTBOUND_URL` y `FCT_WEBHOOK_OUTBOUND_SECRET`; el secreto de entrada se configura por separado con `FCT_WEBHOOK_INBOUND_SECRET`. No guardes secretos reales en Git. Compose pasa esas variables al contenedor PHP.
+
+Cuando `FCT_WEBHOOK_OUTBOUND_URL` está configurada, los eventos se guardan en `webhook_outbox` dentro de la misma transacción que la operación de negocio y se envían después mediante el worker CLI; si no hay destino, no se encolan. Los eventos recibidos se registran en `webhook_inbox`. Se emiten `oferta.creada`, `oferta.revisada`, `convenio.creado`, `convenio.revisado`, `practica.asignada`, `practica.cerrada` y `student.availability_updated`. El evento de disponibilidad lleva `student_id`, `fecha_inicio`, `fecha_fin`, `turno`, `es_indiferente` y `horarios`; no incluye nombre ni correo.
+
+El worker firma el cuerpo JSON exacto con HMAC-SHA256: `X-FCT-Timestamp` contiene la marca temporal y `X-FCT-Signature` lleva `sha256=` seguido de la firma de `timestamp.cuerpo`. El endpoint receptor verifica también la firma y la ventana temporal. Las entregas pendientes se reintentan mediante `scripts/dispatch_webhooks.php`; requiere PHP CLI con la extensión cURL habilitada, URL y secreto de salida válidos, y habilitar la ejecución explícitamente con `FCT_WEBHOOK_DISPATCH_ALLOW=1`:
+
+```powershell
+docker compose exec -e FCT_WEBHOOK_DISPATCH_ALLOW=1 app php scripts/dispatch_webhooks.php
+```
+
+En la imagen Docker actual, PHP cURL está disponible: `docker compose exec -T app php -m` lista `curl` (la imagen base `php:8.2-apache` la incluye; el `Dockerfile` no la instala por separado). Si cambias la imagen base, repite `php -m` dentro de `app` antes de programar el worker; con un PHP CLI externo, comprueba que cURL esté habilitado. Esta comprobación confirma la extensión, pero no se ha verificado la entrega desde la imagen Docker actual. El límite opcional se configura con `FCT_WEBHOOK_DISPATCH_LIMIT` (1–100; por defecto 25). Configura el worker operativo para entregar los eventos de forma asíncrona. El destino remoto debe usar HTTPS y resolver a direcciones públicas; el worker permite HTTP sólo para pruebas en loopback. Para registrar el receptor local y verificar el flujo completo, sigue [la guía de webhooks](docs/webhooks.md) y el script `scripts/local_webhooks.ps1`.
+
+### Cuando los cambios de una isla Vue no aparecen
+
+La isla de disponibilidad actual se llama `AvailabilitySchedule` (archivo `frontend/src/islands/AvailabilitySchedule.vue`); el registro de `frontend/src/main.ts` descubre automáticamente los componentes Vue y la vista PHP debe usar el mismo valor en `data-vue-island`.
+
+- **Desarrollo con HMR:** define `FCT_VITE_DEV_SERVER=http://localhost:5173` en `.env`, recrea PHP con `docker compose up -d app` para cargar esa variable, y ejecuta `npm run dev` en el host (o inicia el perfil `frontend-dev`). Comprueba que el navegador puede abrir `http://localhost:5173`.
+- **Bundle de producción Docker:** `npm run build` genera `public/build` en el host, pero no actualiza una imagen PHP ya creada. Reconstruye y recrea la aplicación con `docker compose up -d --build app`; la imagen copia el bundle durante el build.
+- **Comprueba el montaje:** abre la consola y la pestaña Network del navegador, fuerza recarga sin caché y confirma que se solicita el entrypoint de Vite o el bundle `build/assets/main-*.js`. Revisa que el HTML entregue el marcador `data-vue-island` y que su nombre corresponda a un archivo en `frontend/src/islands/`.
+- **Si HMR conserva una versión antigua:** compara el módulo servido en `http://localhost:5173/frontend/src/islands/AvailabilitySchedule.vue` con el archivo del host. Si no coinciden, reinicia `docker compose restart frontend-dev` (o vuelve a iniciar el proceso `npm run dev`) para limpiar las transformaciones en memoria de Vite; después recarga el navegador sin caché. `docker compose down -v` no es necesario para invalidar HMR.
+- **Aísla la vista:** `.env.example` establece `APP_ENV=development` para el entorno local; el valor de reserva de Compose es `production`. Las vistas previas (`preview-disponibilidad` y `preview-publicar-oferta`) sólo se registran cuando `APP_ENV` es `development` o `local` (`DevelopmentPreviewController::isEnabled()`). Usa `http://localhost:8080/index.php?action=preview-disponibilidad` para mostrar la isla con datos de prueba sin iniciar sesión; configura `APP_ENV=production` en despliegues para que las rutas no se registren. El bypass de ClamAV tiene un criterio distinto: sólo vale para `development`, `test` o `testing`, no para `local`.
+
+Valida el frontend tras modificar componentes con `npm run typecheck` y `npm run build`. No hace falta purgar volúmenes para desplegar cambios de interfaz: basta con HMR o reconstruir la imagen de la aplicación.
+
+## 9. Portal de documentación VitePress
+
+Usa `npm ci` desde la raíz si aún no instalaste las dependencias Node. Para evitar competir con Vite HMR en el puerto 5173, ejecuta la documentación en el puerto 5174:
+
+```powershell
+npm run docs:dev -- --port 5174
+```
+
+Abre <http://localhost:5174>; si el puerto indicado también está ocupado, VitePress asignará otro puerto disponible y lo mostrará en la terminal. El portal está en `docs/` y renderiza los diagramas Mermaid.
+
+Compila el portal para verificar páginas Markdown, configuración y diagramas:
+
+```powershell
+npm run docs:build
+```
+
+Sirve localmente la última compilación de VitePress:
+
+```powershell
+npm run docs:preview -- --port 4173
+```
+
+## 10. Verificaciones y pruebas
+
+Comprueba los tipos de los componentes e islas Vue/TypeScript:
+
+```powershell
+npm run typecheck
+```
+
+Genera el bundle de producción y ejecuta de nuevo la comprobación de tipos:
+
+```powershell
+npm run build
+```
+
+Ejecuta las pruebas de seguridad de almacenamiento y análisis de archivos en el contenedor PHP (las pruebas usan un directorio temporal y no requieren la base de datos):
+
+```powershell
+$tests = (Resolve-Path .\tests).Path -replace '\\', '/'
+docker compose run --rm --no-deps -v "${tests}:/var/www/html/tests:ro" app php tests/file_security.php
+```
+
+`tests/run.php` es una prueba de integración y debe apuntar exclusivamente a una base de datos desechable cuyo nombre empiece por `fct_test_`; configura `FCT_TEST_DB_NAME` y `FCT_DB_NAME` con el mismo nombre antes de ejecutarla. No la ejecutes contra `sistema_fct` ni una base que quieras conservar.
+
+Para ejecutar la integración desde XAMPP, crea `fct_test_local` en phpMyAdmin e
+importa en ella el dump base seleccionando explícitamente esa base. El gestor
+aplica las migraciones pendientes; la suite necesita el esquema actualizado,
+incluidas las bandejas de webhooks y las columnas de respuesta HTTP. Después,
+ejecuta desde PowerShell:
 
 ```powershell
 $env:FCT_TEST_DB_NAME = "fct_test_local"
@@ -527,68 +696,115 @@ $env:FCT_DB_PASS = ""
 & "C:\xampp\php\php.exe" tests\run.php
 ```
 
-El script comprueba que las variables apunten al mismo nombre con prefijo
-permitido, valida datos de demostración y crea y elimina sus fixtures durante
-la prueba. No crea ni elimina la base completa. Al terminar, elimina
-`fct_test_local` desde phpMyAdmin si ya no la necesitas.
+## Restablecimiento de Base de Datos por Cambios de Esquema o Migraciones
 
-## Estructura del proyecto
+> **⚠️ ADVERTENCIA: restablecimiento destructivo.** `docker compose down -v` elimina todos los volúmenes nombrados de este proyecto Compose, no sólo el de MariaDB. Se perderán la base de datos (`db_data`), los archivos privados subidos (`fct_storage`), las firmas de ClamAV (`clamav_db`) y las dependencias Docker (`node_modules` y `frontend_node_modules`). Es irreversible; usa este procedimiento sólo en un entorno local desechable y después de guardar cualquier dato que quieras conservar.
 
-```text
-.htaccess           Bloquea el acceso web directo fuera de public/
-app/
-  Controllers/       Coordinación de peticiones y validación de entrada
-  Core/              Renderizado de vistas
-  Middleware/        Autenticación, autorización y protección CSRF
-  Models/            Consultas y persistencia
-  Views/             Plantillas PHP por módulo
-config/              Conexión PDO y configuración privada de archivos
-database/
-  migrations/        Cambios incrementales del esquema
-  seeds/             Datos de muestra alternativos
-  sistema_fct.sql    Esquema base y datos de demostración
-docs/                Informe técnico histórico
-public/
-  index.php          Front controller y entrada web
-  assets/css/        Estilos
-  assets/js/         JavaScript auxiliar heredado
-routes/              Rutas, métodos HTTP y roles permitidos
-storage/             Reglas heredadas de denegación; no usar para guardar archivos
-tests/               Prueba de integración
+**Alternativa más segura si sólo necesitas reinicializar la base de datos:** detén el proyecto, elimina únicamente el volumen `db_data` y vuelve a iniciarlo. Así se conservan el almacenamiento privado, ClamAV y las dependencias:
+
+```powershell
+docker compose down
+$dbVolume = (docker compose config --format json | ConvertFrom-Json).volumes.db_data.name
+docker volume rm $dbVolume
+docker compose up -d --build
 ```
 
-La aplicación web usa `public/index.php` como front controller y define sus
-rutas en `routes/web.php`. Las vistas se renderizan con el layout común de
-`app/Views/layouts/main.php`. La conexión se obtiene desde
-`config/database.php`.
+Para restablecer **todos** los datos locales después de añadir cambios de esquema o migraciones, sigue estos tres pasos:
 
-Las páginas HTML heredadas de portada, registro de alumno y asignaciones no
-crean rutas ni guardan datos directamente. La portada y el registro redirigen
-al front controller; la página de asignaciones ofrece enlaces a sus rutas
-oficiales. El registro activo está en `app/Views/alumnos/registro.php`, y las
-asignaciones se gestionan mediante las rutas de `public/index.php`.
+1. Elimina los contenedores y todos los volúmenes del proyecto:
 
-`public/assets/js/alumnos_js.js` es un recurso heredado, separado de las vistas
-MVC actuales. La maqueta de alumno no envía ni conserva datos personales y el
-script elimina del navegador las claves antiguas de sus campos en
-`localStorage`; no debe usarse como flujo de registro.
+   ```powershell
+   docker compose down -v
+   ```
 
-## Dump y seed: diferencia
+2. Reconstruye e inicia los servicios. MariaDB importará el esquema y ejecutará todas las migraciones configuradas al crear su volumen vacío, incluidas las tablas de webhooks:
 
-- `database/sistema_fct.sql` crea el esquema base y carga los datos de ejemplo.
-  Es el camino recomendado para una instalación nueva, seguido por las
-  migraciones.
-- `database/seeds/001_sample_data.sql` contiene registros de muestra para un
-  esquema ya migrado, pero empieza con `USE sistema_fct`. No lo importes además
-  del dump completo ni lo uses sin comprobar cuidadosamente la base seleccionada:
-  puede duplicar IDs/cuentas y dirigir las inserciones a `sistema_fct`.
+   ```powershell
+   docker compose up -d --build
+   ```
 
-## Documentación relacionada
+3. Si necesitas las cuentas demo, créalas de nuevo en la base local:
 
-- [documentacion/explicacion.md](documentacion/explicacion.md): descripción extensa de arquitectura,
-  comportamiento de módulos, tablas, seguridad y limitaciones conocidas.
-- [documentacion/Guía Exhaustiva de Pruebas - Sistema FCT.pdf](documentacion/Guía%20Exhaustiva%20de%20Pruebas%20-%20Sistema%20FCT.pdf):
-  guía detallada de pruebas funcionales y técnicas.
-- [docs/informe_jornada_2026-10-07.md](docs/informe_jornada_2026-10-07.md):
-  informe de trabajo con notas históricas; algunas secciones describen fases
-  anteriores y no deben tomarse como estado actual del proyecto.
+   ```powershell
+   docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/crear_cuentas_demo.php
+   ```
+
+   El script renueva las contraseñas demo en cada ejecución; guarda la salida de forma segura. No lo ejecutes en producción.
+
+## 11. Solución de problemas frecuentes
+
+### Puertos ocupados
+
+Los puertos predeterminados son `8080` (aplicación), `8082` (phpMyAdmin), `3307` (MariaDB del host) y `5173` (Vite HMR). Cambia `APP_PORT`, `PMA_PORT` o `VITE_PORT` en `.env` para los puertos publicados configurables; el puerto de MariaDB se cambia editando el mapeo explícito `127.0.0.1:3307:3306` en `docker-compose.yml`. Si al abrir `http://localhost:8081` aparece Jenkins u otro servicio, eso indica que ese puerto ya está ocupado: establece `PMA_PORT=8082` (o cualquier puerto host libre) en `.env` y ejecuta `docker compose up -d` para publicar phpMyAdmin en el puerto elegido. Si VitePress comparte 5173 con Vite, usa el puerto 5174 recomendado.
+
+Lista los puertos y estados publicados por Compose:
+
+```powershell
+docker compose ps
+```
+
+### Almacenamiento no escribible
+
+Comprueba desde PHP que la ruta privada está montada y permite escritura:
+
+```powershell
+docker compose exec app sh -c 'printf "FCT_STORAGE_PATH=%s\n" "$FCT_STORAGE_PATH"; test -d "$FCT_STORAGE_PATH" && test -w "$FCT_STORAGE_PATH"'
+```
+
+En Docker, `FCT_STORAGE_PATH` debe seguir siendo `/var/lib/fct/storage`; si usas XAMPP, crea el directorio local fuera de `public/` y asigna permisos a la cuenta que ejecuta Apache.
+
+### MariaDB o ClamAV aún no saludables
+
+Consulta el estado de los servicios:
+
+```powershell
+docker compose ps
+```
+
+Consulta los últimos mensajes de MariaDB y ClamAV para encontrar errores de inicio o el progreso de descarga de firmas:
+
+```powershell
+docker compose logs --tail=100 db clamav
+```
+
+El primer arranque de ClamAV puede tardar; espera a que indique `healthy` antes de investigar como fallo.
+
+Para permitir cargas de prueba locales sin escaneo, configura explícitamente ambos valores: `APP_ENV=development` y `FCT_CLAMAV_ENABLED=false`; los registros de PHP indicarán que se omitió ClamAV. El bypass también se acepta en `APP_ENV=test` y `APP_ENV=testing`. Si se requiere análisis real, establece `FCT_CLAMAV_ENABLED=true` y revisa la conectividad interna a `clamav:3310`. Nunca uses el bypass en producción.
+
+### La página se ve sin estilos o sin islas Vue
+
+Con `FCT_VITE_DEV_SERVER` definido, las islas y el CSS dependen de que Vite esté en marcha. Si el contenedor `frontend-dev` lleva mucho tiempo activo, puede servir una versión antigua de `frontend/src/main.ts`; reinícialo y recarga con Ctrl+F5:
+
+```powershell
+docker compose restart frontend-dev
+```
+
+Comprueba que Vite responde con `curl.exe -s -o NUL -w "%{http_code}" http://localhost:5173/frontend/src/main.ts` (debe devolver `200`). Si no usas Vite, vacía `FCT_VITE_DEV_SERVER` en `.env` y recrea PHP con `docker compose up -d app`.
+
+### Ciclos DAW y DAM
+
+Si no aparece DAM en una base ya existente, aplica una vez `database/migrations/009_desarrollo_aplicaciones_multiplataforma.sql` a esa base. En un volumen MariaDB nuevo, Compose ejecuta esa migración automáticamente. El matching compara IDs de especialidad: DAW sólo coincide con DAW y DAM con DAM.
+
+### Disponibilidad o controles de contraseña
+
+Las horas se envían como `HH:MM` desde `<input type="time">` y el servidor acepta también `HH:MM:SS`; si una carga manual falla, revisa que días, indicador de disponibilidad indiferente y token CSRF correspondan al contrato. En formularios de contraseña, el botón de ojo cambia la visibilidad sin enviar el formulario; si no cambia, comprueba que `public/assets/js/password-toggle.js` esté cargado y que el campo siga siendo `type="password"` al cargar la página.
+
+### Reiniciar sin borrar datos
+
+Reinicia los contenedores sin borrar volúmenes:
+
+```powershell
+docker compose down
+docker compose up -d --build
+```
+
+Para volver a inicializar la base de datos tras cambios de esquema o migraciones, consulta [Restablecimiento de Base de Datos por Cambios de Esquema o Migraciones](#restablecimiento-de-base-de-datos-por-cambios-de-esquema-o-migraciones) y revisa la advertencia sobre el alcance de `docker compose down -v`.
+
+## Más información
+
+- [Guía de Integraciones en PDF](docs/guia-integraciones.pdf)
+- [Guía de Integraciones editable](docs/integraciones.md)
+- [Hoja de ruta de migración](docs/roadmap.md)
+- [Flujo de datos y ciclo de vida](docs/flujo-de-datos.md)
+- [Diagrama completo de arquitectura](docs/diagrama-completo.md)
+- Configuración y fuentes de verdad: `routes/web.php`, `config/`, `database/` y `docker-compose.yml`.

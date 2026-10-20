@@ -1,4 +1,10 @@
 <?php $rolActual = $_SESSION['rol'] ?? null; ?>
+<?php if ($rolActual !== null && FrontendAssets::isEnabled()): ?>
+    <div
+        data-vue-island="RoleDashboard"
+        data-prop-csrf-token="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>"
+    ></div>
+<?php else: ?>
 <section class="site-home" aria-labelledby="site-home-title">
     <div class="site-home__hero">
         <span class="site-home__eyebrow">Sistema de Formación en Centros de Trabajo</span>
@@ -6,11 +12,11 @@
         <p>Consulta oportunidades de prácticas, encuentra talento para tu empresa y gestiona el proceso de FCT desde un mismo lugar.</p>
         <div class="site-home__actions">
             <?php if ($rolActual === null): ?>
-                <a class="site-home__button" href="index.php?action=ofertas">Ver ofertas</a>
-                <a class="site-home__button site-home__button--secondary" href="index.php?action=registro-alumno">Registro de alumnado</a>
+                <a class="site-home__button" href="index.php?action=registro-alumno">Registro de alumnado</a>
+                <a class="site-home__button site-home__button--secondary" href="index.php?action=login">Iniciar sesión</a>
             <?php elseif ($rolActual === 'Alumno'): ?>
                 <a class="site-home__button" href="index.php?action=portal-alumno">Ir a mi expediente</a>
-                <a class="site-home__button site-home__button--secondary" href="index.php?action=ofertas">Consultar ofertas</a>
+                <a class="site-home__button site-home__button--secondary" href="index.php?action=disponibilidad">Actualizar disponibilidad</a>
             <?php elseif ($rolActual === 'Empresa'): ?>
                 <a class="site-home__button" href="index.php?action=publicar-oferta">Gestionar ofertas</a>
                 <a class="site-home__button site-home__button--secondary" href="index.php?action=convenios">Gestionar convenios</a>
@@ -28,7 +34,7 @@
     <div class="site-home__features">
         <article class="site-home__feature">
             <h3>Alumnado</h3>
-            <p>Crea tu expediente y consulta las oportunidades de prácticas disponibles para tu ciclo formativo.</p>
+            <p>Crea tu expediente y registra tu disponibilidad para que el centro pueda asignarte una práctica compatible.</p>
             <a href="index.php?action=registro-alumno">Crear cuenta de alumno</a>
         </article>
         <article class="site-home__feature">
@@ -51,13 +57,13 @@
             </article>
             <article class="site-home__feature">
                 <h3>Disponibilidad</h3>
-                <p>Actualiza el periodo, turno y horario semanal que el centro utilizará para buscar coincidencias.</p>
+                <p>Actualiza el periodo y las franjas semanales exactas que el centro utilizará para buscar coincidencias.</p>
                 <a href="index.php?action=disponibilidad">Gestionar disponibilidad</a>
             </article>
             <article class="site-home__feature">
-                <h3>Ofertas</h3>
-                <p>Consulta las oportunidades de prácticas aprobadas y vigentes.</p>
-                <a href="index.php?action=ofertas">Ver ofertas</a>
+                <h3>Mis prácticas</h3>
+                <p>Consulta los detalles de empresa cuando el centro confirme una asignación.</p>
+                <a href="index.php?action=mis-asignaciones">Ver mis prácticas</a>
             </article>
         </div>
     <?php elseif ($rolActual === 'Empresa'): ?>
@@ -113,3 +119,4 @@
         </div>
     <?php endif; ?>
 </section>
+<?php endif; ?>

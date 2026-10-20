@@ -23,7 +23,15 @@ if (
 
 require_once __DIR__ . '/../config/database.php';
 $db = getPDOConnection();
-$requiredTables = ['usuarios', 'coordinadores', 'empresas', 'alumnos', 'especialidades'];
+$requiredTables = [
+    'usuarios',
+    'coordinadores',
+    'empresas',
+    'alumnos',
+    'especialidades',
+    'alumno_disponibilidad',
+    'alumno_disponibilidad_semanal',
+];
 foreach ($requiredTables as $table) {
     $check = $db->prepare(
         'SELECT COUNT(*) FROM information_schema.TABLES
@@ -36,12 +44,6 @@ foreach ($requiredTables as $table) {
     }
 }
 
-$cycleId = (int)$db->query('SELECT id FROM especialidades ORDER BY id LIMIT 1')->fetchColumn();
-if ($cycleId < 1) {
-    fwrite(STDERR, "Crea al menos un ciclo formativo antes de instalar las cuentas demo.\n");
-    exit(2);
-}
-
 $definitions = [
     ['role' => 'Administrador', 'email' => 'demo.admin@fct.local'],
     ['role' => 'Coordinador', 'email' => 'demo.coordinador@fct.local'],
@@ -49,51 +51,61 @@ $definitions = [
     ['role' => 'Empresa', 'email' => 'demo.empresa@fct.local'],
     ['role' => 'Alumno', 'email' => 'demo.alumno@fct.local'],
 ];
-$created = [];
-$existing = [];
-$resetPasswords = getenv('FCT_DEMO_SEED_RESET_PASSWORDS') === '1';
+$accounts = [];
+foreach ($definitions as $definition) {
+    $accounts[] = [
+        ...$definition,
+        'password' => 'Fct-' . bin2hex(random_bytes(12)) . '!',
+    ];
+}
+
 $db->beginTransaction();
 try {
+    $cycles = [
+        'DAW' => 'Desarrollo de Aplicaciones Web (DAW)',
+        'DAM' => 'Desarrollo de Aplicaciones Multiplataforma (DAM)',
+    ];
+    $cycleIds = [];
+    $findCycle = $db->prepare(
+        'SELECT id FROM especialidades WHERE nombre_especialidad = :nombre LIMIT 1'
+    );
+    $createCycle = $db->prepare(
+        'INSERT INTO especialidades (nombre_especialidad) VALUES (:nombre)'
+    );
+    foreach ($cycles as $code => $name) {
+        $findCycle->execute(['nombre' => $name]);
+        $cycleId = $findCycle->fetchColumn();
+        if ($cycleId === false) {
+            $createCycle->execute(['nombre' => $name]);
+            $cycleId = $db->lastInsertId();
+        }
+        $cycleIds[$code] = (int)$cycleId;
+    }
+
     $find = $db->prepare('SELECT id, rol FROM usuarios WHERE email = :email LIMIT 1');
     $insertUser = $db->prepare(
         'INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :hash, :rol)'
     );
     $updatePassword = $db->prepare('UPDATE usuarios SET password_hash = :hash WHERE id = :id');
-    foreach ($definitions as $definition) {
+    foreach ($accounts as $account) {
+        $definition = $account;
         $find->execute(['email' => $definition['email']]);
         $existingUser = $find->fetch(PDO::FETCH_ASSOC);
-        $passwordEnvironmentKey = 'FCT_DEMO_PASSWORD_' . strtoupper($definition['role']);
-        $configuredPassword = getenv($passwordEnvironmentKey);
-        if (
-            is_string($configuredPassword)
-            && $configuredPassword !== ''
-            && (strlen($configuredPassword) < 12 || strlen($configuredPassword) > 72)
-        ) {
-            throw new RuntimeException("$passwordEnvironmentKey debe contener entre 12 y 72 caracteres.");
-        }
 
         if ($existingUser !== false) {
             if ($existingUser['rol'] !== $definition['role']) {
                 throw new RuntimeException('El rol de una cuenta demo existente no coincide con la definición esperada.');
             }
-            if ($resetPasswords && is_string($configuredPassword) && $configuredPassword !== '') {
-                $updatePassword->execute([
-                    'hash' => password_hash($configuredPassword, PASSWORD_DEFAULT),
-                    'id' => $existingUser['id'],
-                ]);
-                $created[] = ['email' => $definition['email'], 'role' => $definition['role'], 'password' => null];
-            } else {
-                $existing[] = $definition['email'];
-            }
+            $updatePassword->execute([
+                'hash' => password_hash($account['password'], PASSWORD_DEFAULT),
+                'id' => $existingUser['id'],
+            ]);
             continue;
         }
 
-        $password = is_string($configuredPassword) && $configuredPassword !== ''
-            ? $configuredPassword
-            : 'Fct-' . bin2hex(random_bytes(12)) . '!';
         $insertUser->execute([
             'email' => $definition['email'],
-            'hash' => password_hash($password, PASSWORD_DEFAULT),
+            'hash' => password_hash($account['password'], PASSWORD_DEFAULT),
             'rol' => $definition['role'],
         ]);
         $userId = (int)$db->lastInsertId();
@@ -134,7 +146,7 @@ try {
                 'nss' => 'D' . strtoupper(bin2hex(random_bytes(5))),
                 'codigo_postal' => '28013',
                 'correo' => $definition['email'],
-                'ciclo' => $cycleId,
+                'ciclo' => $cycleIds['DAW'],
             ]);
             $contact = $db->prepare(
                 'INSERT INTO direcciones_telefonos (alumno_id, telefono, direccion_completa)
@@ -146,12 +158,54 @@ try {
                 'direccion' => 'Calle Demo, 1, Madrid',
             ]);
         }
-        $created[] = [
-            'email' => $definition['email'],
-            'role' => $definition['role'],
-            'password' => is_string($configuredPassword) && $configuredPassword !== '' ? null : $password,
-        ];
     }
+
+    $studentUser = $db->prepare(
+        'SELECT a.id
+         FROM usuarios u
+         INNER JOIN alumnos a ON a.usuario_id = u.id
+         WHERE u.email = :email AND u.rol = :rol'
+    );
+    $studentUser->execute(['email' => 'demo.alumno@fct.local', 'rol' => 'Alumno']);
+    $studentId = $studentUser->fetchColumn();
+    if ($studentId === false) {
+        throw new RuntimeException('No se encontró el expediente de la cuenta demo del alumno.');
+    }
+
+    $availabilityStart = new DateTimeImmutable('today');
+    $availabilityEnd = $availabilityStart->modify('+1 year');
+    $deleteAvailability = $db->prepare(
+        'DELETE FROM alumno_disponibilidad WHERE alumno_id = :alumno_id'
+    );
+    $deleteAvailability->execute(['alumno_id' => $studentId]);
+
+    $insertAvailability = $db->prepare(
+        'INSERT INTO alumno_disponibilidad
+            (alumno_id, fecha_inicio, fecha_fin, turno, es_indiferente)
+         VALUES (:alumno_id, :fecha_inicio, :fecha_fin, :turno, FALSE)'
+    );
+    $insertAvailability->execute([
+        'alumno_id' => $studentId,
+        'fecha_inicio' => $availabilityStart->format('Y-m-d'),
+        'fecha_fin' => $availabilityEnd->format('Y-m-d'),
+        'turno' => 'Indiferente',
+    ]);
+    $availabilityId = (int)$db->lastInsertId();
+
+    $insertWeeklyAvailability = $db->prepare(
+        'INSERT INTO alumno_disponibilidad_semanal
+            (disponibilidad_id, dia_semana, hora_inicio, hora_fin)
+         VALUES (:disponibilidad_id, :dia_semana, :hora_inicio, :hora_fin)'
+    );
+    foreach (range(1, 5) as $weekday) {
+        $insertWeeklyAvailability->execute([
+            'disponibilidad_id' => $availabilityId,
+            'dia_semana' => $weekday,
+            'hora_inicio' => '09:00:00',
+            'hora_fin' => '17:00:00',
+        ]);
+    }
+
     $db->commit();
 } catch (Throwable $exception) {
     if ($db->inTransaction()) {
@@ -162,17 +216,9 @@ try {
     exit(1);
 }
 
-if ($created !== []) {
-    echo "Cuentas demo creadas o contraseñas actualizadas. Las contraseñas proporcionadas por entorno no se muestran.\n";
-    foreach ($created as $account) {
-        echo $account['role'] . "\t" . $account['email'];
-        if (is_string($account['password'])) {
-            echo "\t" . $account['password'];
-        }
-        echo "\n";
-    }
+echo "Cuentas demo creadas o renovadas. La ejecución ha cambiado las contraseñas anteriores:\n";
+foreach ($accounts as $account) {
+    echo $account['role'] . "\t" . $account['email'] . "\t" . $account['password'] . "\n";
 }
-if ($existing !== []) {
-    echo "Cuentas ya existentes (no se cambió su contraseña): " . implode(', ', $existing) . "\n";
-}
-echo "Solo para desarrollo local. Elimina estas cuentas o cambia sus contraseñas antes de cualquier despliegue.\n";
+echo "Guarda estas contraseñas ahora: no se almacenan en texto claro y no se volverán a mostrar.\n";
+echo "Solo para desarrollo local; nunca ejecutes este comando en producción.\n";

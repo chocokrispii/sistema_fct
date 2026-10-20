@@ -1,0 +1,73 @@
+.vp-doc .mermaid {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 1.25rem 0;
+  overscroll-behavior-x: contain;
+}
+
+.vp-doc .mermaid svg {
+  display: block;
+  height: auto;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+.roadmap-layout .vp-doc .mermaid {
+  overflow-x: hidden;
+}
+
+.roadmap-layout .vp-doc .mermaid svg {
+  width: auto;
+  max-width: 100%;
+}
+
+.wide-layout .VPDoc .container {
+  max-width: min(1600px, calc(100vw - 48px)) !important;
+}
+
+.wide-layout .VPDoc .content,
+.wide-layout .VPDoc .content-container {
+  max-width: none !important;
+}
+
+.wide-layout .vp-doc .mermaid {
+  overflow-x: auto;
+}
+
+.wide-layout .vp-doc .mermaid svg {
+  max-width: none !important;
+}
+
+@media (min-width: 768px) and (max-width: 959px) {
+  .roadmap-layout .VPNavBarMenu {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .vp-doc .mermaid {
+    overflow-x: auto;
+  }
+
+  .roadmap-layout .VPNavBar .title {
+    max-width: calc(100vw - 160px);
+    overflow: hidden;
+  }
+
+  .roadmap-layout .vp-doc .mermaid {
+    overflow-x: hidden;
+  }
+
+  .roadmap-layout .vp-doc .mermaid svg {
+    width: auto;
+  }
+
+  .wide-layout .VPDoc .container {
+    max-width: 100% !important;
+  }
+
+  .wide-layout .VPDoc .content {
+    padding-inline: 16px;
+  }
+}

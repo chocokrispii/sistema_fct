@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../Core/JsonResponse.php';
 
 final class AuthMiddleware
 {
@@ -8,8 +9,16 @@ final class AuthMiddleware
     {
         $userId = filter_var($_SESSION['usuario_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($userId === false) {
+            if ($route === 'ofertas') {
+                http_response_code(403);
+                throw new RuntimeException('Inicia sesión con una cuenta autorizada para consultar ofertas.');
+            }
             if ($route === 'descargar-convenio') {
                 self::auditDeniedDownload(null, 'autenticacion_requerida');
+            }
+            if (JsonResponse::wantsJson()) {
+                http_response_code(401);
+                throw new RuntimeException('Se requiere autenticación para acceder a esta sección.');
             }
             header('Location: index.php?action=login');
             exit;
@@ -24,6 +33,10 @@ final class AuthMiddleware
             }
             $_SESSION = [];
             session_destroy();
+            if (JsonResponse::wantsJson()) {
+                http_response_code(401);
+                throw new RuntimeException('La cuenta no está activa.');
+            }
             header('Location: index.php?action=login');
             exit;
         }

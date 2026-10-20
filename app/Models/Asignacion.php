@@ -22,11 +22,12 @@ class Asignacion
     {
     }
 
-    public function listar(bool $soloPropias = false, int $usuarioId = 0): array
+    public function listar(bool $soloPropias = false, int $usuarioId = 0, bool $anonimizarAlumnado = false): array
     {
-        [$sql, $params] = $this->consultaListado($soloPropias, $usuarioId);
+        [$sql, $params] = $this->consultaListado($soloPropias, $usuarioId, $anonimizarAlumnado);
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
+
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -44,36 +45,24 @@ class Asignacion
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function obtenerPagina(bool $soloPropias, int $usuarioId, int $pagina, int $porPagina = 20): array
+    private function consultaListado(bool $soloPropias, int $usuarioId, bool $anonimizarAlumnado): array
     {
-        if ($porPagina < 1 || $porPagina > 100) {
-            throw new InvalidArgumentException('El tamaño de página debe estar entre 1 y 100.');
-        }
-
-        $whereSql = $soloPropias ? ' WHERE a.usuario_id = :usuario_id' : '';
-        $params = $soloPropias ? ['usuario_id' => $usuarioId] : [];
-        $countSql = 'SELECT COUNT(*) FROM asignaciones_fct af'
-            . ($soloPropias ? ' INNER JOIN alumnos a ON a.id = af.alumno_id' . $whereSql : '');
-        $count = $this->db->prepare($countSql);
-        $count->execute($params);
-        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
-
-        [$sql, $params] = $this->consultaListado($soloPropias, $usuarioId);
-        $stmt = $this->db->prepare($sql . ' LIMIT :limite OFFSET :offset');
-        foreach ($params as $nombre => $valor) {
-            $stmt->bindValue(':' . $nombre, $valor, PDO::PARAM_INT);
-        }
-        $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
-        $stmt->execute();
-
-        $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        return $paginacion;
-    }
-
-    private function consultaListado(bool $soloPropias, int $usuarioId): array
-    {
-        $sql = self::SELECT_LISTADO;
+        $studentFields = $anonimizarAlumnado
+            ? "'Alumno anonimizado' AS alumno_nombre, '' AS apellidos, NULL AS alumno_correo, NULL AS alumno_id"
+            : 'a.id AS alumno_id, a.nombre AS alumno_nombre, a.apellidos, a.correo AS alumno_correo';
+        $tutorField = $anonimizarAlumnado ? 'NULL AS tutor_empresa' : 'af.tutor_empresa';
+        $privateIds = $anonimizarAlumnado
+            ? 'NULL AS id, NULL AS oferta_id, NULL AS alumno_usuario_id'
+            : 'af.id, p.id AS oferta_id, u.id AS alumno_usuario_id';
+        $sql = "SELECT $privateIds, af.estado, af.fecha_asignacion, af.fecha_cierre, $tutorField,
+                       $studentFields,
+                       p.fecha_inicio, p.fecha_fin, e.nombre_empresa, es.nombre_especialidad
+                FROM asignaciones_fct af
+                INNER JOIN alumnos a ON a.id = af.alumno_id
+                INNER JOIN usuarios u ON u.id = a.usuario_id
+                INNER JOIN empresa_especialidades_plazas p ON p.id = af.oferta_id
+                INNER JOIN empresas e ON e.id = p.empresa_id
+                INNER JOIN especialidades es ON es.id = p.especialidad_id";
         $params = [];
         if ($soloPropias) {
             $sql .= ' WHERE a.usuario_id = :usuario_id';
@@ -82,6 +71,37 @@ class Asignacion
         $sql .= ' ORDER BY af.fecha_asignacion DESC, af.id DESC';
 
         return [$sql, $params];
+    }
+
+    public function obtenerPagina(
+        bool $soloPropias,
+        int $usuarioId,
+        int $pagina,
+        int $porPagina = 20,
+        bool $anonimizarAlumnado = false
+    ): array {
+        $where = $soloPropias ? ' WHERE a.usuario_id = :usuario_id' : '';
+        $params = $soloPropias ? ['usuario_id' => $usuarioId] : [];
+        $count = $this->db->prepare(
+            'SELECT COUNT(*)
+             FROM asignaciones_fct af
+             INNER JOIN alumnos a ON a.id = af.alumno_id'
+             . $where
+        );
+        $count->execute($params);
+        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
+
+        [$sql, $listParams] = $this->consultaListado($soloPropias, $usuarioId, $anonimizarAlumnado);
+        $items = $this->db->prepare($sql . ' LIMIT :limite OFFSET :offset');
+        foreach ($listParams as $name => $value) {
+            $items->bindValue(':' . $name, $value, PDO::PARAM_INT);
+        }
+        $items->bindValue(':limite', $porPagina, PDO::PARAM_INT);
+        $items->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
+        $items->execute();
+        $paginacion['items'] = $items->fetchAll(PDO::FETCH_ASSOC);
+
+        return $paginacion;
     }
 
     public function contarActivasPorUsuario(int $usuarioId): int
@@ -185,23 +205,40 @@ class Asignacion
                  INNER JOIN alumno_disponibilidad d
                     ON d.alumno_id = a.id
                     AND d.fecha_inicio <= p.fecha_inicio AND d.fecha_fin >= p.fecha_fin
-                    AND (d.turno = 'Indiferente' OR p.turno = 'Indiferente'
-                         OR d.turno = p.turno)
-                     AND EXISTS (
-                         SELECT 1
-                         FROM alumno_disponibilidad_semanal ds
-                         WHERE ds.disponibilidad_id = d.id
-                             AND (
-                                 DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                                 OR MOD(ds.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
-                                     <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
-                             )
-                             AND (
-                                 p.turno = 'Indiferente'
-                                 OR (p.turno = 'M' AND ds.hora_inicio < '14:00:00' AND ds.hora_fin > '06:00:00')
-                                 OR (p.turno = 'T' AND ds.hora_inicio < '23:59:59' AND ds.hora_fin > '14:00:00')
-                             )
-                     )
+                    AND (
+                        d.es_indiferente = TRUE
+                        OR d.turno = 'Indiferente'
+                        OR p.turno = 'Indiferente'
+                        OR d.turno = p.turno
+                    )
+                    AND EXISTS (
+                        SELECT 1 FROM empresa_oferta_horarios_semanales oh
+                        WHERE oh.oferta_id = p.id
+                            AND (
+                                DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
+                                OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
+                                    <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
+                            )
+                    )
+                    AND (
+                        d.es_indiferente = TRUE
+                        OR NOT EXISTS (
+                            SELECT 1 FROM empresa_oferta_horarios_semanales oh
+                            WHERE oh.oferta_id = p.id
+                                AND (
+                                    DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
+                                    OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
+                                        <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
+                                )
+                                AND NOT EXISTS (
+                                    SELECT 1 FROM alumno_disponibilidad_semanal ds
+                                    WHERE ds.disponibilidad_id = d.id
+                                        AND ds.dia_semana = oh.dia_semana
+                                        AND ds.hora_inicio <= oh.hora_inicio
+                                        AND ds.hora_fin >= oh.hora_fin
+                                )
+                        )
+                    )
                  WHERE a.id = :alumno_id AND p.id = :oferta_id
                     AND p.estado = 'Aprobada'
                     AND NOT EXISTS (
@@ -212,7 +249,7 @@ class Asignacion
             );
             $candidate->execute(['alumno_id' => $alumnoId, 'oferta_id' => $ofertaId]);
             if (!$candidate->fetchColumn()) {
-                throw new RuntimeException('El alumno no cumple el ciclo, disponibilidad o turno de la oferta.');
+                throw new DomainException('El alumno no cumple el ciclo, disponibilidad o cobertura horaria de la oferta.');
             }
 
             $insert = $this->db->prepare(
@@ -261,6 +298,7 @@ class Asignacion
                 $this->db->rollBack();
                 return false;
             }
+
             (new Auditoria($this->db))->registrar($usuarioId, 'asignacion.cerrada', 'asignaciones_fct', $id);
             Webhook::enqueue($this->db, 'practica.cerrada', [
                 'asignacion_id' => $id,
@@ -273,5 +311,24 @@ class Asignacion
             }
             throw $e;
         }
+    }
+
+    public function obtenerEmpresaAsignada(int $usuarioId): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT e.nombre_empresa, e.categoria, es.nombre_especialidad,
+                    p.fecha_inicio, p.fecha_fin
+             FROM asignaciones_fct af
+             INNER JOIN alumnos a ON a.id = af.alumno_id
+             INNER JOIN empresa_especialidades_plazas p ON p.id = af.oferta_id
+             INNER JOIN empresas e ON e.id = p.empresa_id
+             INNER JOIN especialidades es ON es.id = p.especialidad_id
+             WHERE a.usuario_id = :usuario_id AND af.estado = 'Asignada'
+             ORDER BY af.fecha_asignacion DESC
+             LIMIT 1"
+        );
+        $stmt->execute(['usuario_id' => $usuarioId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
     }
 }

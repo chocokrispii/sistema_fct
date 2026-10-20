@@ -14,6 +14,7 @@ if (getenv('FCT_DB_NAME') !== $testDatabase) {
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/Core/Webhook.php';
+require_once __DIR__ . '/../app/Core/ApiToken.php';
 require_once __DIR__ . '/../app/Core/View.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
 require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
@@ -30,6 +31,7 @@ require_once __DIR__ . '/../app/Models/Calificacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
 require_once __DIR__ . '/../app/Models/RecuperacionCuenta.php';
 require_once __DIR__ . '/../app/Models/Usuario.php';
+require_once __DIR__ . '/../app/Models/Especialidad.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
 require_once __DIR__ . '/../app/Controllers/ConsultaController.php';
@@ -99,6 +101,15 @@ assertTrue(
     (int)$offerConstraints === 2,
     'Faltan restricciones CHECK de las ofertas; ejecuta la migración 010.'
 );
+$cycles = (new Especialidad($db))->obtenerTodas();
+$dam = array_values(array_filter(
+    $cycles,
+    static fn(array $cycle): bool => $cycle['nombre_especialidad'] === 'Desarrollo de Aplicaciones Multiplataforma (DAM)'
+))[0] ?? null;
+assertTrue($dam !== null, 'DAM debe estar disponible como ciclo formativo.');
+$specialtyValidator = new Especialidad($db);
+assertTrue($specialtyValidator->existe((int)$dam['id']), 'La validación debe aceptar el ciclo DAM existente.');
+assertTrue(!$specialtyValidator->existe(PHP_INT_MAX), 'La validación debe rechazar ciclos que no existan.');
 
 $demoUsers = $db->query(
     "SELECT email, password_hash FROM usuarios
@@ -133,8 +144,16 @@ $required = [
     'turno' => ['table' => 'empresa_especialidades_plazas', 'column' => 'turno'],
     'especialidad_id' => ['table' => 'convenios', 'column' => 'especialidad_id'],
     'dia_semana' => ['table' => 'alumno_disponibilidad_semanal', 'column' => 'dia_semana'],
+    'es_indiferente' => ['table' => 'alumno_disponibilidad', 'column' => 'es_indiferente'],
     'nota' => ['table' => 'calificaciones_fct', 'column' => 'nota'],
     'codigo_postal' => ['table' => 'alumnos', 'column' => 'codigo_postal'],
+    'horario_oferta' => ['table' => 'empresa_oferta_horarios_semanales', 'column' => 'hora_inicio'],
+    'titulo_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'titulo'],
+    'descripcion_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'descripcion'],
+    'modalidad_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'modalidad'],
+    'ubicacion_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'ubicacion'],
+    'requisitos_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'requisitos'],
+    'tecnologias_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'tecnologias'],
 ];
 foreach ($required as $name => $definition) {
     $stmt = $db->prepare(
@@ -196,11 +215,13 @@ $createdUsers = [];
 $createdCompany = null;
 $createdStudents = [];
 $createdOffer = null;
+$createdWebhookOffer = null;
 $createdExpiredOffer = null;
 $createdPaginationOffers = [];
 $createdAssignmentId = null;
 $createdCycleId = null;
 $webhookEventId = null;
+$availabilityWebhookEventId = null;
 
 try {
     $webhookEventId = 'test-' . bin2hex(random_bytes(12));
@@ -602,7 +623,8 @@ try {
             && preg_match(
                 '/<input\b(?=[^>]*\bid="profile-dni")(?=[^>]*\bmaxlength="20")[^>]*>/',
                 $profileHtml
-            ) === 1,
+            ) === 1
+            && str_contains($profileHtml, 'data-vue-island="StudentProfile"'),
         'El formulario de perfil debe cargar los datos que se pueden editar.'
     );
     $_SERVER['REQUEST_METHOD'] = 'POST';
@@ -1054,8 +1076,9 @@ try {
     );
 
     $availability = $db->prepare(
-        "INSERT INTO alumno_disponibilidad (alumno_id, fecha_inicio, fecha_fin, turno)
-         VALUES (:alumno, :inicio, :fin, 'Indiferente')"
+        "INSERT INTO alumno_disponibilidad
+            (alumno_id, fecha_inicio, fecha_fin, turno, es_indiferente)
+         VALUES (:alumno, :inicio, :fin, 'M', FALSE)"
     );
     $weeklySchedule = $db->prepare(
         "INSERT INTO alumno_disponibilidad_semanal
@@ -1070,9 +1093,9 @@ try {
         ]);
         $weeklySchedule->execute([
             'periodo' => (int)$db->lastInsertId(),
-            'dia_semana' => $index + 1,
-            'hora_inicio' => $index === 0 ? '08:00:00' : '15:00:00',
-            'hora_fin' => $index === 0 ? '14:00:00' : '19:00:00',
+            'dia_semana' => 1,
+            'hora_inicio' => $index === 0 ? '08:00:00' : '10:00:00',
+            'hora_fin' => $index === 0 ? '14:00:00' : '17:00:00',
         ]);
     }
     $availabilityModel = new Disponibilidad($db);
@@ -1090,21 +1113,125 @@ try {
     ob_start();
     (new DisponibilidadController($db))->gestionar();
     $availabilityHtml = ob_get_clean();
+    $availabilityChecks = [
+        'form' => str_contains($availabilityHtml, 'Disponibilidad semanal'),
+        'schedule island' => str_contains($availabilityHtml, 'data-vue-island="AvailabilitySchedule"'),
+        'schedule state' => str_contains($availabilityHtml, '&quot;active&quot;:true'),
+        'schedule times' => str_contains($availabilityHtml, '&quot;start&quot;:&quot;08:00&quot;')
+            && str_contains($availabilityHtml, '08:00'),
+        'saved island' => str_contains($availabilityHtml, 'data-vue-island="SavedAvailability"'),
+        'saved state' => str_contains($availabilityHtml, 'data-prop-state="'),
+        'saved heading' => str_contains($availabilityHtml, 'Horario semanal guardado'),
+        'five-minute step' => str_contains($availabilityHtml, 'step="300"'),
+        'toggle' => str_contains($availabilityHtml, 'availability-toggle-card__switch'),
+        'form inputs' => str_contains($availabilityHtml, 'name="es_indiferente"')
+            && str_contains($availabilityHtml, 'name="horarios[1][activo]"'),
+    ];
     assertTrue(
-        is_string($availabilityHtml)
-            && str_contains($availabilityHtml, 'Disponibilidad semanal')
-            && str_contains($availabilityHtml, 'Lunes')
-            && str_contains($availabilityHtml, '08:00')
-            && str_contains($availabilityHtml, 'step="600"'),
-        'El formulario de disponibilidad debe mostrar los días y franjas guardados.'
+        !in_array(false, $availabilityChecks, true),
+        'El formulario de disponibilidad debe mostrar los días y franjas guardados. Fallos: '
+            . implode(', ', array_keys(array_filter($availabilityChecks, static fn(bool $passed): bool => !$passed)))
     );
+    foreach (['09:05', '09:15', '14:45', '17:55'] as $fiveMinuteTime) {
+        assertTrue(
+            preg_match('/^(?:[01]\d|2[0-3]):(?:[0-5][05])$/', $fiveMinuteTime) === 1,
+            'La validación horaria debe aceptar incrementos de cinco minutos, como ' . $fiveMinuteTime . '.'
+        );
+    }
+    assertTrue(
+        preg_match('/^(?:[01]\d|2[0-3]):(?:[0-5][05])$/', '09:16') !== 1,
+        'La validación horaria debe rechazar minutos que no sean múltiplos de cinco.'
+    );
+    $deleteAvailability = $db->prepare('DELETE FROM alumno_disponibilidad WHERE alumno_id = :alumno_id');
+    $deleteAvailability->execute(['alumno_id' => $createdStudents[1]]);
+    $_SESSION = ['usuario_id' => $createdUsers[2], 'rol' => 'Alumno'];
+    ob_start();
+    (new DisponibilidadController($db))->gestionar();
+    $newStudentAvailabilityHtml = ob_get_clean();
+    assertTrue(
+        is_string($newStudentAvailabilityHtml)
+            && str_contains($newStudentAvailabilityHtml, '&quot;esIndiferente&quot;:false')
+            && !str_contains($newStudentAvailabilityHtml, 'name="horarios[1][activo]" value="1" aria-label="Lunes" disabled'),
+        'Un alumno sin disponibilidad debe recibir horarios editables y no indiferentes por defecto.'
+    );
+    $availability->execute(['alumno' => $createdStudents[1]]);
+    $weeklySchedule->execute([
+        'periodo' => (int)$db->lastInsertId(),
+        'dia_semana' => 1,
+        'hora_inicio' => '10:00:00',
+        'hora_fin' => '17:00:00',
+    ]);
+    $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno'];
     $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_SERVER['HTTP_ACCEPT'] = 'application/json';
+    unset($_SERVER['CONTENT_TYPE']);
+    $_POST = [
+        'fecha_inicio' => '2027-04-01',
+        'fecha_fin' => '2027-06-30',
+        'turno' => 'M',
+        'es_indiferente' => false,
+        'horarios' => [
+            '1' => ['activo' => true, 'hora_inicio' => '09:15:00', 'hora_fin' => '17:00'],
+        ],
+    ];
+    ob_start();
+    (new DisponibilidadController($db))->gestionar();
+    $savedAvailabilityJson = ob_get_clean();
+    $jsonStart = is_string($savedAvailabilityJson) ? strpos($savedAvailabilityJson, '{') : false;
+    $savedAvailabilityResponse = $jsonStart === false
+        ? null
+        : json_decode(substr($savedAvailabilityJson, $jsonStart), true);
+    assertTrue(
+        is_array($savedAvailabilityResponse)
+            && ($savedAvailabilityResponse['success'] ?? false) === true
+            && ($savedAvailabilityResponse['data']['savedSchedule']['fecha_inicio'] ?? null) === '2027-04-01'
+            && ($savedAvailabilityResponse['data']['savedSchedule']['fecha_fin'] ?? null) === '2027-06-30'
+            && ($savedAvailabilityResponse['data']['savedSchedule']['es_indiferente'] ?? null) === false
+            && ($savedAvailabilityResponse['data']['savedSchedule']['dias'][0]['dia'] ?? null) === 'Lunes'
+            && ($savedAvailabilityResponse['data']['savedSchedule']['dias'][0]['hora_inicio'] ?? null) === '09:15:00',
+        'El guardado JSON debe devolver el horario persistido con los datos que consume la isla de lectura.'
+    );
+    putenv('FCT_WEBHOOK_OUTBOUND_URL=https://receiver.example.test/webhooks');
+    try {
+        $availabilityModel->reemplazar(
+            $createdUsers[1],
+            '2027-03-01',
+            '2027-06-30',
+            'M',
+            false,
+            [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
+        );
+    } finally {
+        putenv('FCT_WEBHOOK_OUTBOUND_URL');
+    }
+    $availabilityEvent = $db->query(
+        "SELECT event_id, payload FROM webhook_outbox
+         WHERE event_type = 'student.availability_updated'
+         ORDER BY created_at DESC LIMIT 1"
+    )->fetch(PDO::FETCH_ASSOC);
+    $availabilityPayload = is_array($availabilityEvent)
+        ? json_decode($availabilityEvent['payload'], true, 16, JSON_THROW_ON_ERROR)
+        : null;
+    assertTrue(
+        is_array($availabilityEvent)
+            && is_array($availabilityPayload)
+            && ($availabilityPayload['data']['student_id'] ?? null) === $createdStudents[0]
+            && ($availabilityPayload['data']['horarios'][0]['hora_inicio'] ?? null) === '08:00:00',
+        'El cambio de disponibilidad debe dejar su evento firmado pendiente en la outbox transaccional.'
+    );
+    $availabilityWebhookEventId = $availabilityEvent['event_id'];
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    unset($_SERVER['HTTP_ACCEPT']);
+    $_POST = [];
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_SERVER['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
     $_POST = [
         'fecha_inicio' => $availabilityEditStart,
         'fecha_fin' => $availabilityEnd,
         'turno' => 'Indiferente',
+        'es_indiferente' => '0',
         'horarios' => [
-            '1' => ['activo' => '1', 'hora_inicio' => '08:15', 'hora_fin' => '13:50'],
+            '1' => ['activo' => '1', 'hora_inicio' => '08:16', 'hora_fin' => '13:50'],
         ],
     ];
     ob_start();
@@ -1112,7 +1239,7 @@ try {
     $invalidTimeHtml = ob_get_clean();
     assertTrue(
         is_string($invalidTimeHtml) && str_contains($invalidTimeHtml, 'franja horaria válida'),
-        'El servidor debe rechazar horas que no respeten intervalos de diez minutos.'
+        'El servidor debe rechazar horas que no respeten intervalos de cinco minutos.'
     );
     assertTrue(
         count($availabilityModel->obtenerPorUsuario($createdUsers[1])) === 1,
@@ -1227,20 +1354,20 @@ try {
         'inicio' => $offerDate,
         'fin' => $offerDate,
     ]);
-    $createdOffer = (int)$db->lastInsertId();
+    $createdWebhookOffer = (int)$db->lastInsertId();
 
     $previousWebhookDestination = getenv('FCT_WEBHOOK_OUTBOUND_URL');
     putenv('FCT_WEBHOOK_OUTBOUND_URL=https://receiver.example.test/webhooks');
     $db->beginTransaction();
     try {
         Webhook::enqueue($db, 'oferta.revisada', [
-            'oferta_id' => $createdOffer,
+            'oferta_id' => $createdWebhookOffer,
             'estado' => 'Aprobada',
         ]);
         $companyTaggedEvent = $db->query(
             "SELECT payload FROM webhook_outbox
              WHERE event_type = 'oferta.revisada'
-               AND CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.data.oferta_id')) AS UNSIGNED) = $createdOffer
+               AND CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.data.oferta_id')) AS UNSIGNED) = $createdWebhookOffer
              ORDER BY created_at DESC, event_id DESC
              LIMIT 1"
         )->fetchColumn();
@@ -1257,8 +1384,37 @@ try {
             ? 'FCT_WEBHOOK_OUTBOUND_URL'
             : 'FCT_WEBHOOK_OUTBOUND_URL=' . $previousWebhookDestination);
     }
-
     $matching = new Oferta($db);
+    $createdOffer = $matching->crearOferta(
+        $createdCompany,
+        $cycleId,
+        1,
+        '2027-03-15',
+        '2027-03-15',
+        "Oferta de prueba $fixture",
+        'Descripción de prueba de la oferta.',
+        'P',
+        'Híbrido',
+        'Madrid',
+        'Trabajo en equipo.',
+        'PHP, Vue',
+        [['dia_semana' => 1, 'hora_inicio' => '09:00:00', 'hora_fin' => '13:00:00']]
+    );
+    $savedOffer = array_values(array_filter(
+        $matching->obtenerPorEmpresa($createdCompany),
+        static fn(array $offer): bool => (int)$offer['id'] === $createdOffer
+    ))[0] ?? null;
+    assertTrue(
+        $savedOffer !== null
+            && $savedOffer['titulo'] === "Oferta de prueba $fixture"
+            && $savedOffer['descripcion'] === 'Descripción de prueba de la oferta.'
+            && $savedOffer['turno'] === 'P'
+            && $savedOffer['modalidad'] === 'Híbrido'
+            && $savedOffer['ubicacion'] === 'Madrid'
+            && $savedOffer['requisitos'] === 'Trabajo en equipo.'
+            && $savedOffer['tecnologias'] === 'PHP, Vue',
+        'La oferta debe persistir sus detalles completos.'
+    );
     assertTrue(
         $matching->resolver($createdOffer, 'Aprobada', '', $createdUsers[3]),
         'Una oferta pendiente debe poder aprobarse.'
@@ -1266,7 +1422,7 @@ try {
     $candidates = $matching->obtenerCandidatos($createdOffer);
     assertTrue(
         count($candidates) === 1 && (int)$candidates[0]['alumno_id'] === $createdStudents[0],
-        'El motor de compatibilidad debe excluir alumnos cuyo horario semanal no coincide con el turno.'
+        'El motor de compatibilidad debe exigir que la disponibilidad cubra las horas exactas de la oferta.'
     );
     $offersWithCounts = $matching->obtenerVigentesConAsignaciones();
     assertTrue(
@@ -1347,7 +1503,46 @@ try {
         $expiredAssignmentRejected,
         'Una oferta vencida debe rechazarse aunque el alumno conserve disponibilidad compatible.'
     );
+    $partialCoverageRejected = false;
+    try {
+        $assignments->crear($createdOffer, $createdStudents[1], $createdUsers[3], 'Tutor de empresa');
+    } catch (DomainException $exception) {
+        $partialCoverageRejected = str_contains($exception->getMessage(), 'cobertura horaria');
+    }
+    assertTrue($partialCoverageRejected, 'La asignación forzada debe rechazar franjas que solo se solapan parcialmente.');
+    $setIndifferent = $db->prepare(
+        'UPDATE alumno_disponibilidad SET es_indiferente = TRUE WHERE alumno_id = :alumno'
+    );
+    $setIndifferent->execute(['alumno' => $createdStudents[0]]);
+    $deleteWeeklySchedule = $db->prepare(
+        'DELETE ds FROM alumno_disponibilidad_semanal ds
+         INNER JOIN alumno_disponibilidad d ON d.id = ds.disponibilidad_id
+         WHERE d.alumno_id = :alumno'
+    );
+    $deleteWeeklySchedule->execute(['alumno' => $createdStudents[0]]);
+    $indifferentCandidates = $matching->obtenerCandidatos($createdOffer);
+    assertTrue(
+        count($indifferentCandidates) === 1
+            && (int)$indifferentCandidates[0]['alumno_id'] === $createdStudents[0],
+        'La disponibilidad indiferente debe coincidir aunque no tenga franjas diarias guardadas.'
+    );
     $assignments->crear($createdOffer, $createdStudents[0], $createdUsers[3], 'Tutor de empresa');
+    $assignedCompany = $assignments->obtenerEmpresaAsignada($createdUsers[1]);
+    assertTrue(
+        $assignedCompany !== null
+            && $assignedCompany['nombre_empresa'] !== ''
+            && !array_key_exists('correo', $assignedCompany),
+        'El endpoint de empresa asignada debe devolver solo datos de interés sin datos de contacto.'
+    );
+    $observerAssignments = $assignments->listar(false, 0, true);
+    assertTrue(
+        count($observerAssignments) === 1
+            && $observerAssignments[0]['alumno_nombre'] === 'Alumno anonimizado'
+            && $observerAssignments[0]['alumno_correo'] === null
+            && $observerAssignments[0]['tutor_empresa'] === null
+            && $observerAssignments[0]['alumno_usuario_id'] === null,
+        'El listado de auditoría debe eliminar la identidad del alumnado y del tutor.'
+    );
     $assignmentId = (int)$db->query(
         'SELECT id FROM asignaciones_fct WHERE oferta_id = ' . $createdOffer . ' AND alumno_id = ' . $createdStudents[0]
     )->fetchColumn();
@@ -1463,7 +1658,8 @@ try {
         $availabilityEditStart,
         $availabilityEnd,
         'T',
-        [['dia_semana' => 2, 'hora_inicio' => '15:00:00', 'hora_fin' => '19:00:00']]
+        false,
+        [['dia_semana' => 2, 'hora_inicio' => '15:15:00', 'hora_fin' => '19:00:00']]
     );
     $updatedAvailability = $availabilityModel->obtenerPorUsuario($createdUsers[1]);
     $updatedWeekly = $availabilityModel->obtenerHorarioSemanalPorUsuario($createdUsers[1]);
@@ -1471,8 +1667,10 @@ try {
         count($updatedAvailability) === 1
             && $updatedAvailability[0]['fecha_inicio'] === $availabilityEditStart
             && $updatedAvailability[0]['turno'] === 'T'
+            && (int)$updatedAvailability[0]['es_indiferente'] === 0
             && count($updatedWeekly) === 1
-            && (int)$updatedWeekly[0]['dia_semana'] === 2,
+            && (int)$updatedWeekly[0]['dia_semana'] === 2
+            && $updatedWeekly[0]['hora_inicio'] === '15:15:00',
         'La edición de disponibilidad debe persistir el periodo, turno y horario semanal.'
     );
 
@@ -1503,6 +1701,13 @@ try {
         $assignments->listarActivasPorUsuario($createdUsers[1]) === [],
         'El dashboard no debe recuperar del historial las asignaciones ya cerradas.'
     );
+    $precisionRejected = false;
+    try {
+        $gradeModel->guardar($assignmentId, $createdUsers[3], 8.501, 'Precisión excesiva');
+    } catch (InvalidArgumentException) {
+        $precisionRejected = true;
+    }
+    assertTrue($precisionRejected, 'El modelo debe rechazar notas con más de dos decimales.');
     $gradeModel->guardar($assignmentId, $createdUsers[3], 8.5, 'Buen desempeño.');
     assertTrue(
         $gradeModel->obtenerNotaMediaPorUsuario($createdUsers[1]) === 8.5,
@@ -1521,6 +1726,13 @@ try {
             && (float)$gradeModel->listar()[0]['nota'] === 9.25
             && $gradeModel->obtenerNotaMediaPorUsuario($createdUsers[1]) === 9.25,
         'La edición de una nota debe actualizar la misma calificación, sin duplicarla.'
+    );
+    $observerGrades = $gradeModel->listar(false, 0, true);
+    assertTrue(
+        count($observerGrades) === 1
+            && $observerGrades[0]['alumno_nombre'] === 'Alumno anonimizado'
+            && $observerGrades[0]['alumno_correo'] === null,
+        'Las calificaciones consultadas por Observador deben omitir la identidad del alumno.'
     );
     $_SESSION = ['usuario_id' => $createdUsers[3], 'rol' => 'Coordinador'];
     ob_start();
@@ -1565,14 +1777,30 @@ try {
     $adminViewHtml = (string)ob_get_clean();
     assertTrue(
         str_contains($adminViewHtml, 'Coordinadora Álvarez O&#039;Connor')
-            && str_contains($adminViewHtml, '¿Estás seguro?')
-            && str_contains($adminViewHtml, 'No, volver.')
-            && str_contains($adminViewHtml, 'Sí, eliminar')
-            && str_contains($adminViewHtml, 'Buscar por correo o nombre')
-            && str_contains($adminViewHtml, 'Filtrar cuentas')
-            && str_contains($adminViewHtml, 'Cuenta actual')
-            && !str_contains($adminViewHtml, 'aria-label="Desactivar cuenta de ' . htmlspecialchars($emails[4], ENT_QUOTES, 'UTF-8') . '"'),
-        'La administración debe mostrar el nombre, las acciones y los controles de búsqueda de cuentas.'
+            && str_contains($adminViewHtml, 'data-delete-user=')
+            && (
+                FrontendAssets::isEnabled()
+                    ? str_contains($adminViewHtml, 'data-vue-island="UserDeleteDialog"')
+                        && str_contains($adminViewHtml, 'data-prop-csrf=')
+                        && !str_contains($adminViewHtml, 'assets/js/admin-users.js')
+                    : str_contains($adminViewHtml, 'Estás seguro?')
+                        && str_contains($adminViewHtml, 'No, volver.')
+                        && str_contains($adminViewHtml, 'Sí, eliminar')
+                        && str_contains($adminViewHtml, 'assets/js/admin-users.js')
+            )
+            && (
+                FrontendAssets::isEnabled()
+                    || (
+                        str_contains($adminViewHtml, 'Buscar por correo o nombre')
+                        && str_contains($adminViewHtml, 'Filtrar cuentas')
+                        && str_contains($adminViewHtml, 'Cuenta actual')
+                    )
+            )
+            && !str_contains(
+                $adminViewHtml,
+                'aria-label="Desactivar cuenta de ' . htmlspecialchars($emails[4], ENT_QUOTES, 'UTF-8') . '"'
+            ),
+        'La administración debe mostrar los usuarios y habilitar el diálogo Vue o su fallback PHP.'
     );
     $_GET = ['cuenta_creada' => '1'];
     ob_start();
@@ -1934,7 +2162,21 @@ try {
     }
     assertTrue($csrfRejected, 'Un token CSRF incorrecto debe rechazarse.');
 
-    echo "OK: migraciones, perfiles, recuperación, validación española, convenios, ofertas, matching, paginación, disponibilidad, dashboard, calificaciones, usuarios, webhooks y CSRF.\n";
+    $_POST = [];
+    $_SERVER['HTTP_X_CSRF_TOKEN'] = $token;
+    CsrfMiddleware::verify();
+    unset($_SERVER['HTTP_X_CSRF_TOKEN']);
+
+    $sessionRoute = (require __DIR__ . '/../routes/web.php')['session'] ?? null;
+    assertTrue(
+        is_array($sessionRoute)
+            && $sessionRoute['method'] === 'GET'
+            && $sessionRoute['controller'] === AuthController::class
+            && $sessionRoute['action'] === 'session',
+        'El estado de sesión debe publicarse por una ruta GET del controlador de autenticación.'
+    );
+
+    echo "OK: migraciones, perfiles, recuperación, validación española, convenios, ofertas, matching, paginación, disponibilidad, dashboard, calificaciones, usuarios, webhooks, estado de sesión y CSRF.\n";
 } finally {
     foreach ($createdPaginationOffers as $paginationOfferId) {
         $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
@@ -1944,6 +2186,14 @@ try {
     if ($webhookEventId !== null) {
         $stmt = $db->prepare('DELETE FROM webhook_inbox WHERE event_id = :event_id');
         $stmt->execute(['event_id' => $webhookEventId]);
+    }
+    if ($availabilityWebhookEventId !== null) {
+        $stmt = $db->prepare('DELETE FROM webhook_outbox WHERE event_id = :event_id');
+        $stmt->execute(['event_id' => $availabilityWebhookEventId]);
+    }
+    if ($createdWebhookOffer !== null) {
+        $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
+        $stmt->execute(['offer' => $createdWebhookOffer]);
     }
     if ($createdOffer !== null) {
         $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');

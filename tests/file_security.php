@@ -3,10 +3,16 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/storage.php';
+require_once __DIR__ . '/../app/Core/ApiToken.php';
+require_once __DIR__ . '/../app/Core/JsonResponse.php';
+require_once __DIR__ . '/../app/Core/ApiResponseAdapter.php';
+require_once __DIR__ . '/../app/Core/ApiRolePolicy.php';
+require_once __DIR__ . '/../app/Middleware/AuthMiddleware.php';
+require_once __DIR__ . '/../app/Controllers/CalificacionController.php';
 require_once __DIR__ . '/../app/Core/FileScanner.php';
 require_once __DIR__ . '/../app/Core/PhpIni.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
-require_once __DIR__ . '/../app/Core/ApiToken.php';
+require_once __DIR__ . '/../app/Controllers/DevelopmentPreviewController.php';
 
 function assertFileSecurity(bool $condition, string $message): void
 {
@@ -56,6 +62,167 @@ if ($originalRequestUri === null) {
 if ($originalHttpStatus !== false) {
     http_response_code($originalHttpStatus);
 }
+assertFileSecurity(
+    $routes['ofertas']['roles'] === ['Administrador', 'Coordinador', 'Observador', 'Empresa']
+        && !in_array('Alumno', $routes['ofertas']['roles'], true)
+        && $routes['empresa-asignada']['roles'] === ['Alumno'],
+    'La visibilidad de ofertas y datos de empresa asignada debe respetar el acceso del alumnado.'
+);
+assertFileSecurity(
+    $routes['revisar-oferta']['roles'] === ['Administrador']
+        && $routes['resolver-convenio']['roles'] === ['Administrador']
+        && $routes['auditar-convenios']['roles'] === ['Observador'],
+    'La resolución de ofertas/convenios y la consulta de auditoría deben tener roles separados.'
+);
+assertFileSecurity(
+    $routes['logout']['method'] === 'POST'
+        && in_array('Observador', $routes['logout']['roles'], true),
+    'Observador debe conservar el permiso de cerrar su sesión.'
+);
+assertFileSecurity(
+    ApiRolePolicy::reviewRoles('ofertas') === $routes['revisar-oferta']['roles']
+        && ApiRolePolicy::reviewRoles('convenios') === $routes['resolver-convenio']['roles'],
+    'La API debe mantener los mismos roles de revisión que las rutas MVC.'
+);
+foreach ($routes as $name => $route) {
+    $methods = is_array($route['method']) ? $route['method'] : [$route['method']];
+    if (in_array('POST', $methods, true) && $name !== 'logout') {
+        assertFileSecurity(
+            !in_array('Observador', $route['roles'], true),
+            "El rol Observador no debe ejecutar mutaciones: $name."
+        );
+    }
+}
+$hadSession = array_key_exists('_SESSION', $GLOBALS);
+$originalSession = $_SESSION ?? null;
+$hadAcceptHeader = array_key_exists('HTTP_ACCEPT', $_SERVER);
+$originalAcceptHeader = $_SERVER['HTTP_ACCEPT'] ?? null;
+$originalHttpStatus = http_response_code();
+if (!is_int($originalHttpStatus)) {
+    $originalHttpStatus = 200;
+}
+$_SESSION = [];
+$_SERVER['HTTP_ACCEPT'] = 'application/json';
+$jsonAuthRejected = false;
+try {
+    AuthMiddleware::requireRoles(['Alumno'], 'portal-alumno');
+} catch (RuntimeException) {
+    $jsonAuthRejected = http_response_code() === 401;
+}
+assertFileSecurity(
+    $jsonAuthRejected,
+    'Una solicitud JSON sin sesión debe responder 401 en lugar de redirigir al formulario HTML.'
+);
+http_response_code($originalHttpStatus);
+if ($hadSession) {
+    $_SESSION = $originalSession;
+} else {
+    unset($_SESSION);
+}
+if ($hadAcceptHeader) {
+    $_SERVER['HTTP_ACCEPT'] = $originalAcceptHeader;
+} else {
+    unset($_SERVER['HTTP_ACCEPT']);
+}
+
+$detailData = ApiResponseAdapter::successData(['data' => ['id' => 17, 'estado' => 'Aprobada']]);
+$pageData = ApiResponseAdapter::successData([
+    'data' => [['id' => 17]],
+    'meta' => ['page' => 2, 'per_page' => 20, 'total' => 21],
+]);
+assertFileSecurity(
+    $detailData === ['id' => 17, 'estado' => 'Aprobada']
+        && $pageData === ['items' => [['id' => 17]], 'meta' => ['page' => 2, 'per_page' => 20, 'total' => 21]],
+    'La API debe conservar los datos y la paginación dentro del campo data del contrato estricto.'
+);
+$originalHttpStatus = http_response_code();
+if (!is_int($originalHttpStatus)) {
+    $originalHttpStatus = 200;
+}
+ob_start();
+JsonResponse::success($detailData, 200);
+$successEnvelope = json_decode((string)ob_get_clean(), true, 512, JSON_THROW_ON_ERROR);
+ob_start();
+JsonResponse::failure('Acceso denegado.', 403);
+$failureEnvelope = json_decode((string)ob_get_clean(), true, 512, JSON_THROW_ON_ERROR);
+assertFileSecurity(
+    $successEnvelope === ['success' => true, 'data' => $detailData]
+        && $failureEnvelope === ['success' => false, 'error' => 'Acceso denegado.'],
+    'Las respuestas de la API deben usar el contrato JSON discriminado JsonResponse.'
+);
+http_response_code($originalHttpStatus);
+
+$gradeDatabaseStub = new class extends PDO {
+    public function __construct()
+    {
+    }
+};
+$gradeController = new CalificacionController($gradeDatabaseStub);
+$hadSession = array_key_exists('_SESSION', $GLOBALS);
+$originalSession = $_SESSION ?? null;
+$hadPost = array_key_exists('_POST', $GLOBALS);
+$originalPost = $_POST ?? null;
+$hadAcceptHeader = array_key_exists('HTTP_ACCEPT', $_SERVER);
+$originalAcceptHeader = $_SERVER['HTTP_ACCEPT'] ?? null;
+$hadContentType = array_key_exists('CONTENT_TYPE', $_SERVER);
+$originalContentType = $_SERVER['CONTENT_TYPE'] ?? null;
+$originalHttpStatus = http_response_code();
+if (!is_int($originalHttpStatus)) {
+    $originalHttpStatus = 200;
+}
+$_SESSION = ['usuario_id' => 1, 'rol' => 'Coordinador'];
+$_SERVER['HTTP_ACCEPT'] = 'application/json';
+$_SERVER['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+try {
+    foreach ([
+        'partial decimal' => '8.',
+        'partial leading decimal' => '.5',
+        'nonnumeric text' => 'not-a-number',
+        'numeric suffix' => '8.5abc',
+        'exponent notation' => '1e1',
+        'above range' => '10.01',
+        'array input' => ['8.5'],
+    ] as $case => $input) {
+        $_POST = [
+            'asignacion_id' => '1',
+            'nota' => $input,
+            'observaciones' => '',
+        ];
+        ob_start();
+        $gradeController->guardar();
+        $gradeResponse = json_decode((string)ob_get_clean(), true);
+        assertFileSecurity(
+            is_array($gradeResponse)
+                && ($gradeResponse['success'] ?? null) === false
+                && is_string($gradeResponse['error'] ?? null),
+            "La entrada de nota '$case' debe rechazarse con un error JSON estricto."
+        );
+        http_response_code($originalHttpStatus);
+    }
+} finally {
+    if ($hadSession) {
+        $_SESSION = $originalSession;
+    } else {
+        unset($_SESSION);
+    }
+    if ($hadPost) {
+        $_POST = $originalPost;
+    } else {
+        unset($_POST);
+    }
+    if ($hadAcceptHeader) {
+        $_SERVER['HTTP_ACCEPT'] = $originalAcceptHeader;
+    } else {
+        unset($_SERVER['HTTP_ACCEPT']);
+    }
+    if ($hadContentType) {
+        $_SERVER['CONTENT_TYPE'] = $originalContentType;
+    } else {
+        unset($_SERVER['CONTENT_TYPE']);
+    }
+    http_response_code($originalHttpStatus);
+}
+
 assertFileSecurity(PhpIni::sizeToBytes('12M') === 12 * 1024 * 1024, 'No se interpretó el límite PHP de 12 MiB.');
 assertFileSecurity(PhpIni::sizeToBytes('512K') === 512 * 1024, 'No se interpretó un límite PHP en KiB.');
 assertFileSecurity(PhpIni::sizeToBytes('0') === PHP_INT_MAX, 'El límite PHP 0 debe representar tamaño ilimitado.');
@@ -91,7 +258,8 @@ $publicPath = realpath(__DIR__ . '/../public');
 $originalStorage = getenv('FCT_STORAGE_PATH');
 $hadDocumentRoot = array_key_exists('DOCUMENT_ROOT', $_SERVER);
 $originalDocumentRoot = $_SERVER['DOCUMENT_ROOT'] ?? null;
-$testStoragePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'fct-file-security-' . bin2hex(random_bytes(8));
+$testStoragePath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR
+    . 'fct-file-security-' . bin2hex(random_bytes(8));
 assertFileSecurity($publicPath !== false, 'No se pudo resolver el document root de prueba.');
 assertFileSecurity(mkdir($testStoragePath), 'No se pudo crear el almacenamiento temporal de prueba.');
 $_SERVER['DOCUMENT_ROOT'] = $publicPath;
@@ -152,13 +320,69 @@ try {
 
 $originalScanner = getenv('FCT_CLAMSCAN');
 $originalClamdHost = getenv('FCT_CLAMD_HOST');
+$originalClamdPort = getenv('FCT_CLAMD_PORT');
+$originalClamavEnabled = getenv('FCT_CLAMAV_ENABLED');
+$originalAppEnvironment = getenv('APP_ENV');
 putenv('FCT_CLAMSCAN');
 putenv('FCT_CLAMD_HOST');
-$scannerRejected = false;
+putenv('FCT_CLAMD_PORT');
+putenv('FCT_CLAMAV_ENABLED');
+putenv('APP_ENV');
 try {
+    $scannerRejected = false;
+    putenv('FCT_CLAMAV_ENABLED=true');
+    try {
+        FileScanner::scan(__FILE__);
+    } catch (FileScannerUnavailableException) {
+        $scannerRejected = true;
+    }
+    assertFileSecurity($scannerRejected, 'Se aceptó un archivo sin análisis antivirus configurado.');
+
+    putenv('APP_ENV=development');
+    putenv('FCT_CLAMAV_ENABLED=false');
     FileScanner::scan(__FILE__);
-} catch (FileScannerUnavailableException) {
-    $scannerRejected = true;
+
+    putenv('APP_ENV=test');
+    FileScanner::scan(__FILE__);
+    putenv('APP_ENV=testing');
+    FileScanner::scan(__FILE__);
+
+    putenv('APP_ENV=production');
+    $productionDisableRejected = false;
+    try {
+        FileScanner::scan(__FILE__);
+    } catch (FileScannerUnavailableException) {
+        $productionDisableRejected = true;
+    }
+    assertFileSecurity($productionDisableRejected, 'Se permitió desactivar ClamAV fuera del desarrollo local.');
+
+    putenv('APP_ENV');
+    $missingEnvironmentRejected = false;
+    try {
+        FileScanner::scan(__FILE__);
+    } catch (FileScannerUnavailableException) {
+        $missingEnvironmentRejected = true;
+    }
+    assertFileSecurity($missingEnvironmentRejected, 'Se permitió desactivar ClamAV sin un entorno local declarado.');
+
+    putenv('APP_ENV=staging');
+    $stagingDisableRejected = false;
+    try {
+        FileScanner::scan(__FILE__);
+    } catch (FileScannerUnavailableException) {
+        $stagingDisableRejected = true;
+    }
+    assertFileSecurity($stagingDisableRejected, 'Se permitió desactivar ClamAV fuera de desarrollo o pruebas.');
+
+    putenv('APP_ENV=development');
+    putenv('FCT_CLAMAV_ENABLED=off');
+    $invalidConfigurationRejected = false;
+    try {
+        FileScanner::scan(__FILE__);
+    } catch (FileScannerUnavailableException) {
+        $invalidConfigurationRejected = true;
+    }
+    assertFileSecurity($invalidConfigurationRejected, 'Se aceptó un valor inválido para FCT_CLAMAV_ENABLED.');
 } finally {
     if ($originalScanner === false) {
         putenv('FCT_CLAMSCAN');
@@ -170,7 +394,21 @@ try {
     } else {
         putenv('FCT_CLAMD_HOST=' . $originalClamdHost);
     }
+    if ($originalClamdPort === false) {
+        putenv('FCT_CLAMD_PORT');
+    } else {
+        putenv('FCT_CLAMD_PORT=' . $originalClamdPort);
+    }
+    if ($originalClamavEnabled === false) {
+        putenv('FCT_CLAMAV_ENABLED');
+    } else {
+        putenv('FCT_CLAMAV_ENABLED=' . $originalClamavEnabled);
+    }
+    if ($originalAppEnvironment === false) {
+        putenv('APP_ENV');
+    } else {
+        putenv('APP_ENV=' . $originalAppEnvironment);
+    }
 }
-assertFileSecurity($scannerRejected, 'Se aceptó un archivo sin análisis antivirus configurado.');
 
-echo "OK: validadores españoles, matriz de rutas, almacenamiento privado y rechazo sin antivirus.\n";
+echo "OK: validadores españoles, matriz de rutas, almacenamiento privado y política antivirus fail-closed.\n";

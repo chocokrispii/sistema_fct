@@ -1,5 +1,17 @@
 FROM composer:2 AS composer
 
+FROM node:22-alpine AS frontend-build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig.json vite.config.ts postcss.config.js ./
+COPY frontend ./frontend
+COPY public/assets/css ./public/assets/css
+RUN npm run build
+
 FROM php:8.2-apache
 
 RUN apt-get update \
@@ -12,6 +24,7 @@ COPY --from=composer /usr/bin/composer /usr/bin/composer
 COPY config/php-upload.ini /usr/local/etc/php/conf.d/zzz-fct-upload.ini
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY . /var/www/html
+COPY --from=frontend-build /app/public/build /var/www/html/public/build
 
 RUN mkdir -p /var/lib/fct/storage \
     && chown -R www-data:www-data /var/lib/fct/storage \

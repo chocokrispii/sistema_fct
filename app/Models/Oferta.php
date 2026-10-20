@@ -14,7 +14,9 @@ class Oferta {
 
     public function tieneDatosDescriptivos(): bool
     {
-        return count($this->obtenerColumnasDescriptivas()) === 2;
+        $columnas = $this->obtenerColumnasDescriptivas();
+        return in_array('titulo', $columnas, true)
+            && (in_array('lugar', $columnas, true) || in_array('ubicacion', $columnas, true));
     }
 
     public function crearOferta(
@@ -23,35 +25,89 @@ class Oferta {
         int $plazas,
         string $fechaInicio,
         string $fechaFin,
-        string $turno,
-        string $titulo = '',
-        string $lugar = ''
+        string $tituloOrTurno,
+        string $descripcionOrTitle = '',
+        string $turnoOrLocation = 'Indiferente',
+        string $modalidad = 'Presencial',
+        ?string $ubicacion = null,
+        ?string $requisitos = null,
+        ?string $tecnologias = null,
+        array $horarios = []
     ): int {
-        try {
-            $columnas = ['empresa_id', 'especialidad_id', 'plazas_cuantas', 'fecha_inicio', 'fecha_fin', 'turno'];
-            $valores = [
-                'empresa_id' => $empresaId,
-                'especialidad_id' => $especialidadId,
-                'plazas_cuantas' => $plazas,
-                'fecha_inicio' => $fechaInicio,
-                'fecha_fin' => $fechaFin,
-                'turno' => $turno,
-            ];
-            foreach ($this->obtenerColumnasDescriptivas() as $columna) {
-                $columnas[] = $columna;
-                $valores[$columna] = $columna === 'titulo' ? $titulo : $lugar;
-            }
-            $marcadores = array_map(static fn(string $columna): string => ':' . $columna, $columnas);
-            $stmt = $this->db->prepare(
-                'INSERT INTO empresa_especialidades_plazas (' . implode(', ', $columnas) . ')
-                 VALUES (' . implode(', ', $marcadores) . ')'
-            );
-            $stmt->execute($valores);
-            return (int)$this->db->lastInsertId();
-        } catch (PDOException $e) {
-            error_log("Error al crear oferta: " . $e->getMessage());
-            return 0;
+        if (func_num_args() <= 8) {
+            $turno = $tituloOrTurno;
+            $titulo = $descripcionOrTitle;
+            $descripcion = null;
+            $ubicacion = $turnoOrLocation !== '' ? $turnoOrLocation : null;
+            $requisitos = null;
+            $tecnologias = null;
+            $horarios = [];
+        } else {
+            $titulo = $tituloOrTurno;
+            $descripcion = $descripcionOrTitle;
+            $turno = $turnoOrLocation;
         }
+
+        $datos = [
+            'empresa_id' => $empresaId,
+            'especialidad_id' => $especialidadId,
+            'plazas_cuantas' => $plazas,
+            'fecha_inicio' => $fechaInicio,
+            'fecha_fin' => $fechaFin,
+            'turno' => $turno,
+        ];
+        $columnasDisponibles = $this->obtenerColumnasDescriptivas();
+        $datosDescriptivos = [
+            'titulo' => $titulo,
+            'descripcion' => $descripcion,
+            'modalidad' => $modalidad,
+            'ubicacion' => $ubicacion,
+            'lugar' => $ubicacion,
+            'requisitos' => $requisitos,
+            'tecnologias' => $tecnologias,
+        ];
+        foreach ($datosDescriptivos as $columna => $valor) {
+            if (in_array($columna, $columnasDisponibles, true)) {
+                $datos[$columna] = $valor;
+            }
+        }
+
+        $columnas = array_keys($datos);
+        $marcadores = array_map(static fn(string $columna): string => ':' . $columna, $columnas);
+        $stmt = $this->db->prepare(
+            'INSERT INTO empresa_especialidades_plazas (' . implode(', ', $columnas) . ')
+             VALUES (' . implode(', ', $marcadores) . ')'
+        );
+        $stmt->execute($datos);
+        $offerId = (int)$this->db->lastInsertId();
+
+        if ($horarios !== []) {
+            $shift = $this->db->prepare(
+                'INSERT INTO empresa_oferta_horarios_semanales (oferta_id, dia_semana, hora_inicio, hora_fin)
+                 VALUES (:oferta_id, :dia_semana, :hora_inicio, :hora_fin)'
+            );
+            foreach ($horarios as $horario) {
+                $shift->execute([
+                    'oferta_id' => $offerId,
+                    'dia_semana' => $horario['dia_semana'],
+                    'hora_inicio' => $horario['hora_inicio'],
+                    'hora_fin' => $horario['hora_fin'],
+                ]);
+            }
+        }
+
+        return $offerId;
+    }
+
+    public function obtenerHorarioSemanal(int $ofertaId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT dia_semana, hora_inicio, hora_fin
+             FROM empresa_oferta_horarios_semanales
+             WHERE oferta_id = :oferta_id ORDER BY dia_semana'
+        );
+        $stmt->execute(['oferta_id' => $ofertaId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function obtenerPorEmpresa(int $empresaId): array {
@@ -125,7 +181,9 @@ class Oferta {
 
     public function obtenerPaginaTodas(bool $soloVigentes, int $pagina, int $porPagina = 20): array
     {
-        $where = $soloVigentes ? "p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '';
+        $where = $soloVigentes
+            ? "p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()"
+            : '';
         return $this->obtenerPagina($where, [], 'p.fecha_inicio, p.id', $pagina, $porPagina);
     }
 
@@ -138,6 +196,33 @@ class Oferta {
     public function obtenerPaginaPendientes(int $pagina, int $porPagina = 20): array
     {
         return $this->obtenerPagina("p.estado = 'Pendiente'", [], 'p.fecha_inicio, p.id', $pagina, $porPagina);
+    }
+
+    private function obtenerPagina(string $where, array $params, string $orderBy, int $pagina, int $porPagina): array
+    {
+        $countSql = 'SELECT COUNT(*) FROM empresa_especialidades_plazas p';
+        if ($where !== '') {
+            $countSql .= ' WHERE ' . $where;
+        }
+        $count = $this->db->prepare($countSql);
+        $count->execute($params);
+        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
+
+        $sql = $this->selectBase();
+        if ($where !== '') {
+            $sql .= ' WHERE ' . $where;
+        }
+        $sql .= ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset';
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $name => $value) {
+            $stmt->bindValue(':' . $name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
+        $stmt->execute();
+        $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return $paginacion;
     }
 
     public function resolver(int $ofertaId, string $estado, string $motivo, int $revisorId): bool
@@ -403,18 +488,32 @@ class Oferta {
                          OR d.turno = p.turno)
                     AND EXISTS (
                         SELECT 1
-                        FROM alumno_disponibilidad_semanal ds
-                        WHERE ds.disponibilidad_id = d.id
+                        FROM empresa_oferta_horarios_semanales oh
+                        WHERE oh.oferta_id = p.id
                             AND (
                                 DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                                OR MOD(ds.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
+                                OR MOD(CAST(oh.dia_semana AS SIGNED) - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
                                     <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
                             )
-                            AND (
-                                p.turno = 'Indiferente'
-                                OR (p.turno = 'M' AND ds.hora_inicio < '14:00:00' AND ds.hora_fin > '06:00:00')
-                                OR (p.turno = 'T' AND ds.hora_inicio < '23:59:59' AND ds.hora_fin > '14:00:00')
-                            )
+                    )
+                    AND (
+                        d.es_indiferente = TRUE
+                        OR NOT EXISTS (
+                            SELECT 1 FROM empresa_oferta_horarios_semanales oh
+                            WHERE oh.oferta_id = p.id
+                                AND (
+                                    DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
+                                    OR MOD(CAST(oh.dia_semana AS SIGNED) - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
+                                        <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
+                                )
+                                AND NOT EXISTS (
+                                    SELECT 1 FROM alumno_disponibilidad_semanal ds
+                                    WHERE ds.disponibilidad_id = d.id
+                                        AND ds.dia_semana = oh.dia_semana
+                                        AND ds.hora_inicio <= oh.hora_inicio
+                                        AND ds.hora_fin >= oh.hora_fin
+                                )
+                        )
                     )
                 {$capacityJoin}
                 WHERE {$filtro}
@@ -432,31 +531,6 @@ class Oferta {
         return [$sql, $params];
     }
 
-    private function obtenerPagina(string $where, array $params, string $orden, int $pagina, int $porPagina): array
-    {
-        if ($porPagina < 1 || $porPagina > 100) {
-            throw new InvalidArgumentException('El tamaño de página debe estar entre 1 y 100.');
-        }
-
-        $whereSql = $where === '' ? '' : ' WHERE ' . $where;
-        $count = $this->db->prepare('SELECT COUNT(*) FROM empresa_especialidades_plazas p' . $whereSql);
-        $count->execute($params);
-        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
-
-        $stmt = $this->db->prepare(
-            $this->selectBase() . $whereSql . ' ORDER BY ' . $orden . ' LIMIT :limite OFFSET :offset'
-        );
-        foreach ($params as $nombre => $valor) {
-            $stmt->bindValue(':' . $nombre, $valor, PDO::PARAM_INT);
-        }
-        $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
-        $stmt->execute();
-
-        $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        return $paginacion;
-    }
-
     private function selectBase(): string
     {
         return 'SELECT p.id, p.empresa_id, p.especialidad_id, '
@@ -472,9 +546,21 @@ class Oferta {
     private function expresionesDatosDescriptivos(): string
     {
         $columnas = $this->obtenerColumnasDescriptivas();
+        $ubicaciones = [];
+        foreach (['ubicacion', 'lugar'] as $columna) {
+            if (in_array($columna, $columnas, true)) {
+                $ubicaciones[] = "NULLIF(p.{$columna}, '')";
+            }
+        }
+
         return implode(', ', [
             in_array('titulo', $columnas, true) ? "COALESCE(p.titulo, '') AS titulo" : "'' AS titulo",
-            in_array('lugar', $columnas, true) ? "COALESCE(p.lugar, '') AS lugar" : "'' AS lugar",
+            in_array('descripcion', $columnas, true) ? "COALESCE(p.descripcion, '') AS descripcion" : "'' AS descripcion",
+            in_array('modalidad', $columnas, true) ? "COALESCE(p.modalidad, 'Presencial') AS modalidad" : "'Presencial' AS modalidad",
+            $ubicaciones !== [] ? 'COALESCE(' . implode(', ', $ubicaciones) . ", '') AS ubicacion" : "'' AS ubicacion",
+            $ubicaciones !== [] ? 'COALESCE(' . implode(', ', $ubicaciones) . ", '') AS lugar" : "'' AS lugar",
+            in_array('requisitos', $columnas, true) ? "COALESCE(p.requisitos, '') AS requisitos" : "'' AS requisitos",
+            in_array('tecnologias', $columnas, true) ? "COALESCE(p.tecnologias, '') AS tecnologias" : "'' AS tecnologias",
         ]);
     }
 
@@ -486,7 +572,7 @@ class Oferta {
                  FROM information_schema.COLUMNS
                  WHERE TABLE_SCHEMA = DATABASE()
                    AND TABLE_NAME = 'empresa_especialidades_plazas'
-                   AND COLUMN_NAME IN ('titulo', 'lugar')"
+                   AND COLUMN_NAME IN ('titulo', 'lugar', 'descripcion', 'modalidad', 'ubicacion', 'requisitos', 'tecnologias')"
             );
             $this->columnasDescriptivas = $stmt->fetchAll(PDO::FETCH_COLUMN);
         }

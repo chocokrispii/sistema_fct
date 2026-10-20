@@ -1,4 +1,7 @@
 .env
 .env.local
-.env.*.local
+.env.mcp.local
 node_modules/
+public/build/
+docs/.vitepress/cache/
+docs/.vitepress/dist/

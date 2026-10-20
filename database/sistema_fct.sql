@@ -60,13 +60,6 @@ CREATE TABLE `coordinadores` (
   `apellidos` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Volcado de datos para la tabla `coordinadores`
---
-
-INSERT INTO `coordinadores` (`id`, `usuario_id`, `nombre`, `apellidos`) VALUES
-(1, 2, 'Carlos', 'Martínez Gómez');
-
 -- --------------------------------------------------------
 
 --
@@ -82,14 +75,6 @@ CREATE TABLE `direcciones_telefonos` (
   `direccion_completa` varchar(255) NOT NULL,
   `es_principal` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `direcciones_telefonos`
---
-
-INSERT INTO `direcciones_telefonos` (`id`, `empresa_id`, `alumno_id`, `tutor_id`, `telefono`, `direccion_completa`, `es_principal`) VALUES
-(1, 1, NULL, NULL, '910111213', 'Avenida de la Industry 45, Planta 2', 1),
-(2, NULL, 2, NULL, '611222333', 'Calle del Alumno Mayor 7, Madrid', 1);
 
 -- --------------------------------------------------------
 
@@ -132,13 +117,6 @@ CREATE TABLE `empresa_especialidades_plazas` (
   `fecha_fin` date NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Volcado de datos para la tabla `empresa_especialidades_plazas`
---
-
-INSERT INTO `empresa_especialidades_plazas` (`id`, `empresa_id`, `especialidad_id`, `plazas_cuantas`, `fecha_inicio`, `fecha_fin`) VALUES
-(1, 1, 1, 2, '2027-03-01', '2027-06-15');
-
 -- --------------------------------------------------------
 
 --
@@ -149,15 +127,6 @@ CREATE TABLE `especialidades` (
   `id` int(11) NOT NULL,
   `nombre_specialidad` varchar(150) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `especialidades`
---
-
-INSERT INTO `especialidades` (`id`, `nombre_specialidad`) VALUES
-(2, 'Desarrollo de Aplicaciones Multiplataforma (DAM)'),
-(1, 'Desarrollo de Aplicaciones Web (DAW)'),
-(3, 'Sistemas Microinformáticos y Redes (SMR)');
 
 -- --------------------------------------------------------
 
@@ -172,13 +141,6 @@ CREATE TABLE `tutores_legales` (
   `direccion` varchar(255) DEFAULT NULL,
   `telefono` varchar(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `tutores_legales`
---
-
-INSERT INTO `tutores_legales` (`id`, `alumno_id`, `nombre_completo`, `direccion`, `telefono`) VALUES
-(1, 1, 'Padre de Lucas Pérez', 'Calle Mayor 12, Madrid', '600123456');
 
 -- --------------------------------------------------------
 
@@ -195,16 +157,7 @@ CREATE TABLE `usuarios` (
   `fecha_actualizacion` datetime NULL DEFAULT NULL ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Volcado de datos para la tabla `usuarios`
---
 
-INSERT INTO `usuarios` (`id`, `email`, `password_hash`, `rol`, `fecha_creacion`) VALUES
-(1, 'admin@centro.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Administrador', '2026-10-07 10:33:53'),
-(2, 'coordinador@centro.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Coordinador', '2026-10-07 10:33:53'),
-(3, 'empresa.tech@gmail.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Empresa', '2026-10-07 10:33:53'),
-(4, 'alumno.menor@alumno.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Alumno', '2026-10-07 10:33:53'),
-(5, 'alumno.mayor@alumno.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Alumno', '2026-10-07 10:33:53');
 
 --
 -- Índices para tablas volcadas
