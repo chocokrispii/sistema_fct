@@ -15,8 +15,8 @@
                 <a class="site-home__button" href="index.php?action=publicar-oferta">Gestionar ofertas</a>
                 <a class="site-home__button site-home__button--secondary" href="index.php?action=convenios">Gestionar convenios</a>
             <?php elseif (in_array($rolActual, ['Administrador', 'Coordinador'], true)): ?>
-                <a class="site-home__button" href="index.php?action=revisar-ofertas">Revisar ofertas</a>
-                <a class="site-home__button site-home__button--secondary" href="index.php?action=emparejar">Emparejar alumnos</a>
+                <a class="site-home__button" href="index.php?action=nueva-oferta">Crear oferta</a>
+                <a class="site-home__button site-home__button--secondary" href="index.php?action=revisar-ofertas">Revisar ofertas</a>
             <?php else: ?>
                 <a class="site-home__button" href="index.php?action=asignaciones">Consultar asignaciones</a>
                 <a class="site-home__button site-home__button--secondary" href="index.php?action=consultas">Consultas</a>

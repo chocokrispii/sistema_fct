@@ -106,6 +106,24 @@ class OfertaController {
         ]);
     }
 
+    public function nuevaParaCentro(): void
+    {
+        $error = '';
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $error = $this->procesarOfertaCentro();
+            if ($error === null) {
+                header('Location: index.php?action=nueva-oferta&creada=1');
+                exit;
+            }
+        }
+
+        View::render('ofertas/nueva-centro', [
+            'empresas' => $this->empresaModel->obtenerTodasParaCentro(),
+            'especialidades' => $this->especialidadModel->obtenerTodas(),
+            'error' => $error,
+        ]);
+    }
+
     public function revisar(): void
     {
         $resultado = $this->ofertaModel->obtenerPaginaPendientes(
@@ -195,6 +213,130 @@ class OfertaController {
         }
         header('Location: index.php?action=revisar-ofertas');
         exit;
+    }
+
+    private function procesarOfertaCentro(): ?string
+    {
+        if (!$this->ofertaModel->tieneDatosDescriptivos()) {
+            return 'La creación de ofertas desde el centro requiere aplicar la migración 011.';
+        }
+
+        $empresaId = filter_var(
+            $_POST['empresa_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $especialidadId = filter_var(
+            $_POST['especialidad_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $plazas = filter_var(
+            $_POST['plazas'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 100]]
+        );
+        $tituloRaw = $_POST['titulo'] ?? null;
+        $lugarRaw = $_POST['lugar'] ?? null;
+        $fechaInicioRaw = $_POST['fecha_inicio'] ?? null;
+        $fechaFinRaw = $_POST['fecha_fin'] ?? null;
+        $turno = $_POST['turno'] ?? null;
+        if (
+            !is_string($tituloRaw)
+            || !is_string($lugarRaw)
+            || !is_string($fechaInicioRaw)
+            || !is_string($fechaFinRaw)
+            || !is_string($turno)
+        ) {
+            return 'Completa los datos de la oferta con valores válidos.';
+        }
+
+        $titulo = trim($tituloRaw);
+        $lugar = trim($lugarRaw);
+        $fechaInicio = $this->parsearFecha($fechaInicioRaw);
+        $fechaFin = $this->parsearFecha($fechaFinRaw);
+        $empresas = $this->empresaModel->obtenerTodasParaCentro();
+        $empresaValida = $empresaId !== false && array_filter(
+            $empresas,
+            static fn(array $empresa): bool => (int)$empresa['id'] === $empresaId
+        ) !== [];
+
+        if (!$empresaValida) {
+            return 'Selecciona una empresa válida.';
+        }
+        if ($titulo === '' || mb_strlen($titulo) > 150) {
+            return 'El nombre de la oferta es obligatorio y no puede superar 150 caracteres.';
+        }
+        if ($lugar === '' || mb_strlen($lugar) > 255) {
+            return 'El lugar de la oferta es obligatorio y no puede superar 255 caracteres.';
+        }
+        if ($especialidadId === false || !$this->especialidadModel->existe($especialidadId)) {
+            return 'Selecciona un ciclo formativo válido.';
+        }
+        if ($plazas === false) {
+            return 'El número de vacantes debe ser un entero entre 1 y 100.';
+        }
+        if ($fechaInicio === null || $fechaFin === null) {
+            return 'Las fechas de inicio y fin deben tener un formato válido.';
+        }
+        if ($fechaInicio < new DateTimeImmutable('today') || $fechaFin <= $fechaInicio) {
+            return 'Indica un periodo futuro cuya fecha de fin sea posterior a la de inicio.';
+        }
+        if (!in_array($turno, ['M', 'T', 'Indiferente'], true)) {
+            return 'Selecciona un turno válido.';
+        }
+        if (!$this->empresaModel->tieneConvenioParaFechas(
+            (int)$empresaId,
+            (int)$especialidadId,
+            $fechaInicio->format('Y-m-d'),
+            $fechaFin->format('Y-m-d')
+        )) {
+            return 'La empresa necesita un convenio aprobado para ese ciclo y durante todo el periodo indicado.';
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $ofertaId = $this->ofertaModel->crearOferta(
+                (int)$empresaId,
+                (int)$especialidadId,
+                (int)$plazas,
+                $fechaInicio->format('Y-m-d'),
+                $fechaFin->format('Y-m-d'),
+                $turno,
+                $titulo,
+                $lugar
+            );
+            if ($ofertaId < 1) {
+                $this->db->rollBack();
+                return 'No se pudo registrar la oferta.';
+            }
+            (new Auditoria($this->db))->registrar(
+                (int)$_SESSION['usuario_id'],
+                'oferta.creada',
+                'ofertas',
+                $ofertaId
+            );
+            Webhook::enqueue($this->db, 'oferta.creada', [
+                'oferta_id' => $ofertaId,
+                'empresa_id' => (int)$empresaId,
+                'especialidad_id' => (int)$especialidadId,
+                'estado' => 'Pendiente',
+                'titulo' => $titulo,
+                'lugar' => $lugar,
+                'plazas' => (int)$plazas,
+                'fecha_inicio' => $fechaInicio->format('Y-m-d'),
+                'fecha_fin' => $fechaFin->format('Y-m-d'),
+                'turno' => $turno,
+            ]);
+            $this->db->commit();
+            return null;
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Error al crear una oferta desde el centro: ' . $e->getMessage());
+            return 'No se pudo registrar la oferta.';
+        }
     }
 
     /** Devuelve el mensaje de error o null si la oferta se ha creado. */

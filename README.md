@@ -439,10 +439,17 @@ historial y conserva el registro de auditoría.
   consulta de prácticas propias y sus calificaciones finales.
 - **Empresa:** registro, gestión de sedes, carga de convenios PDF y publicación
   de ofertas asociadas al perfil autenticado. Se registra como máximo un
-  convenio por ciclo formativo, y solo cubre ofertas del mismo ciclo.
+  convenio por ciclo formativo, y solo cubre ofertas del mismo ciclo. Puede
+  corregir convenios pendientes o rechazados; al guardarlos vuelven a revisión.
+  Los convenios aprobados no se pueden modificar.
 - **Revisión del centro:** Administradores y Coordinadores revisan convenios y
   ofertas. Una oferta solo puede aprobarse cuando un convenio aprobado cubre
-  todo su periodo.
+  todo su periodo. También pueden crear ofertas para una empresa indicando
+  nombre, lugar, ciclo, vacantes, turno y periodo; las nuevas ofertas quedan
+  pendientes de revisión. Pueden modificar convenios pendientes, rechazados y
+  aprobados desde el menú; al guardar, cualquier convenio modificado vuelve a
+  revisión. Las empresas solo pueden modificar sus convenios pendientes o
+  rechazados.
 - **Matching y asignaciones:** búsqueda de alumnos compatibles por ciclo,
   fechas, turno y horario semanal compatible; asignación transaccional con control de
   plazas; cierre de prácticas. Las pantallas heredadas de asignaciones y

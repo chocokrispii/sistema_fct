@@ -1,4 +1,7 @@
 <h2><?= $soloCompatibles ? 'Ofertas compatibles con tu perfil' : 'Ofertas de FCT aprobadas' ?></h2>
+<?php if (in_array($_SESSION['rol'] ?? null, ['Administrador', 'Coordinador'], true)): ?>
+    <p><a class="button" href="index.php?action=nueva-oferta">Crear oferta</a></p>
+<?php endif; ?>
 <?php if ($ofertas === []): ?>
     <?php if ($soloCompatibles && $tieneAsignacionActiva): ?>
         <p role="status">Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.</p>
@@ -12,10 +15,12 @@
     <div class="table-responsive" role="region" aria-label="Listado de ofertas" tabindex="0">
         <table>
             <caption><?= $soloCompatibles ? 'Ofertas compatibles con tu perfil' : 'Ofertas de FCT aprobadas' ?></caption>
-            <thead><tr><th scope="col">Empresa</th><th scope="col">Ciclo</th><th scope="col"><?= $soloCompatibles ? 'Plazas disponibles' : 'Plazas' ?></th><th scope="col">Turno</th><th scope="col">Inicio</th><th scope="col">Fin</th></tr></thead>
+            <thead><tr><th scope="col">Oferta</th><th scope="col">Lugar</th><th scope="col">Empresa</th><th scope="col">Ciclo</th><th scope="col"><?= $soloCompatibles ? 'Vacantes disponibles' : 'Vacantes' ?></th><th scope="col">Turno</th><th scope="col">Inicio</th><th scope="col">Fin</th></tr></thead>
             <tbody>
             <?php foreach ($ofertas as $oferta): ?>
                 <tr>
+                    <td><?= htmlspecialchars($oferta['titulo'] !== '' ? $oferta['titulo'] : $oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars($oferta['lugar'] !== '' ? $oferta['lugar'] : '—', ENT_QUOTES, 'UTF-8') ?></td>
                     <td><?= htmlspecialchars($oferta['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
                     <td><?= htmlspecialchars($oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></td>
                     <td><?= (int)($soloCompatibles ? $oferta['plazas_disponibles'] : $oferta['plazas_cuantas']) ?></td>

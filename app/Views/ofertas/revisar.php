@@ -6,8 +6,11 @@
 <?php else: ?>
     <?php foreach ($ofertas as $oferta): ?>
         <section class="review-card">
-            <h3><?= htmlspecialchars($oferta['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?> — <?= htmlspecialchars($oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></h3>
-            <p><?= (int)$oferta['plazas_cuantas'] ?> plazas · Turno <?= htmlspecialchars($oferta['turno'], ENT_QUOTES, 'UTF-8') ?> ·
+            <h3><?= htmlspecialchars($oferta['titulo'] !== '' ? $oferta['titulo'] : $oferta['nombre_empresa'] . ' — ' . $oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></h3>
+            <p><?= htmlspecialchars($oferta['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?> ·
+                <?= htmlspecialchars($oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?> ·
+                <?= htmlspecialchars($oferta['lugar'] !== '' ? $oferta['lugar'] : 'Lugar no indicado', ENT_QUOTES, 'UTF-8') ?> ·
+                <?= (int)$oferta['plazas_cuantas'] ?> vacantes · Turno <?= htmlspecialchars($oferta['turno'], ENT_QUOTES, 'UTF-8') ?> ·
                 <?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></p>
             <form class="review-decision" method="POST" action="index.php?action=revisar-oferta">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">

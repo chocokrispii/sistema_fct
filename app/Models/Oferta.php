@@ -6,17 +6,15 @@ require_once __DIR__ . '/../Core/Paginacion.php';
 
 class Oferta {
     private PDO $db;
-
-    private const SELECT_BASE =
-        'SELECT p.id, p.empresa_id, p.especialidad_id, p.plazas_cuantas, p.fecha_inicio, p.fecha_fin,
-                p.estado, p.turno, p.motivo_revision,
-                e.nombre_empresa, es.nombre_especialidad
-         FROM empresa_especialidades_plazas p
-         INNER JOIN empresas e ON e.id = p.empresa_id
-         INNER JOIN especialidades es ON es.id = p.especialidad_id';
+    private ?array $columnasDescriptivas = null;
 
     public function __construct(?PDO $db = null) {
         $this->db = $db ?? getPDOConnection();
+    }
+
+    public function tieneDatosDescriptivos(): bool
+    {
+        return count($this->obtenerColumnasDescriptivas()) === 2;
     }
 
     public function crearOferta(
@@ -25,21 +23,30 @@ class Oferta {
         int $plazas,
         string $fechaInicio,
         string $fechaFin,
-        string $turno
+        string $turno,
+        string $titulo = '',
+        string $lugar = ''
     ): int {
         try {
-            $stmt = $this->db->prepare(
-                'INSERT INTO empresa_especialidades_plazas (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno)
-                 VALUES (:empresa_id, :especialidad_id, :plazas, :fecha_inicio, :fecha_fin, :turno)'
-            );
-            $stmt->execute([
-                'empresa_id'      => $empresaId,
+            $columnas = ['empresa_id', 'especialidad_id', 'plazas_cuantas', 'fecha_inicio', 'fecha_fin', 'turno'];
+            $valores = [
+                'empresa_id' => $empresaId,
                 'especialidad_id' => $especialidadId,
-                'plazas'          => $plazas,
-                'fecha_inicio'    => $fechaInicio,
-                'fecha_fin'       => $fechaFin,
-                'turno'           => $turno,
-            ]);
+                'plazas_cuantas' => $plazas,
+                'fecha_inicio' => $fechaInicio,
+                'fecha_fin' => $fechaFin,
+                'turno' => $turno,
+            ];
+            foreach ($this->obtenerColumnasDescriptivas() as $columna) {
+                $columnas[] = $columna;
+                $valores[$columna] = $columna === 'titulo' ? $titulo : $lugar;
+            }
+            $marcadores = array_map(static fn(string $columna): string => ':' . $columna, $columnas);
+            $stmt = $this->db->prepare(
+                'INSERT INTO empresa_especialidades_plazas (' . implode(', ', $columnas) . ')
+                 VALUES (' . implode(', ', $marcadores) . ')'
+            );
+            $stmt->execute($valores);
             return (int)$this->db->lastInsertId();
         } catch (PDOException $e) {
             error_log("Error al crear oferta: " . $e->getMessage());
@@ -48,7 +55,7 @@ class Oferta {
     }
 
     public function obtenerPorEmpresa(int $empresaId): array {
-        $stmt = $this->db->prepare(self::SELECT_BASE . ' WHERE p.empresa_id = :empresa_id ORDER BY p.fecha_inicio DESC');
+        $stmt = $this->db->prepare($this->selectBase() . ' WHERE p.empresa_id = :empresa_id ORDER BY p.fecha_inicio DESC');
         $stmt->execute(['empresa_id' => $empresaId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -59,7 +66,7 @@ class Oferta {
     }
 
     public function obtenerTodas(bool $soloVigentes = false): array {
-        $sql = self::SELECT_BASE
+        $sql = $this->selectBase()
             . ($soloVigentes ? " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()" : '')
             . ' ORDER BY p.fecha_inicio, p.id';
         return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
@@ -68,7 +75,9 @@ class Oferta {
     public function obtenerVigentesConAsignaciones(): array
     {
         $stmt = $this->db->query(
-            "SELECT p.id, p.empresa_id, p.especialidad_id, p.plazas_cuantas, p.fecha_inicio, p.fecha_fin, p.turno,
+            "SELECT p.id, p.empresa_id, p.especialidad_id,
+                    " . $this->expresionesDatosDescriptivos() . ",
+                    p.plazas_cuantas, p.fecha_inicio, p.fecha_fin, p.turno,
                     e.nombre_empresa, es.nombre_especialidad,
                     COALESCE(conteo.asignadas, 0) AS asignadas
              FROM empresa_especialidades_plazas p
@@ -104,7 +113,7 @@ class Oferta {
         }
 
         $stmt = $this->db->prepare(
-            self::SELECT_BASE
+            $this->selectBase()
             . " WHERE p.estado = 'Aprobada' AND p.fecha_fin >= CURDATE()
                ORDER BY p.fecha_inicio, p.id LIMIT :limite"
         );
@@ -122,7 +131,7 @@ class Oferta {
 
     public function obtenerPendientes(): array
     {
-        $stmt = $this->db->query(self::SELECT_BASE . " WHERE p.estado = 'Pendiente' ORDER BY p.fecha_inicio");
+        $stmt = $this->db->query($this->selectBase() . " WHERE p.estado = 'Pendiente' ORDER BY p.fecha_inicio");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -435,7 +444,7 @@ class Oferta {
         $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
 
         $stmt = $this->db->prepare(
-            self::SELECT_BASE . $whereSql . ' ORDER BY ' . $orden . ' LIMIT :limite OFFSET :offset'
+            $this->selectBase() . $whereSql . ' ORDER BY ' . $orden . ' LIMIT :limite OFFSET :offset'
         );
         foreach ($params as $nombre => $valor) {
             $stmt->bindValue(':' . $nombre, $valor, PDO::PARAM_INT);
@@ -446,5 +455,42 @@ class Oferta {
 
         $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
         return $paginacion;
+    }
+
+    private function selectBase(): string
+    {
+        return 'SELECT p.id, p.empresa_id, p.especialidad_id, '
+            . $this->expresionesDatosDescriptivos() . ',
+                p.plazas_cuantas, p.fecha_inicio, p.fecha_fin,
+                p.estado, p.turno, p.motivo_revision,
+                e.nombre_empresa, es.nombre_especialidad
+         FROM empresa_especialidades_plazas p
+         INNER JOIN empresas e ON e.id = p.empresa_id
+         INNER JOIN especialidades es ON es.id = p.especialidad_id';
+    }
+
+    private function expresionesDatosDescriptivos(): string
+    {
+        $columnas = $this->obtenerColumnasDescriptivas();
+        return implode(', ', [
+            in_array('titulo', $columnas, true) ? "COALESCE(p.titulo, '') AS titulo" : "'' AS titulo",
+            in_array('lugar', $columnas, true) ? "COALESCE(p.lugar, '') AS lugar" : "'' AS lugar",
+        ]);
+    }
+
+    private function obtenerColumnasDescriptivas(): array
+    {
+        if ($this->columnasDescriptivas === null) {
+            $stmt = $this->db->query(
+                "SELECT COLUMN_NAME
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'empresa_especialidades_plazas'
+                   AND COLUMN_NAME IN ('titulo', 'lugar')"
+            );
+            $this->columnasDescriptivas = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        }
+
+        return $this->columnasDescriptivas;
     }
 }

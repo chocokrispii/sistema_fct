@@ -1,5 +1,7 @@
 <?php if ($error !== ''): ?><p class="message message-error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if (isset($_GET['enviado'])): ?><p class="message message-success">Convenio enviado a revisión.</p><?php endif; ?>
+<?php if (isset($_GET['modificado'])): ?><p class="message message-success">Convenio actualizado y enviado a revisión.</p><?php endif; ?>
+<?php if (is_string($_GET['error'] ?? null) && $error === ''): ?><p class="message message-error"><?= htmlspecialchars($_GET['error'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <h2>Convenios de <?= htmlspecialchars($empresa['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></h2>
 <form class="page-form" method="POST" enctype="multipart/form-data" action="index.php?action=convenios">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
@@ -25,7 +27,7 @@
 </form>
 <h3>Historial de convenios</h3>
 <?php if ($convenios === []): ?><p>No hay convenios registrados.</p>
-<?php else: ?><div class="table-responsive" role="region" aria-label="Historial de convenios" tabindex="0"><table><thead><tr><th>Número</th><th>Ciclo</th><th>Fechas</th><th>Estado</th><th>Motivo</th><th>Documento</th></tr></thead><tbody>
+<?php else: ?><div class="table-responsive" role="region" aria-label="Historial de convenios" tabindex="0"><table><thead><tr><th>Número</th><th>Ciclo</th><th>Fechas</th><th>Estado</th><th>Motivo</th><th>Documento</th><th>Acciones</th></tr></thead><tbody>
 <?php foreach ($convenios as $item): ?><tr>
     <td><?= htmlspecialchars($item['numero_convenio'], ENT_QUOTES, 'UTF-8') ?></td>
     <td><?= htmlspecialchars($item['nombre_especialidad'] ?? 'Sin clasificar (anterior)', ENT_QUOTES, 'UTF-8') ?></td>
@@ -33,4 +35,7 @@
     <td><?= htmlspecialchars($item['estado'], ENT_QUOTES, 'UTF-8') ?></td>
     <td><?= htmlspecialchars($item['motivo_revision'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
     <td><a href="index.php?action=descargar-convenio&id=<?= (int)$item['id'] ?>">Descargar PDF</a></td>
+    <td><?php if (in_array($item['estado'], ['Pendiente', 'Rechazado'], true)): ?>
+        <a href="index.php?action=editar-convenio&id=<?= (int)$item['id'] ?>">Modificar</a>
+    <?php else: ?>No modificable<?php endif; ?></td>
 </tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
