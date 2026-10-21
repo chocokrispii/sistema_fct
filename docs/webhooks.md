@@ -379,7 +379,7 @@ La primera versión encola estos cambios:
 |---|---|---|
 | `convenio.creado` | Una empresa registra un convenio | `convenio_id`, `empresa_id`, `especialidad_id`, estado y periodo |
 | `convenio.revisado` | El centro aprueba o rechaza el convenio | `convenio_id`, estado |
-| `oferta.creada` | Una empresa registra una oferta | IDs de oferta/empresa/especialidad, estado, plazas, fechas y turno |
+| `oferta.creada` | Una empresa registra una oferta | IDs de oferta/empresa/especialidad, estado, plazas, fechas, jornada, turno legado y franjas semanales |
 | `oferta.revisada` | El centro aprueba o rechaza una oferta | `oferta_id`, estado |
 | `practica.asignada` | Se confirma una asignación | `asignacion_id`, `oferta_id`, `alumno_id` |
 | `practica.cerrada` | Se cierra una práctica | `asignacion_id` |

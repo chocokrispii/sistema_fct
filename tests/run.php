@@ -148,6 +148,9 @@ $required = [
     'nota' => ['table' => 'calificaciones_fct', 'column' => 'nota'],
     'codigo_postal' => ['table' => 'alumnos', 'column' => 'codigo_postal'],
     'horario_oferta' => ['table' => 'empresa_oferta_horarios_semanales', 'column' => 'hora_inicio'],
+    'jornada_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'jornada'],
+    'segunda_hora_inicio_oferta' => ['table' => 'empresa_oferta_horarios_semanales', 'column' => 'hora_inicio_2'],
+    'segunda_hora_fin_oferta' => ['table' => 'empresa_oferta_horarios_semanales', 'column' => 'hora_fin_2'],
     'titulo_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'titulo'],
     'descripcion_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'descripcion'],
     'modalidad_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'modalidad'],
@@ -167,6 +170,24 @@ foreach ($required as $name => $definition) {
     ]);
     assertTrue((int)$stmt->fetchColumn() === 1, "Falta columna requerida para las migraciones: $name.");
 }
+$jornadaDefault = $db->query(
+    "SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'empresa_especialidades_plazas'
+       AND COLUMN_NAME = 'jornada'"
+)->fetchColumn();
+$nullableSecondIntervalColumns = $db->query(
+    "SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'empresa_oferta_horarios_semanales'
+       AND COLUMN_NAME IN ('hora_inicio_2', 'hora_fin_2')
+       AND IS_NULLABLE = 'YES'"
+)->fetchColumn();
+assertTrue(
+    in_array($jornadaDefault, ['normal', "'normal'"], true)
+        && (int)$nullableSecondIntervalColumns === 2,
+    'La migración debe asignar jornada normal a ofertas existentes y mantener nullable el segundo intervalo.'
+);
 $webhookTables = $db->query(
     "SELECT COUNT(*) FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('webhook_inbox', 'webhook_outbox')"
@@ -1398,7 +1419,14 @@ try {
         'Madrid',
         'Trabajo en equipo.',
         'PHP, Vue',
-        [['dia_semana' => 1, 'hora_inicio' => '09:00:00', 'hora_fin' => '13:00:00']]
+        [[
+            'dia_semana' => 1,
+            'hora_inicio' => '09:00:00',
+            'hora_fin' => '11:00:00',
+            'hora_inicio_2' => '12:00:00',
+            'hora_fin_2' => '13:00:00',
+        ]],
+        'partida'
     );
     $savedOffer = array_values(array_filter(
         $matching->obtenerPorEmpresa($createdCompany),
@@ -1412,8 +1440,93 @@ try {
             && $savedOffer['modalidad'] === 'Híbrido'
             && $savedOffer['ubicacion'] === 'Madrid'
             && $savedOffer['requisitos'] === 'Trabajo en equipo.'
-            && $savedOffer['tecnologias'] === 'PHP, Vue',
+            && $savedOffer['tecnologias'] === 'PHP, Vue'
+            && $savedOffer['jornada'] === 'partida',
         'La oferta debe persistir sus detalles completos.'
+    );
+    $savedSchedule = $matching->obtenerHorarioSemanal($createdOffer);
+    assertTrue(
+        count($savedSchedule) === 1
+            && $savedSchedule[0]['hora_inicio_2'] === '12:00:00'
+            && $savedSchedule[0]['hora_fin_2'] === '13:00:00',
+        'La jornada partida debe persistir su segunda franja semanal.'
+    );
+    $_SESSION = ['usuario_id' => $createdUsers[3]];
+    $publishOffer = new ReflectionMethod(OfertaController::class, 'procesarPublicacion');
+    $publishOffer->setAccessible(true);
+    $splitOfferRequest = [
+        'especialidad_id' => (string)$cycleId,
+        'plazas' => '1',
+        'fecha_inicio' => $offerDate,
+        'fecha_fin' => (new DateTimeImmutable($offerDate))->modify('+1 day')->format('Y-m-d'),
+        'titulo' => "Oferta partida del formulario $fixture",
+        'descripcion' => 'Prueba del guardado del formulario PHP.',
+        'jornada' => 'partida',
+        'modalidad' => 'Presencial',
+        'ubicacion' => 'Madrid',
+        'horarios' => [
+            1 => [
+                'activo' => '1',
+                'hora_inicio' => '09:00',
+                'hora_fin' => '11:00',
+                'hora_inicio_2' => '12:00',
+                'hora_fin_2' => '13:00',
+            ],
+        ],
+    ];
+    $publishError = $publishOffer->invoke(new OfertaController($db), $createdCompany, $splitOfferRequest);
+    $overlappingSplitRequest = $splitOfferRequest;
+    $overlappingSplitRequest['horarios'][1]['hora_inicio_2'] = '10:55';
+    assertTrue(
+        $publishOffer->invoke(new OfertaController($db), $createdCompany, $overlappingSplitRequest)
+            === 'Cada día seleccionado necesita dos franjas válidas, no solapadas y en orden horario.',
+        'La validación debe rechazar franjas partidas solapadas.'
+    );
+    $missingSplitTimeRequest = $splitOfferRequest;
+    unset($missingSplitTimeRequest['horarios'][1]['hora_fin_2']);
+    assertTrue(
+        $publishOffer->invoke(new OfertaController($db), $createdCompany, $missingSplitTimeRequest)
+            === 'Cada día seleccionado necesita dos franjas válidas, no solapadas y en orden horario.',
+        'La validación debe exigir las cuatro horas de cada día activo en jornada partida.'
+    );
+    $formPublishedOffer = $db->prepare(
+        'SELECT id, jornada, turno FROM empresa_especialidades_plazas WHERE titulo = :titulo'
+    );
+    $formPublishedOffer->execute(['titulo' => "Oferta partida del formulario $fixture"]);
+    $formOffer = $formPublishedOffer->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        $publishError === null
+            && is_array($formOffer)
+            && $formOffer['jornada'] === 'partida'
+            && $formOffer['turno'] === 'Indiferente'
+            && count((new Oferta($db))->obtenerHorarioSemanal((int)$formOffer['id'])) === 1,
+        'El formulario PHP debe aceptar jornada y franjas partidas sin requerir la etiqueta de turno antigua.'
+    );
+    $normalOfferRequest = $splitOfferRequest;
+    $normalOfferRequest['fecha_inicio'] = (new DateTimeImmutable($offerDate))->modify('+2 days')->format('Y-m-d');
+    $normalOfferRequest['fecha_fin'] = (new DateTimeImmutable($offerDate))->modify('+3 days')->format('Y-m-d');
+    $normalOfferRequest['titulo'] = "Oferta normal del formulario $fixture";
+    $normalOfferRequest['jornada'] = 'normal';
+    $normalOfferRequest['horarios'][1]['hora_inicio_2'] = ['ignored'];
+    $normalOfferRequest['horarios'][1]['hora_fin_2'] = ['ignored'];
+    assertTrue(
+        $publishOffer->invoke(new OfertaController($db), $createdCompany, $normalOfferRequest) === null,
+        'La jornada normal debe ignorar con seguridad los campos de segunda franja.'
+    );
+    $normalOffer = $db->prepare(
+        'SELECT p.jornada, oh.hora_inicio_2, oh.hora_fin_2
+         FROM empresa_especialidades_plazas p
+         INNER JOIN empresa_oferta_horarios_semanales oh ON oh.oferta_id = p.id
+         WHERE p.titulo = :titulo'
+    );
+    $normalOffer->execute(['titulo' => "Oferta normal del formulario $fixture"]);
+    $normalOfferSchedule = $normalOffer->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_array($normalOfferSchedule)
+            && $normalOfferSchedule['jornada'] === 'normal'
+            && $normalOfferSchedule['hora_inicio_2'] === null
+            && $normalOfferSchedule['hora_fin_2'] === null,
+        'La jornada normal debe guardarse sin segunda franja incluso si recibe valores ignorables.'
     );
     assertTrue(
         $matching->resolver($createdOffer, 'Aprobada', '', $createdUsers[3]),
@@ -1422,8 +1535,37 @@ try {
     $candidates = $matching->obtenerCandidatos($createdOffer);
     assertTrue(
         count($candidates) === 1 && (int)$candidates[0]['alumno_id'] === $createdStudents[0],
-        'El motor de compatibilidad debe exigir que la disponibilidad cubra las horas exactas de la oferta.'
+        'El matching debe basarse en los intervalos (aunque las etiquetas de turno difieran) y exigir cobertura de ambas franjas.'
     );
+    $shortSecondInterval = $db->prepare(
+        'UPDATE alumno_disponibilidad_semanal ds
+         INNER JOIN alumno_disponibilidad d ON d.id = ds.disponibilidad_id
+         SET ds.hora_fin = \'12:30:00\'
+         WHERE d.alumno_id = :alumno AND ds.dia_semana = 1'
+    );
+    $shortSecondInterval->execute(['alumno' => $createdStudents[0]]);
+    assertTrue(
+        $matching->obtenerCandidatos($createdOffer) === [],
+        'El matching debe rechazar al candidato si su horario cubre la primera franja, pero no la segunda.'
+    );
+    $assignments = new Asignacion($db);
+    $splitAssignmentRejected = false;
+    try {
+        $assignments->crear($createdOffer, $createdStudents[0], $createdUsers[3], 'Tutor de empresa');
+    } catch (DomainException $exception) {
+        $splitAssignmentRejected = str_contains($exception->getMessage(), 'cobertura horaria');
+    }
+    assertTrue(
+        $splitAssignmentRejected,
+        'La validación transaccional de asignación también debe exigir cobertura de la segunda franja.'
+    );
+    $restoreSecondInterval = $db->prepare(
+        'UPDATE alumno_disponibilidad_semanal ds
+         INNER JOIN alumno_disponibilidad d ON d.id = ds.disponibilidad_id
+         SET ds.hora_fin = \'14:00:00\'
+         WHERE d.alumno_id = :alumno AND ds.dia_semana = 1'
+    );
+    $restoreSecondInterval->execute(['alumno' => $createdStudents[0]]);
     $offersWithCounts = $matching->obtenerVigentesConAsignaciones();
     assertTrue(
         count($offersWithCounts) === 1

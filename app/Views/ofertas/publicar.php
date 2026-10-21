@@ -79,24 +79,25 @@
             </div>
             <div class="offer-create__grid offer-create__grid--details">
                 <div class="offer-create__field">
-                    <label for="offer-shift">Tipo de turno</label>
-                    <select id="offer-shift" name="turno" required>
-                        <?php foreach (['M' => 'Mañana', 'T' => 'Tarde', 'P' => 'Partido', 'Indiferente' => 'Indiferente'] as $value => $label): ?>
-                            <option value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" <?= ($formValues['turno'] ?? 'M') === $value ? 'selected' : '' ?>><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></option>
-                        <?php endforeach; ?>
+                    <label for="offer-jornada">Tipo de jornada</label>
+                    <select id="offer-jornada" name="jornada" required>
+                        <option value="normal" <?= ($formValues['jornada'] ?? 'normal') === 'normal' ? 'selected' : '' ?>>Jornada normal</option>
+                        <option value="partida" <?= ($formValues['jornada'] ?? 'normal') === 'partida' ? 'selected' : '' ?>>Jornada partida</option>
                     </select>
-                    <small>La compatibilidad horaria se calcula con las franjas definidas por día.</small>
+                    <small>La jornada partida permite definir dos franjas por cada día activo.</small>
                 </div>
             </div>
-            <p class="offer-create__schedule-hint">Las franjas exactas permiten comprobar la compatibilidad horaria con el alumnado. El tipo de turno clasifica la oferta y los horarios usan intervalos de cinco minutos.</p>
+            <p class="offer-create__schedule-hint">Indica los días activos y sus franjas. Los horarios usan intervalos de cinco minutos.</p>
             <div class="offer-create__schedule-table-wrap">
                 <table class="offer-create__schedule-table">
                     <thead>
                         <tr>
                             <th scope="col">Día</th>
                             <th scope="col">Activo</th>
-                            <th scope="col">Hora de inicio</th>
-                            <th scope="col">Hora de fin</th>
+                            <th scope="col">Inicio (1.ª franja)</th>
+                            <th scope="col"><span class="visually-hidden">Fin (1.ª franja)</span></th>
+                            <th scope="col" data-partida-column><span class="visually-hidden">Inicio (2.ª franja)</span></th>
+                            <th scope="col" data-partida-column>Fin (2.ª franja)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -106,22 +107,31 @@
                                 <td>
                                     <label class="offer-weekday__active">
                                         <input type="checkbox" name="horarios[<?= $day ?>][activo]" value="1" aria-label="<?= htmlspecialchars($name . ', activo', ENT_QUOTES, 'UTF-8') ?>" <?= $day <= 5 ? 'checked' : '' ?>>
-                                        <span><?= $day <= 5 ? 'Sí' : 'No' ?></span>
+                                        <span data-day-active-label><?= $day <= 5 ? 'Sí' : 'No' ?></span>
                                     </label>
                                 </td>
                                 <td>
                                     <label class="visually-hidden" for="offer-start-<?= $day ?>"><?= htmlspecialchars($name . ', hora de inicio', ENT_QUOTES, 'UTF-8') ?></label>
-                                    <input id="offer-start-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_inicio]" value="09:00" step="300" <?= $day > 5 ? 'disabled' : '' ?>>
+                                    <input id="offer-start-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_inicio]" value="09:00" step="300">
                                 </td>
                                 <td>
                                     <label class="visually-hidden" for="offer-end-<?= $day ?>"><?= htmlspecialchars($name . ', hora de fin', ENT_QUOTES, 'UTF-8') ?></label>
-                                    <input id="offer-end-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_fin]" value="17:00" step="300" <?= $day > 5 ? 'disabled' : '' ?>>
+                                    <input id="offer-end-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_fin]" value="<?= ($formValues['jornada'] ?? 'normal') === 'partida' ? '14:00' : '17:00' ?>" step="300">
+                                </td>
+                                <td data-partida-column>
+                                    <label class="visually-hidden" for="offer-start-2-<?= $day ?>"><?= htmlspecialchars($name . ', hora de inicio de la segunda franja', ENT_QUOTES, 'UTF-8') ?></label>
+                                    <input id="offer-start-2-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_inicio_2]" value="<?= ($formValues['jornada'] ?? 'normal') === 'partida' ? '16:00' : '' ?>" step="300" data-partida-field>
+                                </td>
+                                <td data-partida-column>
+                                    <label class="visually-hidden" for="offer-end-2-<?= $day ?>"><?= htmlspecialchars($name . ', hora de fin de la segunda franja', ENT_QUOTES, 'UTF-8') ?></label>
+                                    <input id="offer-end-2-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_fin_2]" value="<?= ($formValues['jornada'] ?? 'normal') === 'partida' ? '21:00' : '' ?>" step="300" data-partida-field>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
+            <script src="assets/js/offer-schedule.js" defer></script>
         </section>
 
         <section class="offer-create__section" aria-labelledby="offer-location-title">
@@ -206,12 +216,12 @@
         <div class="assignments-table-wrap">
             <table class="assignments-table">
                 <thead>
-                    <tr><th scope="col">Oferta</th><th scope="col">Ciclo</th><th scope="col">Plazas</th><th scope="col">Periodo</th><th scope="col">Turno y modalidad</th><th scope="col">Estado</th><th scope="col">Observación</th></tr>
+                    <tr><th scope="col">Oferta</th><th scope="col">Ciclo</th><th scope="col">Plazas</th><th scope="col">Periodo</th><th scope="col">Jornada y horario</th><th scope="col">Modalidad y ubicación</th><th scope="col">Estado</th><th scope="col">Observación</th></tr>
                 </thead>
                 <tbody>
                     <?php foreach ($ofertas as $oferta): ?>
                         <?php
-                        $turnLabel = ['M' => 'Mañana', 'T' => 'Tarde', 'P' => 'Partido', 'Indiferente' => 'Indiferente'][$oferta['turno']] ?? 'Sin especificar';
+                        $jornadaLabel = ($oferta['jornada'] ?? '') === 'partida' ? 'Jornada partida' : 'Jornada normal';
                         $statusClass = match ($oferta['estado']) {
                             'Aprobada' => 'status-badge--approved',
                             'Rechazada' => 'status-badge--rejected',
@@ -224,15 +234,24 @@
                             <td><?= (int)$oferta['plazas_cuantas'] ?></td>
                             <td><?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
                             <td>
+                                <strong><?= htmlspecialchars($jornadaLabel, ENT_QUOTES, 'UTF-8') ?></strong>
                                 <?php if ($oferta['horarios'] === []): ?>
-                                    Pendiente de actualizar
+                                    <small>Pendiente de actualizar el horario</small>
                                 <?php else: ?>
                                     <?php foreach ($oferta['horarios'] as $shift): ?>
-                                        <?= htmlspecialchars(['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][(int)$shift['dia_semana']] . ' ' . substr($shift['hora_inicio'], 0, 5) . '–' . substr($shift['hora_fin'], 0, 5), ENT_QUOTES, 'UTF-8') ?><br>
+                                        <?php
+                                        $dayLabel = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][(int)$shift['dia_semana']] ?? 'Día';
+                                        $startSecond = (string)($shift['hora_inicio_2'] ?? '');
+                                        $endSecond = (string)($shift['hora_fin_2'] ?? '');
+                                        ?>
+                                        <small><?= htmlspecialchars($dayLabel . ' · 1.ª franja: ' . substr((string)$shift['hora_inicio'], 0, 5) . '–' . substr((string)$shift['hora_fin'], 0, 5), ENT_QUOTES, 'UTF-8') ?></small>
+                                        <?php if ($startSecond !== '' && $endSecond !== ''): ?>
+                                            <small><?= htmlspecialchars($dayLabel . ' · 2.ª franja: ' . substr($startSecond, 0, 5) . '–' . substr($endSecond, 0, 5), ENT_QUOTES, 'UTF-8') ?></small>
+                                        <?php endif; ?>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
                             </td>
-                            <td><?= htmlspecialchars($turnLabel . ' · ' . $oferta['modalidad'] . (!empty($oferta['ubicacion']) ? ' · ' . $oferta['ubicacion'] : ''), ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars($oferta['modalidad'] . (!empty($oferta['ubicacion']) ? ' · ' . $oferta['ubicacion'] : ''), ENT_QUOTES, 'UTF-8') ?></td>
                             <td><span class="status-badge <?= $statusClass ?>"><?= htmlspecialchars($oferta['estado'], ENT_QUOTES, 'UTF-8') ?></span></td>
                             <td><?= htmlspecialchars($oferta['motivo_revision'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
                         </tr>

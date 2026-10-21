@@ -39,14 +39,6 @@ CREATE TABLE `alumnos` (
   `proceso_solicitud_practicas` varchar(50) DEFAULT 'Pendiente'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Volcado de datos para la tabla `alumnos`
---
-
-INSERT INTO `alumnos` (`id`, `usuario_id`, `nombre`, `apellidos`, `dni`, `numero_seguridad_social`, `correo`, `especialidad_id`, `proceso_solicitud_practicas`) VALUES
-(1, 4, 'Lucas', 'Pérez Ruiz', '12345678Z', 'SS-11111111', 'lucas@correo.com', 1, 'Pendiente'),
-(2, 5, 'Sofía', 'García López', '87654321X', 'SS-22222222', 'sofia@correo.com', 2, 'Pendiente');
-
 -- --------------------------------------------------------
 
 --
@@ -94,13 +86,6 @@ CREATE TABLE `empresas` (
   `registro_mercantil` varchar(255) DEFAULT NULL,
   `convenios_documentacion` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Volcado de datos para la tabla `empresas`
---
-
-INSERT INTO `empresas` (`id`, `usuario_id`, `nombre_empresa`, `cif_empresa`, `pagina_web`, `pertenece_grupo_empresa`, `categoria`, `cnae`, `registro_mercantil`, `convenios_documentacion`) VALUES
-(1, 3, 'Tech Solutions S.L.', 'B12345678', 'https://techsolutions.com', 0, 'Desarrollo de Software', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 

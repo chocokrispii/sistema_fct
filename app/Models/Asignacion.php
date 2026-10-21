@@ -205,12 +205,6 @@ class Asignacion
                  INNER JOIN alumno_disponibilidad d
                     ON d.alumno_id = a.id
                     AND d.fecha_inicio <= p.fecha_inicio AND d.fecha_fin >= p.fecha_fin
-                    AND (
-                        d.es_indiferente = TRUE
-                        OR d.turno = 'Indiferente'
-                        OR p.turno = 'Indiferente'
-                        OR d.turno = p.turno
-                    )
                     AND EXISTS (
                         SELECT 1 FROM empresa_oferta_horarios_semanales oh
                         WHERE oh.oferta_id = p.id
@@ -230,12 +224,24 @@ class Asignacion
                                     OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
                                         <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
                                 )
-                                AND NOT EXISTS (
-                                    SELECT 1 FROM alumno_disponibilidad_semanal ds
-                                    WHERE ds.disponibilidad_id = d.id
-                                        AND ds.dia_semana = oh.dia_semana
-                                        AND ds.hora_inicio <= oh.hora_inicio
-                                        AND ds.hora_fin >= oh.hora_fin
+                                AND (
+                                    NOT EXISTS (
+                                        SELECT 1 FROM alumno_disponibilidad_semanal ds
+                                        WHERE ds.disponibilidad_id = d.id
+                                            AND ds.dia_semana = oh.dia_semana
+                                            AND ds.hora_inicio <= oh.hora_inicio
+                                            AND ds.hora_fin >= oh.hora_fin
+                                    )
+                                    OR (
+                                        oh.hora_inicio_2 IS NOT NULL
+                                        AND NOT EXISTS (
+                                            SELECT 1 FROM alumno_disponibilidad_semanal ds
+                                            WHERE ds.disponibilidad_id = d.id
+                                                AND ds.dia_semana = oh.dia_semana
+                                                AND ds.hora_inicio <= oh.hora_inicio_2
+                                                AND ds.hora_fin >= oh.hora_fin_2
+                                        )
+                                    )
                                 )
                         )
                     )

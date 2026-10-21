@@ -21,7 +21,7 @@ $ofertas = $ofertas ?? [];
                 <a href="index.php?action=disponibilidad">Registrar disponibilidad</a>
             <?php else: ?>
                 <h3><?= $soloCompatibles ? 'No hay ofertas compatibles' : 'No hay ofertas aprobadas para mostrar' ?></h3>
-                <p role="status"><?= $soloCompatibles ? 'No hay plazas que coincidan con tu ciclo, disponibilidad y turno.' : 'Vuelve a consultar más adelante.' ?></p>
+                <p role="status"><?= $soloCompatibles ? 'No hay plazas que coincidan con tu ciclo, disponibilidad y horario.' : 'Vuelve a consultar más adelante.' ?></p>
             <?php endif; ?>
         </div>
     <?php else: ?>
@@ -36,7 +36,7 @@ $ofertas = $ofertas ?? [];
                         <th scope="col"><?= $soloCompatibles ? 'Vacantes disponibles' : 'Plazas' ?></th>
                         <th scope="col">Horario semanal</th>
                         <th scope="col">Periodo</th>
-                        <th scope="col">Turno</th>
+                        <th scope="col">Jornada</th>
                         <th scope="col">Modalidad</th>
                         <th scope="col">Ubicación</th>
                     </tr>
@@ -56,14 +56,27 @@ $ofertas = $ofertas ?? [];
                             <td>
                                 <?php if (!empty($oferta['horarios'])): ?>
                                     <?php foreach ($oferta['horarios'] as $shift): ?>
-                                        <?= htmlspecialchars(['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][(int)$shift['dia_semana']] . ' ' . substr($shift['hora_inicio'], 0, 5) . '–' . substr($shift['hora_fin'], 0, 5), ENT_QUOTES, 'UTF-8') ?><br>
+                                        <?php
+                                        $dayLabel = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][(int)($shift['dia_semana'] ?? 0)] ?? 'Día';
+                                        $firstRange = $dayLabel . ' · 1.ª franja: ' . substr((string)($shift['hora_inicio'] ?? ''), 0, 5) . '–' . substr((string)($shift['hora_fin'] ?? ''), 0, 5);
+                                        $startSecond = (string)($shift['hora_inicio_2'] ?? '');
+                                        $endSecond = (string)($shift['hora_fin_2'] ?? '');
+                                        ?>
+                                        <small><?= htmlspecialchars($firstRange, ENT_QUOTES, 'UTF-8') ?></small>
+                                        <?php if ($startSecond !== '' && $endSecond !== ''): ?>
+                                            <small><?= htmlspecialchars($dayLabel . ' · 2.ª franja: ' . substr($startSecond, 0, 5) . '–' . substr($endSecond, 0, 5), ENT_QUOTES, 'UTF-8') ?></small>
+                                        <?php endif; ?>
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <span>Horario no especificado</span>
                                 <?php endif; ?>
                             </td>
                             <td><?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars(['M' => 'Mañana', 'T' => 'Tarde', 'P' => 'Partido', 'Indiferente' => 'Indiferente'][$oferta['turno']] ?? 'Sin especificar', ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars(match ($oferta['jornada'] ?? null) {
+                                'normal' => 'Jornada normal',
+                                'partida' => 'Jornada partida',
+                                default => 'Jornada no especificada',
+                            }, ENT_QUOTES, 'UTF-8') ?></td>
                             <td><span class="status-badge status-badge--neutral"><?= htmlspecialchars($oferta['modalidad'] ?? 'Presencial', ENT_QUOTES, 'UTF-8') ?></span></td>
                             <td><?= htmlspecialchars(($oferta['ubicacion'] ?? '') !== '' ? $oferta['ubicacion'] : (($oferta['lugar'] ?? '') !== '' ? $oferta['lugar'] : '—'), ENT_QUOTES, 'UTF-8') ?></td>
                         </tr>

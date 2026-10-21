@@ -426,6 +426,7 @@ class OfertaController {
         $tituloRaw = $request['titulo'] ?? null;
         $descripcionRaw = $request['descripcion'] ?? null;
         $turnoRaw = $request['turno'] ?? null;
+        $jornadaRaw = $request['jornada'] ?? 'normal';
         $modalidadRaw = $request['modalidad'] ?? null;
         $ubicacionRaw = $request['ubicacion'] ?? null;
         $requisitosRaw = $request['requisitos'] ?? '';
@@ -436,7 +437,8 @@ class OfertaController {
         if (
             !is_string($tituloRaw)
             || !is_string($descripcionRaw)
-            || !is_string($turnoRaw)
+            || (!is_string($turnoRaw) && $turnoRaw !== null)
+            || !is_string($jornadaRaw)
             || !is_string($modalidadRaw)
             || !is_string($ubicacionRaw)
             || !is_string($requisitosRaw)
@@ -446,7 +448,8 @@ class OfertaController {
         }
         $titulo = trim($tituloRaw);
         $descripcion = trim($descripcionRaw);
-        $turno = $turnoRaw;
+        $turno = $turnoRaw ?? 'Indiferente';
+        $jornada = $jornadaRaw;
         $modalidad = $modalidadRaw;
         $ubicacion = trim($ubicacionRaw);
         $requisitos = trim($requisitosRaw);
@@ -460,6 +463,9 @@ class OfertaController {
         }
         if (!in_array($turno, ['M', 'T', 'P', 'Indiferente'], true)) {
             return 'Selecciona un tipo de turno válido.';
+        }
+        if (!in_array($jornada, ['normal', 'partida'], true)) {
+            return 'Selecciona una jornada válida.';
         }
         if (!in_array($modalidad, ['Presencial', 'Remoto', 'Híbrido'], true)) {
             return 'Selecciona una modalidad válida.';
@@ -507,6 +513,8 @@ class OfertaController {
             }
             $horaInicio = $horario['hora_inicio'] ?? null;
             $horaFin = $horario['hora_fin'] ?? null;
+            $horaInicio2 = $horario['hora_inicio_2'] ?? '';
+            $horaFin2 = $horario['hora_fin_2'] ?? '';
             if (
                 !is_string($horaInicio)
                 || !is_string($horaFin)
@@ -516,11 +524,27 @@ class OfertaController {
             ) {
                 return 'Cada día seleccionado necesita una hora válida en intervalos de cinco minutos.';
             }
-            $horarios[] = [
+            $horarioNormalizado = [
                 'dia_semana' => (int)$diaNumero,
                 'hora_inicio' => $horaInicio . ':00',
                 'hora_fin' => $horaFin . ':00',
             ];
+            if ($jornada === 'partida') {
+                if (
+                    !is_string($horaInicio2)
+                    || !is_string($horaFin2)
+                    || preg_match('/^(?:[01]\d|2[0-3]):(?:[0-5][05])$/', $horaInicio2) !== 1
+                    || preg_match('/^(?:[01]\d|2[0-3]):(?:[0-5][05])$/', $horaFin2) !== 1
+                    || $horaFin <= $horaInicio
+                    || $horaInicio2 < $horaFin
+                    || $horaFin2 <= $horaInicio2
+                ) {
+                    return 'Cada día seleccionado necesita dos franjas válidas, no solapadas y en orden horario.';
+                }
+                $horarioNormalizado['hora_inicio_2'] = $horaInicio2 . ':00';
+                $horarioNormalizado['hora_fin_2'] = $horaFin2 . ':00';
+            }
+            $horarios[] = $horarioNormalizado;
         }
         if ($horarios === []) {
             return 'Selecciona al menos un día y una franja horaria semanal.';
@@ -558,7 +582,8 @@ class OfertaController {
                 $ubicacion !== '' ? $ubicacion : null,
                 $requisitos !== '' ? $requisitos : null,
                 $tecnologias !== '' ? $tecnologias : null,
-                $horarios
+                $horarios,
+                $jornada
             );
             if ($ofertaId < 1) {
                 $this->db->rollBack();
@@ -580,6 +605,7 @@ class OfertaController {
                 'fecha_inicio' => $fechaInicio->format('Y-m-d'),
                 'fecha_fin' => $fechaFin->format('Y-m-d'),
                 'turno' => $turno,
+                'jornada' => $jornada,
                 'titulo' => $titulo,
                 'descripcion' => $descripcion,
                 'modalidad' => $modalidad,
@@ -619,7 +645,7 @@ class OfertaController {
 
     private function formValues(array $request): array
     {
-        $fields = ['titulo', 'descripcion', 'especialidad_id', 'plazas', 'fecha_inicio', 'fecha_fin', 'turno', 'modalidad', 'ubicacion', 'requisitos', 'tecnologias'];
+        $fields = ['titulo', 'descripcion', 'especialidad_id', 'plazas', 'fecha_inicio', 'fecha_fin', 'turno', 'jornada', 'modalidad', 'ubicacion', 'requisitos', 'tecnologias'];
         $values = [];
         foreach ($fields as $field) {
             $values[$field] = isset($request[$field]) && is_string($request[$field])

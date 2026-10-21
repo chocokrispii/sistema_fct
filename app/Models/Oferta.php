@@ -32,7 +32,8 @@ class Oferta {
         ?string $ubicacion = null,
         ?string $requisitos = null,
         ?string $tecnologias = null,
-        array $horarios = []
+        array $horarios = [],
+        string $jornada = 'normal'
     ): int {
         if (func_num_args() <= 8) {
             $turno = $tituloOrTurno;
@@ -48,6 +49,37 @@ class Oferta {
             $turno = $turnoOrLocation;
         }
 
+        if (!in_array($jornada, ['normal', 'partida'], true)) {
+            throw new InvalidArgumentException('La jornada de la oferta no es válida.');
+        }
+        if ($jornada === 'partida' && $horarios === []) {
+            throw new InvalidArgumentException('La jornada partida necesita franjas semanales.');
+        }
+        foreach ($horarios as &$horario) {
+            if (!is_array($horario)) {
+                throw new InvalidArgumentException('El horario semanal de la oferta no es válido.');
+            }
+            if ($jornada === 'normal') {
+                unset($horario['hora_inicio_2'], $horario['hora_fin_2']);
+                continue;
+            }
+            $horaInicio2 = $horario['hora_inicio_2'] ?? null;
+            $horaFin = $horario['hora_fin'] ?? null;
+            $horaFin2 = $horario['hora_fin_2'] ?? null;
+            if (
+                !is_string($horaInicio2)
+                || !is_string($horaFin)
+                || !is_string($horaFin2)
+                || preg_match('/\A(?:[01]\d|2[0-3]):[0-5]\d:00\z/', $horaInicio2) !== 1
+                || preg_match('/\A(?:[01]\d|2[0-3]):[0-5]\d:00\z/', $horaFin2) !== 1
+                || $horaInicio2 < $horaFin
+                || $horaFin2 <= $horaInicio2
+            ) {
+                throw new InvalidArgumentException('La jornada partida necesita dos franjas semanales válidas y no solapadas.');
+            }
+        }
+        unset($horario);
+
         $datos = [
             'empresa_id' => $empresaId,
             'especialidad_id' => $especialidadId,
@@ -55,6 +87,7 @@ class Oferta {
             'fecha_inicio' => $fechaInicio,
             'fecha_fin' => $fechaFin,
             'turno' => $turno,
+            'jornada' => $jornada,
         ];
         $columnasDisponibles = $this->obtenerColumnasDescriptivas();
         $datosDescriptivos = [
@@ -83,8 +116,10 @@ class Oferta {
 
         if ($horarios !== []) {
             $shift = $this->db->prepare(
-                'INSERT INTO empresa_oferta_horarios_semanales (oferta_id, dia_semana, hora_inicio, hora_fin)
-                 VALUES (:oferta_id, :dia_semana, :hora_inicio, :hora_fin)'
+                'INSERT INTO empresa_oferta_horarios_semanales
+                    (oferta_id, dia_semana, hora_inicio, hora_fin, hora_inicio_2, hora_fin_2)
+                 VALUES
+                    (:oferta_id, :dia_semana, :hora_inicio, :hora_fin, :hora_inicio_2, :hora_fin_2)'
             );
             foreach ($horarios as $horario) {
                 $shift->execute([
@@ -92,6 +127,8 @@ class Oferta {
                     'dia_semana' => $horario['dia_semana'],
                     'hora_inicio' => $horario['hora_inicio'],
                     'hora_fin' => $horario['hora_fin'],
+                    'hora_inicio_2' => $horario['hora_inicio_2'] ?? null,
+                    'hora_fin_2' => $horario['hora_fin_2'] ?? null,
                 ]);
             }
         }
@@ -102,7 +139,7 @@ class Oferta {
     public function obtenerHorarioSemanal(int $ofertaId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT dia_semana, hora_inicio, hora_fin
+            'SELECT dia_semana, hora_inicio, hora_fin, hora_inicio_2, hora_fin_2
              FROM empresa_oferta_horarios_semanales
              WHERE oferta_id = :oferta_id ORDER BY dia_semana'
         );
@@ -133,7 +170,7 @@ class Oferta {
         $stmt = $this->db->query(
             "SELECT p.id, p.empresa_id, p.especialidad_id,
                     " . $this->expresionesDatosDescriptivos() . ",
-                    p.plazas_cuantas, p.fecha_inicio, p.fecha_fin, p.turno,
+                    p.plazas_cuantas, p.fecha_inicio, p.fecha_fin, p.turno, p.jornada,
                     e.nombre_empresa, es.nombre_especialidad,
                     COALESCE(conteo.asignadas, 0) AS asignadas
              FROM empresa_especialidades_plazas p
@@ -484,8 +521,6 @@ class Oferta {
                     ON d.alumno_id = a.id
                     AND d.fecha_inicio <= p.fecha_inicio
                     AND d.fecha_fin >= p.fecha_fin
-                    AND (d.turno = 'Indiferente' OR p.turno = 'Indiferente'
-                         OR d.turno = p.turno)
                     AND EXISTS (
                         SELECT 1
                         FROM empresa_oferta_horarios_semanales oh
@@ -506,12 +541,26 @@ class Oferta {
                                     OR MOD(CAST(oh.dia_semana AS SIGNED) - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
                                         <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
                                 )
-                                AND NOT EXISTS (
-                                    SELECT 1 FROM alumno_disponibilidad_semanal ds
-                                    WHERE ds.disponibilidad_id = d.id
-                                        AND ds.dia_semana = oh.dia_semana
-                                        AND ds.hora_inicio <= oh.hora_inicio
-                                        AND ds.hora_fin >= oh.hora_fin
+                                AND (
+                                    NOT EXISTS (
+                                        SELECT 1
+                                        FROM alumno_disponibilidad_semanal ds
+                                        WHERE ds.disponibilidad_id = d.id
+                                            AND ds.dia_semana = oh.dia_semana
+                                            AND ds.hora_inicio <= oh.hora_inicio
+                                            AND ds.hora_fin >= oh.hora_fin
+                                    )
+                                    OR (
+                                        oh.hora_inicio_2 IS NOT NULL
+                                        AND NOT EXISTS (
+                                            SELECT 1
+                                            FROM alumno_disponibilidad_semanal ds
+                                            WHERE ds.disponibilidad_id = d.id
+                                                AND ds.dia_semana = oh.dia_semana
+                                                AND ds.hora_inicio <= oh.hora_inicio_2
+                                                AND ds.hora_fin >= oh.hora_fin_2
+                                        )
+                                    )
                                 )
                         )
                     )
@@ -536,7 +585,7 @@ class Oferta {
         return 'SELECT p.id, p.empresa_id, p.especialidad_id, '
             . $this->expresionesDatosDescriptivos() . ',
                 p.plazas_cuantas, p.fecha_inicio, p.fecha_fin,
-                p.estado, p.turno, p.motivo_revision,
+                p.estado, p.turno, p.jornada, p.motivo_revision,
                 e.nombre_empresa, es.nombre_especialidad
          FROM empresa_especialidades_plazas p
          INNER JOIN empresas e ON e.id = p.empresa_id
