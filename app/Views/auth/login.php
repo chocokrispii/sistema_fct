@@ -11,11 +11,9 @@
 <?php $csrfToken = CsrfMiddleware::token(); ?>
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=login">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-    <?php if (FrontendAssets::isEnabled()): ?>
-        <div data-vue-island="AuthLoginEnhancement" data-prop-csrf-token="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>"></div>
-    <?php endif; ?>
-    <label for="login-email">Correo electrónico</label>
-    <input id="login-email" type="email" name="email" autocomplete="username" required>
+    <label for="login-identifier">NIF / CIF</label>
+    <input id="login-identifier" type="text" name="identifier" autocomplete="username" required>
+    <small>Alumnado y personal: NIF/DNI/NIE. Empresa: CIF. El acceso con correo electrónico no está permitido.</small>
     <label for="login-password">Contraseña</label>
     <input id="login-password" type="password" name="password" maxlength="72" autocomplete="current-password" aria-describedby="login-password-help" required>
     <small id="login-password-help">Máximo 72 caracteres, igual que al registrarse. Los espacios cuentan.</small>

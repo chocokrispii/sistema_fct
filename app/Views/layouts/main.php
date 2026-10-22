@@ -49,6 +49,7 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                 <a href="index.php?action=sedes">Sedes</a>
                 <a href="index.php?action=convenios">Convenios</a>
             <?php elseif (in_array($rolActual, ['Administrador', 'Coordinador'], true)): ?>
+                <a href="index.php?action=alumnos-centro">Alumnado</a>
                 <a href="index.php?action=revisar-convenios">Revisar convenios</a>
                 <a href="index.php?action=revisar-ofertas">Revisar ofertas</a>
                 <a href="index.php?action=emparejar">Emparejar alumnos</a>
@@ -75,7 +76,6 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                 <a href="index.php?action=mis-calificaciones">Mis calificaciones</a>
             <?php endif; ?>
             <?php if (!$usuarioAutenticado): ?>
-                <a href="index.php?action=registro-alumno">Registro alumno</a>
                 <a href="index.php?action=registro-empresa">Registro empresa</a>
                 <a href="index.php?action=login">Iniciar sesión</a>
             <?php endif; ?>

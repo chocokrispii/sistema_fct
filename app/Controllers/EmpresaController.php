@@ -3,6 +3,7 @@
 
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/Empresa.php';
+require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 
 class EmpresaController {
     private PDO $db;
@@ -34,7 +35,7 @@ class EmpresaController {
         }
         $email = $input['email'];
         $password = $input['password'];
-        $cif = $input['cif'];
+        $cif = SpanishDataValidator::normalizeFiscalIdentifier($input['cif']);
         $nombreComercial = $input['nombre_comercial'];
         $telefono = $input['telefono'];
         $direccion = $input['direccion'];
@@ -46,8 +47,7 @@ class EmpresaController {
             || strlen($password) < 12
             || strlen($password) > 72
             || trim($password) === ''
-            || $cif === ''
-            || mb_strlen($cif) > 20
+            || !SpanishDataValidator::isCifFormat($cif)
             || $nombreComercial === ''
             || mb_strlen($nombreComercial) > 150
             || mb_strlen($contacto) > 150
@@ -61,6 +61,7 @@ class EmpresaController {
 
         try {
             $this->db->beginTransaction();
+            $this->usuarioModel->assertIdentificadorFiscalDisponible($cif);
 
             $usuarioId = $this->usuarioModel->crear($email, $password, 'Empresa');
             if ($usuarioId < 1) {

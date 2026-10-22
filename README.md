@@ -161,6 +161,12 @@ Los volúmenes de base de datos, archivos subidos, firmas ClamAV y dependencias 
 
 En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica las migraciones de dominio, disponibilidad y ofertas, además de las tablas de webhooks, tokens API y sus respuestas. Los nombres de algunas migraciones comparten prefijo porque proceden de líneas de trabajo paralelas; Compose les asigna nombres de inicialización únicos para conservar el orden y evitar colisiones. La inicialización oficial de MariaDB sólo procesa estos archivos al crear una base de datos nueva; no vuelve a ejecutarlos en cada arranque.
 
+Las cuentas de alumnos se crean desde **Alumnado**, disponible para Administradores y Coordinadores con sesión iniciada. La creación solicita NIF/DNI/NIE, nombre, apellidos, correo, ciclo, curso y observaciones; el sistema envía al correo un enlace de activación de un solo uso y válido durante 24 horas para que el alumno elija su contraseña. La cuenta permanece inactiva hasta activarla. No existe un formulario público de alta de alumnos. En una base existente, aplica una sola vez `012_alta_alumnos_personal.sql` y `013_activacion_cuentas_alumno.sql` mediante el procedimiento de migración manual de abajo; no basta con reiniciar Compose.
+
+El acceso usa el identificador fiscal y la contraseña: Alumno, Administrador, Coordinador y Observador entran con NIF/DNI/NIE; Empresa entra con CIF. El correo no sirve como identificador de login. El personal existente debe tener un NIF asignado en **Usuarios**; aplica una sola vez `014_identificador_fiscal_personal.sql` y conserva abierta la sesión actual del administrador hasta que este asigne allí su NIF y los del resto del personal. Si se perdió esa sesión, el administrador local puede ejecutar `docker compose exec -it app php scripts/asignar_nif_personal.php` para asignar su identificador en desarrollo; el asistente solicita correo y NIF interactivamente y no muestra contraseñas. Las cuentas antiguas sin NIF no podrán iniciar sesión hasta que se actualicen. Las nuevas cuentas de personal solicitan el NIF/DNI/NIE durante su creación.
+
+Para probar mensajes en local sin enviar correos reales, usa Mailpit: configura `FCT_MAIL_TRANSPORT=mailpit`, `FCT_MAIL_HOST=mailpit`, `FCT_MAIL_PORT=1025`, `FCT_MAIL_ENCRYPTION=none`, un remitente válido en `FCT_MAIL_FROM` y `FCT_APP_URL=http://localhost:8080`. Abre <http://localhost:8025> para ver los mensajes capturados. Esta modalidad solo se acepta en `APP_ENV=development` y el enlace localhost solo funciona en el mismo equipo; no envíes esos mensajes a alumnos. Para enviar correo real con Gmail/Google Workspace, usa `FCT_MAIL_TRANSPORT=smtp`, `FCT_MAIL_USERNAME`, `FCT_MAIL_PASSWORD` (contraseña de aplicación), y `FCT_MAIL_FROM`; usa una URL HTTPS accesible desde los dispositivos del alumnado. Gmail requiere verificación en dos pasos; no uses la contraseña normal ni guardes credenciales en el repositorio.
+
 Las ofertas históricas aprobadas no tienen horas exactas inferibles a partir de sus antiguos turnos amplios; se excluyen del matching y del catálogo hasta republicarlas con horario semanal. No asignes horarios aproximados automáticamente.
 
 Para una base ya inicializada, no vuelvas a importar el esquema ni ejecutes migraciones existentes indiscriminadamente: varias no son idempotentes. Examina `docker compose ps` y los registros de MariaDB antes de diagnosticar una instalación incompleta. `009_desarrollo_aplicaciones_multiplataforma.sql` es idempotente y puede aplicarse a una base existente para añadir DAM. Para un entorno nuevo creado fuera de Compose, ejecuta el esquema y las migraciones una sola vez, en orden, contra esa base vacía.
@@ -224,13 +230,24 @@ La migración es idempotente. Los datos de ofertas históricas reciben valores p
 
 Las migraciones `007_webhooks.sql`, `008_api_access_tokens.sql` y `009_webhook_responses.sql` también se aplican al crear un volumen nuevo; Compose las ejecuta con nombres de inicialización únicos después de las migraciones de dominio. Si conservas una base creada antes de la integración de webhooks, aplica esas tres migraciones una sola vez, en ese orden y con el procedimiento `docker compose cp` descrito arriba, antes de desplegar el nuevo código. La última es un `ALTER TABLE` y no debe ejecutarse de nuevo si ya existen las columnas de respuesta.
 
+Para habilitar el NIF del personal en una base local ya inicializada, aplica **una sola vez** la migración `014_identificador_fiscal_personal.sql`:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\014_identificador_fiscal_personal.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --****** "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+No repitas este `ALTER TABLE` si `usuarios.identificador_fiscal` ya existe. Después recarga la página de la aplicación. Desde **Usuarios**, asigna y guarda el NIF/DNI/NIE válido del administrador actual y de cada miembro del personal antes de cerrar la sesión; no se puede inferir el NIF real a partir del correo.
+
+Si la sesión de administrador ya no está disponible, dentro de Docker Desktop y en modo desarrollo ejecuta `docker compose exec -it app php scripts/asignar_nif_personal.php`; escribe el correo existente y el NIF real cuando el asistente los solicite. Repite para cada cuenta del personal que necesite acceso. Este asistente está limitado a ejecución CLI en `APP_ENV=development` o `local`.
+
 Genera las cinco cuentas de prueba actuales (Administrador, Coordinador, Observador, Empresa y Alumno) sólo en la base local autorizada:
 
 ```powershell
 docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/crear_cuentas_demo.php
 ```
 
-El script imprime contraseñas aleatorias una sola vez. **Cada ejecución renueva todas las contraseñas demo y deja inválidas las anteriores**; guarda la salida de forma segura. También crea para el alumno demo disponibilidad de lunes a viernes, de 09:00 a 17:00, con franjas exactas. No ejecutes este comando en producción. `database/seeds/001_sample_data.sql` es un conjunto legado de datos de muestra y no se ejecuta automáticamente ni sustituye al generador seguro de cuentas.
+El script imprime identificadores fiscales y contraseñas aleatorias una sola vez. **Cada ejecución renueva todas las contraseñas demo y deja inválidas las anteriores**; guarda la salida de forma segura. También crea para el alumno demo disponibilidad de lunes a viernes, de 09:00 a 17:00, con franjas exactas. No ejecutes este comando en producción. `database/seeds/001_sample_data.sql` es un conjunto legado de datos de muestra y no se ejecuta automáticamente ni sustituye al generador seguro de cuentas.
 
 Consulta [la matriz de roles y permisos](docs/roles_y_permisos.md) para conocer el acceso restringido al catálogo y el alcance de solo lectura del perfil Observador.
 
@@ -293,6 +310,8 @@ Compose ejecuta ClamAV y PHP se conecta a él por la red interna del proyecto. S
 Si necesitas comprobar el comportamiento de fallo cerrado, establece `FCT_CLAMAV_ENABLED=true`, detén ClamAV sólo en un entorno local desechable (`docker compose stop clamav`), confirma que una carga se rechaza y vuelve a iniciarlo (`docker compose up -d clamav`). No desactives el análisis fuera de desarrollo ni expongas el puerto interno del scanner.
 
 ## 7. Acceso a la aplicación y herramientas
+
+Consulta la [guía de acceso para usuarios](docs/guia-acceso.pdf) o su [fuente editable](docs/guia-acceso.html) para iniciar el entorno y acceder según el perfil.
 
 | Servicio | Dirección local |
 |---|---|

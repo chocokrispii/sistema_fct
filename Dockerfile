@@ -15,7 +15,7 @@ RUN npm run build
 FROM php:8.2-apache
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libonig-dev \
+    && apt-get install -y --no-install-recommends libonig-dev unzip \
     && docker-php-ext-install mbstring pdo_mysql \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
@@ -25,6 +25,7 @@ COPY config/php-upload.ini /usr/local/etc/php/conf.d/zzz-fct-upload.ini
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/storage-entrypoint.sh /usr/local/bin/fct-storage-entrypoint
 COPY . /var/www/html
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 COPY --from=frontend-build /app/public/build /var/www/html/public/build
 
 RUN mkdir -p /var/lib/fct/storage \

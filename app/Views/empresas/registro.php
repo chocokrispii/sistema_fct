@@ -42,7 +42,8 @@
 
                 <div class="company-registration__field">
                     <label for="company-cif">CIF <span aria-hidden="true">*</span></label>
-                    <input id="company-cif" type="text" name="cif" maxlength="20" autocomplete="off" placeholder="Ej. B12345678" required>
+                    <input id="company-cif" type="text" name="cif" maxlength="20" autocomplete="off" placeholder="Ej. B12345678" aria-describedby="company-cif-help" required>
+                    <small id="company-cif-help">Introduce el CIF con una letra, siete números y un carácter de control.</small>
                 </div>
 
                 <div class="company-registration__field">

@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
+require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 
 class UsuarioAdminController
 {
@@ -21,18 +22,26 @@ class UsuarioAdminController
             $emailRaw = $_POST['email'] ?? '';
             $password = $_POST['password'] ?? '';
             $role = $_POST['rol'] ?? '';
-            if (!is_string($emailRaw) || !is_string($password) || !is_string($role)) {
+            $nifRaw = $_POST['identificador_fiscal'] ?? '';
+            if (
+                !is_string($emailRaw)
+                || !is_string($password)
+                || !is_string($role)
+                || !is_string($nifRaw)
+            ) {
                 throw new InvalidArgumentException('Los datos de la cuenta no tienen un formato válido.');
             }
             $email = trim($emailRaw);
+            $nif = SpanishDataValidator::normalizeDniNie($nifRaw);
             if (
                 !filter_var($email, FILTER_VALIDATE_EMAIL)
                 || strlen($email) > 100
                 || strlen($password) < 12
                 || strlen($password) > 72
                 || trim($password) === ''
+                || !SpanishDataValidator::isDniNie($nif)
             ) {
-                $error = 'Indica un correo válido y una contraseña de 12 a 72 caracteres.';
+                $error = 'Indica un correo válido, un NIF/DNI/NIE correcto y una contraseña de 12 a 72 caracteres.';
             } else {
                 try {
                     $this->db->beginTransaction();
@@ -49,7 +58,7 @@ class UsuarioAdminController
                     ) {
                         throw new InvalidArgumentException('Los coordinadores necesitan nombre y apellidos.');
                     }
-                    $id = $this->model->crearCuentaStaff($email, $password, $role);
+                    $id = $this->model->crearCuentaStaff($email, $password, $role, $nif);
                     if ($role === 'Coordinador') {
                         $profile = $this->db->prepare(
                             'INSERT INTO coordinadores (usuario_id, nombre, apellidos)
@@ -66,7 +75,9 @@ class UsuarioAdminController
                         $this->db->rollBack();
                     }
                     error_log('Error al crear cuenta de personal: ' . $e->getMessage());
-                    $error = 'No se pudo crear la cuenta. Comprueba si el correo ya está registrado.';
+                    $error = $e instanceof InvalidArgumentException || $e instanceof DomainException
+                        ? $e->getMessage()
+                        : 'No se pudo crear la cuenta. Comprueba si el correo y el identificador fiscal no están ya registrados.';
                 }
             }
         }
@@ -76,6 +87,45 @@ class UsuarioAdminController
             'error' => $error !== '' ? $error : (is_string($_GET['error'] ?? null) ? $_GET['error'] : ''),
             'eliminado' => isset($_GET['eliminado']),
         ]);
+    }
+
+    public function actualizarIdentificadorFiscal(): void
+    {
+        $id = filter_var($_POST['usuario_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $identifier = $_POST['identificador_fiscal'] ?? null;
+        if ($id === false || !is_string($identifier)) {
+            $this->redirectWithError('Los datos del identificador fiscal no tienen un formato válido.');
+        }
+
+        try {
+            $this->db->beginTransaction();
+            $roleQuery = $this->db->prepare('SELECT rol FROM usuarios WHERE id = :id FOR UPDATE');
+            $roleQuery->execute(['id' => $id]);
+            $role = $roleQuery->fetchColumn();
+            if (in_array($role, ['Administrador', 'Coordinador', 'Observador'], true)) {
+                $this->model->asignarNifPersonal((int)$id, $identifier);
+            } elseif ($role === 'Empresa') {
+                $this->model->actualizarCifEmpresa((int)$id, $identifier);
+            } else {
+                throw new DomainException('Solo se pueden actualizar identificadores fiscales de personal o empresas.');
+            }
+            $this->audit('usuario.identificador_fiscal_actualizado', (int)$id, 'identificador fiscal actualizado');
+            $this->db->commit();
+        } catch (InvalidArgumentException|DomainException $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            $this->redirectWithError($exception->getMessage());
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Error al actualizar identificador fiscal: ' . $exception->getMessage());
+            $this->redirectWithError('No se pudo actualizar el identificador. Comprueba que sea válido y no esté asociado a otra cuenta.');
+        }
+
+        header('Location: index.php?action=usuarios');
+        exit;
     }
 
     public function eliminar(): void

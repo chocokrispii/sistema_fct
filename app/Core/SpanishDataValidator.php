@@ -6,7 +6,7 @@ final class SpanishDataValidator
 {
     public static function isDniNie(string $value): bool
     {
-        $document = strtoupper((string)preg_replace('/[\s-]+/u', '', trim($value)));
+        $document = self::normalizeDniNie($value);
         if (preg_match('/\A\d{8}[A-Z]\z/', $document) === 1) {
             $number = (int)substr($document, 0, 8);
             $letter = $document[8];
@@ -19,6 +19,22 @@ final class SpanishDataValidator
         }
 
         return $letter === 'TRWAGMYFPDXBNJZSQVHLCKE'[$number % 23];
+    }
+
+    public static function isDniNieFormat(string $value): bool
+    {
+        return preg_match('/\A(?:\d{8}[A-Z]|[XYZ]\d{7}[A-Z])\z/', self::normalizeDniNie($value)) === 1;
+    }
+
+    public static function isCifFormat(string $value): bool
+    {
+        $identifier = self::normalizeDniNie($value);
+        return preg_match('/\A[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]\z/', $identifier) === 1;
+    }
+
+    public static function normalizeFiscalIdentifier(string $value): string
+    {
+        return strtoupper((string)preg_replace('/[\s.-]+/u', '', trim($value)));
     }
 
     public static function isSpanishPhone(string $value): bool
@@ -49,7 +65,7 @@ final class SpanishDataValidator
 
     public static function normalizeDniNie(string $value): string
     {
-        return strtoupper((string)preg_replace('/[\s-]+/u', '', trim($value)));
+        return self::normalizeFiscalIdentifier($value);
     }
 
     public static function normalizePhone(string $value): string

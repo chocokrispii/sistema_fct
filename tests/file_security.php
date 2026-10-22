@@ -41,6 +41,11 @@ assertFileSecurity(
     'La eliminación permanente debe ser POST y estar limitada a administradores.'
 );
 assertFileSecurity(
+    $routes['actualizar-identificador-fiscal-usuario']['method'] === 'POST'
+        && $routes['actualizar-identificador-fiscal-usuario']['roles'] === ['Administrador'],
+    'La actualización de identificadores fiscales debe ser POST y estar limitada a administradores.'
+);
+assertFileSecurity(
     $routes['mis-calificaciones']['roles'] === ['Alumno']
         && $routes['calificaciones']['roles'] === ['Administrador', 'Coordinador', 'Observador']
         && $routes['guardar-calificacion']['roles'] === ['Administrador', 'Coordinador'],
@@ -216,6 +221,9 @@ assertFileSecurity(SpanishDataValidator::isDniNie('00000009D'), 'Se rechazó un 
 assertFileSecurity(SpanishDataValidator::isDniNie('X-1234567-L'), 'Se rechazó un NIE válido con separadores.');
 assertFileSecurity(!SpanishDataValidator::isDniNie('12345678A'), 'Se aceptó un DNI con letra de control incorrecta.');
 assertFileSecurity(!SpanishDataValidator::isDniNie('X1234567A'), 'Se aceptó un NIE con letra de control incorrecta.');
+assertFileSecurity(SpanishDataValidator::isDniNieFormat('12345678A'), 'El login debe reconocer el formato de DNI de cuentas históricas.');
+assertFileSecurity(SpanishDataValidator::isCifFormat('B12345678'), 'Se rechazó un CIF con formato válido.');
+assertFileSecurity(!SpanishDataValidator::isCifFormat('B1234'), 'Se aceptó un CIF mal formado.');
 assertFileSecurity(SpanishDataValidator::isSpanishPhone('+34 612 345 678'), 'Se rechazó un teléfono válido con prefijo +34.');
 assertFileSecurity(!SpanishDataValidator::isSpanishPhone('512345678'), 'Se aceptó un teléfono con prefijo nacional no permitido.');
 assertFileSecurity(SpanishDataValidator::isSpanishPostcode('28013'), 'Se rechazó un código postal válido.');

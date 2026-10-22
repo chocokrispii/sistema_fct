@@ -3,6 +3,7 @@
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/Auditoria.php';
+require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 
 class Usuario {
     private PDO $db;
@@ -11,16 +12,17 @@ class Usuario {
         $this->db = $db ?? getPDOConnection();
     }
 
-    public function crear(string $email, string $password, string $rol): int {
+    public function crear(string $email, string $password, string $rol, bool $activo = true): int {
         try {
             $passwordHash = $this->hashPassword($password);
             $stmt = $this->db->prepare(
-                "INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :password, :rol)"
+                "INSERT INTO usuarios (email, password_hash, rol, activo) VALUES (:email, :password, :rol, :activo)"
             );
             $stmt->execute([
                 'email'    => $email,
                 'password' => $passwordHash,
-                'rol'      => $rol
+                'rol'      => $rol,
+                'activo'   => $activo ? 1 : 0,
             ]);
             return (int)$this->db->lastInsertId();
         } catch (PDOException $e) {
@@ -36,33 +38,154 @@ class Usuario {
         return $user ?: null;
     }
 
+    public function obtenerPorIdentificador(string $identificador): ?array
+    {
+        $identificador = SpanishDataValidator::normalizeFiscalIdentifier($identificador);
+        if ($identificador === '') {
+            return null;
+        }
+
+        $stmt = $this->db->prepare(
+            "SELECT u.*
+             FROM usuarios u
+             LEFT JOIN alumnos a ON a.usuario_id = u.id AND u.rol = 'Alumno'
+             LEFT JOIN empresas e ON e.usuario_id = u.id AND u.rol = 'Empresa'
+             WHERE (u.rol IN ('Administrador', 'Coordinador', 'Observador')
+                    AND UPPER(REPLACE(REPLACE(REPLACE(u.identificador_fiscal, ' ', ''), '-', ''), '.', '')) = :staff_nif)
+                OR (u.rol = 'Alumno'
+                    AND UPPER(REPLACE(REPLACE(REPLACE(a.dni, ' ', ''), '-', ''), '.', '')) = :dni)
+                OR (u.rol = 'Empresa'
+                    AND UPPER(REPLACE(REPLACE(REPLACE(e.cif_empresa, ' ', ''), '-', ''), '.', '')) = :cif)
+             LIMIT 2"
+        );
+        $stmt->execute([
+            'staff_nif' => $identificador,
+            'dni' => $identificador,
+            'cif' => $identificador,
+        ]);
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return count($users) === 1 ? $users[0] : null;
+    }
+
     public function obtenerTodos(): array
     {
         $stmt = $this->db->query(
-            "SELECT u.id, u.email, u.rol, u.activo, u.fecha_creacion,
+            "SELECT u.id, u.email, COALESCE(u.identificador_fiscal, a.dni, e.cif_empresa) AS identificador_fiscal,
+                    u.rol, u.activo, u.fecha_creacion,
                     COALESCE(NULLIF(CONCAT_WS(' ', c.nombre, c.apellidos), ''), '—') AS nombre_completo
              FROM usuarios u
              LEFT JOIN coordinadores c ON c.usuario_id = u.id
+             LEFT JOIN alumnos a ON a.usuario_id = u.id AND u.rol = 'Alumno'
+             LEFT JOIN empresas e ON e.usuario_id = u.id AND u.rol = 'Empresa'
              ORDER BY u.rol, u.email"
         );
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function crearCuentaStaff(string $email, string $password, string $rol): int
+    public function crearCuentaStaff(string $email, string $password, string $rol, string $nif): int
     {
         if (!in_array($rol, ['Administrador', 'Coordinador', 'Observador'], true)) {
             throw new InvalidArgumentException('Solo se pueden crear cuentas de personal del centro.');
         }
+        $nif = $this->validarNifPersonal($nif);
+        $this->assertIdentificadorFiscalDisponible($nif);
         $passwordHash = $this->hashPassword($password);
         $stmt = $this->db->prepare(
-            'INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :hash, :rol)'
+            'INSERT INTO usuarios (email, identificador_fiscal, password_hash, rol)
+             VALUES (:email, :nif, :hash, :rol)'
         );
         $stmt->execute([
             'email' => $email,
+            'nif' => $nif,
             'hash' => $passwordHash,
             'rol' => $rol,
         ]);
         return (int)$this->db->lastInsertId();
+    }
+
+    public function asignarNifPersonal(int $usuarioId, string $nif): void
+    {
+        $nif = $this->validarNifPersonal($nif);
+        $user = $this->db->prepare(
+            "SELECT rol FROM usuarios WHERE id = :id AND rol IN ('Administrador', 'Coordinador', 'Observador')"
+        );
+        $user->execute(['id' => $usuarioId]);
+        if ($user->fetchColumn() === false) {
+            throw new DomainException('Solo se puede asignar un NIF a una cuenta del personal del centro.');
+        }
+
+        $this->assertIdentificadorFiscalDisponible($nif, $usuarioId);
+        $update = $this->db->prepare(
+            "UPDATE usuarios SET identificador_fiscal = :nif
+             WHERE id = :id AND rol IN ('Administrador', 'Coordinador', 'Observador')"
+        );
+        $update->execute(['nif' => $nif, 'id' => $usuarioId]);
+    }
+
+    public function actualizarCifEmpresa(int $usuarioId, string $cif): void
+    {
+        $cif = SpanishDataValidator::normalizeFiscalIdentifier($cif);
+        if (!SpanishDataValidator::isCifFormat($cif)) {
+            throw new InvalidArgumentException('Introduce un CIF con formato válido.');
+        }
+
+        $user = $this->db->prepare(
+            "SELECT id FROM usuarios WHERE id = :id AND rol = 'Empresa'"
+        );
+        $user->execute(['id' => $usuarioId]);
+        if ($user->fetchColumn() === false) {
+            throw new DomainException('Solo se puede asignar un CIF a una cuenta de empresa.');
+        }
+
+        $this->assertIdentificadorFiscalDisponible($cif, $usuarioId);
+        $update = $this->db->prepare(
+            'UPDATE empresas SET cif_empresa = :cif WHERE usuario_id = :id'
+        );
+        $update->execute(['cif' => $cif, 'id' => $usuarioId]);
+    }
+
+    private function validarNifPersonal(string $nif): string
+    {
+        $nif = SpanishDataValidator::normalizeDniNie($nif);
+        if (!SpanishDataValidator::isDniNie($nif)) {
+            throw new InvalidArgumentException('Introduce un NIF, DNI o NIE válido para el personal.');
+        }
+        return $nif;
+    }
+
+    public function assertIdentificadorFiscalDisponible(string $identifier, ?int $excludeUserId = null): void
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM (
+                SELECT u.id FROM usuarios u
+                WHERE u.identificador_fiscal IS NOT NULL
+                  AND UPPER(REPLACE(REPLACE(REPLACE(u.identificador_fiscal, ' ', ''), '-', ''), '.', '')) = :staff_nif
+                  AND (:staff_exclude IS NULL OR u.id <> :staff_exclude_id)
+                UNION ALL
+                SELECT a.usuario_id FROM alumnos a
+                WHERE UPPER(REPLACE(REPLACE(REPLACE(a.dni, ' ', ''), '-', ''), '.', '')) = :student_nif
+                  AND (:student_exclude IS NULL OR a.usuario_id <> :student_exclude_id)
+                UNION ALL
+                SELECT e.usuario_id FROM empresas e
+                WHERE UPPER(REPLACE(REPLACE(REPLACE(e.cif_empresa, ' ', ''), '-', ''), '.', '')) = :company_cif
+                  AND (:company_exclude IS NULL OR e.usuario_id <> :company_exclude_id)
+            ) AS identifiers"
+        );
+        $stmt->execute([
+            'staff_nif' => $identifier,
+            'staff_exclude' => $excludeUserId,
+            'staff_exclude_id' => $excludeUserId,
+            'student_nif' => $identifier,
+            'student_exclude' => $excludeUserId,
+            'student_exclude_id' => $excludeUserId,
+            'company_cif' => $identifier,
+            'company_exclude' => $excludeUserId,
+            'company_exclude_id' => $excludeUserId,
+        ]);
+        if ((int)$stmt->fetchColumn() > 0) {
+            throw new DomainException('Ese identificador fiscal ya está asociado a otra cuenta.');
+        }
     }
 
     public function cambiarContrasena(int $id, string $password): void

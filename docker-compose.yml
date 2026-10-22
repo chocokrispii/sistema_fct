@@ -29,6 +29,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       APP_ENV: ${APP_ENV:-production}
       FCT_DB_HOST: db
@@ -43,6 +45,15 @@ services:
       FCT_WEBHOOK_INBOUND_SECRET: ${FCT_WEBHOOK_INBOUND_SECRET:-}
       FCT_WEBHOOK_OUTBOUND_URL: ${FCT_WEBHOOK_OUTBOUND_URL:-}
       FCT_WEBHOOK_OUTBOUND_SECRET: ${FCT_WEBHOOK_OUTBOUND_SECRET:-}
+      FCT_APP_URL: ${FCT_APP_URL:-}
+      FCT_MAIL_HOST: ${FCT_MAIL_HOST:-smtp.gmail.com}
+      FCT_MAIL_PORT: ${FCT_MAIL_PORT:-587}
+      FCT_MAIL_ENCRYPTION: ${FCT_MAIL_ENCRYPTION:-tls}
+      FCT_MAIL_TRANSPORT: ${FCT_MAIL_TRANSPORT:-smtp}
+      FCT_MAIL_USERNAME: ${FCT_MAIL_USERNAME:-}
+      FCT_MAIL_PASSWORD: ${FCT_MAIL_PASSWORD:-}
+      FCT_MAIL_FROM: ${FCT_MAIL_FROM:-}
+      FCT_MAIL_FROM_NAME: ${FCT_MAIL_FROM_NAME:-Sistema FCT}
     ports:
       - "${APP_PORT:-8080}:80"
     volumes:
@@ -87,6 +98,9 @@ services:
       - ./database/migrations/008_api_access_tokens.sql:/docker-entrypoint-initdb.d/013-api-access-tokens.sql:ro
       - ./database/migrations/009_webhook_responses.sql:/docker-entrypoint-initdb.d/014-webhook-responses.sql:ro
       - ./database/migrations/011_gestion_ciclos.sql:/docker-entrypoint-initdb.d/015-gestion-ciclos.sql:ro
+      - ./database/migrations/012_alta_alumnos_personal.sql:/docker-entrypoint-initdb.d/016-alta-alumnos-personal.sql:ro
+      - ./database/migrations/013_activacion_cuentas_alumno.sql:/docker-entrypoint-initdb.d/017-activacion-cuentas-alumno.sql:ro
+      - ./database/migrations/014_identificador_fiscal_personal.sql:/docker-entrypoint-initdb.d/018-identificador-fiscal-personal.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -121,7 +135,10 @@ services:
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'api_access_tokens')
           AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_outbox'
-          AND COLUMN_NAME = 'response_body'), 1, 0)")" = "1"
+          AND COLUMN_NAME = 'response_body')
+          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios'
+          AND COLUMN_NAME = 'identificador_fiscal'), 1, 0)")" = "1"
       interval: 10s
       timeout: 5s
       retries: 10
@@ -139,6 +156,12 @@ services:
       PMA_ARBITRARY: 0
     ports:
       - "127.0.0.1:${PMA_PORT:-8082}:80"
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:${MAILPIT_WEB_PORT:-8025}:8025"
     restart: unless-stopped
 
   clamav:

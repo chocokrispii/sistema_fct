@@ -5,9 +5,12 @@ $vueEnabled = FrontendAssets::isEnabled();
 <?php if ($error !== ''): ?><p class="message message-error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if ($eliminado): ?><p class="message message-success" role="status">Usuario eliminado permanentemente.</p><?php endif; ?>
 <h2>Gestión de cuentas</h2>
+<p>El alumnado y personal acceden con NIF/DNI/NIE; las empresas, con CIF. Desde esta tabla puedes corregir el identificador del personal o de una empresa existente.</p>
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=usuarios">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
     <label>Correo <input type="email" name="email" required></label>
+    <label>NIF/DNI/NIE (identificador de acceso) <input type="text" name="identificador_fiscal" maxlength="20" autocomplete="off" required></label>
+    <small>Debe ser un NIF, DNI o NIE válido y no puede estar asignado a otra cuenta.</small>
     <label>Contraseña inicial (12-72 caracteres) <input type="password" name="password" minlength="12" maxlength="72" aria-describedby="staff-password-help" required></label>
     <small id="staff-password-help">Debe tener entre 12 y 72 caracteres. Los espacios cuentan.</small>
     <label>Nombre (para coordinador) <input type="text" name="nombre"></label>
@@ -22,10 +25,26 @@ $vueEnabled = FrontendAssets::isEnabled();
     <button type="submit">Crear cuenta del centro</button>
 </form>
 <table>
-    <thead><tr><th>Correo</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+    <thead><tr><th>Correo</th><th>Identificador fiscal de acceso</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
     <tbody><?php foreach ($usuarios as $usuario): ?>
         <tr>
             <td><?= htmlspecialchars($usuario['email'], ENT_QUOTES, 'UTF-8') ?></td>
+            <td>
+                <?php if (in_array($usuario['rol'], ['Administrador', 'Coordinador', 'Observador', 'Empresa'], true)): ?>
+                    <?php $companyAccount = $usuario['rol'] === 'Empresa'; ?>
+                    <form class="action-form" method="POST" action="index.php?action=actualizar-identificador-fiscal-usuario">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="usuario_id" value="<?= (int)$usuario['id'] ?>">
+                        <label class="visually-hidden" for="user-fiscal-id-<?= (int)$usuario['id'] ?>"><?= $companyAccount ? 'CIF' : 'NIF/DNI/NIE' ?> de <?= htmlspecialchars($usuario['email'], ENT_QUOTES, 'UTF-8') ?></label>
+                        <input id="user-fiscal-id-<?= (int)$usuario['id'] ?>" type="text" name="identificador_fiscal" value="<?= htmlspecialchars((string)($usuario['identificador_fiscal'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" maxlength="20" autocomplete="off" required>
+                        <button type="submit">Guardar <?= $companyAccount ? 'CIF' : 'NIF' ?></button>
+                    </form>
+                <?php elseif ($usuario['rol'] === 'Alumno'): ?>
+                    <?= htmlspecialchars((string)($usuario['identificador_fiscal'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                <?php else: ?>
+                    —
+                <?php endif; ?>
+            </td>
             <td><?= htmlspecialchars($usuario['nombre_completo'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= htmlspecialchars($usuario['rol'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= (int)$usuario['activo'] === 1 ? 'Activo' : 'Desactivado' ?></td>

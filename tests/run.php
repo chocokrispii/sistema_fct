@@ -74,10 +74,13 @@ foreach ($demoUsers as $demoUser) {
 }
 
 $required = [
+    'identificador_fiscal_personal' => ['table' => 'usuarios', 'column' => 'identificador_fiscal'],
     'persona_contacto' => ['table' => 'empresas', 'column' => 'persona_contacto'],
     'fecha_nacimiento' => ['table' => 'alumnos', 'column' => 'fecha_nacimiento'],
     'turno' => ['table' => 'empresa_especialidades_plazas', 'column' => 'turno'],
     'especialidad_id' => ['table' => 'convenios', 'column' => 'especialidad_id'],
+    'curso_alumno' => ['table' => 'alumnos', 'column' => 'curso'],
+    'observaciones_administrativas_alumno' => ['table' => 'alumnos', 'column' => 'observaciones_administrativas'],
     'estado_ciclo' => ['table' => 'especialidades', 'column' => 'activo'],
     'dia_semana' => ['table' => 'alumno_disponibilidad_semanal', 'column' => 'dia_semana'],
     'es_indiferente' => ['table' => 'alumno_disponibilidad', 'column' => 'es_indiferente'],
@@ -103,6 +106,12 @@ foreach ($required as $name => $definition) {
     ]);
     assertTrue((int)$stmt->fetchColumn() === 1, "Falta columna requerida para las migraciones: $name.");
 }
+$activationTable = $db->prepare(
+    'SELECT COUNT(*) FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table'
+);
+$activationTable->execute(['schema' => $testDatabase, 'table' => 'student_activation_tokens']);
+assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de enlaces de activación de alumnado.');
 $webhookTables = $db->query(
     "SELECT COUNT(*) FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('webhook_inbox', 'webhook_outbox')"
@@ -135,6 +144,8 @@ $createdOffer = null;
 $createdAgreementId = null;
 $createdAssignmentId = null;
 $createdCycleId = null;
+$createdAdminStudentUserId = null;
+$createdAdminStudentProfileId = null;
 $webhookEventId = null;
 $availabilityWebhookEventId = null;
 
@@ -423,6 +434,50 @@ try {
         ]);
         $createdStudents[] = (int)$db->lastInsertId();
     }
+    $userModel = new Usuario($db);
+    $dniLetterMap = 'TRWAGMYFPDXBNJZSQVHLCKE';
+    $staffDniNumber = hexdec(substr($fixture, 0, 7)) % 100000000;
+    $staffNif = str_pad((string)$staffDniNumber, 8, '0', STR_PAD_LEFT)
+        . $dniLetterMap[$staffDniNumber % 23];
+    $adminDniNumber = ($staffDniNumber + 1) % 100000000;
+    $adminNif = str_pad((string)$adminDniNumber, 8, '0', STR_PAD_LEFT)
+        . $dniLetterMap[$adminDniNumber % 23];
+    $observerDniNumber = ($staffDniNumber + 2) % 100000000;
+    $observerNif = str_pad((string)$observerDniNumber, 8, '0', STR_PAD_LEFT)
+        . $dniLetterMap[$observerDniNumber % 23];
+    $userModel->asignarNifPersonal($createdUsers[3], $staffNif);
+    $userModel->asignarNifPersonal($createdUsers[4], $adminNif);
+    $userModel->asignarNifPersonal($createdUsers[5], $observerNif);
+    assertTrue(
+        (int)($userModel->obtenerPorIdentificador(strtolower($dnis[0]))['id'] ?? 0) === $createdUsers[1]
+            && (int)($userModel->obtenerPorIdentificador(strtolower($cifs[0]))['id'] ?? 0) === $createdUsers[0]
+            && (int)($userModel->obtenerPorIdentificador($staffNif)['id'] ?? 0) === $createdUsers[3]
+            && (int)($userModel->obtenerPorIdentificador($adminNif)['id'] ?? 0) === $createdUsers[4]
+            && (int)($userModel->obtenerPorIdentificador($observerNif)['id'] ?? 0) === $createdUsers[5]
+            && $userModel->obtenerPorIdentificador($emails[4]) === null,
+        'El inicio de sesión debe resolver NIF del personal, DNI/NIE del alumnado y CIF de empresas, pero no correo.'
+    );
+    assertTrue(
+        SpanishDataValidator::isDniNieFormat('12345678A')
+            && !SpanishDataValidator::isDniNieFormat('1234')
+            && SpanishDataValidator::isCifFormat('B12345678')
+            && !SpanishDataValidator::isCifFormat('B1234'),
+        'La autenticación debe distinguir formatos NIF/DNI/NIE y CIF y rechazar identificadores mal formados.'
+    );
+    $updatedCif = 'B' . str_pad((string)(hexdec(substr($fixture, 1, 6)) % 10000000), 7, '0', STR_PAD_LEFT) . '7';
+    $userModel->actualizarCifEmpresa($createdUsers[0], $updatedCif);
+    assertTrue(
+        (int)($userModel->obtenerPorIdentificador($updatedCif)['id'] ?? 0) === $createdUsers[0]
+            && $userModel->obtenerPorIdentificador($cifs[0]) === null,
+        'El administrador debe poder corregir el CIF y la autenticación debe usar el valor actualizado.'
+    );
+    $duplicateStaffNifRejected = false;
+    try {
+        $userModel->asignarNifPersonal($createdUsers[6], $staffNif);
+    } catch (DomainException $exception) {
+        $duplicateStaffNifRejected = str_contains($exception->getMessage(), 'ya está asociado');
+    }
+    assertTrue($duplicateStaffNifRejected, 'No se debe asignar el mismo identificador fiscal a dos cuentas.');
     $studentProfile = (new Alumno($db))->obtenerPorUsuario($createdUsers[1]);
     assertTrue(
         $studentProfile !== null
@@ -431,6 +486,35 @@ try {
         'El portal debe recuperar el expediente y ciclo del alumno autenticado.'
     );
     $studentModel = new Alumno($db);
+    $createdAdminStudentUserId = (new Usuario($db))->crear(
+        "center-student-$fixture@example.test",
+        bin2hex(random_bytes(16)),
+        'Alumno'
+    );
+    assertTrue($createdAdminStudentUserId > 0, 'El centro debe poder crear una cuenta con una contraseña temporal segura.');
+    $createdAdminStudentProfileId = $studentModel->crearDesdePersonal(
+        $createdAdminStudentUserId,
+        'Alumno',
+        "Centro $fixture",
+        "D$fixture",
+        "center-student-$fixture@example.test",
+        $cycleId,
+        2,
+        'Observación de prueba'
+    );
+    $createdStudentByCenter = $db->prepare(
+        'SELECT curso, observaciones_administrativas, especialidad_id
+         FROM alumnos WHERE id = :id'
+    );
+    $createdStudentByCenter->execute(['id' => $createdAdminStudentProfileId]);
+    $createdStudentByCenterRow = $createdStudentByCenter->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_array($createdStudentByCenterRow)
+            && (int)$createdStudentByCenterRow['curso'] === 2
+            && $createdStudentByCenterRow['observaciones_administrativas'] === 'Observación de prueba'
+            && (int)$createdStudentByCenterRow['especialidad_id'] === $cycleId,
+        'El alta del centro debe guardar ciclo, curso y observaciones administrativas.'
+    );
     $studentModel->actualizarPerfil(
         $createdUsers[1],
         $emails[1],
@@ -1082,6 +1166,8 @@ try {
     $adminViewHtml = (string)ob_get_clean();
     assertTrue(
         str_contains($adminViewHtml, 'Coordinadora Álvarez O&#039;Connor')
+            && str_contains($adminViewHtml, 'name="identificador_fiscal"')
+            && str_contains($adminViewHtml, 'actualizar-identificador-fiscal-usuario')
             && str_contains($adminViewHtml, 'data-delete-user=')
             && (
                 FrontendAssets::isEnabled()
@@ -1171,6 +1257,18 @@ try {
             && $sessionRoute['action'] === 'session',
         'El estado de sesión debe publicarse por una ruta GET del controlador de autenticación.'
     );
+    $routes = require __DIR__ . '/../routes/web.php';
+    assertTrue(!isset($routes['registro-alumno']), 'No debe existir una ruta pública de alta de alumnos.');
+    assertTrue(
+        ($routes['alumnos-centro']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['alumnos-centro']['method'] ?? null) === ['GET', 'POST'],
+        'La creación de alumnos debe quedar limitada al personal autorizado.'
+    );
+    assertTrue(
+        ($routes['activar-cuenta']['roles'] ?? null) === []
+            && ($routes['activar-cuenta']['method'] ?? null) === ['GET', 'POST'],
+        'La activación debe aceptar enlaces públicos y proteger el cambio de contraseña mediante CSRF.'
+    );
 
     echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, disponibilidad, calificaciones, usuarios y CSRF.\n";
 } finally {
@@ -1199,6 +1297,12 @@ try {
         $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
         $stmt->execute(['offer' => $createdOffer]);
     }
+    if ($createdAdminStudentProfileId !== null) {
+        $stmt = $db->prepare('DELETE FROM auditoria WHERE entidad = :entidad AND entidad_id = :id');
+        $stmt->execute(['entidad' => 'alumnos', 'id' => $createdAdminStudentProfileId]);
+        $stmt = $db->prepare('DELETE FROM alumnos WHERE id = :id');
+        $stmt->execute(['id' => $createdAdminStudentProfileId]);
+    }
     if ($createdStudents !== []) {
         $stmt = $db->prepare('DELETE FROM alumnos WHERE id = :id');
         foreach ($createdStudents as $studentId) {
@@ -1209,10 +1313,14 @@ try {
         $stmt = $db->prepare('DELETE FROM empresas WHERE id = :id');
         $stmt->execute(['id' => $createdCompany]);
     }
-    if ($createdUsers !== []) {
+    if ($createdUsers !== [] || $createdAdminStudentUserId !== null) {
         $stmt = $db->prepare('DELETE FROM usuarios WHERE id = :id');
         foreach ($createdUsers as $userId) {
             $stmt->execute(['id' => $userId]);
+        }
+        if ($createdAdminStudentUserId !== null) {
+            $stmt = $db->prepare('DELETE FROM usuarios WHERE id = :id');
+            $stmt->execute(['id' => $createdAdminStudentUserId]);
         }
     }
     if ($createdCycleId !== null) {

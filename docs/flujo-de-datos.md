@@ -183,7 +183,9 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 | Recuperación | `recuperar`, `restablecer` | GET, POST | Público |
 |  | `recuperaciones` | GET | Administrador, Coordinador |
 |  | `verificar-recuperacion` | POST | Administrador, Coordinador |
-| Registro y catálogo autenticado | `registro-alumno`, `registro-empresa` | GET, POST | Público |
+| Registro y catálogo autenticado | `registro-empresa` | GET, POST | Público |
+|  | `alumnos-centro` | GET, POST | Administrador, Coordinador; alta de alumnos con NIF, datos de contacto y ciclo/curso |
+|  | `activar-cuenta` | GET, POST | Público con token de un solo uso; selección de contraseña y activación de la cuenta |
 |  | `ofertas` | GET | Administrador, Coordinador, Observador, Empresa |
 | Alumno | `portal-alumno`, `mis-asignaciones`, `mis-calificaciones` | GET | Alumno |
 |  | `perfil-alumno`, `disponibilidad` | GET, POST | Alumno |
@@ -221,7 +223,9 @@ La definición completa del rol de auditoría y sus límites está en [Roles y p
 | Cargar el inicio sin sesión | Navegador; Vue no sustituye el contenido público | `GET inicio` | Entrada → `home/index` | Ninguna obligatoria | Landing HTML PHP |
 | Cargar el login | `AuthLoginEnhancement` se monta junto al formulario PHP | `GET login` | `AuthController::login` | Genera/reutiliza token CSRF de sesión | HTML; isla Vue mejora el envío si Vite está habilitado |
 | Consultar sesión | `RoleDashboard` / Pinia `session` | `GET session`, `Accept: application/json` | `AuthController::session` | Consulta `usuarios` por ID de sesión y verifica `activo` | `{ success: true, data: { user, csrfToken } }`; `user` es `null` si no está autenticado |
-| Iniciar sesión | `AuthLoginEnhancement` → `api/client.ts` → Pinia | `POST login`, JSON `{ email, password }`, `X-CSRF-Token` | `AuthController::login` | `IntentoLogin` + `Usuario`; verificación de hash; `session_regenerate_id` | JSON de éxito con usuario/rol y nuevo token; errores JSON con status HTTP; sin JSON sigue formulario/redirección |
+| Iniciar sesión | `AuthLoginEnhancement` → `api/client.ts` → Pinia | `POST login`, JSON `{ identifier, password }`, `X-CSRF-Token` | `AuthController::login` | `IntentoLogin` + `Usuario`; correo para personal y CIF de empresa o DNI/NIE de alumno según rol; verificación de hash; `session_regenerate_id` | JSON de éxito con usuario/rol y nuevo token; errores JSON con status HTTP; sin JSON sigue formulario/redirección |
+| Enviar activación al alumno | `AlumnoAdminController` | `POST alumnos-centro` | `AuthMiddleware` (Administrador/Coordinador) + `CsrfMiddleware` | Cuenta inactiva, hash de token de 256 bits y expiración de 24 horas; PHPMailer por SMTP TLS | Enlace de un solo uso para elegir contraseña; si SMTP falla, se revierte la creación |
+| Activar cuenta del alumno | Formulario PHP de activación | `GET, POST activar-cuenta` | `ActivacionController` | Comprueba hash, expiración y uso; guarda hash de la contraseña y marca token usado en una transacción | Mensaje de activación; no se permite reutilizar el enlace |
 | Cerrar sesión | Pinia `session` / formulario PHP | `POST logout`; JSON incluye `X-CSRF-Token` o form usa `_csrf` | `AuthController::logout` | Destruye sesión y expira cookie | JSON `{ user: null }` o redirección HTML a login |
 | Editar perfil de alumno | `StudentProfile` + Pinia `student-profile` | `POST perfil-alumno`, JSON con `X-CSRF-Token`; fallback urlencoded con `_csrf` | `AuthMiddleware` (Alumno) + `CsrfMiddleware` → `AlumnoController::editarPerfil` | Validación del servidor y `Alumno::actualizarPerfil`; transacción sobre usuario, alumno, contacto y tutor | JSON `{ success: true, data: { message } }` / `{ success: false, error }`; fallback HTML con redirección |
 | Guardar disponibilidad semanal | `AvailabilitySchedule` dentro del formulario PHP | `POST disponibilidad`, JSON `{ fecha_inicio, fecha_fin, turno, es_indiferente, horarios }` con `X-CSRF-Token`; fallback urlencoded con `_csrf` | `AuthMiddleware` (Alumno) + `CsrfMiddleware` → `DisponibilidadController::gestionar` | Valida periodo y franjas exactas; `turno` se conserva como dato legado y no decide compatibilidad. `Disponibilidad::reemplazar` actualiza las tablas de disponibilidad en una transacción | JSON `{ success: true, data: { message } }` / `{ success: false, error }`; fallback HTML con redirección |

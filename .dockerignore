@@ -3,6 +3,7 @@
 .env.*
 !.env.docker.example
 node_modules
+vendor
 public/build
 storage/*
 !storage/.htaccess

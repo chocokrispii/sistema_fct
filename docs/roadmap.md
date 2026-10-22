@@ -155,7 +155,7 @@ flowchart TB
 | Recuperación | `GET, POST restablecer` | PENDING | Formulario PHP síncrono | Isla progresiva con validación y JSON | Token hash, expiración, uso único y política de contraseña | P2 |
 | Administración | `GET recuperaciones` | PENDING | Listado PHP protegido | Mantener lectura PHP; mejorar acciones sólo cuando haya necesidad | Administrador/Coordinador | P3 |
 | Administración | `POST verificar-recuperacion` | PENDING | Formulario PHP síncrono | Isla JSON con estado y errores accesibles | Autorización, CSRF y auditoría/limpieza de token | P2 |
-| Portal del alumno | `GET, POST registro-alumno` | PENDING | Registro PHP síncrono | Isla con JSON/Pinia y fallback | Validadores de identidad y transacción Usuario/Alumno/Tutor | P2 |
+| Administración | `GET, POST alumnos-centro` | COMPLETED | Formulario PHP para altas por Administrador/Coordinador; contraseña temporal aleatoria de un solo vistazo | Mantener flujo de mejora progresiva | CSRF, validación NIF/DNI/NIE, ciclo activo, curso 1.º/2.º, transacción y auditoría | P2 |
 | Portal del alumno | `GET portal-alumno` | PENDING | Vista PHP de expediente | Mantener render inicial PHP; añadir isla sólo para widgets interactivos | Rol Alumno y datos del propio expediente | P3 |
 | Portal del alumno | `GET, POST perfil-alumno` | COMPLETED | Isla `StudentProfile`, DTO JSON, store `student-profile`, fallback PHP | Mantener contrato y ampliar sólo ante nuevos campos | Validación de expediente y transacción del modelo | P3 |
 | Empresa y ofertas | `GET, POST registro-empresa` | PENDING | Registro PHP síncrono | Isla con contrato JSON y estado Pinia manteniendo fallback | Creación atómica Usuario/Empresa y unicidad de correo/CIF | P2 |
