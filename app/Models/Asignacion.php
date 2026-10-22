@@ -177,6 +177,7 @@ class Asignacion
                 "SELECT 1
                  FROM alumnos a
                  INNER JOIN empresa_especialidades_plazas p ON p.especialidad_id = a.especialidad_id
+                 INNER JOIN especialidades es ON es.id = p.especialidad_id AND es.activo = 1
                  INNER JOIN alumno_disponibilidad d
                     ON d.alumno_id = a.id
                     AND d.fecha_inicio <= p.fecha_inicio AND d.fecha_fin >= p.fecha_fin

@@ -18,6 +18,7 @@ class Oferta {
 
     private const FROM_CANDIDATOS =
         'FROM empresa_especialidades_plazas p
+         INNER JOIN especialidades es ON es.id = p.especialidad_id AND es.activo = 1
          INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
          INNER JOIN alumno_disponibilidad d
             ON d.alumno_id = a.id
@@ -279,6 +280,7 @@ class Oferta {
     {
         $sql = "SELECT a.id AS alumno_id, a.nombre, a.apellidos, a.correo
                 FROM empresa_especialidades_plazas p
+                INNER JOIN especialidades es ON es.id = p.especialidad_id AND es.activo = 1
                 INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
                 INNER JOIN alumno_disponibilidad d
                     ON d.alumno_id = a.id

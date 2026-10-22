@@ -21,6 +21,7 @@ require_once __DIR__ . '/../app/Controllers/AsignacionController.php';
 require_once __DIR__ . '/../app/Controllers/CalificacionController.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
 require_once __DIR__ . '/../app/Controllers/UsuarioAdminController.php';
+require_once __DIR__ . '/../app/Controllers/EspecialidadAdminController.php';
 require_once __DIR__ . '/../app/Controllers/ConsultaController.php';
 require_once __DIR__ . '/../app/Controllers/ApiTokenAdminController.php';
 require_once __DIR__ . '/../app/Controllers/IntegrationTestController.php';

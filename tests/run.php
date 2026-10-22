@@ -78,6 +78,7 @@ $required = [
     'fecha_nacimiento' => ['table' => 'alumnos', 'column' => 'fecha_nacimiento'],
     'turno' => ['table' => 'empresa_especialidades_plazas', 'column' => 'turno'],
     'especialidad_id' => ['table' => 'convenios', 'column' => 'especialidad_id'],
+    'estado_ciclo' => ['table' => 'especialidades', 'column' => 'activo'],
     'dia_semana' => ['table' => 'alumno_disponibilidad_semanal', 'column' => 'dia_semana'],
     'es_indiferente' => ['table' => 'alumno_disponibilidad', 'column' => 'es_indiferente'],
     'nota' => ['table' => 'calificaciones_fct', 'column' => 'nota'],
@@ -339,13 +340,45 @@ try {
     $_SESSION = [];
     http_response_code(200);
 
-    $cycleId = (int)$db->query('SELECT id FROM especialidades ORDER BY id LIMIT 1')->fetchColumn();
-    if ($cycleId === 0) {
-        $cycle = $db->prepare('INSERT INTO especialidades (nombre_especialidad) VALUES (:nombre)');
-        $cycle->execute(['nombre' => "Ciclo de prueba $fixture"]);
-        $cycleId = (int)$db->lastInsertId();
-        $createdCycleId = $cycleId;
+    $specialtyModel = new Especialidad($db);
+    $createdCycleId = $specialtyModel->crear("Ciclo de prueba $fixture");
+    $cycleId = $createdCycleId;
+    assertTrue(
+        $specialtyModel->existe($cycleId)
+            && in_array(
+                $cycleId,
+                array_map(static fn(array $cycle): int => (int)$cycle['id'], $specialtyModel->obtenerTodas()),
+                true
+            ),
+        'Un ciclo nuevo debe estar disponible de inmediato para formularios y procesos de la aplicación.'
+    );
+    $duplicateCycleRejected = false;
+    try {
+        $specialtyModel->crear("Ciclo de prueba $fixture");
+    } catch (DomainException) {
+        $duplicateCycleRejected = true;
     }
+    assertTrue($duplicateCycleRejected, 'No se deben crear ciclos duplicados.');
+    assertTrue($specialtyModel->retirar($cycleId), 'El administrador debe poder retirar un ciclo.');
+    assertTrue(
+        !$specialtyModel->existe($cycleId)
+            && !in_array(
+                $cycleId,
+                array_map(static fn(array $cycle): int => (int)$cycle['id'], $specialtyModel->obtenerTodas()),
+                true
+            ),
+        'Un ciclo retirado no debe ofrecerse en formularios ni aceptarse en nuevas operaciones.'
+    );
+    $retiredCycle = array_values(array_filter(
+        $specialtyModel->obtenerTodas(false),
+        static fn(array $cycle): bool => (int)$cycle['id'] === $cycleId
+    ))[0] ?? null;
+    assertTrue(
+        $retiredCycle !== null && (int)$retiredCycle['activo'] === 0,
+        'Retirar un ciclo debe conservarlo en el catálogo administrativo.'
+    );
+    assertTrue($specialtyModel->reactivar($cycleId), 'El administrador debe poder reactivar un ciclo.');
+    assertTrue($specialtyModel->existe($cycleId), 'Un ciclo reactivado debe volver a estar disponible.');
 
     $companyInsert = $db->prepare(
         'INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto)
@@ -871,7 +904,28 @@ try {
         'El motor de compatibilidad debe exigir que la disponibilidad cubra las horas exactas de la oferta.'
     );
 
+    assertTrue($specialtyModel->retirar($cycleId), 'El ciclo de la oferta debe poder retirarse.');
+    assertTrue(
+        $matching->obtenerCandidatos($createdOffer) === [],
+        'Las ofertas de un ciclo retirado no deben generar candidatos nuevos.'
+    );
     $assignments = new Asignacion($db);
+    $retiredCycleAssignmentRejected = false;
+    try {
+        $assignments->crear($createdOffer, $createdStudents[0], $createdUsers[3], 'Tutor de empresa');
+    } catch (DomainException) {
+        $retiredCycleAssignmentRejected = true;
+    }
+    assertTrue(
+        $retiredCycleAssignmentRejected,
+        'La asignación manual también debe impedir emparejar ofertas de ciclos retirados.'
+    );
+    assertTrue($specialtyModel->reactivar($cycleId), 'El ciclo debe poder reactivarse para continuar la prueba.');
+    assertTrue(
+        count($matching->obtenerCandidatos($createdOffer)) === 1,
+        'Al reactivar un ciclo, sus ofertas deben volver a participar en el emparejamiento.'
+    );
+
     $partialCoverageRejected = false;
     try {
         $assignments->crear($createdOffer, $createdStudents[1], $createdUsers[3], 'Tutor de empresa');

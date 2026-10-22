@@ -51,7 +51,7 @@
                             </label>
                         <?php endforeach; ?>
                     </div>
-                    <small>Selecciona un ciclo por oferta; DAW y DAM se gestionan como ciclos independientes.</small>
+                    <small>Selecciona el ciclo formativo al que corresponde esta oferta.</small>
                 </div>
                 <div class="offer-create__field">
                     <label for="offer-vacancies">Número de plazas</label>

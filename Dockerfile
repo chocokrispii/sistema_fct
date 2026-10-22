@@ -23,15 +23,19 @@ RUN apt-get update \
 COPY --from=composer /usr/bin/composer /usr/bin/composer
 COPY config/php-upload.ini /usr/local/etc/php/conf.d/zzz-fct-upload.ini
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
+COPY docker/storage-entrypoint.sh /usr/local/bin/fct-storage-entrypoint
 COPY . /var/www/html
 COPY --from=frontend-build /app/public/build /var/www/html/public/build
 
 RUN mkdir -p /var/lib/fct/storage \
+    && chmod 755 /usr/local/bin/fct-storage-entrypoint \
     && chown -R www-data:www-data /var/lib/fct/storage \
     && chown -R www-data:www-data /var/www/html/storage \
     && chmod 700 /var/lib/fct/storage
 
 ENV FCT_STORAGE_PATH=/var/lib/fct/storage
+
+ENTRYPOINT ["/usr/local/bin/fct-storage-entrypoint"]
 
 WORKDIR /var/www/html
 
