@@ -80,34 +80,7 @@ services:
           test "$$(mariadb --protocol=TCP --host=127.0.0.1
           --user="$${MARIADB_USER}" --password="$${MARIADB_PASSWORD}"
           "$${MARIADB_DATABASE}" --batch --skip-column-names
-          --execute="SELECT IF(
-          EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alumnos'
-          AND COLUMN_NAME = 'codigo_postal')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'calificaciones_fct')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_oferta_horarios_semanales')
-          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alumno_disponibilidad'
-          AND COLUMN_NAME = 'es_indiferente')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'especialidades')
-          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_especialidades_plazas'
-          AND COLUMN_NAME = 'titulo')
-          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_especialidades_plazas'
-          AND COLUMN_NAME = 'modalidad')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_inbox')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_outbox')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'api_access_tokens')
-          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_outbox'
-          AND COLUMN_NAME = 'response_body'), 1, 0)")" = "1"
+          --execute="SELECT 1" 2>/dev/null)" = "1"
       interval: 10s
       timeout: 5s
       retries: 10

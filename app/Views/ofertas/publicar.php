@@ -1,4 +1,7 @@
-<?php $previewMode = ($previewMode ?? false) === true; ?>
+<?php
+$previewMode = ($previewMode ?? false) === true;
+$partidaEnabled = ($formValues['jornada'] ?? 'normal') === 'partida';
+?>
 <section class="offer-create-page" aria-labelledby="offer-create-title">
     <nav class="offer-create__breadcrumbs" aria-label="Ruta de navegación">
         <a href="index.php?action=ofertas">Ofertas</a>
@@ -95,9 +98,9 @@
                             <th scope="col">Día</th>
                             <th scope="col">Activo</th>
                             <th scope="col">Inicio (1.ª franja)</th>
-                            <th scope="col"><span class="visually-hidden">Fin (1.ª franja)</span></th>
-                            <th scope="col" data-partida-column><span class="visually-hidden">Inicio (2.ª franja)</span></th>
-                            <th scope="col" data-partida-column>Fin (2.ª franja)</th>
+                            <th scope="col">Fin (1.ª franja)</th>
+                            <th scope="col" data-partida-column <?= $partidaEnabled ? '' : 'hidden' ?>>Inicio (2.ª franja)</th>
+                            <th scope="col" data-partida-column <?= $partidaEnabled ? '' : 'hidden' ?>>Fin (2.ª franja)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -118,11 +121,11 @@
                                     <label class="visually-hidden" for="offer-end-<?= $day ?>"><?= htmlspecialchars($name . ', hora de fin', ENT_QUOTES, 'UTF-8') ?></label>
                                     <input id="offer-end-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_fin]" value="<?= ($formValues['jornada'] ?? 'normal') === 'partida' ? '14:00' : '17:00' ?>" step="300">
                                 </td>
-                                <td data-partida-column>
+                                <td data-partida-column <?= $partidaEnabled ? '' : 'hidden' ?>>
                                     <label class="visually-hidden" for="offer-start-2-<?= $day ?>"><?= htmlspecialchars($name . ', hora de inicio de la segunda franja', ENT_QUOTES, 'UTF-8') ?></label>
                                     <input id="offer-start-2-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_inicio_2]" value="<?= ($formValues['jornada'] ?? 'normal') === 'partida' ? '16:00' : '' ?>" step="300" data-partida-field>
                                 </td>
-                                <td data-partida-column>
+                                <td data-partida-column <?= $partidaEnabled ? '' : 'hidden' ?>>
                                     <label class="visually-hidden" for="offer-end-2-<?= $day ?>"><?= htmlspecialchars($name . ', hora de fin de la segunda franja', ENT_QUOTES, 'UTF-8') ?></label>
                                     <input id="offer-end-2-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_fin_2]" value="<?= ($formValues['jornada'] ?? 'normal') === 'partida' ? '21:00' : '' ?>" step="300" data-partida-field>
                                 </td>

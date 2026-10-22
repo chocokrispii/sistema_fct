@@ -82,9 +82,6 @@ $actionActual = $_GET['action'] ?? '';
 $nombreUsuario = $_SESSION['nombre'] ?? $_SESSION['email'] ?? 'Usuario';
 $csrfToken = $usuarioAutenticado ? htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') : '';
 $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
-$sessionIsland = $usuarioAutenticado
-    ? '<div data-vue-island="SessionControls" data-prop-csrf-token="' . $csrfToken . '"></div>'
-    : '';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -99,7 +96,7 @@ $sessionIsland = $usuarioAutenticado
         <link rel="stylesheet" href="assets/css/style.css?v=<?= (int)filemtime(__DIR__ . '/../../../public/assets/css/style.css') ?>">
     <?php endif; ?>
     <script src="assets/js/password-toggle.js" defer></script>
-    <?= FrontendAssets::render($contenido . $themeIsland . $sessionIsland) ?>
+    <?= FrontendAssets::render($contenido . $themeIsland) ?>
 </head>
 <body data-role="<?= htmlspecialchars(strtolower($rolActual ?? 'publico'), ENT_QUOTES, 'UTF-8') ?>">
 <div class="app-shell">
@@ -122,14 +119,6 @@ $sessionIsland = $usuarioAutenticado
                 </a>
             <?php endforeach; ?>
         </nav>
-        <?php if ($usuarioAutenticado): ?>
-            <div class="app-sidebar__bottom">
-                <form method="POST" action="index.php?action=logout">
-                    <input type="hidden" name="_csrf" value="<?= $csrfToken ?>">
-                    <button type="submit"><span class="app-nav__icon"><?= $svg('salir') ?></span><span>Cerrar sesión</span></button>
-                </form>
-            </div>
-        <?php endif; ?>
     </aside>
     <div class="app-main">
         <header class="app-topbar">
@@ -154,7 +143,6 @@ $sessionIsland = $usuarioAutenticado
                             <a href="index.php"><?= $svg('inicio') ?><span>Inicio</span></a>
                         <?php endif; ?>
                         <div class="app-menu__sep"></div>
-                        <?= $sessionIsland ?>
                         <form method="POST" action="index.php?action=logout"><input type="hidden" name="_csrf" value="<?= $csrfToken ?>"><button type="submit" class="is-danger"><?= $svg('salir') ?><span>Cerrar sesión</span></button></form>
                     </div>
                 </details>
