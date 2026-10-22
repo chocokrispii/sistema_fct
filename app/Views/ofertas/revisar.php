@@ -55,6 +55,7 @@
                     <label>Motivo u observación <input type="text" name="motivo" maxlength="500"></label>
                     <button name="decision" value="Aprobada" type="submit">Aprobar</button>
                     <button name="decision" value="Rechazada" type="submit">Rechazar</button>
+                    <a href="index.php?action=revisar-convenios">Consultar convenios</a>
                 </form>
             <?php else: ?>
                 <p>La resolución de ofertas está reservada a administración.</p>

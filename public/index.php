@@ -107,7 +107,12 @@ try {
     if (JsonResponse::wantsJson()) {
         JsonResponse::failure('No se pudo completar la solicitud.', http_response_code());
     } else {
-        View::render('errors/generic', ['status' => http_response_code()]);
+        $dbUnavailable = $e instanceof PDOException
+            && in_array((int)($e->errorInfo[1] ?? 0), [2002, 2006, 2013], true);
+        if ($dbUnavailable) {
+            http_response_code(503);
+        }
+        View::render('errors/generic', ['status' => http_response_code(), 'dbUnavailable' => $dbUnavailable]);
     }
 }
 

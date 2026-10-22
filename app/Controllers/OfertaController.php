@@ -246,7 +246,7 @@ class OfertaController {
                 }
                 if (!$offer || !$agreement->fetchColumn()) {
                     throw new DomainException($offer
-                        ? 'No se puede aprobar: falta un convenio aprobado para el mismo ciclo y que cubra todo el periodo.'
+                        ? $this->describeMissingAgreement($offer)
                         : 'La oferta no existe o ya fue revisada.');
                 }
             }
@@ -641,6 +641,97 @@ class OfertaController {
         }
         unset($offer);
         return $offers;
+    }
+
+    private function describeMissingAgreement(array $offer): string
+    {
+        $cycleStatement = $this->db->prepare(
+            'SELECT nombre_especialidad FROM especialidades WHERE id = :especialidad_id'
+        );
+        $cycleStatement->execute(['especialidad_id' => $offer['especialidad_id']]);
+        $requiredCycle = $cycleStatement->fetchColumn();
+        $requiredCycle = is_string($requiredCycle) ? $requiredCycle : 'el ciclo de la oferta';
+
+        $stmt = $this->db->prepare(
+            'SELECT c.especialidad_id, e.nombre_especialidad, c.estado, c.fecha_inicio, c.fecha_fin
+             FROM convenios c
+             LEFT JOIN especialidades e ON e.id = c.especialidad_id
+             WHERE c.empresa_id = :empresa_id
+             ORDER BY c.especialidad_id = :especialidad_id DESC, c.fecha_inicio DESC'
+        );
+        $stmt->execute([
+            'empresa_id' => $offer['empresa_id'],
+            'especialidad_id' => $offer['especialidad_id'],
+        ]);
+        $agreements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $matchingAgreement = null;
+        foreach ($agreements as $agreement) {
+            if ((int)($agreement['especialidad_id'] ?? 0) === (int)$offer['especialidad_id']) {
+                $matchingAgreement = $agreement;
+                break;
+            }
+        }
+
+        $period = 'del ' . $offer['fecha_inicio'] . ' al ' . $offer['fecha_fin'];
+        if ($matchingAgreement !== null) {
+            $cycle = $matchingAgreement['nombre_especialidad'] ?? $requiredCycle;
+            if ($matchingAgreement['estado'] !== 'Aprobado') {
+                return sprintf(
+                    'No se puede aprobar: el convenio de %s está %s y debe estar aprobado. La oferta requiere cobertura durante el periodo %s.',
+                    $cycle,
+                    $matchingAgreement['estado'],
+                    $period
+                );
+            }
+
+            $gaps = [];
+            if ($matchingAgreement['fecha_inicio'] > $offer['fecha_inicio']) {
+                $gaps[] = 'el convenio comienza el ' . $matchingAgreement['fecha_inicio'] . ', después del inicio de la oferta';
+            }
+            if ($matchingAgreement['fecha_fin'] < $offer['fecha_fin']) {
+                $gaps[] = 'el convenio vence el ' . $matchingAgreement['fecha_fin'] . ', antes del fin de la oferta';
+            }
+            if ($gaps !== []) {
+                return sprintf(
+                    'No se puede aprobar: el convenio aprobado de %s cubre del %s al %s, pero la oferta requiere del %s al %s; %s.',
+                    $cycle,
+                    $matchingAgreement['fecha_inicio'],
+                    $matchingAgreement['fecha_fin'],
+                    $offer['fecha_inicio'],
+                    $offer['fecha_fin'],
+                    implode(' y ', $gaps)
+                );
+            }
+        }
+
+        if ($agreements === []) {
+            return 'No se puede aprobar: esta empresa no tiene convenios registrados. Se requiere uno aprobado para '
+                . $requiredCycle . ' que cubra el periodo '
+                . $period . '.';
+        }
+
+        $available = [];
+        foreach (array_slice($agreements, 0, 3) as $agreement) {
+            $cycle = $agreement['nombre_especialidad'] ?? 'ciclo sin clasificar';
+            $available[] = sprintf(
+                '%s (%s, %s a %s)',
+                $cycle,
+                $agreement['estado'],
+                $agreement['fecha_inicio'],
+                $agreement['fecha_fin']
+            );
+        }
+        $suffix = count($agreements) > count($available)
+            ? ' y otros convenios'
+            : '';
+
+        return sprintf(
+            'No se puede aprobar: no hay un convenio aprobado para %s que cubra el periodo %s. Convenios registrados: %s%s.',
+            $requiredCycle,
+            $period,
+            implode('; ', $available),
+            $suffix
+        );
     }
 
     private function formValues(array $request): array

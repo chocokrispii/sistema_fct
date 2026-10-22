@@ -278,11 +278,15 @@ class ConvenioController
             ]);
             $this->db->commit();
         } catch (Throwable $e) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
             if (is_file($destination) && !unlink($destination)) {
                 error_log('No se pudo retirar un archivo de convenio tras fallar su registro.');
+            }
+            try {
+                if ($this->db->inTransaction()) {
+                    $this->db->rollBack();
+                }
+            } catch (Throwable $rollbackError) {
+                error_log('No se pudo revertir la transacción del convenio: ' . $rollbackError->getMessage());
             }
             if ($e instanceof PDOException && (int)($e->errorInfo[1] ?? 0) === 1062) {
                 throw new InvalidArgumentException('Ya existe un convenio registrado para ese ciclo formativo.', 0, $e);
