@@ -16,13 +16,13 @@ $partidaEnabled = ($formValues['jornada'] ?? 'normal') === 'partida';
     </header>
 
     <?php if ($error !== ''): ?>
-        <p class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
+        <p id="offer-publication-error" class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
     <?php endif; ?>
     <?php if (isset($_GET['publicada'])): ?>
         <p class="message message-success" role="status">Oferta enviada a revisión.</p>
     <?php endif; ?>
 
-    <form class="page-form offer-create__form" method="POST" action="index.php?action=<?= $previewMode ? 'preview-publicar-oferta' : 'publicar-oferta' ?>">
+    <form class="page-form offer-create__form" method="POST" action="index.php?action=<?= $previewMode ? 'preview-publicar-oferta' : 'publicar-oferta' ?>"<?= $error !== '' ? ' aria-describedby="offer-publication-error"' : '' ?>>
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
 
         <section class="offer-create__section" aria-labelledby="offer-general-title">
@@ -105,29 +105,46 @@ $partidaEnabled = ($formValues['jornada'] ?? 'normal') === 'partida';
                     </thead>
                     <tbody>
                         <?php foreach ([1 => 'Lunes', 2 => 'Martes', 3 => 'Miércoles', 4 => 'Jueves', 5 => 'Viernes', 6 => 'Sábado', 7 => 'Domingo'] as $day => $name): ?>
+                            <?php
+                            $daySchedule = $formValues['horarios'][$day] ?? [];
+                            $hasPostedSchedule = array_key_exists('horarios', $formValues);
+                            $dayActive = $hasPostedSchedule
+                                ? (bool)($daySchedule['activo'] ?? false)
+                                : $day <= 5;
+                            $dayStart = $daySchedule['hora_inicio'] ?? ($hasPostedSchedule ? '' : '09:00');
+                            $dayEnd = $daySchedule['hora_fin'] ?? ($hasPostedSchedule
+                                ? ''
+                                : (($formValues['jornada'] ?? 'normal') === 'partida' ? '14:00' : '17:00'));
+                            $daySecondStart = $daySchedule['hora_inicio_2'] ?? ($hasPostedSchedule
+                                ? ''
+                                : (($formValues['jornada'] ?? 'normal') === 'partida' ? '16:00' : ''));
+                            $daySecondEnd = $daySchedule['hora_fin_2'] ?? ($hasPostedSchedule
+                                ? ''
+                                : (($formValues['jornada'] ?? 'normal') === 'partida' ? '21:00' : ''));
+                            ?>
                             <tr class="offer-weekday">
                                 <th scope="row"><?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?></th>
                                 <td>
                                     <label class="offer-weekday__active">
-                                        <input type="checkbox" name="horarios[<?= $day ?>][activo]" value="1" aria-label="<?= htmlspecialchars($name . ', activo', ENT_QUOTES, 'UTF-8') ?>" <?= $day <= 5 ? 'checked' : '' ?>>
-                                        <span data-day-active-label><?= $day <= 5 ? 'Sí' : 'No' ?></span>
+                                        <input type="checkbox" name="horarios[<?= $day ?>][activo]" value="1" aria-label="<?= htmlspecialchars($name . ', activo', ENT_QUOTES, 'UTF-8') ?>" <?= $dayActive ? 'checked' : '' ?>>
+                                        <span data-day-active-label><?= $dayActive ? 'Sí' : 'No' ?></span>
                                     </label>
                                 </td>
                                 <td>
                                     <label class="visually-hidden" for="offer-start-<?= $day ?>"><?= htmlspecialchars($name . ', hora de inicio', ENT_QUOTES, 'UTF-8') ?></label>
-                                    <input id="offer-start-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_inicio]" value="09:00" step="300">
+                                    <input id="offer-start-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_inicio]" value="<?= htmlspecialchars($dayStart, ENT_QUOTES, 'UTF-8') ?>" step="300">
                                 </td>
                                 <td>
                                     <label class="visually-hidden" for="offer-end-<?= $day ?>"><?= htmlspecialchars($name . ', hora de fin', ENT_QUOTES, 'UTF-8') ?></label>
-                                    <input id="offer-end-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_fin]" value="<?= ($formValues['jornada'] ?? 'normal') === 'partida' ? '14:00' : '17:00' ?>" step="300">
+                                    <input id="offer-end-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_fin]" value="<?= htmlspecialchars($dayEnd, ENT_QUOTES, 'UTF-8') ?>" step="300">
                                 </td>
                                 <td data-partida-column <?= $partidaEnabled ? '' : 'hidden' ?>>
                                     <label class="visually-hidden" for="offer-start-2-<?= $day ?>"><?= htmlspecialchars($name . ', hora de inicio de la segunda franja', ENT_QUOTES, 'UTF-8') ?></label>
-                                    <input id="offer-start-2-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_inicio_2]" value="<?= ($formValues['jornada'] ?? 'normal') === 'partida' ? '16:00' : '' ?>" step="300" data-partida-field>
+                                    <input id="offer-start-2-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_inicio_2]" value="<?= htmlspecialchars($daySecondStart, ENT_QUOTES, 'UTF-8') ?>" step="300" data-partida-field>
                                 </td>
                                 <td data-partida-column <?= $partidaEnabled ? '' : 'hidden' ?>>
                                     <label class="visually-hidden" for="offer-end-2-<?= $day ?>"><?= htmlspecialchars($name . ', hora de fin de la segunda franja', ENT_QUOTES, 'UTF-8') ?></label>
-                                    <input id="offer-end-2-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_fin_2]" value="<?= ($formValues['jornada'] ?? 'normal') === 'partida' ? '21:00' : '' ?>" step="300" data-partida-field>
+                                    <input id="offer-end-2-<?= $day ?>" type="time" name="horarios[<?= $day ?>][hora_fin_2]" value="<?= htmlspecialchars($daySecondEnd, ENT_QUOTES, 'UTF-8') ?>" step="300" data-partida-field>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

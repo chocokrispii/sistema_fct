@@ -1,5 +1,5 @@
 <section class="availability-page" aria-labelledby="availability-title">
-    <?php if ($error !== ''): ?><p class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+    <?php if ($error !== ''): ?><p id="availability-error" class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
     <?php if (isset($_GET['guardada'])): ?><p class="message message-success" role="status">Disponibilidad guardada.</p><?php endif; ?>
     <div class="availability-page__intro">
         <span class="student-registration__eyebrow">Área de alumnado</span>
@@ -41,7 +41,7 @@
         ),
     ];
     ?>
-    <form class="page-form page-form--narrow" method="POST" action="index.php?action=disponibilidad">
+    <form class="page-form page-form--narrow" method="POST" action="index.php?action=disponibilidad"<?= $error !== '' ? ' aria-describedby="availability-error"' : '' ?>>
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($scheduleState['csrf'], ENT_QUOTES, 'UTF-8') ?>">
     <input type="hidden" name="turno" value="M">
         <div

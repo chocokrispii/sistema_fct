@@ -1175,7 +1175,11 @@ try {
             && !str_contains($newStudentAvailabilityHtml, 'name="horarios[1][activo]" value="1" aria-label="Lunes" disabled'),
         'Un alumno sin disponibilidad debe recibir horarios editables y no indiferentes por defecto.'
     );
-    $availability->execute(['alumno' => $createdStudents[1]]);
+    $availability->execute([
+        'alumno' => $createdStudents[1],
+        'inicio' => $availabilityStart,
+        'fin' => $availabilityEnd,
+    ]);
     $weeklySchedule->execute([
         'periodo' => (int)$db->lastInsertId(),
         'dia_semana' => 1,
@@ -1414,7 +1418,7 @@ try {
         '2027-03-15',
         "Oferta de prueba $fixture",
         'Descripción de prueba de la oferta.',
-        'P',
+        'Indiferente',
         'Híbrido',
         'Madrid',
         'Trabajo en equipo.',
@@ -1436,7 +1440,6 @@ try {
         $savedOffer !== null
             && $savedOffer['titulo'] === "Oferta de prueba $fixture"
             && $savedOffer['descripcion'] === 'Descripción de prueba de la oferta.'
-            && $savedOffer['turno'] === 'P'
             && $savedOffer['modalidad'] === 'Híbrido'
             && $savedOffer['ubicacion'] === 'Madrid'
             && $savedOffer['requisitos'] === 'Trabajo en equipo.'
@@ -1454,6 +1457,7 @@ try {
     $_SESSION = ['usuario_id' => $createdUsers[3]];
     $publishOffer = new ReflectionMethod(OfertaController::class, 'procesarPublicacion');
     $publishOffer->setAccessible(true);
+    $offerDate = '2027-03-15';
     $splitOfferRequest = [
         'especialidad_id' => (string)$cycleId,
         'plazas' => '1',
@@ -1701,6 +1705,7 @@ try {
         $availabilityStart,
         $availabilityEnd,
         'M',
+        false,
         [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
     );
     $remainingCandidates = $matching->obtenerCandidatos($createdOffer);
@@ -2143,10 +2148,8 @@ try {
     (new OfertaController($db))->listar();
     $assignedStudentOfferListingHtml = (string)ob_get_clean();
     assertTrue(
-        str_contains(
-            $assignedStudentOfferListingHtml,
-            'Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.'
-        ),
+        str_contains($assignedStudentOfferListingHtml, 'Ya tienes una práctica asignada')
+            && str_contains($assignedStudentOfferListingHtml, 'Cuando finalice, podrás consultar nuevas ofertas compatibles.'),
         'El listado debe explicar que las nuevas ofertas no están disponibles mientras haya una práctica activa.'
     );
 
@@ -2155,6 +2158,7 @@ try {
         $eventStart->modify('-2 days')->format('Y-m-d'),
         $eventEnd->modify('+5 days')->format('Y-m-d'),
         'M',
+        false,
         [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
     );
     $upcomingAvailability = $availabilityModel->obtenerVigentesPorUsuario(
@@ -2198,30 +2202,35 @@ try {
     assertTrue(
         str_contains(
             $compatibleDashboardHtml,
-            'Del ' . $eventStart->format('d/m/Y') . ' al ' . $eventEnd->format('d/m/Y') . ' - Turno mañana'
+            'Del ' . $eventStart->format('d/m/Y') . ' al ' . $eventEnd->format('d/m/Y') . ' - Jornada partida'
         ),
-        'La tarjeta debe mostrar las fechas de la oferta y traducir su turno al castellano.'
+        'La tarjeta debe mostrar las fechas y la jornada partida de la oferta.'
     );
+    $compatibleListingChecks = [
+        'heading' => str_contains($compatibleOfferListingHtml, 'Ofertas compatibles con tu perfil'),
+        'accessible wrapper' => str_contains($compatibleOfferListingHtml, '<div class="assignments-table-wrap" role="region" aria-label="Listado de ofertas" tabindex="0">'),
+        'caption' => str_contains($compatibleOfferListingHtml, '<caption>Ofertas compatibles con tu perfil</caption>'),
+        'company header' => str_contains($compatibleOfferListingHtml, '<th scope="col">Empresa</th>'),
+        'vacancies header' => str_contains($compatibleOfferListingHtml, '<th scope="col">Vacantes disponibles</th>'),
+        'one available vacancy' => str_contains($compatibleOfferListingHtml, '<td>1</td>'),
+        'split jornada' => str_contains($compatibleOfferListingHtml, '<td>Jornada partida</td>'),
+        'start date' => str_contains($compatibleOfferListingHtml, '<td>' . $eventStart->format('Y-m-d') . ' –'),
+        'end date' => str_contains($compatibleOfferListingHtml, $eventEnd->format('Y-m-d') . '</td>'),
+        'company name' => str_contains($compatibleOfferListingHtml, "Test Company $fixture"),
+        'no legacy turn label' => !str_contains($compatibleOfferListingHtml, '<td>M</td>'),
+    ];
     assertTrue(
-        str_contains($compatibleOfferListingHtml, '<h2>Ofertas compatibles con tu perfil</h2>')
-            && str_contains($compatibleOfferListingHtml, '<div class="table-responsive" role="region" aria-label="Listado de ofertas" tabindex="0">')
-            && str_contains($compatibleOfferListingHtml, '<caption>Ofertas compatibles con tu perfil</caption>')
-            && str_contains($compatibleOfferListingHtml, '<th scope="col">Empresa</th>')
-            && str_contains($compatibleOfferListingHtml, '<th scope="col">Plazas disponibles</th>')
-            && str_contains($compatibleOfferListingHtml, '<td>1</td>')
-            && str_contains($compatibleOfferListingHtml, '<td>Mañana</td>')
-            && str_contains($compatibleOfferListingHtml, '<td>' . $eventStart->format('d/m/Y') . '</td>')
-            && str_contains($compatibleOfferListingHtml, '<td>' . $eventEnd->format('d/m/Y') . '</td>')
-            && str_contains($compatibleOfferListingHtml, "Test Company $fixture")
-            && !str_contains($compatibleOfferListingHtml, '<td>M</td>'),
-        'El listado abierto desde el dashboard debe mantener el filtro de compatibilidad y mostrar el cupo libre.'
+        !in_array(false, $compatibleListingChecks, true),
+        'El listado abierto desde el dashboard debe mantener el filtro de compatibilidad y mostrar el cupo libre. Fallos: '
+            . implode(', ', array_keys(array_filter($compatibleListingChecks, static fn(bool $passed): bool => !$passed)))
+            . ' Contenido: ' . trim(preg_replace('/\s+/', ' ', strip_tags($compatibleOfferListingHtml)))
     );
     $_SESSION = [];
     ob_start();
     (new OfertaController($db))->listar();
     $publicOfferListingHtml = (string)ob_get_clean();
     assertTrue(
-        str_contains($publicOfferListingHtml, '<h2>Ofertas de FCT aprobadas</h2>')
+        str_contains($publicOfferListingHtml, 'Ofertas de prácticas')
             && !str_contains($publicOfferListingHtml, 'Ofertas compatibles con tu perfil'),
         'El listado público debe conservar la visualización general de ofertas aprobadas.'
     );
@@ -2283,7 +2292,7 @@ try {
     (new OfertaController($db))->listar();
     $expiredAvailabilityOfferListingHtml = (string)ob_get_clean();
     assertTrue(
-        str_contains($expiredAvailabilityOfferListingHtml, '<p role="status">Registra una disponibilidad vigente')
+        str_contains($expiredAvailabilityOfferListingHtml, '<p role="status">Necesitas una disponibilidad vigente')
             && str_contains(
                 $expiredAvailabilityOfferListingHtml,
                 'href="index.php?action=disponibilidad">Registrar disponibilidad'

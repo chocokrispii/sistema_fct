@@ -100,7 +100,7 @@ class ConsultaController
             $totalPaginas = max(1, (int)ceil($totalFilas / self::FILAS_POR_PAGINA));
             $pagina = min((int)$paginaSolicitada, $totalPaginas);
             $offset = ($pagina - 1) * self::FILAS_POR_PAGINA;
-            $sql = "SELECT p.id, p.titulo, p.modalidad, p.ubicacion, p.estado, p.fecha_inicio, p.fecha_fin, p.plazas_cuantas, p.turno,
+            $sql = "SELECT p.id, p.titulo, p.modalidad, p.ubicacion, p.estado, p.fecha_inicio, p.fecha_fin, p.plazas_cuantas, p.turno, p.jornada,
                            e.nombre_empresa, es.nombre_especialidad,
                            $studentFields, af.estado AS estado_asignacion
                     $from$whereSql

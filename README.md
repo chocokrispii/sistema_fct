@@ -477,6 +477,8 @@ docker compose cp (Resolve-Path .\database\migrations\010_detalles_ofertas.sql).
 
 La migración es idempotente. Los datos de ofertas históricas reciben valores predeterminados compatibles; una descripción/ubicación no se inventa para esos registros. Después de aplicarla, comprueba con una consulta de solo lectura que `modalidad` conserva `Híbrido` (la columna debe mostrar `enum('Presencial','Remoto','Híbrido')`):
 
+`012_jornada_ofertas.sql` agrega la jornada (`normal` o `partida`) y las columnas opcionales para la segunda franja horaria. Compose la ejecuta al crear una base nueva; en una base existente debe aplicarse una vez después de `010_detalles_ofertas.sql`.
+
 ```powershell
 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e "SHOW COLUMNS FROM empresa_especialidades_plazas LIKE ''modalidad''" #' | docker compose exec -T db sh -s
 ```
@@ -503,7 +505,7 @@ El sistema compara ofertas y expedientes del mismo ciclo formativo, por ejemplo 
 
 Los ciclos soportados incluyen **DAW** (Desarrollo de Aplicaciones Web) y **DAM** (Desarrollo de Aplicaciones Multiplataforma). La especialidad se relaciona por ID en la base de datos, y `009_desarrollo_aplicaciones_multiplataforma.sql` incorpora DAM sin duplicarlo. Una oferta guarda un único ciclo para preservar el matching actual.
 
-La publicación recoge título, descripción, plazas, fechas, turno, franjas semanales de cinco minutos, modalidad, ubicación, requisitos y tecnologías. La modalidad presencial e híbrida requiere ubicación. La revisión y los listados muestran los detalles persistidos; el matching sigue usando la misma relación por ciclo, fechas y horarios.
+La publicación recoge título, descripción, plazas, fechas, jornada normal o partida y franjas semanales de cinco minutos, modalidad, ubicación, requisitos y tecnologías. La jornada partida admite dos intervalos no solapados por día; la modalidad presencial e híbrida requiere ubicación. La revisión y los listados muestran los detalles persistidos; el matching usa los intervalos exactos junto con ciclo y fechas.
 
 En el portal del alumno, la disponibilidad tiene tres pasos de configuración:
 
@@ -678,6 +680,15 @@ Ejecuta las pruebas de seguridad de almacenamiento y análisis de archivos en el
 $tests = (Resolve-Path .\tests).Path -replace '\\', '/'
 docker compose run --rm --no-deps -v "${tests}:/var/www/html/tests:ro" app php tests/file_security.php
 ```
+
+Ejecuta la suite local completa con:
+
+```powershell
+npm ci
+npm run test
+```
+
+El comando valida lint y tipos frontend, compila el bundle y la documentación, crea un proyecto Docker temporal con una base `fct_test_*`, ejecuta el lint PHP, las pruebas de seguridad y las suites de integración, y elimina únicamente los volúmenes de ese proyecto temporal al terminar.
 
 `tests/run.php` es una prueba de integración y debe apuntar exclusivamente a una base de datos desechable cuyo nombre empiece por `fct_test_`; configura `FCT_TEST_DB_NAME` y `FCT_DB_NAME` con el mismo nombre antes de ejecutarla. No la ejecutes contra `sistema_fct` ni una base que quieras conservar.
 

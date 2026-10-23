@@ -147,14 +147,16 @@ $body = @{
     plazas = 2
     fecha_inicio = '2027-03-01'
     fecha_fin = '2027-06-15'
-    turno = 'Indiferente'
-    horarios = @(
-        @{
-            dia_semana = 1
+    jornada = 'partida'
+    horarios = @{
+        '1' = @{
+            activo = '1'
             hora_inicio = '09:00'
-            hora_fin = '17:00'
+            hora_fin = '11:00'
+            hora_inicio_2 = '12:00'
+            hora_fin_2 = '17:00'
         }
-    )
+    }
 } | ConvertTo-Json
 
 Invoke-RestMethod -Method Post `

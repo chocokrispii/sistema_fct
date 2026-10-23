@@ -9,16 +9,16 @@ $vueEnabled = FrontendAssets::isEnabled();
 <h2>Gestión de cuentas</h2>
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=usuarios">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
-    <label>Correo <input type="email" name="email" maxlength="100" value="<?= htmlspecialchars($datosCuenta['email'], ENT_QUOTES, 'UTF-8') ?>" required></label>
-    <label>Contraseña inicial (12-72 caracteres) <input type="password" name="password" minlength="12" maxlength="72" aria-describedby="staff-password-help" required></label>
+    <label for="staff-email">Correo <input id="staff-email" type="email" name="email" maxlength="100" value="<?= htmlspecialchars($formValues['email'] ?? $datosCuenta['email'], ENT_QUOTES, 'UTF-8') ?>" required></label>
+    <label for="staff-password">Contraseña inicial (12-72 caracteres) <input id="staff-password" type="password" name="password" minlength="12" maxlength="72" aria-describedby="staff-password-help" required></label>
     <small id="staff-password-help">Debe tener entre 12 y 72 caracteres. Los espacios cuentan.</small>
-    <label>Nombre (para coordinador) <input type="text" name="nombre" maxlength="50" value="<?= htmlspecialchars($datosCuenta['nombre'], ENT_QUOTES, 'UTF-8') ?>"></label>
-    <label>Apellidos (para coordinador) <input type="text" name="apellidos" maxlength="100" value="<?= htmlspecialchars($datosCuenta['apellidos'], ENT_QUOTES, 'UTF-8') ?>"></label>
-    <label>Rol
-        <select name="rol" required>
-            <option value="Coordinador" <?= $datosCuenta['rol'] === 'Coordinador' ? 'selected' : '' ?>>Coordinador</option>
-            <option value="Observador" <?= $datosCuenta['rol'] === 'Observador' ? 'selected' : '' ?>>Observador</option>
-            <option value="Administrador" <?= $datosCuenta['rol'] === 'Administrador' ? 'selected' : '' ?>>Administrador</option>
+    <label for="staff-name">Nombre (para coordinador) <input id="staff-name" type="text" name="nombre" maxlength="50" value="<?= htmlspecialchars($formValues['nombre'] ?? $datosCuenta['nombre'], ENT_QUOTES, 'UTF-8') ?>"></label>
+    <label for="staff-surname">Apellidos (para coordinador) <input id="staff-surname" type="text" name="apellidos" maxlength="100" value="<?= htmlspecialchars($formValues['apellidos'] ?? $datosCuenta['apellidos'], ENT_QUOTES, 'UTF-8') ?>"></label>
+    <label for="staff-role">Rol
+        <select id="staff-role" name="rol" required>
+            <option value="Coordinador" <?= ($formValues['rol'] ?? '') === 'Coordinador' ? 'selected' : '' ?>>Coordinador</option>
+            <option value="Observador" <?= ($formValues['rol'] ?? '') === 'Observador' ? 'selected' : '' ?>>Observador</option>
+            <option value="Administrador" <?= ($formValues['rol'] ?? '') === 'Administrador' ? 'selected' : '' ?>>Administrador</option>
         </select>
     </label>
     <button type="submit">Crear cuenta del centro</button>

@@ -39,7 +39,11 @@
                 <td><?= htmlspecialchars($row['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars($row['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></td>
                 <td><?= htmlspecialchars($row['fecha_inicio'] . ' – ' . $row['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
-                <td><strong><?= htmlspecialchars($row['titulo'] ?? 'Oferta FCT', ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars(($row['modalidad'] ?? '') . (!empty($row['ubicacion']) ? ' · ' . $row['ubicacion'] : ''), ENT_QUOTES, 'UTF-8') ?></small></td>
+                <td><strong><?= htmlspecialchars($row['titulo'] ?? 'Oferta FCT', ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars(match ($row['jornada'] ?? null) {
+                    'normal' => 'Jornada normal',
+                    'partida' => 'Jornada partida',
+                    default => 'Jornada no especificada',
+                }, ENT_QUOTES, 'UTF-8') ?></small><small><?= htmlspecialchars(($row['modalidad'] ?? '') . (!empty($row['ubicacion']) ? ' · ' . $row['ubicacion'] : ''), ENT_QUOTES, 'UTF-8') ?></small></td>
                 <td><span class="status-badge status-badge--<?= $row['estado'] === 'Aprobada' ? 'approved' : ($row['estado'] === 'Rechazada' ? 'rejected' : 'pending') ?>"><?= htmlspecialchars($row['estado'], ENT_QUOTES, 'UTF-8') ?></span></td>
                 <td><?= htmlspecialchars(trim(($row['alumno_nombre'] ?? '') . ' ' . ($row['apellidos'] ?? '')), ENT_QUOTES, 'UTF-8') ?: '—' ?></td>
                 <td><?= htmlspecialchars($row['estado_asignacion'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>

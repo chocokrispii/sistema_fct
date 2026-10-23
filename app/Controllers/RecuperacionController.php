@@ -5,6 +5,8 @@ require_once __DIR__ . '/../Models/IntentoLogin.php';
 
 class RecuperacionController
 {
+    private const SESSION_TOKEN_KEY = 'password_reset_token';
+
     private RecuperacionCuenta $recuperaciones;
 
     public function __construct(?PDO $db = null)
@@ -55,24 +57,32 @@ class RecuperacionController
 
     public function restablecer(): void
     {
-        $token = $_SERVER['REQUEST_METHOD'] === 'POST' ? ($_POST['token'] ?? '') : ($_GET['token'] ?? '');
+        $isPost = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST';
+        $token = $isPost
+            ? ($_SESSION[self::SESSION_TOKEN_KEY] ?? '')
+            : ($_GET['token'] ?? '');
         if (!is_string($token)) {
             $token = '';
         }
         $ahora = new DateTimeImmutable();
         if ($token === '' || strlen($token) !== 64 || !$this->recuperaciones->vigente($token, $ahora)) {
-            View::render('auth/restablecer', ['token' => '', 'error' => 'El enlace no es válido o ha caducado.']);
+            unset($_SESSION[self::SESSION_TOKEN_KEY]);
+            View::render('auth/restablecer', [
+                'canReset' => false,
+                'error' => 'El enlace no es válido o ha caducado.',
+            ]);
             return;
         }
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            View::render('auth/restablecer', ['token' => $token, 'error' => '']);
+        if (!$isPost) {
+            $_SESSION[self::SESSION_TOKEN_KEY] = $token;
+            View::render('auth/restablecer', ['canReset' => true, 'error' => '']);
             return;
         }
 
         $password = $_POST['password'] ?? '';
         if (!is_string($password) || strlen($password) < 12 || strlen($password) > 72 || trim($password) === '') {
             View::render('auth/restablecer', [
-                'token' => $token,
+                'canReset' => true,
                 'error' => 'La contraseña debe tener entre 12 y 72 caracteres y no puede ser solo espacios.',
             ]);
             return;
@@ -80,9 +90,14 @@ class RecuperacionController
 
         $email = $this->recuperaciones->consumir($token, $password, $ahora);
         if ($email === null) {
-            View::render('auth/restablecer', ['token' => '', 'error' => 'El enlace no es válido o ha caducado.']);
+            unset($_SESSION[self::SESSION_TOKEN_KEY]);
+            View::render('auth/restablecer', [
+                'canReset' => false,
+                'error' => 'El enlace no es válido o ha caducado.',
+            ]);
             return;
         }
+        unset($_SESSION[self::SESSION_TOKEN_KEY]);
         (new IntentoLogin())->limpiar($email);
         header('Location: index.php?action=login&restablecida=1');
         exit;

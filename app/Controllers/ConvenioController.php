@@ -32,8 +32,21 @@ class ConvenioController
             throw new RuntimeException('No se encontró el perfil de empresa.');
         }
         $error = '';
+        $values = [
+            'numero_convenio' => '',
+            'especialidad_id' => '',
+            'sede_id' => '',
+            'fecha_firma' => '',
+            'fecha_inicio' => '',
+            'fecha_fin' => '',
+        ];
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            foreach (array_keys($values) as $field) {
+                if (isset($_POST[$field]) && is_string($_POST[$field])) {
+                    $values[$field] = $_POST[$field];
+                }
+            }
             try {
                 $this->guardarConvenio((int)$empresa['id']);
                 header('Location: index.php?action=convenios&enviado=1');
@@ -60,6 +73,7 @@ class ConvenioController
             'especialidades' => $this->especialidadModel->obtenerTodas(),
             'convenios' => $this->convenioModel->listar((int)$empresa['id']),
             'error' => $error,
+            'values' => $values,
         ]);
     }
 

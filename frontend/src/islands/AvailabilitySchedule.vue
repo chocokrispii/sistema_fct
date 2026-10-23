@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { requestApi } from '../api/client';
 import type {
     AvailabilityDayPayload,
@@ -21,9 +21,33 @@ const bulkStart = ref(firstActiveDay?.start ?? '09:00');
 const bulkEnd = ref(firstActiveDay?.end ?? '17:00');
 const announcement = ref('');
 const bulkError = ref('');
+const bulkInvalidField = ref<'days' | 'start' | 'end' | null>(null);
+const bulkStartInput = ref<HTMLInputElement | null>(null);
+const bulkEndInput = ref<HTMLInputElement | null>(null);
+const bulkDaysFieldset = ref<HTMLElement | null>(null);
+const bulkErrorMessage = ref<HTMLElement | null>(null);
+const saveErrorMessage = ref<HTMLElement | null>(null);
 const error = ref('');
 const root = ref<HTMLElement | null>(null);
 let form: HTMLFormElement | null = null;
+
+function clearBulkError(): void {
+    bulkError.value = '';
+    bulkInvalidField.value = null;
+}
+
+async function showBulkError(field: 'days' | 'start' | 'end', message: string): Promise<void> {
+    bulkInvalidField.value = field;
+    bulkError.value = message;
+    await nextTick();
+
+    const invalidControl = field === 'start'
+        ? bulkStartInput.value
+        : field === 'end'
+            ? bulkEndInput.value
+            : bulkDaysFieldset.value?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    (invalidControl ?? bulkErrorMessage.value)?.focus();
+}
 
 function fieldValue(data: FormData, name: string): string {
     const value = data.get(name);
@@ -52,14 +76,18 @@ function payloadFromForm(target: HTMLFormElement): AvailabilityUpdatePayload {
 }
 
 function applyBulkSchedule(): void {
-    bulkError.value = '';
+    clearBulkError();
     if (bulkSelectedDays.value.length === 0) {
-        bulkError.value = 'Selecciona al menos un día.';
+        void showBulkError('days', 'Selecciona al menos un día.');
         return;
     }
     const validTime = /^(?:[01]\d|2[0-3]):(?:[0-5][05])$/;
-    if (!validTime.test(bulkStart.value) || !validTime.test(bulkEnd.value) || bulkEnd.value <= bulkStart.value) {
-        bulkError.value = 'Indica una franja válida en intervalos de cinco minutos.';
+    if (!validTime.test(bulkStart.value)) {
+        void showBulkError('start', 'Indica una franja válida en intervalos de cinco minutos.');
+        return;
+    }
+    if (!validTime.test(bulkEnd.value) || bulkEnd.value <= bulkStart.value) {
+        void showBulkError('end', 'Indica una franja válida en intervalos de cinco minutos.');
         return;
     }
 
@@ -79,7 +107,7 @@ function applyBulkSchedule(): void {
 }
 
 function onScheduleChange(): void {
-    bulkError.value = '';
+    clearBulkError();
     if (status.value !== 'saving') {
         status.value = 'idle';
         error.value = '';
@@ -118,6 +146,8 @@ async function save(target: HTMLFormElement): Promise<void> {
         error.value = cause instanceof Error
             ? cause.message
             : 'No se pudo guardar la disponibilidad. Inténtalo de nuevo.';
+        await nextTick();
+        saveErrorMessage.value?.focus();
     } finally {
         if (submitButton) {
             submitButton.disabled = false;
@@ -150,16 +180,39 @@ onBeforeUnmount(() => {
         <fieldset class="availability-schedule__bulk" :disabled="esIndiferente || status === 'saving'">
             <legend>Horario general</legend>
             <div class="availability-schedule__bulk-grid">
-                <label>Hora entrada
-                    <input v-model="bulkStart" type="time" step="300">
+                <label for="availability-bulk-start">Hora entrada
+                    <input
+                        id="availability-bulk-start"
+                        ref="bulkStartInput"
+                        v-model="bulkStart"
+                        type="time"
+                        step="300"
+                        :aria-invalid="bulkInvalidField === 'start' ? 'true' : undefined"
+                        :aria-describedby="bulkInvalidField === 'start' ? 'availability-bulk-error' : undefined"
+                        @input="clearBulkError"
+                    >
                 </label>
-                <label>Hora salida
-                    <input v-model="bulkEnd" type="time" step="300">
+                <label for="availability-bulk-end">Hora salida
+                    <input
+                        id="availability-bulk-end"
+                        ref="bulkEndInput"
+                        v-model="bulkEnd"
+                        type="time"
+                        step="300"
+                        :aria-invalid="bulkInvalidField === 'end' ? 'true' : undefined"
+                        :aria-describedby="bulkInvalidField === 'end' ? 'availability-bulk-error' : undefined"
+                        @input="clearBulkError"
+                    >
                 </label>
-                <fieldset class="availability-schedule__day-picker">
+                <fieldset
+                    ref="bulkDaysFieldset"
+                    class="availability-schedule__day-picker"
+                    :aria-invalid="bulkInvalidField === 'days' ? 'true' : undefined"
+                    :aria-describedby="bulkInvalidField === 'days' ? 'availability-bulk-error' : undefined"
+                >
                     <legend>Días</legend>
                     <label v-for="day in days" :key="day.day" class="availability-schedule__day-pill">
-                        <input v-model="bulkSelectedDays" type="checkbox" :value="day.day" :aria-label="day.name">
+                        <input v-model="bulkSelectedDays" type="checkbox" :value="day.day" :aria-label="day.name" @change="clearBulkError">
                         <span :aria-label="day.name">{{ day.name.slice(0, 1) }}</span>
                     </label>
                 </fieldset>
@@ -168,7 +221,7 @@ onBeforeUnmount(() => {
                 </button>
             </div>
             <p class="availability-schedule__hint">El horario aplicado queda disponible para editarse por día.</p>
-            <p v-if="bulkError" class="message message-error" role="alert">{{ bulkError }}</p>
+            <p v-if="bulkError" id="availability-bulk-error" ref="bulkErrorMessage" class="message message-error" role="alert" tabindex="-1">{{ bulkError }}</p>
         </fieldset>
 
         <fieldset class="availability-schedule__indifferent">
@@ -250,6 +303,6 @@ onBeforeUnmount(() => {
             </div>
         </fieldset>
         <p v-if="status === 'saved' && props.preview !== true" class="message message-success" role="status">Disponibilidad guardada con éxito.</p>
-        <p v-if="error" class="message message-error" role="alert">{{ error }}</p>
+        <p v-if="error" id="availability-save-error" ref="saveErrorMessage" class="message message-error" role="alert" tabindex="-1">{{ error }}</p>
     </div>
 </template>

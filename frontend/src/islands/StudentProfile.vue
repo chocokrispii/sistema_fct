@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, nextTick, reactive, ref } from 'vue';
 import { useStudentProfileStore } from '../stores/studentProfile';
 import type { ProfileUpdatePayload } from '../types/profile';
 
@@ -214,9 +214,16 @@ async function saveProfile(): Promise<void> {
     const fieldsToValidate = isMinor.value ? [...studentFields, ...guardianFields] : studentFields;
     const invalidFields = fieldsToValidate.filter((field) => !validateField(field));
     if (invalidFields.length > 0) {
-        const input = form.value?.elements.namedItem(invalidFields[0]);
-        if (input instanceof HTMLElement) {
-            input.focus();
+        await nextTick();
+        const field = invalidFields[0];
+        const input = form.value?.elements.namedItem(field);
+        const firstInvalid = input instanceof HTMLElement
+            ? input
+            : form.value?.querySelector<HTMLElement>(`[name="${field}"]`);
+        if (firstInvalid) {
+            firstInvalid.focus();
+        } else {
+            form.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
         }
         return;
     }
@@ -224,6 +231,9 @@ async function saveProfile(): Promise<void> {
     await profileStore.save({ ...values } satisfies ProfileUpdatePayload, initial.csrf);
     if (profileStore.status === 'saved') {
         serverError.value = '';
+    } else if (profileStore.status === 'error') {
+        await nextTick();
+        form.value?.querySelector<HTMLElement>('[role="alert"]')?.focus();
     }
 }
 </script>
@@ -237,7 +247,7 @@ async function saveProfile(): Promise<void> {
         </div>
 
         <p v-if="initial.guardado || profileStore.status === 'saved'" class="message message-success" role="status">Tus datos se han actualizado.</p>
-        <p v-if="serverError || profileStore.error" class="message message-error student-registration__error" role="alert">{{ serverError || profileStore.error }}</p>
+        <p v-if="serverError || profileStore.error" id="student-profile-error" class="message message-error student-registration__error" role="alert" tabindex="-1">{{ serverError || profileStore.error }}</p>
 
         <form
             ref="form"

@@ -6,10 +6,10 @@
     </div>
 
     <?php if ($error !== ''): ?>
-        <p class="message message-error company-registration__error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
+        <p id="company-registration-error" class="message message-error company-registration__error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
     <?php endif; ?>
 
-    <form class="company-registration__form" method="POST" action="index.php?action=registro-empresa">
+    <form class="company-registration__form" method="POST" action="index.php?action=registro-empresa"<?= $error !== '' ? ' aria-describedby="company-registration-error"' : '' ?>>
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
 
         <fieldset class="company-registration__section">
@@ -19,7 +19,7 @@
             <div class="company-registration__grid">
                 <div class="company-registration__field">
                     <label for="company-email">Correo electrónico <span aria-hidden="true">*</span></label>
-                    <input id="company-email" type="email" name="email" maxlength="100" autocomplete="email" placeholder="nombre@empresa.es" required>
+                    <input id="company-email" type="email" name="email" maxlength="100" autocomplete="email" value="<?= htmlspecialchars($values['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="nombre@empresa.es" required>
                 </div>
 
                 <div class="company-registration__field">
@@ -37,27 +37,27 @@
             <div class="company-registration__grid">
                 <div class="company-registration__field">
                     <label for="company-name">Razón social <span aria-hidden="true">*</span></label>
-                    <input id="company-name" type="text" name="nombre_comercial" maxlength="150" autocomplete="organization" placeholder="Nombre legal de la empresa" required>
+                    <input id="company-name" type="text" name="nombre_comercial" maxlength="150" autocomplete="organization" value="<?= htmlspecialchars($values['nombre_comercial'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Nombre legal de la empresa" required>
                 </div>
 
                 <div class="company-registration__field">
                     <label for="company-cif">CIF <span aria-hidden="true">*</span></label>
-                    <input id="company-cif" type="text" name="cif" maxlength="20" autocomplete="off" placeholder="Ej. B12345678" required>
+                    <input id="company-cif" type="text" name="cif" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['cif'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. B12345678" required>
                 </div>
 
                 <div class="company-registration__field">
                     <label for="company-contact">Persona de contacto <span class="company-registration__optional">Opcional</span></label>
-                    <input id="company-contact" type="text" name="persona_contacto" maxlength="150" autocomplete="name" placeholder="Nombre y apellidos">
+                    <input id="company-contact" type="text" name="persona_contacto" maxlength="150" autocomplete="name" value="<?= htmlspecialchars($values['persona_contacto'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Nombre y apellidos">
                 </div>
 
                 <div class="company-registration__field">
                     <label for="company-phone">Teléfono <span class="company-registration__optional">Opcional</span></label>
-                    <input id="company-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" placeholder="Ej. 600 123 456">
+                    <input id="company-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" value="<?= htmlspecialchars($values['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. 600 123 456">
                 </div>
 
                 <div class="company-registration__field company-registration__field--full">
                     <label for="company-address">Dirección principal <span aria-hidden="true">*</span></label>
-                    <input id="company-address" type="text" name="direccion" maxlength="255" autocomplete="street-address" placeholder="Calle, número, código postal y localidad" required>
+                    <input id="company-address" type="text" name="direccion" maxlength="255" autocomplete="street-address" value="<?= htmlspecialchars($values['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Calle, número, código postal y localidad" required>
                 </div>
             </div>
         </fieldset>

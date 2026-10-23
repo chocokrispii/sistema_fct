@@ -63,7 +63,7 @@ services:
   db:
     image: mariadb:10.4.32
     ports:
-      - "127.0.0.1:3307:3306"
+      - "127.0.0.1:${DB_PORT:-3307}:3306"
     environment:
       MARIADB_DATABASE: ${FCT_DB_NAME:-sistema_fct}
       MARIADB_USER: ${FCT_DB_USER:-fct}
@@ -73,6 +73,20 @@ services:
       - db_data:/var/lib/mysql
       # MariaDB importa el esquema base; la aplicación aplica y registra migraciones.
       - ./database/sistema_fct.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+      - ./database/migrations/001_renombrar_nombre_especialidad.sql:/docker-entrypoint-initdb.d/002-migration.sql:ro
+      - ./database/migrations/002_fct_workflows.sql:/docker-entrypoint-initdb.d/003-migration.sql:ro
+      - ./database/migrations/003_login_y_recuperacion.sql:/docker-entrypoint-initdb.d/004-migration.sql:ro
+      - ./database/migrations/004_convenios_por_especialidad.sql:/docker-entrypoint-initdb.d/005-migration.sql:ro
+      - ./database/migrations/005_horarios_y_calificaciones.sql:/docker-entrypoint-initdb.d/006-migration.sql:ro
+      - ./database/migrations/006_alumno_codigo_postal.sql:/docker-entrypoint-initdb.d/007-migration.sql:ro
+      - ./database/migrations/007_horarios_ofertas.sql:/docker-entrypoint-initdb.d/008-migration.sql:ro
+      - ./database/migrations/008_disponibilidad_indiferente.sql:/docker-entrypoint-initdb.d/009-migration.sql:ro
+      - ./database/migrations/009_desarrollo_aplicaciones_multiplataforma.sql:/docker-entrypoint-initdb.d/010-migration.sql:ro
+      - ./database/migrations/010_detalles_ofertas.sql:/docker-entrypoint-initdb.d/011-migration.sql:ro
+      - ./database/migrations/007_webhooks.sql:/docker-entrypoint-initdb.d/012-webhooks.sql:ro
+      - ./database/migrations/008_api_access_tokens.sql:/docker-entrypoint-initdb.d/013-api-access-tokens.sql:ro
+      - ./database/migrations/009_webhook_responses.sql:/docker-entrypoint-initdb.d/014-webhook-responses.sql:ro
+      - ./database/migrations/012_jornada_ofertas.sql:/docker-entrypoint-initdb.d/015-jornada-ofertas.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -107,7 +121,7 @@ services:
       CLAMD_CONF_TCPAddr: 0.0.0.0
       CLAMD_CONF_TCPSocket: 3310
     ports:
-      - "127.0.0.1:3310:3310"
+      - "127.0.0.1:${CLAMAV_PORT:-3310}:3310"
     volumes:
       - clamav_db:/var/lib/clamav
     healthcheck:

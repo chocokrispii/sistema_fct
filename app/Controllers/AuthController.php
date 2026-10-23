@@ -34,13 +34,17 @@ class AuthController {
         $emailRaw = $input['email'] ?? '';
         $password = $input['password'] ?? '';
         if (!is_string($emailRaw) || !is_string($password)) {
-            $this->mostrarFormulario('Los datos de acceso no tienen un formato válido.', 422);
+            $this->mostrarFormulario(
+                'Los datos de acceso no tienen un formato válido.',
+                422,
+                is_string($emailRaw) ? trim($emailRaw) : ''
+            );
             return;
         }
         $email = trim($emailRaw);
 
         if ($email === '' || $password === '') {
-            $this->mostrarFormulario('Por favor completa todos los campos.', 422);
+            $this->mostrarFormulario('Por favor completa todos los campos.', 422, $email);
             return;
         }
 
@@ -50,13 +54,14 @@ class AuthController {
         if ($intentos->estaBloqueado($email, $ip, $ahora)) {
             $this->mostrarFormulario(
                 'Demasiados intentos fallidos. Espera ' . IntentoLogin::VENTANA_MINUTOS . ' minutos y vuelve a intentarlo.',
-                429
+                429,
+                $email
             );
             return;
         }
         if (strlen($password) > 72) {
             $intentos->registrarFallo($email, $ip, $ahora);
-            $this->mostrarFormulario('La contraseña no puede superar 72 caracteres.', 422);
+            $this->mostrarFormulario('La contraseña no puede superar 72 bytes.', 422, $email);
             return;
         }
 
@@ -65,12 +70,12 @@ class AuthController {
 
         if (!$usuario || !$correcta) {
             $intentos->registrarFallo($email, $ip, $ahora);
-            $this->mostrarFormulario('Credenciales incorrectas.', 401);
+            $this->mostrarFormulario('Credenciales incorrectas.', 401, $email);
             return;
         }
         $intentos->limpiar($email);
         if (isset($usuario['activo']) && (int)$usuario['activo'] !== 1) {
-            $this->mostrarFormulario('La cuenta está desactivada. Contacta con el centro educativo.', 403);
+            $this->mostrarFormulario('La cuenta está desactivada. Contacta con el centro educativo.', 403, $email);
             return;
         }
 
@@ -152,12 +157,12 @@ class AuthController {
         ];
     }
 
-    private function mostrarFormulario(string $error = '', int $status = 200): void {
+    private function mostrarFormulario(string $error = '', int $status = 200, string $email = ''): void {
         if (JsonResponse::wantsJson()) {
             JsonResponse::failure($error, $status);
             return;
         }
 
-        View::render('auth/login', ['error' => $error]);
+        View::render('auth/login', ['error' => $error, 'email' => $email]);
     }
 }

@@ -100,7 +100,7 @@ $etiquetaClase = static function (string $texto): string {
                                     <strong><?= $e($oferta['titulo'] !== '' ? $oferta['titulo'] : $oferta['nombre_empresa']) ?></strong>
                                     <small><?= $e($oferta['nombre_empresa']) ?> · <?= $e($oferta['lugar'] !== '' ? $oferta['lugar'] : 'Lugar no indicado') ?></small>
                                     <small><?= $e($oferta['nombre_especialidad']) ?></small>
-                                    <small>Del <?= $e(date('d/m/Y', strtotime($oferta['fecha_inicio']))) ?> al <?= $e(date('d/m/Y', strtotime($oferta['fecha_fin']))) ?> - Turno <?= $e($oferta['turno'] === 'M' ? 'mañana' : ($oferta['turno'] === 'T' ? 'tarde' : 'indiferente')) ?></small>
+                                    <small>Del <?= $e(date('d/m/Y', strtotime($oferta['fecha_inicio']))) ?> al <?= $e(date('d/m/Y', strtotime($oferta['fecha_fin']))) ?> - <?= $e(($oferta['jornada'] ?? 'normal') === 'partida' ? 'Jornada partida' : 'Jornada normal') ?></small>
                                     <small class="fct-offer__capacity"><?= (int)$oferta['plazas_disponibles'] ?> <?= $oferta['plazas_disponibles'] === 1 ? 'plaza disponible' : 'plazas disponibles' ?></small>
                                 </span>
                                 <span class="fct-tag fct-tag--<?= $etiquetaClase($oferta['nombre_especialidad']) ?>"><?= $e($oferta['nombre_especialidad']) ?></span>

@@ -13,7 +13,8 @@ export interface Usuario {
 }
 
 export type EstadoOferta = 'Pendiente' | 'Aprobada' | 'Rechazada';
-export type Turno = 'M' | 'T' | 'Indiferente';
+export type JornadaOferta = 'normal' | 'partida';
+export type TurnoDisponibilidad = 'M' | 'T' | 'Indiferente';
 
 export interface Oferta {
     id: number;
@@ -23,7 +24,7 @@ export interface Oferta {
     fecha_inicio: string;
     fecha_fin: string;
     estado: EstadoOferta;
-    turno: Turno;
+    jornada: JornadaOferta;
     motivo_revision: string | null;
     nombre_empresa: string;
     nombre_especialidad: string;
@@ -73,6 +74,6 @@ export interface Disponibilidad {
     id: number;
     fecha_inicio: string;
     fecha_fin: string;
-    turno: Turno;
+    turno: TurnoDisponibilidad;
     horario_semanal?: FranjaDisponibilidad[];
 }

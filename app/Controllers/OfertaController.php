@@ -461,9 +461,6 @@ class OfertaController {
         ) {
             return 'Indica un título de hasta 150 caracteres y una descripción de hasta 2.000 caracteres.';
         }
-        if (!in_array($turno, ['M', 'T', 'P', 'Indiferente'], true)) {
-            return 'Selecciona un tipo de turno válido.';
-        }
         if (!in_array($jornada, ['normal', 'partida'], true)) {
             return 'Selecciona una jornada válida.';
         }
@@ -742,6 +739,24 @@ class OfertaController {
             $values[$field] = isset($request[$field]) && is_string($request[$field])
                 ? $request[$field]
                 : '';
+        }
+        if (array_key_exists('horarios', $request)) {
+            $submittedSchedules = is_array($request['horarios']) ? $request['horarios'] : [];
+            $values['horarios'] = [];
+            foreach (range(1, 7) as $day) {
+                $submitted = $submittedSchedules[$day] ?? [];
+                if (!is_array($submitted)) {
+                    $submitted = [];
+                }
+                $values['horarios'][$day] = [
+                    'activo' => in_array($submitted['activo'] ?? null, ['1', 1, true], true),
+                ];
+                foreach (['hora_inicio', 'hora_fin', 'hora_inicio_2', 'hora_fin_2'] as $field) {
+                    $values['horarios'][$day][$field] = isset($submitted[$field]) && is_string($submitted[$field])
+                        ? $submitted[$field]
+                        : '';
+                }
+            }
         }
 
         return $values;

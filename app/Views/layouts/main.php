@@ -143,7 +143,8 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                             <a href="index.php"><?= $svg('inicio') ?><span>Inicio</span></a>
                         <?php endif; ?>
                         <div class="app-menu__sep"></div>
-                        <form method="POST" action="index.php?action=logout"><input type="hidden" name="_csrf" value="<?= $csrfToken ?>"><button type="submit" class="is-danger"><?= $svg('salir') ?><span>Cerrar sesión</span></button></form>
+                        <div data-vue-island="SessionControls" data-prop-csrf-token="<?= $csrfToken ?>"></div>
+                        <form method="POST" action="index.php?action=logout" class="session-fallback"><input type="hidden" name="_csrf" value="<?= $csrfToken ?>"><button type="submit" class="is-danger"><?= $svg('salir') ?><span>Cerrar sesión</span></button></form>
                     </div>
                 </details>
             <?php else: ?>
@@ -154,6 +155,6 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
         <footer><p>Gestión de Formación en Centros de Trabajo</p></footer>
     </div>
 </div>
-<script src="assets/js/app-menu.js" defer></script>
+<script src="assets/js/app-menu.js?v=<?= (int)filemtime(__DIR__ . '/../../../public/assets/js/app-menu.js') ?>" defer></script>
 </body>
 </html>

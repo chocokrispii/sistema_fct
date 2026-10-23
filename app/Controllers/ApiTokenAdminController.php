@@ -15,16 +15,26 @@ final class ApiTokenAdminController
     {
         $plainTextToken = null;
         $error = '';
+        $formValues = ['name' => '', 'user_id' => ''];
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $action = $_POST['token_action'] ?? '';
             if ($action === 'create') {
+                if (isset($_POST['name']) && is_string($_POST['name'])) {
+                    $formValues['name'] = $_POST['name'];
+                }
+                if (isset($_POST['user_id']) && is_string($_POST['user_id'])) {
+                    $formValues['user_id'] = $_POST['user_id'];
+                }
                 $plainTextToken = $this->crearToken($error);
             } elseif ($action === 'revoke') {
                 $this->revocarToken($error);
             } else {
                 throw new InvalidArgumentException('La acción de gestión de tokens no es válida.');
             }
+        }
+        if ($plainTextToken !== null) {
+            $formValues = ['name' => '', 'user_id' => ''];
         }
 
         $users = $this->db->query(
@@ -44,6 +54,7 @@ final class ApiTokenAdminController
             'tokens' => $tokens,
             'plainTextToken' => $plainTextToken,
             'error' => $error,
+            'formValues' => $formValues,
         ]);
     }
 

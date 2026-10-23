@@ -21,12 +21,19 @@ class EmpresaController {
             return;
         }
 
+        $values = [];
+        foreach (['email', 'cif', 'nombre_comercial', 'telefono', 'direccion', 'persona_contacto'] as $field) {
+            if (isset($_POST[$field]) && is_string($_POST[$field])) {
+                $values[$field] = trim($_POST[$field]);
+            }
+        }
+
         $fields = ['email', 'password', 'cif', 'nombre_comercial', 'telefono', 'direccion', 'persona_contacto'];
         $input = [];
         foreach ($fields as $field) {
             $value = $_POST[$field] ?? '';
             if (!is_string($value)) {
-                $this->mostrarFormulario('Los datos del registro deben ser valores de texto válidos.');
+                $this->mostrarFormulario('Los datos del registro deben ser valores de texto válidos.', $values);
                 return;
             }
             // La contraseña no se recorta: los espacios cuentan.
@@ -55,7 +62,7 @@ class EmpresaController {
             || $direccion === ''
             || mb_strlen($direccion) > 255
         ) {
-            $this->mostrarFormulario('Completa correctamente todos los campos obligatorios.');
+            $this->mostrarFormulario('Completa correctamente todos los campos obligatorios.', $values);
             return;
         }
 
@@ -87,12 +94,15 @@ class EmpresaController {
                 $this->db->rollBack();
             }
             error_log('Error al registrar empresa: ' . $e->getMessage());
-            $this->mostrarFormulario('No se pudo completar el registro. Comprueba que el correo y el CIF no estén ya registrados.');
+            $this->mostrarFormulario(
+                'No se pudo completar el registro. Comprueba que el correo y el CIF no estén ya registrados.',
+                $values
+            );
         }
     }
 
-    private function mostrarFormulario(string $error = ''): void {
-        View::render('empresas/registro', ['error' => $error]);
+    private function mostrarFormulario(string $error = '', array $values = []): void {
+        View::render('empresas/registro', ['error' => $error, 'values' => $values]);
     }
 
     public function listarParaCentro(): void
@@ -110,10 +120,16 @@ class EmpresaController {
         }
 
         $error = '';
+        $values = ['nombre' => '', 'direccion' => '', 'telefono' => ''];
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $nombre = $_POST['nombre'] ?? '';
             $direccion = $_POST['direccion'] ?? '';
             $telefono = $_POST['telefono'] ?? '';
+            foreach (['nombre' => $nombre, 'direccion' => $direccion, 'telefono' => $telefono] as $field => $value) {
+                if (is_string($value)) {
+                    $values[$field] = $value;
+                }
+            }
             if (!is_string($nombre) || !is_string($direccion) || !is_string($telefono)) {
                 $error = 'Los datos de la sede deben ser valores de texto válidos.';
             } elseif (
@@ -140,6 +156,7 @@ class EmpresaController {
             'empresa' => $empresa,
             'sedes' => $this->empresaModel->obtenerSedes((int)$empresa['id']),
             'error' => $error,
+            'values' => $values,
         ]);
     }
 }

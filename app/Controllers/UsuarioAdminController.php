@@ -21,13 +21,19 @@ class UsuarioAdminController
         $busqueda = '';
         $rolFiltro = '';
         $estadoFiltro = '';
-        $datosCuenta = [
+        $formValues = [
             'email' => '',
             'nombre' => '',
             'apellidos' => '',
             'rol' => 'Coordinador',
         ];
+        $datosCuenta = $formValues;
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            foreach (['email', 'nombre', 'apellidos', 'rol'] as $field) {
+                if (isset($_POST[$field]) && is_string($_POST[$field])) {
+                    $formValues[$field] = $_POST[$field];
+                }
+            }
             $emailRaw = $_POST['email'] ?? '';
             $password = $_POST['password'] ?? '';
             $role = $_POST['rol'] ?? '';
@@ -128,6 +134,7 @@ class UsuarioAdminController
             'eliminado' => isset($_GET['eliminado']),
             'estadoActualizado' => ($_GET['estado_actualizado'] ?? null) === '1',
             'cuentaCreada' => ($_GET['cuenta_creada'] ?? null) === '1',
+            'formValues' => $formValues,
         ]);
     }
 

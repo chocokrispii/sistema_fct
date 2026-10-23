@@ -461,9 +461,9 @@ consola de reintentos con permisos aún no forma parte de esta versión.
 ## Pruebas automatizadas
 
 La suite requiere una base desechable llamada `fct_test_*` que ya tenga el
-volcado y las migraciones `001`–`009`. La migración `006` incorpora el código
-postal del perfil del alumnado y la `009` añade las columnas necesarias para
-comprobar las respuestas de recepción y envío. Configúrala antes de ejecutar:
+volcado, los datos de demostración y las migraciones requeridas por la aplicación.
+Incluye las que agregan el código postal del alumnado, las respuestas de los
+webhooks y la jornada partida (`012_jornada_ofertas.sql`). Configúrala antes de ejecutar:
 
 ```powershell
 $env:FCT_DB_HOST = '127.0.0.1'

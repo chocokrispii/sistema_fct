@@ -6,10 +6,10 @@
     </div>
 
     <?php if ($error !== ''): ?>
-        <p class="message message-error student-registration__error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
+        <p id="student-registration-error" class="message message-error student-registration__error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
     <?php endif; ?>
 
-    <form class="student-registration__form" method="POST" action="index.php?action=registro-alumno">
+    <form class="student-registration__form" method="POST" action="index.php?action=registro-alumno"<?= $error !== '' ? ' aria-describedby="student-registration-error"' : '' ?>>
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
 
         <fieldset class="student-registration__section">
