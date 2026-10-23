@@ -24,6 +24,7 @@ COPY --from=composer /usr/bin/composer /usr/bin/composer
 COPY config/php-upload.ini /usr/local/etc/php/conf.d/zzz-fct-upload.ini
 COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/storage-entrypoint.sh /usr/local/bin/fct-storage-entrypoint
+RUN sed -i 's/\r$//' /usr/local/bin/fct-storage-entrypoint
 COPY . /var/www/html
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 COPY --from=frontend-build /app/public/build /var/www/html/public/build

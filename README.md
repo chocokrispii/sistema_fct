@@ -249,6 +249,8 @@ docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 ap
 
 El script imprime identificadores fiscales y contraseñas aleatorias una sola vez. **Cada ejecución renueva todas las contraseñas demo y deja inválidas las anteriores**; guarda la salida de forma segura. También crea para el alumno demo disponibilidad de lunes a viernes, de 09:00 a 17:00, con franjas exactas. No ejecutes este comando en producción. `database/seeds/001_sample_data.sql` es un conjunto legado de datos de muestra y no se ejecuta automáticamente ni sustituye al generador seguro de cuentas.
 
+La cuenta demo de Administrador usa el correo `demo.admin@fct.local`, pero el formulario de inicio de sesión no admite correo: entra con el NIF aleatorio y la contraseña que aparecen en la salida de esa ejecución. Las contraseñas no se guardan en texto legible ni se pueden consultar después. Si perdiste la salida, puedes volver a ejecutar el comando únicamente en desarrollo local; generará credenciales nuevas y cambiará las contraseñas de **todas** las cuentas demo, así que guarda de forma segura la nueva salida.
+
 Consulta [la matriz de roles y permisos](docs/roles_y_permisos.md) para conocer el acceso restringido al catálogo y el alcance de solo lectura del perfil Observador.
 
 Abre phpMyAdmin en <http://localhost:8082>. Inicia sesión con el servidor `db`, puerto `3306`, base `sistema_fct` y las credenciales `FCT_DB_USER`/`FCT_DB_PASS` de `.env` (por defecto, `fct`). El usuario `root` y `MARIADB_ROOT_PASSWORD` deben reservarse para administración local cuando sea necesaria; no uses phpMyAdmin para exponer el servicio a la red.
