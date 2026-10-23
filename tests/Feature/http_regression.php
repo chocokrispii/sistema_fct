@@ -863,6 +863,83 @@ try {
         'Empresa'
     );
     expectRegression($companyOwnerCsrf !== '', 'Company login should return a CSRF token.');
+
+    $invalidMimeNumber = $agreementNumber . '-invalid-mime';
+    $invalidMimeBoundary = 'fct-invalid-mime-' . $nonce;
+    $invalidMimeBody = multipartBody([
+        'numero_convenio' => $invalidMimeNumber,
+        'especialidad_id' => (string)$fixtureSpecialtyId,
+        'sede_id' => '',
+        'fecha_firma' => '2026-01-01',
+        'fecha_inicio' => '2026-02-01',
+        'fecha_fin' => '2027-01-31',
+    ], 'not-a-pdf.txt', 'plain text is not a PDF', $invalidMimeBoundary);
+    $invalidMimeUpload = $companyOwnerClient->request(
+        'POST',
+        'convenios',
+        [
+            'Content-Type' => 'multipart/form-data; boundary=' . $invalidMimeBoundary,
+            'Content-Length' => (string)strlen($invalidMimeBody),
+            'X-CSRF-Token' => $companyOwnerCsrf,
+        ],
+        $invalidMimeBody
+    );
+    expectRegression(
+        $invalidMimeUpload['status'] === 200
+            && str_contains($invalidMimeUpload['body'], 'El documento debe ser un archivo PDF.'),
+        'The HTTP upload should reject a mismatched extension and detected MIME type.'
+    );
+    $invalidMimeCount = $database->prepare(
+        'SELECT COUNT(*) FROM convenios WHERE empresa_id = :empresa AND numero_convenio = :numero'
+    );
+    $invalidMimeCount->execute([
+        'empresa' => $fixtureCompanyIds[0],
+        'numero' => $invalidMimeNumber,
+    ]);
+    expectRegression(
+        (int)$invalidMimeCount->fetchColumn() === 0 && !is_dir($agreementDirectory),
+        'A rejected MIME type should not create a convention row or private upload directory.'
+    );
+
+    $oversizedNumber = $agreementNumber . '-oversized';
+    $oversizedBoundary = 'fct-oversized-' . $nonce;
+    $oversizedBytes = str_repeat('x', 10 * 1024 * 1024 + 1);
+    $oversizedBody = multipartBody([
+        'numero_convenio' => $oversizedNumber,
+        'especialidad_id' => (string)$fixtureSpecialtyId,
+        'sede_id' => '',
+        'fecha_firma' => '2026-01-01',
+        'fecha_inicio' => '2026-02-01',
+        'fecha_fin' => '2027-01-31',
+    ], 'oversized.pdf', $oversizedBytes, $oversizedBoundary);
+    $oversizedUpload = $companyOwnerClient->request(
+        'POST',
+        'convenios',
+        [
+            'Content-Type' => 'multipart/form-data; boundary=' . $oversizedBoundary,
+            'Content-Length' => (string)strlen($oversizedBody),
+            'X-CSRF-Token' => $companyOwnerCsrf,
+        ],
+        $oversizedBody
+    );
+    expectRegression(
+        $oversizedUpload['status'] === 200
+            && str_contains($oversizedUpload['body'], 'Adjunta un PDF válido de hasta 10 MB.'),
+        'The HTTP upload should reject a PDF larger than the configured 10 MiB maximum.'
+    );
+    $oversizedCount = $database->prepare(
+        'SELECT COUNT(*) FROM convenios WHERE empresa_id = :empresa AND numero_convenio = :numero'
+    );
+    $oversizedCount->execute([
+        'empresa' => $fixtureCompanyIds[0],
+        'numero' => $oversizedNumber,
+    ]);
+    expectRegression(
+        (int)$oversizedCount->fetchColumn() === 0 && !is_dir($agreementDirectory),
+        'An oversized upload should not create a convention row or private upload directory.'
+    );
+    $passedTests[] = 'HTTP upload rejects invalid PDF MIME/extension and files larger than 10 MiB without persisting them';
+
     $uploadBoundary = 'fct-regression-' . $nonce;
     $uploadBody = multipartBody([
         'numero_convenio' => $agreementNumber,
