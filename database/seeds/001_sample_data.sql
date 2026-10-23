@@ -18,8 +18,9 @@ INSERT INTO coordinadores (usuario_id, nombre, apellidos) VALUES
 (2, 'Carlos', 'Martínez Gómez');
 
 -- 4. INSERTAR EMPRESA
-INSERT INTO empresas (id, usuario_id, nombre_empresa, cif_empresa, pagina_web, categoria) VALUES
-(1, 3, 'Tech Solutions S.L.', 'B12345678', 'https://techsolutions.com', 'Desarrollo de Software');
+INSERT INTO empresas
+    (id, usuario_id, nombre_empresa, nombre_comercial, cif_empresa, pagina_web, categoria, estado) VALUES
+(1, 3, 'Tech Solutions S.L.', 'Tech Solutions', 'B12345678', 'https://techsolutions.com', 'Desarrollo de Software', 'Aprobada');
 
 -- 5. INSERTAR OFERTA DE PLAZAS
 INSERT INTO empresa_especialidades_plazas (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin) VALUES

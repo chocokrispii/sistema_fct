@@ -5,6 +5,8 @@ Las acciones y sus métodos MVC se declaran en `routes/web.php`.
 controlador; `CsrfMiddleware` protege las mutaciones POST de esa capa. La API
 tokenizada usa autenticación Bearer propia, descrita más abajo. El rol se
 vuelve a comprobar en el servidor para las decisiones de ofertas y convenios.
+Las cuentas de Empresa sólo acceden a módulos privados cuando su perfil tiene
+estado `Aprobada`.
 
 ## Alcance de Observador
 
@@ -35,6 +37,19 @@ El único POST disponible es `logout`, para invalidar la propia sesión; es una 
 | Coordinador | Consulta y seguimiento de ofertas/convenios, asignación y cierre de prácticas, calificaciones y consultas. No puede aprobar o rechazar ofertas ni convenios. |
 | Administrador | Gestión de usuarios y decisiones sobre ofertas/convenios; comparte la gestión de asignaciones y calificaciones. Es el único rol con acceso a la administración de integraciones: `api-tokens` (emisión y revocación de tokens), `pruebas-integracion` y la consulta de webhooks (`webhook-inbox`, `webhooks-recibidos`, `webhooks-enviados`, `webhooks-empresa`). |
 | Observador | Solo lectura, con anonimización y sin acceso a documentos privados, según el alcance anterior. |
+
+## Alta y aprobación de empresas
+
+El registro público crea la cuenta con estado `Pendiente_Aprobacion`. El login,
+la sesión y las rutas privadas MVC y de API deniegan el acceso con HTTP 403
+hasta que un Administrador aprueba la solicitud. Las empresas existentes al
+aplicar la migración se conservan como aprobadas.
+
+Sólo Administrador puede consultar `solicitudes-empresa` y aprobar mediante
+`aprobar-empresa` o el endpoint de sesión
+`POST /api/admin/empresas/{id}/aprobar`. La aprobación requiere un número de
+Convenio Marco y un PDF firmado; el archivo se analiza con ClamAV y se guarda
+fuera de `public/` dentro de `FCT_STORAGE_PATH`.
 
 ## Privacidad del alumnado
 

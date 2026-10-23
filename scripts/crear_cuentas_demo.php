@@ -118,12 +118,15 @@ try {
             $profile->execute(['usuario' => $userId, 'nombre' => 'Cuenta', 'apellidos' => 'Demo Coordinación']);
         } elseif ($definition['role'] === 'Empresa') {
             $profile = $db->prepare(
-                'INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto)
-                 VALUES (:usuario, :nombre, :cif, :contacto)'
+                "INSERT INTO empresas
+                    (usuario_id, nombre_empresa, nombre_comercial, cif_empresa, persona_contacto,
+                     representante_legal, estado)
+                 VALUES (:usuario, :nombre, :comercial, :cif, :contacto, :contacto, 'Aprobada')"
             );
             $profile->execute([
                 'usuario' => $userId,
                 'nombre' => 'Empresa Demo Local',
+                'comercial' => 'Empresa Demo Local',
                 'cif' => 'B' . strtoupper(bin2hex(random_bytes(4))),
                 'contacto' => 'Contacto de prueba',
             ]);

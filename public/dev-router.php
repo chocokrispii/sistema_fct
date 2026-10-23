@@ -9,6 +9,18 @@ if (!is_string($requestPath)) {
 }
 
 $decodedPath = rawurldecode($requestPath);
+if ($decodedPath === '/api/public/empresas/registro') {
+    $_GET['action'] = 'api-registro-empresa';
+    require __DIR__ . '/index.php';
+    return true;
+}
+if (preg_match('/\A\/api\/admin\/empresas\/([1-9][0-9]*)\/aprobar\/?\z/', $decodedPath, $matches) === 1) {
+    $_GET['action'] = 'api-aprobar-empresa';
+    $_GET['id'] = $matches[1];
+    require __DIR__ . '/index.php';
+    return true;
+}
+
 foreach (explode('/', str_replace('\\', '/', $decodedPath)) as $segment) {
     if (str_starts_with($segment, '.')) {
         http_response_code(404);

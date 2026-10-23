@@ -155,7 +155,9 @@ final class RegressionHttpClient
                 'max_redirects' => 0,
             ],
         ]);
-        $url = $this->baseUrl . '/index.php?action=' . rawurlencode($action) . $query;
+        $url = str_starts_with($action, '/')
+            ? $this->baseUrl . $action . $query
+            : $this->baseUrl . '/index.php?action=' . rawurlencode($action) . $query;
         $responseBody = @file_get_contents($url, false, $context);
         expectRegression(is_string($responseBody), 'The HTTP server did not return a response.');
 
@@ -246,7 +248,7 @@ function loginFixture(
     return $data['csrfToken'];
 }
 
-function multipartBody(array $fields, string $filename, string $fileBytes, string $boundary): string
+function multipartFieldsBody(array $fields, string $boundary): string
 {
     $body = '';
     foreach ($fields as $name => $value) {
@@ -255,13 +257,41 @@ function multipartBody(array $fields, string $filename, string $fileBytes, strin
         $body .= (string)$value . "\r\n";
     }
 
+    return $body;
+}
+
+function multipartBody(
+    array $fields,
+    string $filename,
+    string $fileBytes,
+    string $boundary,
+    string $fileField = 'archivo'
+): string {
+    $body = multipartFieldsBody($fields, $boundary);
     $body .= '--' . $boundary . "\r\n";
-    $body .= 'Content-Disposition: form-data; name="archivo"; filename="' . $filename . '"' . "\r\n";
+    $body .= 'Content-Disposition: form-data; name="' . $fileField . '"; filename="' . $filename . '"' . "\r\n";
     $body .= 'Content-Type: application/pdf' . "\r\n\r\n";
     $body .= $fileBytes . "\r\n";
     $body .= '--' . $boundary . "--\r\n";
 
     return $body;
+}
+
+function validFixtureCif(string $nonce): string
+{
+    $digits = substr(str_pad((string)hexdec(substr($nonce, 0, 7)), 7, '0', STR_PAD_LEFT), -7);
+    $sum = 0;
+    for ($index = 0; $index < 7; $index++) {
+        $digit = (int)$digits[$index];
+        if ($index % 2 === 0) {
+            $doubled = $digit * 2;
+            $sum += intdiv($doubled, 10) + ($doubled % 10);
+        } else {
+            $sum += $digit;
+        }
+    }
+
+    return 'B' . $digits . (string)((10 - ($sum % 10)) % 10);
 }
 
 function insertFixtureUser(
@@ -312,7 +342,11 @@ function assertFeatureSchema(PDO $db, string $databaseName): void
 
     $required = [
         'usuarios' => ['id', 'email', 'password_hash', 'rol', 'activo'],
-        'empresas' => ['id', 'usuario_id', 'nombre_empresa', 'cif_empresa'],
+        'empresas' => [
+            'id', 'usuario_id', 'nombre_empresa', 'nombre_comercial', 'cif_empresa',
+            'representante_legal', 'dni_representante', 'estado', 'numero_convenio',
+            'pdf_convenio_path', 'fecha_aprobacion',
+        ],
         'especialidades' => ['id', 'nombre_especialidad'],
         'convenios' => ['id', 'empresa_id', 'especialidad_id', 'numero_convenio', 'fecha_firma', 'fecha_inicio', 'fecha_fin', 'archivo_path'],
         'auditoria' => ['id', 'usuario_id', 'evento', 'entidad', 'entidad_id', 'detalle'],
@@ -428,10 +462,11 @@ try {
     $student = insertFixtureUser($database, $nonce, 'alumno', 'Alumno', $fixtureEmails, $fixtureUserIds);
     $companyOwner = insertFixtureUser($database, $nonce, 'empresa-a', 'Empresa', $fixtureEmails, $fixtureUserIds);
     $otherCompany = insertFixtureUser($database, $nonce, 'empresa-b', 'Empresa', $fixtureEmails, $fixtureUserIds);
+    $admin = insertFixtureUser($database, $nonce, 'admin', 'Administrador', $fixtureEmails, $fixtureUserIds);
 
     $companyInsert = $database->prepare(
-        'INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa)
-         VALUES (:usuario, :nombre, :cif)'
+        "INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, estado)
+         VALUES (:usuario, :nombre, :cif, 'Aprobada')"
     );
     foreach ([
         ['user' => $companyOwner, 'suffix' => 'A'],
@@ -503,6 +538,7 @@ try {
             '127.0.0.1:' . $port,
             '-t',
             $publicRoot,
+            $projectRoot . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'dev-router.php',
         ],
         $descriptors,
         $serverPipes,
@@ -625,6 +661,160 @@ try {
     $companyAdminDenied = $companyAdminClient->request('GET', 'usuarios');
     assertJsonForbidden($companyAdminDenied);
     $passedTests[] = 'Alumno and Empresa are denied access to the administrator-only route';
+
+    $registrationClient = new RegressionHttpClient($baseUrl);
+    $registrationCsrf = fetchCsrfToken($registrationClient);
+    $registrationEmail = 'http-regression-' . $nonce . '-public-company@example.invalid';
+    $registrationPassword = 'Regression-Pass-' . substr($nonce, 0, 12);
+    $registrationTaxId = validFixtureCif($nonce);
+    $registrationBoundary = 'fct-registration-' . $nonce;
+    $registrationBody = multipartFieldsBody([
+        '_csrf' => $registrationCsrf,
+        'email' => $registrationEmail,
+        'password' => $registrationPassword,
+        'razon_social' => 'HTTP Registration ' . $nonce . ' S.L.',
+        'nombre_comercial' => 'HTTP Registration ' . $nonce,
+        'cif' => $registrationTaxId,
+        'representante_legal' => 'Representante de prueba',
+        'dni_representante' => '12345678Z',
+        'telefono' => '600123456',
+        'direccion' => 'Calle de prueba 1, Madrid',
+    ], $registrationBoundary) . '--' . $registrationBoundary . "--\r\n";
+    $registrationResponse = $registrationClient->request(
+        'POST',
+        '/api/public/empresas/registro',
+        [
+            'Content-Type' => 'multipart/form-data; boundary=' . $registrationBoundary,
+            'Content-Length' => (string)strlen($registrationBody),
+            'X-CSRF-Token' => $registrationCsrf,
+        ],
+        $registrationBody
+    );
+    $registrationData = responseData($registrationResponse, 201);
+    expectRegression(
+        isset($registrationData['id'])
+            && $registrationData['estado'] === 'Pendiente_Aprobacion'
+            && str_contains($registrationData['message'], 'Pendiente de Aprobación'),
+        'Public registration should return the pending approval state and confirmation message.'
+    );
+    $findRegistration = $database->prepare(
+        'SELECT e.id, e.usuario_id, e.nombre_empresa, e.nombre_comercial, e.cif_empresa,
+                e.representante_legal, e.dni_representante, e.estado
+         FROM empresas e
+         INNER JOIN usuarios u ON u.id = e.usuario_id
+         WHERE u.email = :email'
+    );
+    $findRegistration->execute(['email' => $registrationEmail]);
+    $registeredCompany = $findRegistration->fetch(PDO::FETCH_ASSOC);
+    expectRegression(is_array($registeredCompany), 'The public registration should persist its company profile.');
+    $fixtureEmails[] = $registrationEmail;
+    $fixtureUserIds[] = (int)$registeredCompany['usuario_id'];
+    $fixtureCompanyIds[] = (int)$registeredCompany['id'];
+    expectRegression(
+        $registeredCompany['estado'] === 'Pendiente_Aprobacion'
+            && $registeredCompany['nombre_comercial'] === 'HTTP Registration ' . $nonce
+            && $registeredCompany['cif_empresa'] === $registrationTaxId
+            && $registeredCompany['representante_legal'] === 'Representante de prueba'
+            && $registeredCompany['dni_representante'] === '12345678Z',
+        'Public registration should persist legal data in the pending state.'
+    );
+
+    $pendingLogin = $registrationClient->request(
+        'POST',
+        'login',
+        [
+            'Content-Type' => 'application/json',
+            'X-CSRF-Token' => $registrationCsrf,
+        ],
+        json_encode([
+            'email' => $registrationEmail,
+            'password' => $registrationPassword,
+        ], JSON_THROW_ON_ERROR)
+    );
+    $pendingLoginFailure = responseFailure($pendingLogin, 403);
+    expectRegression(
+        str_contains($pendingLoginFailure['error'], 'pendiente de aprobación'),
+        'A pending company should receive an explanatory HTTP 403 at login.'
+    );
+    $passedTests[] = 'Public company registration persists a pending request and blocks login until approval';
+
+    $adminClient = new RegressionHttpClient($baseUrl);
+    $adminCsrf = loginFixture($adminClient, $admin['email'], $admin['password'], 'Administrador');
+    $pendingList = $adminClient->request('GET', 'solicitudes-empresa');
+    expectRegression(
+        $pendingList['status'] === 200
+            && str_contains($pendingList['body'], 'HTTP Registration ' . $nonce . ' S.L.')
+            && str_contains($pendingList['body'], 'Pendiente_Aprobacion'),
+        'The administrator request list should show pending companies by default.'
+    );
+    $approvalNumber = 'MARCO-' . $nonce;
+    $approvalBoundary = 'fct-approval-' . $nonce;
+    $approvalBody = multipartBody([
+        '_csrf' => $adminCsrf,
+        'numero_convenio' => $approvalNumber,
+    ], 'convenio-firmado.pdf', $pdfBytes, $approvalBoundary, 'pdf_convenio');
+    $approvalResponse = $adminClient->request(
+        'POST',
+        '/api/admin/empresas/' . (int)$registeredCompany['id'] . '/aprobar',
+        [
+            'Content-Type' => 'multipart/form-data; boundary=' . $approvalBoundary,
+            'Content-Length' => (string)strlen($approvalBody),
+            'X-CSRF-Token' => $adminCsrf,
+        ],
+        $approvalBody
+    );
+    $approvalData = responseData($approvalResponse);
+    expectRegression(
+        $approvalData['estado'] === 'Aprobada'
+            && (int)$approvalData['id'] === (int)$registeredCompany['id'],
+        'The admin approval endpoint should return the approved company.'
+    );
+    $approvedCompanyQuery = $database->prepare(
+        'SELECT estado, numero_convenio, pdf_convenio_path, fecha_aprobacion
+         FROM empresas WHERE id = :id'
+    );
+    $approvedCompanyQuery->execute(['id' => $registeredCompany['id']]);
+    $approvedCompany = $approvedCompanyQuery->fetch(PDO::FETCH_ASSOC);
+    expectRegression(
+        is_array($approvedCompany)
+            && $approvedCompany['estado'] === 'Aprobada'
+            && $approvedCompany['numero_convenio'] === $approvalNumber
+            && is_string($approvedCompany['fecha_aprobacion'])
+            && preg_match('#\Auploads/convenios-marco/[a-f0-9]{48}\.pdf\z#', (string)$approvedCompany['pdf_convenio_path']) === 1,
+        'Approval should persist its state, agreement number, approval date, and private PDF path.'
+    );
+    $approvalFile = $storageRoot . DIRECTORY_SEPARATOR
+        . str_replace('/', DIRECTORY_SEPARATOR, $approvedCompany['pdf_convenio_path']);
+    $resolvedApprovalFile = realpath($approvalFile);
+    expectRegression(
+        is_string($resolvedApprovalFile)
+            && pathIsWithin($resolvedApprovalFile, $storageRoot)
+            && !pathIsWithin($resolvedApprovalFile, $publicRoot)
+            && file_get_contents($resolvedApprovalFile) === $pdfBytes,
+        'The signed agreement PDF should be scanned and stored outside the public document root.'
+    );
+
+    $approvedCompanyClient = new RegressionHttpClient($baseUrl);
+    loginFixture(
+        $approvedCompanyClient,
+        $registrationEmail,
+        $registrationPassword,
+        'Empresa'
+    );
+    $setPending = $database->prepare("UPDATE empresas SET estado = 'Pendiente_Aprobacion' WHERE id = :id");
+    $setPending->execute(['id' => $registeredCompany['id']]);
+    try {
+        $blockedCompanyPage = $approvedCompanyClient->request('GET', 'sedes');
+        $blockedCompanyFailure = responseFailure($blockedCompanyPage, 403);
+        expectRegression(
+            str_contains($blockedCompanyFailure['error'], 'pendiente de aprobación'),
+            'An existing company session should lose private access when its approval state is pending.'
+        );
+    } finally {
+        $restoreApproval = $database->prepare("UPDATE empresas SET estado = 'Aprobada' WHERE id = :id");
+        $restoreApproval->execute(['id' => $registeredCompany['id']]);
+    }
+    $passedTests[] = 'Admin approval scans and stores the private PDF and gates existing company sessions by state';
 
     $staleStudentCookie = $studentClient->cookieHeader();
     expectRegression($staleStudentCookie !== '', 'An authenticated HTTP session cookie should be present.');

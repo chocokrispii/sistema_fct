@@ -35,6 +35,10 @@ if (
     && ctype_digit($contentLength)
     && (int)$contentLength > PhpIni::sizeToBytes((string)ini_get('post_max_size'))
 ) {
+    if (JsonResponse::wantsJson()) {
+        JsonResponse::failure('La solicitud supera el límite configurado.', 413);
+        exit;
+    }
     http_response_code(413);
     header('Content-Type: text/plain; charset=UTF-8');
     exit('La solicitud supera el límite configurado.');
@@ -93,6 +97,17 @@ try {
                 $controller->{$route['action']}();
             }
         }
+    }
+} catch (CompanyApprovalRequiredException $e) {
+    while (ob_get_level() > $outputBufferLevel + 1) {
+        ob_end_clean();
+    }
+    ob_clean();
+    http_response_code(403);
+    if (JsonResponse::wantsJson()) {
+        JsonResponse::failure($e->getMessage(), 403);
+    } else {
+        View::render('errors/empresa-pendiente');
     }
 } catch (Throwable $e) {
     while (ob_get_level() > $outputBufferLevel + 1) {

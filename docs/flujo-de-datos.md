@@ -178,12 +178,16 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 |---|---|---|---|
 | Inicio y autenticación | `inicio` | GET | Público |
 |  | `login` | GET, POST | Público |
-|  | `session` | GET | Público; la respuesta informa `user: null` si no hay sesión válida |
+|  | `session` | GET | Público; la respuesta informa `user: null` si no hay sesión válida y 403 para Empresa sin aprobar |
 |  | `logout` | POST | Administrador, Coordinador, Observador, Empresa, Alumno |
 | Recuperación | `recuperar`, `restablecer` | GET, POST | Público |
 |  | `recuperaciones` | GET | Administrador, Coordinador |
 |  | `verificar-recuperacion` | POST | Administrador, Coordinador |
 | Registro y catálogo autenticado | `registro-alumno`, `registro-empresa` | GET, POST | Público |
+|  | `api-registro-empresa` | POST | Público; sesión MVC y CSRF para `/api/public/empresas/registro` |
+|  | `empresas-centro` | GET | Administrador, Coordinador |
+|  | `solicitudes-empresa`, `formulario-aprobar-empresa` | GET | Administrador |
+|  | `aprobar-empresa`, `api-aprobar-empresa` | POST | Administrador; CSRF |
 |  | `ofertas` | GET | Administrador, Coordinador, Observador, Empresa |
 | Alumno | `portal-alumno`, `mis-asignaciones`, `mis-calificaciones` | GET | Alumno |
 |  | `perfil-alumno`, `disponibilidad` | GET, POST | Alumno |
@@ -209,7 +213,7 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 |  | `webhooks-enviados` | GET | Administrador; últimos 50 eventos de `webhook_outbox` |
 |  | `webhooks-empresa` | GET | Administrador; actividad de webhooks filtrada por `empresa_id` |
 
-`routes/web.php` declara 42 acciones estáticas, todas recogidas arriba. Además, `preview-disponibilidad` y `preview-publicar-oferta` (públicas, GET, vistas de desarrollo) se registran sólo cuando `APP_ENV` es `development` o `local`; no forman parte del catálogo de producción.
+`routes/web.php` declara 48 acciones estáticas, todas recogidas arriba. Además, `preview-disponibilidad` y `preview-publicar-oferta` (públicas, GET, vistas de desarrollo) se registran sólo cuando `APP_ENV` es `development` o `local`; no forman parte del catálogo de producción.
 
 La definición completa del rol de auditoría y sus límites está en [Roles y permisos](/roles_y_permisos).
 

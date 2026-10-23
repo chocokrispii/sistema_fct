@@ -14,9 +14,8 @@ require_once __DIR__ . '/../app/Models/Oferta.php';
 require_once __DIR__ . '/../app/Models/Asignacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
-require_once __DIR__ . '/../app/Core/FileScanner.php';
+require_once __DIR__ . '/../app/Core/PrivatePdfStorage.php';
 require_once __DIR__ . '/../app/Core/PhpIni.php';
-require_once __DIR__ . '/../config/storage.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
@@ -58,6 +57,14 @@ try {
     if ($identity === null) {
         header('WWW-Authenticate: Bearer');
         $fail(401, 'unauthorized', 'Se requiere un token Bearer válido y activo.');
+    }
+
+    if ($identity['role'] === 'Empresa') {
+        $approval = $db->prepare('SELECT estado FROM empresas WHERE usuario_id = :usuario_id LIMIT 1');
+        $approval->execute(['usuario_id' => $identity['userId']]);
+        if ($approval->fetchColumn() !== 'Aprobada') {
+            $fail(403, 'company_not_approved', 'La cuenta de empresa no está aprobada para acceder a los recursos privados.');
+        }
     }
 
     $rawPath = $_GET['path'] ?? '';
@@ -713,12 +720,15 @@ function apiCreateCompany(PDO $db, int $actorId, Closure $respond, Closure $fail
         $account->execute(['email' => $email, 'password_hash' => password_hash($password, PASSWORD_DEFAULT)]);
         $newUserId = (int)$db->lastInsertId();
         $profile = $db->prepare(
-            'INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto)
-             VALUES (:user_id, :name, :cif, :contact)'
+            "INSERT INTO empresas
+                (usuario_id, nombre_empresa, nombre_comercial, cif_empresa, persona_contacto,
+                 representante_legal, estado)
+             VALUES (:user_id, :name, :commercial, :cif, :contact, :contact, 'Aprobada')"
         );
         $profile->execute([
             'user_id' => $newUserId,
             'name' => $name,
+            'commercial' => $name,
             'cif' => $cif,
             'contact' => $contact,
         ]);
@@ -984,39 +994,12 @@ function apiCreateAgreement(PDO $db, int $userId, ?int $companyId, Closure $resp
     if (!$specialty->fetchColumn()) {
         $fail(422, 'invalid_agreement', 'El ciclo formativo no existe.');
     }
-    if (!is_array($upload) || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
-        || !is_int($upload['size'] ?? null) || $upload['size'] < 1 || $upload['size'] > 10 * 1024 * 1024
-        || !is_string($upload['tmp_name'] ?? null) || !is_string($upload['name'] ?? null)
-        || !is_uploaded_file($upload['tmp_name'])) {
+    if (!is_array($upload)) {
         $fail(422, 'invalid_pdf', 'Adjunta un PDF válido de hasta 10 MiB en el campo archivo.');
     }
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($upload['tmp_name']);
-    if ($mime !== 'application/pdf' || strtolower(pathinfo($upload['name'], PATHINFO_EXTENSION)) !== 'pdf') {
-        $fail(422, 'invalid_pdf', 'El documento debe ser un archivo PDF.');
-    }
-
-    FileScanner::scan($upload['tmp_name']);
-    $storageRoot = fctStoragePath();
-    $directory = $storageRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'convenios';
-    foreach ([$storageRoot, dirname($directory), $directory] as $privateDirectory) {
-        if (!is_dir($privateDirectory) && !mkdir($privateDirectory, 0700) && !is_dir($privateDirectory)) {
-            throw new RuntimeException('No se pudo preparar el almacenamiento privado de convenios.');
-        }
-        if (is_link($privateDirectory) || !chmod($privateDirectory, 0700)) {
-            throw new RuntimeException('No se pudieron establecer los permisos privados de almacenamiento.');
-        }
-    }
-    $storedName = bin2hex(random_bytes(24)) . '.pdf';
-    $destination = $directory . DIRECTORY_SEPARATOR . $storedName;
-    if (!move_uploaded_file($upload['tmp_name'], $destination)) {
-        throw new RuntimeException('No se pudo guardar el archivo privado del convenio.');
-    }
-    if (!chmod($destination, 0600)) {
-        if (!unlink($destination)) {
-            error_log('No se pudo eliminar un PDF de convenio con permisos inseguros.');
-        }
-        throw new RuntimeException('No se pudieron establecer permisos privados para el convenio.');
-    }
+    $storedFile = PrivatePdfStorage::store($upload, 'uploads/convenios');
+    $storedName = $storedFile['filename'];
+    $destination = $storedFile['path'];
 
     $db->beginTransaction();
     try {

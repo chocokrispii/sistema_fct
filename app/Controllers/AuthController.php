@@ -78,6 +78,13 @@ class AuthController {
             $this->mostrarFormulario('La cuenta está desactivada. Contacta con el centro educativo.', 403, $email);
             return;
         }
+        if ($usuario['rol'] === 'Empresa') {
+            $approvalError = $this->empresaApprovalError((int)$usuario['id']);
+            if ($approvalError !== null) {
+                $this->mostrarFormulario($approvalError, 403, $email);
+                return;
+            }
+        }
 
         session_regenerate_id(true);
         unset($_SESSION['csrf_token']);
@@ -115,6 +122,15 @@ class AuthController {
             $stmt->execute(['id' => $userId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (is_array($row) && (int)$row['activo'] === 1) {
+                if ($row['rol'] === 'Empresa') {
+                    $approvalError = $this->empresaApprovalError((int)$row['id']);
+                    if ($approvalError !== null) {
+                        $_SESSION = [];
+                        session_regenerate_id(true);
+                        JsonResponse::failure($approvalError, 403);
+                        return;
+                    }
+                }
                 $_SESSION['email'] = $row['email'];
                 $_SESSION['rol'] = $row['rol'];
                 $user = $this->sessionUser($row);
@@ -157,12 +173,29 @@ class AuthController {
         ];
     }
 
+    private function empresaApprovalError(int $userId): ?string
+    {
+        $stmt = getPDOConnection()->prepare(
+            'SELECT estado FROM empresas WHERE usuario_id = :usuario_id LIMIT 1'
+        );
+        $stmt->execute(['usuario_id' => $userId]);
+        $estado = $stmt->fetchColumn();
+
+        return match ($estado) {
+            'Aprobada' => null,
+            'Pendiente_Aprobacion' => 'La solicitud de empresa está pendiente de aprobación; todavía no puedes acceder a los módulos privados.',
+            'Rechazada' => 'La solicitud de empresa ha sido rechazada. Contacta con el centro educativo.',
+            default => 'No se encontró un perfil de empresa aprobado para esta cuenta.',
+        };
+    }
+
     private function mostrarFormulario(string $error = '', int $status = 200, string $email = ''): void {
         if (JsonResponse::wantsJson()) {
             JsonResponse::failure($error, $status);
             return;
         }
 
+        http_response_code($status);
         View::render('auth/login', ['error' => $error, 'email' => $email]);
     }
 }

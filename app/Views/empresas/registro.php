@@ -1,72 +1,89 @@
 <section class="company-registration" aria-labelledby="company-registration-title">
     <div class="company-registration__intro">
         <span class="company-registration__eyebrow">Área de empresas</span>
-        <h2 id="company-registration-title">Registra tu empresa</h2>
-        <p>Crea tu cuenta para gestionar ofertas de prácticas y conectar con estudiantes.</p>
+        <h2 id="company-registration-title">Contacte con nosotros / Alta de empresa</h2>
+        <p>Envía tus datos para solicitar el alta y gestionar ofertas de prácticas.</p>
     </div>
 
-    <?php if ($error !== ''): ?>
-        <p id="company-registration-error" class="message message-error company-registration__error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
+    <?php if ($success): ?>
+        <p class="message message-success company-registration__success" role="status" tabindex="-1">
+            Solicitud enviada con éxito. Su cuenta se encuentra en estado Pendiente de Aprobación. Se le notificará una vez el equipo administrativo valide la información.
+        </p>
+        <p class="company-registration__login">Cuando el equipo valide la solicitud, podrás <a href="index.php?action=login">iniciar sesión</a>.</p>
+    <?php else: ?>
+        <?php if ($error !== ''): ?>
+            <p id="company-registration-error" class="message message-error company-registration__error" role="alert" tabindex="-1"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
+
+        <form class="company-registration__form" method="POST" action="index.php?action=registro-empresa"<?= $error !== '' ? ' aria-describedby="company-registration-error"' : '' ?>>
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
+
+            <fieldset class="company-registration__section">
+                <legend>Acceso a la cuenta</legend>
+                <p class="company-registration__section-help">Usarás estos datos para iniciar sesión cuando la solicitud sea aprobada.</p>
+
+                <div class="company-registration__grid">
+                    <div class="company-registration__field">
+                        <label for="company-email">Correo electrónico <span aria-hidden="true">*</span></label>
+                        <input id="company-email" type="email" name="email" maxlength="100" autocomplete="email" value="<?= htmlspecialchars($values['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="nombre@empresa.es" required>
+                    </div>
+
+                    <div class="company-registration__field">
+                        <label for="company-password">Contraseña <span aria-hidden="true">*</span></label>
+                        <input id="company-password" type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" aria-describedby="company-password-help" placeholder="Mínimo 12 caracteres" required>
+                        <small id="company-password-help">Debe tener entre 12 y 72 bytes. Los espacios cuentan.</small>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="company-registration__section">
+                <legend>Datos de la empresa</legend>
+                <p class="company-registration__section-help">La información se revisará antes de habilitar el acceso a los módulos privados.</p>
+
+                <div class="company-registration__grid">
+                    <div class="company-registration__field">
+                        <label for="company-legal-name">Razón social <span aria-hidden="true">*</span></label>
+                        <input id="company-legal-name" type="text" name="razon_social" maxlength="150" autocomplete="organization" value="<?= htmlspecialchars($values['razon_social'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                    </div>
+
+                    <div class="company-registration__field">
+                        <label for="company-commercial-name">Nombre comercial <span class="company-registration__optional">Opcional</span></label>
+                        <input id="company-commercial-name" type="text" name="nombre_comercial" maxlength="150" autocomplete="organization" value="<?= htmlspecialchars($values['nombre_comercial'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    </div>
+
+                    <div class="company-registration__field">
+                        <label for="company-cif">CIF / NIF <span aria-hidden="true">*</span></label>
+                        <input id="company-cif" type="text" name="cif" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['cif'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. A28017895" required>
+                    </div>
+
+                    <div class="company-registration__field">
+                        <label for="company-representative">Representante legal <span aria-hidden="true">*</span></label>
+                        <input id="company-representative" type="text" name="representante_legal" maxlength="150" autocomplete="name" value="<?= htmlspecialchars($values['representante_legal'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                    </div>
+
+                    <div class="company-registration__field">
+                        <label for="company-representative-dni">DNI / NIE del representante <span class="company-registration__optional">Opcional</span></label>
+                        <input id="company-representative-dni" type="text" name="dni_representante" maxlength="20" autocomplete="off">
+                    </div>
+
+                    <div class="company-registration__field">
+                        <label for="company-phone">Teléfono <span class="company-registration__optional">Opcional</span></label>
+                        <input id="company-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" value="<?= htmlspecialchars($values['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. 600 123 456">
+                    </div>
+
+                    <div class="company-registration__field company-registration__field--full">
+                        <label for="company-address">Dirección completa <span aria-hidden="true">*</span></label>
+                        <input id="company-address" type="text" name="direccion" maxlength="255" autocomplete="street-address" value="<?= htmlspecialchars($values['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Calle, número, código postal y localidad" required>
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="company-registration__actions">
+                <p><span aria-hidden="true">*</span> Campos obligatorios</p>
+                <button class="company-registration__submit" type="submit">Enviar solicitud</button>
+            </div>
+        </form>
+        <div data-vue-island="AltaEmpresa" data-prop-csrf="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>"></div>
+        <p class="company-registration__login">¿Ya tienes una cuenta aprobada? <a href="index.php?action=login">Inicia sesión</a></p>
     <?php endif; ?>
-
-    <form class="company-registration__form" method="POST" action="index.php?action=registro-empresa"<?= $error !== '' ? ' aria-describedby="company-registration-error"' : '' ?>>
-        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
-
-        <fieldset class="company-registration__section">
-            <legend>Acceso a la cuenta</legend>
-            <p class="company-registration__section-help">Usarás estos datos para iniciar sesión.</p>
-
-            <div class="company-registration__grid">
-                <div class="company-registration__field">
-                    <label for="company-email">Correo electrónico <span aria-hidden="true">*</span></label>
-                    <input id="company-email" type="email" name="email" maxlength="100" autocomplete="email" value="<?= htmlspecialchars($values['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="nombre@empresa.es" required>
-                </div>
-
-                <div class="company-registration__field">
-                    <label for="company-password">Contraseña <span aria-hidden="true">*</span></label>
-                    <input id="company-password" type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" aria-describedby="company-password-help" placeholder="Mínimo 12 caracteres" required>
-                    <small id="company-password-help">Debe tener entre 12 y 72 caracteres. Los espacios cuentan.</small>
-                </div>
-            </div>
-        </fieldset>
-
-        <fieldset class="company-registration__section">
-            <legend>Datos de la empresa</legend>
-            <p class="company-registration__section-help">Indica la información legal y dónde podemos localizarte.</p>
-
-            <div class="company-registration__grid">
-                <div class="company-registration__field">
-                    <label for="company-name">Razón social <span aria-hidden="true">*</span></label>
-                    <input id="company-name" type="text" name="nombre_comercial" maxlength="150" autocomplete="organization" value="<?= htmlspecialchars($values['nombre_comercial'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Nombre legal de la empresa" required>
-                </div>
-
-                <div class="company-registration__field">
-                    <label for="company-cif">CIF <span aria-hidden="true">*</span></label>
-                    <input id="company-cif" type="text" name="cif" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['cif'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. B12345678" required>
-                </div>
-
-                <div class="company-registration__field">
-                    <label for="company-contact">Persona de contacto <span class="company-registration__optional">Opcional</span></label>
-                    <input id="company-contact" type="text" name="persona_contacto" maxlength="150" autocomplete="name" value="<?= htmlspecialchars($values['persona_contacto'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Nombre y apellidos">
-                </div>
-
-                <div class="company-registration__field">
-                    <label for="company-phone">Teléfono <span class="company-registration__optional">Opcional</span></label>
-                    <input id="company-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" value="<?= htmlspecialchars($values['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. 600 123 456">
-                </div>
-
-                <div class="company-registration__field company-registration__field--full">
-                    <label for="company-address">Dirección principal <span aria-hidden="true">*</span></label>
-                    <input id="company-address" type="text" name="direccion" maxlength="255" autocomplete="street-address" value="<?= htmlspecialchars($values['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Calle, número, código postal y localidad" required>
-                </div>
-            </div>
-        </fieldset>
-
-        <div class="company-registration__actions">
-            <p><span aria-hidden="true">*</span> Campos obligatorios</p>
-            <button class="company-registration__submit" type="submit">Crear cuenta de empresa</button>
-        </div>
-    </form>
-
-    <p class="company-registration__login">¿Ya tienes una cuenta? <a href="index.php?action=login">Inicia sesión</a></p>
 </section>

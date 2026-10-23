@@ -509,8 +509,8 @@ try {
     }
 
     $companyInsert = $db->prepare(
-        'INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto)
-         VALUES (:usuario, :nombre, :cif, :contacto)'
+        "INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto, estado)
+         VALUES (:usuario, :nombre, :cif, :contacto, 'Aprobada')"
     );
     $companyInsert->execute([
         'usuario' => $createdUsers[0],

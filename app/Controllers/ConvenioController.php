@@ -5,7 +5,7 @@ require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/Webhook.php';
-require_once __DIR__ . '/../Core/FileScanner.php';
+require_once __DIR__ . '/../Core/PrivatePdfStorage.php';
 require_once __DIR__ . '/../Core/JsonResponse.php';
 require_once __DIR__ . '/../Core/PhpIni.php';
 require_once __DIR__ . '/../../config/storage.php';
@@ -224,44 +224,12 @@ class ConvenioController
             throw new InvalidArgumentException('Ya existe un convenio registrado para ese ciclo formativo.');
         }
 
-        if (!is_array($upload) || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            if (is_array($upload) && in_array($upload['error'] ?? null, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
-                throw new InvalidArgumentException('El archivo supera el límite de carga configurado en el servidor.');
-            }
+        if (!is_array($upload)) {
             throw new InvalidArgumentException('Selecciona un PDF válido de hasta 10 MB.');
         }
-        if (
-            !is_int($upload['size'] ?? null)
-            || !is_string($upload['tmp_name'] ?? null)
-            || !is_string($upload['name'] ?? null)
-            || $upload['size'] < 1
-            || $upload['size'] > 10 * 1024 * 1024
-            || !is_uploaded_file($upload['tmp_name'])
-        ) {
-            throw new InvalidArgumentException('El archivo excede el límite de 10 MB o no es una carga válida.');
-        }
-        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($upload['tmp_name']);
-        if ($mime !== 'application/pdf' || strtolower(pathinfo($upload['name'], PATHINFO_EXTENSION)) !== 'pdf') {
-            throw new InvalidArgumentException('El documento debe ser un archivo PDF.');
-        }
-
-        FileScanner::scan($upload['tmp_name']);
-
-        $storageRoot = fctStoragePath();
-        $uploadRoot = $storageRoot . DIRECTORY_SEPARATOR . 'uploads';
-        $directory = $uploadRoot . DIRECTORY_SEPARATOR . 'convenios';
-        foreach ([$storageRoot, $uploadRoot, $directory] as $privateDirectory) {
-            if (!is_dir($privateDirectory) && !mkdir($privateDirectory, 0700) && !is_dir($privateDirectory)) {
-                throw new RuntimeException('No se pudo preparar el almacenamiento privado de convenios.');
-            }
-            if (is_link($privateDirectory) || !chmod($privateDirectory, 0700)) {
-                throw new RuntimeException('No se pudieron establecer los permisos privados de almacenamiento.');
-            }
-        }
-        if (!is_dir($directory)) {
-            throw new RuntimeException('No se pudo preparar el almacenamiento privado de convenios.');
-        }
-        [$storedName, $destination] = $this->almacenarArchivo($upload, $directory);
+        $storedFile = PrivatePdfStorage::store($upload, 'uploads/convenios');
+        $storedName = $storedFile['filename'];
+        $destination = $storedFile['path'];
 
         $this->db->beginTransaction();
         try {
@@ -385,21 +353,9 @@ class ConvenioController
         $destination = null;
         if (is_array($upload) && ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
             $this->validarLimitesCarga();
-            if (($upload['error'] ?? null) !== UPLOAD_ERR_OK) {
-                throw new InvalidArgumentException('No se pudo recibir el PDF. Comprueba el límite de carga.');
-            }
-            $storageRoot = fctStoragePath();
-            $uploadRoot = $storageRoot . DIRECTORY_SEPARATOR . 'uploads';
-            $directory = $uploadRoot . DIRECTORY_SEPARATOR . 'convenios';
-            foreach ([$storageRoot, $uploadRoot, $directory] as $privateDirectory) {
-                if (!is_dir($privateDirectory) && !mkdir($privateDirectory, 0700) && !is_dir($privateDirectory)) {
-                    throw new RuntimeException('No se pudo preparar el almacenamiento privado de convenios.');
-                }
-                if (is_link($privateDirectory) || !chmod($privateDirectory, 0700)) {
-                    throw new RuntimeException('No se pudieron establecer los permisos privados de almacenamiento.');
-                }
-            }
-            [$storedName, $destination] = $this->almacenarArchivo($upload, $directory);
+            $storedFile = PrivatePdfStorage::store($upload, 'uploads/convenios');
+            $storedName = $storedFile['filename'];
+            $destination = $storedFile['path'];
         }
 
         $this->db->beginTransaction();
@@ -454,39 +410,6 @@ class ConvenioController
                 error_log('No se pudo retirar el archivo anterior del convenio modificado.');
             }
         }
-    }
-
-    /** @return array{0: string, 1: string} */
-    private function almacenarArchivo(array $upload, string $directory): array
-    {
-        if (
-            !is_int($upload['size'] ?? null)
-            || !is_string($upload['tmp_name'] ?? null)
-            || !is_string($upload['name'] ?? null)
-            || $upload['size'] < 1
-            || $upload['size'] > 10 * 1024 * 1024
-            || !is_uploaded_file($upload['tmp_name'])
-        ) {
-            throw new InvalidArgumentException('El archivo excede el límite de 10 MB o no es una carga válida.');
-        }
-        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($upload['tmp_name']);
-        if ($mime !== 'application/pdf' || strtolower(pathinfo($upload['name'], PATHINFO_EXTENSION)) !== 'pdf') {
-            throw new InvalidArgumentException('El documento debe ser un archivo PDF.');
-        }
-        FileScanner::scan($upload['tmp_name']);
-
-        $storedName = bin2hex(random_bytes(24)) . '.pdf';
-        $destination = $directory . DIRECTORY_SEPARATOR . $storedName;
-        if (!move_uploaded_file($upload['tmp_name'], $destination)) {
-            throw new RuntimeException('No se pudo guardar el archivo del convenio.');
-        }
-        if (!chmod($destination, 0600)) {
-            if (!unlink($destination)) {
-                error_log('No se pudo retirar un archivo de convenio sin permisos privados.');
-            }
-            throw new RuntimeException('No se pudieron establecer los permisos privados del convenio.');
-        }
-        return [$storedName, $destination];
     }
 
     private function rutaPrivadaDelConvenio(string $storedName): ?string

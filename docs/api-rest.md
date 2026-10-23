@@ -108,6 +108,26 @@ Ejemplo de error:
 | POST | `/asignaciones` | Administrador o Coordinador asigna un alumno que cumpla las reglas actuales de disponibilidad, ciclo y cupo. |
 | PATCH | `/asignaciones/{id}` | Administrador o Coordinador cierra una asignación activa. |
 
+## Alta pública y aprobación (sesión MVC)
+
+Estas dos rutas de navegador no pertenecen a la API tokenizada `/api/v1`:
+usan la cookie de sesión MVC, el sobre de `JsonResponse` y el token CSRF de la
+sesión. La isla `AltaEmpresa` envía `X-CSRF-Token` y `multipart/form-data`;
+el formulario PHP conserva un fallback síncrono.
+
+| Método | Ruta | Acceso y acción |
+|---|---|---|
+| POST | `/api/public/empresas/registro` | Público con CSRF; crea la cuenta en `Pendiente_Aprobacion` y devuelve HTTP 201. |
+| POST | `/api/admin/empresas/{id}/aprobar` | Sesión Administrador con CSRF; requiere `numero_convenio` y `pdf_convenio` (PDF, máximo 10 MiB). |
+
+La solicitud pública contiene correo, contraseña, razón social, nombre
+comercial opcional, CIF/NIF, representante legal, DNI/NIE opcional, teléfono y
+dirección. Una empresa pendiente o rechazada recibe HTTP 403 al iniciar sesión
+y no puede utilizar las rutas privadas. La aprobación asigna el número de
+Convenio Marco, registra `fecha_aprobacion` y habilita el acceso de la empresa.
+El PDF se escanea con ClamAV y se guarda como archivo aleatorio en
+`FCT_STORAGE_PATH/uploads/convenios-marco`; nunca se sirve desde `public/`.
+
 ### Relación con los permisos MVC
 
 `public/api.php` y `routes/web.php` aplican sus permisos por separado. En la
