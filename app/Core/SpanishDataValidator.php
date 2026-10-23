@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 final class SpanishDataValidator
 {
+    public const DOCUMENT_TYPE_NIF_NIE_DNI = 'NIF_NIE_DNI';
+    public const DOCUMENT_TYPE_PASSPORT = 'PASAPORTE';
+
     public static function isDniNie(string $value): bool
     {
         $document = self::normalizeDniNie($value);
@@ -26,10 +29,55 @@ final class SpanishDataValidator
         return preg_match('/\A(?:\d{8}[A-Z]|[XYZ]\d{7}[A-Z])\z/', self::normalizeDniNie($value)) === 1;
     }
 
-    public static function isCifFormat(string $value): bool
+    public static function isNifPersonaJuridica(string $value): bool
     {
         $identifier = self::normalizeDniNie($value);
-        return preg_match('/\A[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]\z/', $identifier) === 1;
+        if (preg_match('/\A([ABCDEFGHJNPQRSUVW])(\d{7})([0-9A-J])\z/', $identifier, $matches) !== 1) {
+            return false;
+        }
+
+        $sum = 0;
+        for ($index = 0; $index < 7; $index++) {
+            $digit = (int)$matches[2][$index];
+            if ($index % 2 === 0) {
+                $doubled = $digit * 2;
+                $sum += intdiv($doubled, 10) + ($doubled % 10);
+            } else {
+                $sum += $digit;
+            }
+        }
+
+        $control = (10 - ($sum % 10)) % 10;
+        $controlDigit = (string)$control;
+        $controlLetter = 'JABCDEFGHI'[$control];
+        $prefix = $matches[1];
+
+        if (str_contains('ABEH', $prefix)) {
+            return $matches[3] === $controlDigit;
+        }
+        if (str_contains('PQRS', $prefix)) {
+            return $matches[3] === $controlLetter;
+        }
+
+        return $matches[3] === $controlDigit || $matches[3] === $controlLetter;
+    }
+
+    public static function isNifPersonaJuridicaFormat(string $value): bool
+    {
+        return preg_match(
+            '/\A[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]\z/',
+            self::normalizeFiscalIdentifier($value)
+        ) === 1;
+    }
+
+    public static function isPassport(string $value): bool
+    {
+        return preg_match('/\A[A-Z0-9]{6,15}\z/', strtoupper(trim($value))) === 1;
+    }
+
+    public static function isStudentDocumentType(string $value): bool
+    {
+        return in_array($value, [self::DOCUMENT_TYPE_NIF_NIE_DNI, self::DOCUMENT_TYPE_PASSPORT], true);
     }
 
     public static function normalizeFiscalIdentifier(string $value): string

@@ -60,6 +60,7 @@ class AlumnoController
             'nombre' => $alumno['nombre'],
             'apellidos' => $alumno['apellidos'],
             'fecha_nacimiento' => $alumno['fecha_nacimiento'] ?? '',
+            'tipo_documento' => $alumno['tipo_documento'] ?? SpanishDataValidator::DOCUMENT_TYPE_NIF_NIE_DNI,
             'dni' => $alumno['dni'],
             'nss' => $alumno['numero_seguridad_social'],
             'telefono' => $alumno['telefono'] ?? '',
@@ -112,7 +113,9 @@ class AlumnoController
                 }
                 $values[$field] = trim($posted);
             }
-            $values['dni'] = SpanishDataValidator::normalizeDniNie($values['dni']);
+            $values['dni'] = $values['tipo_documento'] === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
+                ? strtoupper($values['dni'])
+                : SpanishDataValidator::normalizeDniNie($values['dni']);
             $values['telefono'] = SpanishDataValidator::normalizePhone($values['telefono']);
 
             $birthDate = DateTimeImmutable::createFromFormat('!Y-m-d', $values['fecha_nacimiento']);
@@ -122,7 +125,10 @@ class AlumnoController
             $email = SpanishDataValidator::isEmail($values['email']);
             $name = SpanishDataValidator::isPersonName($values['nombre'], 50);
             $surname = SpanishDataValidator::isPersonName($values['apellidos'], 100);
-            $dni = SpanishDataValidator::isDniNie($values['dni']);
+            $documentTypeValid = SpanishDataValidator::isStudentDocumentType($values['tipo_documento']);
+            $documentValid = $values['tipo_documento'] === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
+                ? SpanishDataValidator::isPassport($values['dni'])
+                : SpanishDataValidator::isDniNie($values['dni']);
             $nss = preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $values['nss']) === 1;
             $phone = SpanishDataValidator::isSpanishPhone($values['telefono']);
             $address = $values['direccion'] !== ''
@@ -138,8 +144,10 @@ class AlumnoController
             if (!$surname) {
                 $fieldErrors['apellidos'] = 'Introduce apellidos válidos de hasta 100 caracteres.';
             }
-            if (!$dni) {
-                $fieldErrors['dni'] = 'Introduce un DNI/NIE con una letra de control válida.';
+            if (!$documentTypeValid || !$documentValid) {
+                $fieldErrors['dni'] = $values['tipo_documento'] === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
+                    ? 'Introduce un pasaporte de 6 a 15 caracteres alfanuméricos.'
+                    : 'Introduce un NIF con una letra de control válida.';
             }
             if (!$nss) {
                 $fieldErrors['nss'] = 'Introduce entre 5 y 20 caracteres alfanuméricos, espacios, puntos o guiones.';
@@ -203,7 +211,8 @@ class AlumnoController
                         $values['telefono'],
                         $values['direccion'],
                         $values['codigo_postal'],
-                        $tutorData
+                        $tutorData,
+                        $values['tipo_documento']
                     );
                     $_SESSION['email'] = $values['email'];
                     if ($jsonRequest) {
@@ -214,7 +223,7 @@ class AlumnoController
                     exit;
                 } catch (PDOException $exception) {
                     if ((string)$exception->getCode() === '23000') {
-                        $error = 'El correo o DNI/NIE indicado ya está asociado a otra cuenta.';
+                        $error = 'El correo o documento de identidad indicado ya está asociado a otra cuenta.';
                         $errorStatus = 409;
                     } else {
                         error_log('Error al actualizar perfil de alumno: ' . $exception->getMessage());

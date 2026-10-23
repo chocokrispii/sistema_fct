@@ -8,7 +8,6 @@ require_once __DIR__ . '/../app/Core/JsonResponse.php';
 require_once __DIR__ . '/../app/Core/ApiResponseAdapter.php';
 require_once __DIR__ . '/../app/Core/ApiRolePolicy.php';
 require_once __DIR__ . '/../app/Core/PhpIni.php';
-require_once __DIR__ . '/../app/Core/Webhook.php';
 require_once __DIR__ . '/../app/Models/Auditoria.php';
 require_once __DIR__ . '/../app/Models/Oferta.php';
 require_once __DIR__ . '/../app/Models/Asignacion.php';
@@ -522,26 +521,7 @@ function apiCreateOffer(PDO $db, int $userId, ?int $companyId, Closure $respond,
                 ]);
             }
         }
-        $cycleName = (string)$cycleName;
         (new Auditoria($db))->registrar($userId, 'oferta.creada', 'ofertas', $offerId);
-        Webhook::enqueue($db, 'oferta.creada', [
-            'oferta_id' => $offerId,
-            'empresa_id' => $companyId,
-            'especialidad_id' => (int)$specialtyId,
-            'ciclo' => $cycleName,
-            'estado' => 'Pendiente',
-            'plazas' => (int)$seats,
-            'fecha_inicio' => $start->format('Y-m-d'),
-            'fecha_fin' => $end->format('Y-m-d'),
-            'titulo' => $title,
-            'descripcion' => $description,
-            'turno' => $shift,
-            'modalidad' => $modality,
-            'ubicacion' => $location !== '' ? $location : null,
-            'requisitos_tecnologicos' => $requirements !== '' ? $requirements : null,
-            'tecnologias' => $technologies !== '' ? $technologies : null,
-            'horarios' => $weeklyHours,
-        ]);
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -566,7 +546,13 @@ function apiCreateStudent(PDO $db, int $actorId, Closure $respond, Closure $fail
     $name = trim($input['nombre']);
     $surname = trim($input['apellidos']);
     $birthDate = apiDate($input['fecha_nacimiento']);
-    $dni = SpanishDataValidator::normalizeDniNie(trim($input['dni']));
+    $documentType = $input['tipo_documento'] ?? SpanishDataValidator::DOCUMENT_TYPE_NIF_NIE_DNI;
+    if (!is_string($documentType) || !SpanishDataValidator::isStudentDocumentType($documentType)) {
+        $fail(422, 'invalid_student', 'Selecciona un tipo de documento válido.');
+    }
+    $dni = $documentType === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
+        ? strtoupper(trim($input['dni']))
+        : SpanishDataValidator::normalizeDniNie(trim($input['dni']));
     $nss = trim($input['nss']);
     $phone = SpanishDataValidator::normalizePhone(trim($input['telefono']));
     $address = trim($input['direccion']);
@@ -576,7 +562,9 @@ function apiCreateStudent(PDO $db, int $actorId, Closure $respond, Closure $fail
         || trim($password) === '' || !SpanishDataValidator::isPersonName($name, 50)
         || !SpanishDataValidator::isPersonName($surname, 100) || $birthDate === null
         || $birthDate > new DateTimeImmutable('today') || $birthDate->diff(new DateTimeImmutable('today'))->y < 16
-        || !SpanishDataValidator::isDniNie($dni)
+        || ($documentType === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
+            ? !SpanishDataValidator::isPassport($dni)
+            : !SpanishDataValidator::isDniNie($dni))
         || preg_match('/\A[A-Za-z0-9][A-Za-z0-9 .-]{4,19}\z/u', $nss) !== 1
         || !SpanishDataValidator::isSpanishPhone($phone)
         || $address === '' || mb_strlen($address) > 255 || preg_match('/[\p{Cc}]/u', $address) === 1
@@ -630,9 +618,9 @@ function apiCreateStudent(PDO $db, int $actorId, Closure $respond, Closure $fail
         $newUserId = (int)$db->lastInsertId();
         $profile = $db->prepare(
             'INSERT INTO alumnos
-                (usuario_id, nombre, apellidos, fecha_nacimiento, dni, numero_seguridad_social,
+                (usuario_id, nombre, apellidos, fecha_nacimiento, dni, tipo_documento, numero_seguridad_social,
                  codigo_postal, correo, especialidad_id)
-             VALUES (:user_id, :nombre, :apellidos, :birth_date, :dni, :nss, :postcode, :email, :specialty_id)'
+             VALUES (:user_id, :nombre, :apellidos, :birth_date, :dni, :document_type, :nss, :postcode, :email, :specialty_id)'
         );
         $profile->execute([
             'user_id' => $newUserId,
@@ -640,6 +628,7 @@ function apiCreateStudent(PDO $db, int $actorId, Closure $respond, Closure $fail
             'apellidos' => $surname,
             'birth_date' => $birthDate->format('Y-m-d'),
             'dni' => $dni,
+            'document_type' => $documentType,
             'nss' => $nss,
             'postcode' => $postcode,
             'email' => $email,
@@ -674,7 +663,7 @@ function apiCreateStudent(PDO $db, int $actorId, Closure $respond, Closure $fail
             $db->rollBack();
         }
         if ($exception instanceof PDOException && (int)($exception->errorInfo[1] ?? 0) === 1062) {
-            $fail(409, 'duplicate_student_data', 'El correo, DNI u otro dato único ya está registrado.');
+            $fail(409, 'duplicate_student_data', 'El correo, documento u otro dato único ya está registrado.');
         }
         throw $exception;
     }
@@ -684,7 +673,8 @@ function apiCreateStudent(PDO $db, int $actorId, Closure $respond, Closure $fail
 function apiCreateCompany(PDO $db, int $actorId, Closure $respond, Closure $fail): never
 {
     $input = apiJsonInput($fail);
-    $fields = ['email', 'password', 'cif', 'nombre_comercial', 'telefono', 'direccion', 'persona_contacto'];
+    $identityField = array_key_exists('nif_persona_juridica', $input) ? 'nif_persona_juridica' : 'cif';
+    $fields = ['email', 'password', $identityField, 'nombre_comercial', 'telefono', 'direccion', 'persona_contacto'];
     foreach ($fields as $field) {
         if (!is_string($input[$field] ?? null)) {
             $fail(422, 'invalid_company', "El campo $field es obligatorio y debe ser texto.");
@@ -692,14 +682,15 @@ function apiCreateCompany(PDO $db, int $actorId, Closure $respond, Closure $fail
     }
     $email = trim($input['email']);
     $password = $input['password'];
-    $cif = trim($input['cif']);
+    $nif = SpanishDataValidator::normalizeFiscalIdentifier($input[$identityField]);
     $name = trim($input['nombre_comercial']);
     $phone = trim($input['telefono']);
     $address = trim($input['direccion']);
     $contact = trim($input['persona_contacto']);
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 100
         || strlen($password) < 12 || strlen($password) > 72 || trim($password) === ''
-        || $cif === '' || mb_strlen($cif) > 20 || $name === '' || mb_strlen($name) > 150
+        || mb_strlen($nif) > 20 || !SpanishDataValidator::isNifPersonaJuridica($nif)
+        || $name === '' || mb_strlen($name) > 150
         || mb_strlen($contact) > 150 || mb_strlen($phone) > 20
         || $address === '' || mb_strlen($address) > 255) {
         $fail(422, 'invalid_company', 'Revisa email, contraseña y los campos obligatorios de la empresa.');
@@ -719,7 +710,7 @@ function apiCreateCompany(PDO $db, int $actorId, Closure $respond, Closure $fail
         $profile->execute([
             'user_id' => $newUserId,
             'name' => $name,
-            'cif' => $cif,
+            'cif' => $nif,
             'contact' => $contact,
         ]);
         $companyId = (int)$db->lastInsertId();
@@ -735,7 +726,7 @@ function apiCreateCompany(PDO $db, int $actorId, Closure $respond, Closure $fail
             $db->rollBack();
         }
         if ($exception instanceof PDOException && (int)($exception->errorInfo[1] ?? 0) === 1062) {
-            $fail(409, 'duplicate_company_data', 'El correo o CIF ya está registrado.');
+            $fail(409, 'duplicate_company_data', 'El correo o el NIF de persona jurídica ya están registrados.');
         }
         throw $exception;
     }
@@ -906,7 +897,6 @@ function apiReviewOffer(PDO $db, int $id, int $userId, Closure $respond, Closure
             $fail(404, 'not_found', 'La oferta no existe o ya fue revisada.');
         }
         (new Auditoria($db))->registrar($userId, 'oferta.revisada', 'ofertas', $id, 'estado=' . $decision);
-        Webhook::enqueue($db, 'oferta.revisada', ['oferta_id' => $id, 'estado' => $decision]);
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -933,7 +923,6 @@ function apiReviewAgreement(PDO $db, int $id, int $userId, Closure $respond, Clo
             $fail(404, 'not_found', 'El convenio no existe o ya fue revisado.');
         }
         (new Auditoria($db))->registrar($userId, 'convenio.revisado', 'convenios', $id, 'estado=' . $decision);
-        Webhook::enqueue($db, 'convenio.revisado', ['convenio_id' => $id, 'estado' => $decision]);
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -1038,14 +1027,6 @@ function apiCreateAgreement(PDO $db, int $userId, ?int $companyId, Closure $resp
         ]);
         $agreementId = (int)$db->lastInsertId();
         (new Auditoria($db))->registrar($userId, 'convenio.creado', 'convenios', $agreementId, 'estado=Pendiente');
-        Webhook::enqueue($db, 'convenio.creado', [
-            'convenio_id' => $agreementId,
-            'empresa_id' => $companyId,
-            'especialidad_id' => (int)$specialtyId,
-            'estado' => 'Pendiente',
-            'fecha_inicio' => $start->format('Y-m-d'),
-            'fecha_fin' => $end->format('Y-m-d'),
-        ]);
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {

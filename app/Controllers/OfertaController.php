@@ -189,10 +189,6 @@ class OfertaController {
                 (int)$id,
                 'estado=' . $decision
             );
-            Webhook::enqueue($this->db, 'oferta.revisada', [
-                'oferta_id' => (int)$id,
-                'estado' => $decision,
-            ]);
             $this->db->commit();
         } catch (DomainException $e) {
             if ($this->db->inTransaction()) {
@@ -375,24 +371,6 @@ class OfertaController {
                 'ofertas',
                 $ofertaId
             );
-            Webhook::enqueue($this->db, 'oferta.creada', [
-                'oferta_id' => $ofertaId,
-                'empresa_id' => $empresaId,
-                'especialidad_id' => (int)$especialidadId,
-                'ciclo' => $ciclo,
-                'estado' => 'Pendiente',
-                'plazas' => (int)$plazas,
-                'fecha_inicio' => $fechaInicio->format('Y-m-d'),
-                'fecha_fin' => $fechaFin->format('Y-m-d'),
-                'turno' => $turno,
-                'titulo' => $titulo,
-                'descripcion' => $descripcion,
-                'modalidad' => $modalidad,
-                'ubicacion' => $ubicacion !== '' ? $ubicacion : null,
-                'requisitos_tecnologicos' => $requisitos !== '' ? $requisitos : null,
-                'tecnologias' => $tecnologias !== '' ? $tecnologias : null,
-                'horarios' => $horarios,
-            ]);
             $this->db->commit();
             return null;
         } catch (Throwable $e) {

@@ -19,8 +19,14 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=alumnos-centro">
     <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">
 
-    <label for="student-dni">NIF / DNI / NIE</label>
+    <label for="student-document-type">Tipo de documento</label>
+    <select id="student-document-type" name="tipo_documento" aria-describedby="student-document-help" required>
+        <option value="NIF_NIE_DNI" <?= ($values['tipo_documento'] ?? 'NIF_NIE_DNI') === 'NIF_NIE_DNI' ? 'selected' : '' ?>>NIF</option>
+        <option value="PASAPORTE" <?= ($values['tipo_documento'] ?? '') === 'PASAPORTE' ? 'selected' : '' ?>>Pasaporte</option>
+    </select>
+    <label for="student-dni">Número de documento</label>
     <input id="student-dni" type="text" name="dni" maxlength="20" autocomplete="off" required value="<?= $escape($values['dni'] ?? '') ?>">
+    <small id="student-document-help">Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional.</small>
 
     <label for="student-name">Nombre</label>
     <input id="student-name" type="text" name="nombre" maxlength="50" autocomplete="given-name" required value="<?= $escape($values['nombre'] ?? '') ?>">
@@ -58,12 +64,12 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
 <h3>Alumnado registrado</h3>
 <table>
     <thead>
-        <tr><th>NIF/DNI/NIE</th><th>Nombre</th><th>Correo</th><th>Ciclo</th><th>Curso</th><th>Observaciones administrativas</th><th>Estado</th></tr>
+        <tr><th>Tipo y número de documento</th><th>Nombre</th><th>Correo</th><th>Ciclo</th><th>Curso</th><th>Observaciones administrativas</th><th>Estado</th></tr>
     </thead>
     <tbody>
         <?php foreach ($alumnos as $alumno): ?>
             <tr>
-                <td><?= $escape($alumno['dni']) ?></td>
+                <td><?= $escape($alumno['tipo_documento'] === 'PASAPORTE' ? 'Pasaporte' : 'NIF') ?>: <?= $escape($alumno['dni']) ?></td>
                 <td><?= $escape($alumno['nombre'] . ' ' . $alumno['apellidos']) ?></td>
                 <td><?= $escape($alumno['correo']) ?></td>
                 <td><?= $escape($alumno['nombre_especialidad'] ?? '—') ?></td>

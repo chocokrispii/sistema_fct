@@ -13,7 +13,7 @@
 <?php else: ?>
     <table>
         <thead>
-            <tr><th>Fecha</th><th>Nombre</th><th>Correo</th><th>NIF/DNI/NIE</th><th>Tipo de cuenta</th><th>Acción</th></tr>
+            <tr><th>Fecha</th><th>Nombre</th><th>Correo</th><th>NIF</th><th>Tipo de cuenta</th><th>Acción</th></tr>
         </thead>
         <tbody>
             <?php foreach ($solicitudes as $solicitud): ?>

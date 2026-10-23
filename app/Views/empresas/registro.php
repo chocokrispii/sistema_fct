@@ -41,9 +41,9 @@
                 </div>
 
                 <div class="company-registration__field">
-                    <label for="company-cif">CIF <span aria-hidden="true">*</span></label>
-                    <input id="company-cif" type="text" name="cif" maxlength="20" autocomplete="off" placeholder="Ej. B12345678" aria-describedby="company-cif-help" required>
-                    <small id="company-cif-help">Introduce el CIF con una letra, siete números y un carácter de control.</small>
+                    <label for="company-nif">NIF (Persona Jurídica) <span aria-hidden="true">*</span></label>
+                    <input id="company-nif" type="text" name="nif_persona_juridica" maxlength="20" autocomplete="off" placeholder="Ej. B12345674" aria-describedby="company-nif-help" required>
+                    <small id="company-nif-help">Introduce el NIF de persona jurídica con su carácter de control válido.</small>
                 </div>
 
                 <div class="company-registration__field">

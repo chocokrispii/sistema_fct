@@ -11,9 +11,9 @@
 <?php $csrfToken = CsrfMiddleware::token(); ?>
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=login">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-    <label for="login-identifier">NIF / CIF</label>
+    <label for="login-identifier">NIF o pasaporte</label>
     <input id="login-identifier" type="text" name="identifier" autocomplete="username" required>
-    <small>Alumnado y personal: NIF/DNI/NIE. Empresa: CIF. El acceso con correo electrónico no está permitido.</small>
+    <small>Alumnado: NIF o pasaporte. Personal: NIF. Empresa: NIF (Persona Jurídica). El acceso con correo electrónico no está permitido.</small>
     <label for="login-password">Contraseña</label>
     <input id="login-password" type="password" name="password" maxlength="72" autocomplete="current-password" aria-describedby="login-password-help" required>
     <small id="login-password-help">Máximo 72 caracteres, igual que al registrarse. Los espacios cuentan.</small>

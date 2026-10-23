@@ -15,8 +15,13 @@ final class SolicitudReenvioActivacion
     public function solicitar(string $email, string $identifier): void
     {
         $email = mb_strtolower(trim($email));
-        $identifier = SpanishDataValidator::normalizeDniNie($identifier);
-        if (!SpanishDataValidator::isEmail($email) || !SpanishDataValidator::isDniNie($identifier)) {
+        $identifier = SpanishDataValidator::isPassport($identifier)
+            ? strtoupper(trim($identifier))
+            : SpanishDataValidator::normalizeDniNie($identifier);
+        if (
+            !SpanishDataValidator::isEmail($email)
+            || (!SpanishDataValidator::isDniNie($identifier) && !SpanishDataValidator::isPassport($identifier))
+        ) {
             return;
         }
 

@@ -21,6 +21,6 @@
     "frontend/src/**/*.ts",
     "frontend/src/**/*.vue",
     "vite.config.ts",
-    "docs/.vitepress/**/*.ts"
+    "docs_md/.vitepress/**/*.ts"
   ]
 }

@@ -5,7 +5,7 @@
 <?php else: ?>
     <table>
         <thead>
-            <tr><th>Empresa</th><th>CIF</th><th>Correo de la cuenta</th><th>Estado</th></tr>
+            <tr><th>Empresa</th><th>NIF (Persona Jurídica)</th><th>Correo de la cuenta</th><th>Estado</th></tr>
         </thead>
         <tbody>
             <?php foreach ($empresas as $empresa): ?>

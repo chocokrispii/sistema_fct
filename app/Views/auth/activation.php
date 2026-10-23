@@ -28,8 +28,9 @@
             <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">
             <label for="activation-email">Correo de la cuenta</label>
             <input id="activation-email" type="email" name="email" maxlength="100" autocomplete="email" required>
-            <label for="activation-identifier">NIF / DNI / NIE</label>
+            <label for="activation-identifier">Documento de identidad</label>
             <input id="activation-identifier" type="text" name="identificador_fiscal" maxlength="20" autocomplete="off" required>
+            <small>Alumnado: NIF o pasaporte. Personal: NIF.</small>
             <button type="submit">Solicitar nuevo enlace al Centro</button>
         </form>
     <?php endif; ?>

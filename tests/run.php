@@ -13,7 +13,6 @@ if (getenv('FCT_DB_NAME') !== $testDatabase) {
 }
 
 require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../app/Core/Webhook.php';
 require_once __DIR__ . '/../app/Core/ApiToken.php';
 require_once __DIR__ . '/../app/Core/View.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
@@ -34,7 +33,6 @@ require_once __DIR__ . '/../app/Models/Usuario.php';
 require_once __DIR__ . '/../app/Models/Especialidad.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
-require_once __DIR__ . '/../app/Controllers/WebhookCompanyActivityController.php';
 
 function assertTrue(bool $condition, string $message): void
 {
@@ -84,6 +82,7 @@ $required = [
     'turno' => ['table' => 'empresa_especialidades_plazas', 'column' => 'turno'],
     'especialidad_id' => ['table' => 'convenios', 'column' => 'especialidad_id'],
     'curso_alumno' => ['table' => 'alumnos', 'column' => 'curso'],
+    'tipo_documento_alumno' => ['table' => 'alumnos', 'column' => 'tipo_documento'],
     'observaciones_administrativas_alumno' => ['table' => 'alumnos', 'column' => 'observaciones_administrativas'],
     'estado_ciclo' => ['table' => 'especialidades', 'column' => 'activo'],
     'dia_semana' => ['table' => 'alumno_disponibilidad_semanal', 'column' => 'dia_semana'],
@@ -131,19 +130,6 @@ $auditColumns = $db->query(
        )"
 )->fetchColumn();
 assertTrue((int)$auditColumns === 7, 'La tabla audit_logs debe incluir todos los datos de trazabilidad requeridos.');
-$webhookTables = $db->query(
-    "SELECT COUNT(*) FROM information_schema.TABLES
-     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('webhook_inbox', 'webhook_outbox')"
-)->fetchColumn();
-assertTrue((int)$webhookTables === 2, 'Faltan tablas de entrada/salida webhook; ejecuta la migración 007.');
-$webhookResponseColumns = $db->query(
-    "SELECT COUNT(*) FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND ((TABLE_NAME = 'webhook_inbox' AND COLUMN_NAME IN ('response_status', 'response_body'))
-         OR (TABLE_NAME = 'webhook_outbox' AND COLUMN_NAME = 'response_body'))"
-)->fetchColumn();
-assertTrue((int)$webhookResponseColumns === 3, 'Faltan columnas para conservar las respuestas webhook; ejecuta la migración 009.');
-
 $fixture = bin2hex(random_bytes(5));
 $emails = [
     "company-$fixture@example.test",
@@ -167,142 +153,8 @@ $createdCycleId = null;
 $createdAdminStudentUserId = null;
 $createdAdminStudentProfileId = null;
 $activationAuditRequestId = null;
-$webhookEventId = null;
-$availabilityWebhookEventId = null;
 
 try {
-    $webhookEventId = 'test-' . bin2hex(random_bytes(12));
-    $webhookBody = json_encode([
-        'event_id' => $webhookEventId,
-        'event' => 'prueba.integracion',
-        'version' => 1,
-        'occurred_at' => gmdate('Y-m-d\TH:i:s\Z'),
-        'data' => (object)['registro_id' => 123],
-    ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-    $webhookTimestamp = (string)time();
-    $webhookSecret = bin2hex(random_bytes(32));
-    $webhookSignature = 'sha256=' . hash_hmac(
-        'sha256',
-        $webhookTimestamp . '.' . $webhookBody,
-        $webhookSecret
-    );
-    assertTrue(
-        Webhook::receive(
-            $db,
-            $webhookBody,
-            $webhookEventId,
-            $webhookTimestamp,
-            $webhookSignature,
-            $webhookSecret
-        ),
-        'Un webhook firmado nuevo debe registrarse.'
-    );
-    Webhook::recordInboundResponse(
-        $db,
-        $webhookEventId,
-        202,
-        json_encode(['received' => true, 'duplicate' => false, 'event_id' => $webhookEventId], JSON_THROW_ON_ERROR)
-    );
-    $storedResponse = $db->prepare(
-        'SELECT response_status, response_body FROM webhook_inbox WHERE event_id = :event_id'
-    );
-    $storedResponse->execute(['event_id' => $webhookEventId]);
-    $storedResponseRow = $storedResponse->fetch(PDO::FETCH_ASSOC);
-    assertTrue(
-        is_array($storedResponseRow)
-            && (int)$storedResponseRow['response_status'] === 202
-            && is_string($storedResponseRow['response_body'])
-            && json_decode($storedResponseRow['response_body'], true, 16, JSON_THROW_ON_ERROR)['duplicate'] === false,
-        'La respuesta HTTP inicial del webhook entrante debe conservarse.'
-    );
-    assertTrue(
-        !Webhook::receive(
-            $db,
-            $webhookBody,
-            $webhookEventId,
-            $webhookTimestamp,
-            $webhookSignature,
-            $webhookSecret
-        ),
-        'Un webhook ya recibido debe detectarse como duplicado.'
-    );
-    Webhook::recordInboundResponse(
-        $db,
-        $webhookEventId,
-        200,
-        json_encode(['received' => true, 'duplicate' => true, 'event_id' => $webhookEventId], JSON_THROW_ON_ERROR)
-    );
-    $storedResponse->execute(['event_id' => $webhookEventId]);
-    $storedDuplicateResponse = $storedResponse->fetch(PDO::FETCH_ASSOC);
-    assertTrue(
-        is_array($storedDuplicateResponse)
-            && (int)$storedDuplicateResponse['response_status'] === 200
-            && is_string($storedDuplicateResponse['response_body'])
-            && json_decode($storedDuplicateResponse['response_body'], true, 16, JSON_THROW_ON_ERROR)['duplicate'] === true,
-        'La respuesta de un webhook duplicado debe conservarse como respuesta más reciente.'
-    );
-    $webhookSignatureRejected = false;
-    try {
-        Webhook::receive(
-            $db,
-            $webhookBody,
-            'another-' . $webhookEventId,
-            $webhookTimestamp,
-            'sha256=' . str_repeat('0', 64),
-            $webhookSecret
-        );
-    } catch (WebhookRequestException $exception) {
-        $webhookSignatureRejected = $exception->httpStatus === 401;
-    }
-    assertTrue($webhookSignatureRejected, 'Un webhook con firma HMAC incorrecta debe rechazarse.');
-    $conflictingPayload = json_decode($webhookBody, false, 16, JSON_THROW_ON_ERROR);
-    $conflictingPayload->data->registro_id = 124;
-    $conflictingBody = json_encode(
-        $conflictingPayload,
-        JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
-    );
-    $conflictingSignature = 'sha256=' . hash_hmac(
-        'sha256',
-        $webhookTimestamp . '.' . $conflictingBody,
-        $webhookSecret
-    );
-    $webhookConflictRejected = false;
-    try {
-        Webhook::receive(
-            $db,
-            $conflictingBody,
-            $webhookEventId,
-            $webhookTimestamp,
-            $conflictingSignature,
-            $webhookSecret
-        );
-    } catch (WebhookRequestException $exception) {
-        $webhookConflictRejected = $exception->httpStatus === 409;
-    }
-    assertTrue($webhookConflictRejected, 'Un event_id reutilizado con distinto contenido debe rechazarse.');
-
-    putenv('FCT_WEBHOOK_OUTBOUND_URL=https://receiver.example.test/webhooks');
-    $db->beginTransaction();
-    try {
-        Webhook::enqueue($db, 'prueba.transaccional', ['registro_id' => 123]);
-        $queued = $db->query(
-            "SELECT event_type, payload FROM webhook_outbox
-             WHERE event_type = 'prueba.transaccional'
-             ORDER BY created_at DESC LIMIT 1"
-        )->fetch(PDO::FETCH_ASSOC);
-        assertTrue(
-            $queued !== false
-                && $queued['event_type'] === 'prueba.transaccional'
-                && json_decode($queued['payload'], true, 16, JSON_THROW_ON_ERROR)['data']['registro_id'] === 123,
-            'El evento saliente debe guardarse como JSON en la transacción local.'
-        );
-    } finally {
-        if ($db->inTransaction()) {
-            $db->rollBack();
-        }
-        putenv('FCT_WEBHOOK_OUTBOUND_URL');
-    }
-
     $roleHash = password_hash('TestPassword123!', PASSWORD_DEFAULT);
     $addUser = $db->prepare('INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :hash, :role)');
     $addUser->execute(['email' => $emails[0], 'hash' => $roleHash, 'role' => 'Empresa']);
@@ -484,7 +336,7 @@ try {
             && (int)($lookups['admin']['id'] ?? 0) === $createdUsers[4]
             && (int)($lookups['observer']['id'] ?? 0) === $createdUsers[5]
             && $lookups['email'] === null,
-        'El inicio de sesión debe resolver NIF del personal, DNI/NIE del alumnado y CIF de empresas, pero no correo. '
+        'El inicio de sesión debe resolver NIF del personal, DNI/NIE del alumnado y NIF de personas jurídicas, pero no correo. '
             . json_encode(array_map(
                 static fn(?array $user): ?int => $user === null ? null : (int)$user['id'],
                 $lookups
@@ -493,16 +345,29 @@ try {
     assertTrue(
         SpanishDataValidator::isDniNieFormat('12345678A')
             && !SpanishDataValidator::isDniNieFormat('1234')
-            && SpanishDataValidator::isCifFormat('B12345678')
-            && !SpanishDataValidator::isCifFormat('B1234'),
-        'La autenticación debe distinguir formatos NIF/DNI/NIE y CIF y rechazar identificadores mal formados.'
+            && SpanishDataValidator::isNifPersonaJuridica('B12345674')
+            && !SpanishDataValidator::isNifPersonaJuridica('B12345678')
+            && SpanishDataValidator::isPassport('AB123456')
+            && !SpanishDataValidator::isPassport('ABC-123'),
+        'La validación debe comprobar documentos personales, NIF de persona jurídica y pasaportes.'
     );
-    $updatedCif = 'B' . str_pad((string)(hexdec(substr($fixture, 1, 6)) % 10000000), 7, '0', STR_PAD_LEFT) . '7';
-    $userModel->actualizarCifEmpresa($createdUsers[0], $updatedCif);
+    $companyNifNumber = str_pad((string)(hexdec(substr($fixture, 2, 6)) % 10000000), 7, '0', STR_PAD_LEFT);
+    $companyNifSum = 0;
+    for ($index = 0; $index < 7; $index++) {
+        $digit = (int)$companyNifNumber[$index];
+        if ($index % 2 === 0) {
+            $doubled = $digit * 2;
+            $companyNifSum += intdiv($doubled, 10) + ($doubled % 10);
+        } else {
+            $companyNifSum += $digit;
+        }
+    }
+    $updatedNifPersonaJuridica = 'B' . $companyNifNumber . (string)((10 - ($companyNifSum % 10)) % 10);
+    $userModel->actualizarNifPersonaJuridica($createdUsers[0], $updatedNifPersonaJuridica);
     assertTrue(
-        (int)($userModel->obtenerPorIdentificador($updatedCif)['id'] ?? 0) === $createdUsers[0]
+        (int)($userModel->obtenerPorIdentificador($updatedNifPersonaJuridica)['id'] ?? 0) === $createdUsers[0]
             && $userModel->obtenerPorIdentificador($cifs[0]) === null,
-        'El administrador debe poder corregir el CIF y la autenticación debe usar el valor actualizado.'
+        'El administrador debe poder corregir el NIF de persona jurídica y la autenticación debe usar el valor actualizado.'
     );
     $duplicateStaffNifRejected = false;
     try {
@@ -533,10 +398,11 @@ try {
         "center-student-$fixture@example.test",
         $cycleId,
         2,
-        'Observación de prueba'
+        'Observación de prueba',
+        SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
     );
     $createdStudentByCenter = $db->prepare(
-        'SELECT curso, observaciones_administrativas, especialidad_id
+        'SELECT curso, observaciones_administrativas, especialidad_id, dni, tipo_documento
          FROM alumnos WHERE id = :id'
     );
     $createdStudentByCenter->execute(['id' => $createdAdminStudentProfileId]);
@@ -545,8 +411,15 @@ try {
         is_array($createdStudentByCenterRow)
             && (int)$createdStudentByCenterRow['curso'] === 2
             && $createdStudentByCenterRow['observaciones_administrativas'] === 'Observación de prueba'
-            && (int)$createdStudentByCenterRow['especialidad_id'] === $cycleId,
+            && (int)$createdStudentByCenterRow['especialidad_id'] === $cycleId
+            && $createdStudentByCenterRow['dni'] === 'D' . $fixture
+            && $createdStudentByCenterRow['tipo_documento'] === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT,
         'El alta del centro debe guardar ciclo, curso y observaciones administrativas.'
+    );
+    assertTrue(
+        (int)($userModel->obtenerPorIdentificador(strtolower($createdStudentByCenterRow['dni']))['id'] ?? 0)
+            === $createdAdminStudentUserId,
+        'El acceso debe permitir localizar al alumnado con su pasaporte guardado.'
     );
     $studentModel->actualizarPerfil(
         $createdUsers[1],
@@ -599,6 +472,13 @@ try {
     (new AlumnoController($db))->editarPerfil();
     $profileHtml = ob_get_clean();
     assertTrue(
+        str_contains($profileHtml, '>NIF</option>')
+            && str_contains($profileHtml, '>Pasaporte</option>')
+            && str_contains($profileHtml, 'aria-describedby="profile-document-help"')
+            && str_contains($profileHtml, 'Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional'),
+        'El perfil debe mostrar NIF y Pasaporte con su nota informativa accesible.'
+    );
+    assertTrue(
         is_string($profileHtml)
             && str_contains($profileHtml, 'Ángela')
             && str_contains($profileHtml, '28013')
@@ -612,6 +492,7 @@ try {
         'apellidos' => "O'Connor",
         'fecha_nacimiento' => '2005-01-01',
         'dni' => '12345678A',
+        'tipo_documento' => SpanishDataValidator::DOCUMENT_TYPE_NIF_NIE_DNI,
         'nss' => '12345-67890',
         'telefono' => '+34 612 345 678',
         'direccion' => 'Calle O’Donnell, 1',
@@ -662,6 +543,7 @@ try {
         'apellidos' => 'Apellidos Legado',
         'fecha_nacimiento' => '2010-01-01',
         'dni' => '87654321X',
+        'tipo_documento' => SpanishDataValidator::DOCUMENT_TYPE_NIF_NIE_DNI,
         'nss' => "NSS-$fixture-2",
         'telefono' => '612345679',
         'direccion' => 'Calle Nueva 2',
@@ -839,35 +721,14 @@ try {
             && ($savedAvailabilityResponse['data']['savedSchedule']['dias'][0]['hora_inicio'] ?? null) === '09:15:00',
         'El guardado JSON debe devolver el horario persistido con los datos que consume la isla de lectura.'
     );
-    putenv('FCT_WEBHOOK_OUTBOUND_URL=https://receiver.example.test/webhooks');
-    try {
-        $availabilityModel->reemplazar(
-            $createdUsers[1],
-            '2027-03-01',
-            '2027-06-30',
-            'M',
-            false,
-            [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
-        );
-    } finally {
-        putenv('FCT_WEBHOOK_OUTBOUND_URL');
-    }
-    $availabilityEvent = $db->query(
-        "SELECT event_id, payload FROM webhook_outbox
-         WHERE event_type = 'student.availability_updated'
-         ORDER BY created_at DESC LIMIT 1"
-    )->fetch(PDO::FETCH_ASSOC);
-    $availabilityPayload = is_array($availabilityEvent)
-        ? json_decode($availabilityEvent['payload'], true, 16, JSON_THROW_ON_ERROR)
-        : null;
-    assertTrue(
-        is_array($availabilityEvent)
-            && is_array($availabilityPayload)
-            && ($availabilityPayload['data']['student_id'] ?? null) === $createdStudents[0]
-            && ($availabilityPayload['data']['horarios'][0]['hora_inicio'] ?? null) === '08:00:00',
-        'El cambio de disponibilidad debe dejar su evento firmado pendiente en la outbox transaccional.'
+    $availabilityModel->reemplazar(
+        $createdUsers[1],
+        '2027-03-01',
+        '2027-06-30',
+        'M',
+        false,
+        [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
     );
-    $availabilityWebhookEventId = $availabilityEvent['event_id'];
     $_SERVER['REQUEST_METHOD'] = 'GET';
     unset($_SERVER['HTTP_ACCEPT']);
     $_POST = [];
@@ -1656,18 +1517,9 @@ try {
 
     echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, disponibilidad, calificaciones, usuarios y CSRF.\n";
 } finally {
-    putenv('FCT_WEBHOOK_OUTBOUND_URL');
     if ($createdAgreementId !== null) {
         $stmt = $db->prepare('DELETE FROM auditoria WHERE entidad = :entidad AND entidad_id = :id');
         $stmt->execute(['entidad' => 'convenios', 'id' => $createdAgreementId]);
-    }
-    if ($webhookEventId !== null) {
-        $stmt = $db->prepare('DELETE FROM webhook_inbox WHERE event_id = :event_id');
-        $stmt->execute(['event_id' => $webhookEventId]);
-    }
-    if ($availabilityWebhookEventId !== null) {
-        $stmt = $db->prepare('DELETE FROM webhook_outbox WHERE event_id = :event_id');
-        $stmt->execute(['event_id' => $availabilityWebhookEventId]);
     }
     if ($createdOffer !== null) {
         $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');

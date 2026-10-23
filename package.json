@@ -12,9 +12,9 @@
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "check": "npm run build",
-    "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:dev": "vitepress dev docs_md",
+    "docs:build": "vitepress build docs_md",
+    "docs:preview": "vitepress preview docs_md"
   },
   "dependencies": {
     "pinia": "^4.1.0",

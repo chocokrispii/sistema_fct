@@ -37,9 +37,15 @@ $vueProfileState = [
                     <small data-field-error><?= htmlspecialchars($fieldErrors['apellidos'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
                 <div class="student-registration__field">
-                    <label for="profile-dni">DNI/NIE</label>
-                    <input id="profile-dni" name="dni" maxlength="10" autocomplete="off" value="<?= htmlspecialchars($values['dni'], ENT_QUOTES, 'UTF-8') ?>" data-spanish-id aria-invalid="<?= isset($fieldErrors['dni']) ? 'true' : 'false' ?>" required>
-                    <small>Se valida la letra de control del DNI/NIE.</small>
+                    <label for="profile-document-type">Tipo de documento</label>
+                    <select id="profile-document-type" name="tipo_documento" aria-describedby="profile-document-help" required>
+                        <option value="NIF_NIE_DNI" <?= $values['tipo_documento'] === 'NIF_NIE_DNI' ? 'selected' : '' ?>>NIF</option>
+                        <option value="PASAPORTE" <?= $values['tipo_documento'] === 'PASAPORTE' ? 'selected' : '' ?>>Pasaporte</option>
+                    </select>
+                    <label for="profile-dni">Número de documento</label>
+                    <input id="profile-dni" name="dni" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['dni'], ENT_QUOTES, 'UTF-8') ?>" data-spanish-id aria-invalid="<?= isset($fieldErrors['dni']) ? 'true' : 'false' ?>" required>
+                    <small id="profile-document-help">Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional.</small>
+                    <small>Para NIF se valida la letra de control.</small>
                     <small data-field-error><?= htmlspecialchars($fieldErrors['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
                 <div class="student-registration__field">

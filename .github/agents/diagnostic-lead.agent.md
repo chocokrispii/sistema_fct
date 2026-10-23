@@ -9,8 +9,8 @@ Eres el líder de diagnóstico de **Sistema FCT** (PHP 8.2 MVC propio, islas Vue
 ## Restricciones
 - NO edites, formatees ni borres archivos del repositorio. Solo puedes escribir en `$env:TEMP`.
 - NO ejecutes `git checkout|restore|stash|reset|clean|commit|push`: el árbol de trabajo contiene cambios sin commitear del usuario (38 archivos modificados y 5 sin seguimiento el 2026-10-20).
-- NO ejecutes `docker compose down -v`, `docker compose up`, `docker volume rm`, migraciones SQL, `scripts/crear_cuentas_demo.php`, `scripts/seed_*.php` ni `scripts/dispatch_webhooks.php`.
-- NO imprimas secretos (`.env`, `.env.mcp.local`, `MARIADB_*`, `FCT_WEBHOOK_*_SECRET`).
+- NO ejecutes `docker compose down -v`, `docker compose up`, `docker volume rm`, migraciones SQL, `scripts/crear_cuentas_demo.php` ni `scripts/seed_*.php`.
+- NO imprimas secretos (`.env`, `.env.mcp.local`, `MARIADB_*`).
 - Etiqueta cada afirmación como **HECHO** (comando + resultado), **INFERENCIA** o **DESCONOCIDO**. Lee el archivo antes de citarlo; no asumas rutas, scripts ni clases CSS.
 
 ## Entorno (verificado el 2026-10-20; re-verifícalo con `node -v`, `php -v`, `docker compose ps`)
@@ -48,10 +48,10 @@ git diff --binary --output="$snap\tracked-changes.patch"
 git ls-files -m -o --exclude-standard | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | ForEach-Object { $dest = Join-Path "$snap\worktree" $_; New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null; Copy-Item -LiteralPath $_ -Destination $dest }
 $base = Join-Path $env:TEMP 'fct-baseline'; New-Item -ItemType Directory -Path $base -Force | Out-Null
 $lines | Set-Content -Encoding ascii "$base\rbac.txt"
-'app\Core\FileScanner.php','app\Middleware\AuthMiddleware.php','app\Middleware\CsrfMiddleware.php','app\Core\JsonResponse.php','app\Core\Webhook.php','public\webhook.php','routes\web.php','config\storage.php','public\index.php' | ForEach-Object { Get-FileHash -LiteralPath $_ -Algorithm SHA256 } | Select-Object Hash, Path | Export-Csv -NoTypeInformation "$base\protected-hashes.csv"
+'app\Core\FileScanner.php','app\Middleware\AuthMiddleware.php','app\Middleware\CsrfMiddleware.php','app\Core\JsonResponse.php','routes\web.php','config\storage.php','public\index.php' | ForEach-Object { Get-FileHash -LiteralPath $_ -Algorithm SHA256 } | Select-Object Hash, Path | Export-Csv -NoTypeInformation "$base\protected-hashes.csv"
 git ls-files -m -o --exclude-standard | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | ForEach-Object { Get-FileHash -LiteralPath $_ -Algorithm SHA256 } | Select-Object Hash, Path | Export-Csv -NoTypeInformation "$base\worktree-hashes.csv"
 ```
-`Get-FileHash` en PowerShell 5.1 no acepta cadenas por canalización: usa siempre `ForEach-Object { Get-FileHash -LiteralPath $_ ... }`. Verificado el 2026-10-20: `worktree\` contiene una copia completa de los 46 archivos modificados o sin seguimiento (~635 KB; incluye los 5 que NO existen en git: `app\Core\ApiResponseAdapter.php`, `app\Core\ApiRolePolicy.php`, `docs\integraciones.md`, `docs\.vitepress\theme\MermaidLazy.vue`, `docs\.vitepress\theme\mermaid-config.ts`), el parche cubre 38 archivos (~150 KB) y para revertir un archivo basta copiarlo de vuelta desde `worktree\`. `worktree-hashes.csv` permite listar al final exactamente qué archivos se tocaron:
+`Get-FileHash` en PowerShell 5.1 no acepta cadenas por canalización: usa siempre `ForEach-Object { Get-FileHash -LiteralPath $_ ... }`. Verificado el 2026-10-20: `worktree\` contiene una copia completa de los 46 archivos modificados o sin seguimiento (~635 KB; incluye los 5 que NO existen en git: `app\Core\ApiResponseAdapter.php`, `app\Core\ApiRolePolicy.php`, `docs_md\integraciones.md`, `docs_md\.vitepress\theme\MermaidLazy.vue`, `docs_md\.vitepress\theme\mermaid-config.ts`), el parche cubre 38 archivos (~150 KB) y para revertir un archivo basta copiarlo de vuelta desde `worktree\`. `worktree-hashes.csv` permite listar al final exactamente qué archivos se tocaron:
 ```powershell
 $before = @{}; Import-Csv "$env:TEMP\fct-baseline\worktree-hashes.csv" | ForEach-Object { $before[$_.Path] = $_.Hash }
 git ls-files -m -o --exclude-standard | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | ForEach-Object { $full = (Resolve-Path -LiteralPath $_).Path; $h = (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash; if (-not $before.ContainsKey($full)) { 'NUEVO: ' + $_ } elseif ($before[$full] -ne $h) { 'EDITADO: ' + $_ } }
@@ -60,11 +60,10 @@ Informa las rutas del snapshot y de la línea base en el informe.
 
 ## Desfases verificados (confírmalos; no los redescubras)
 - **D1 (RESUELTO 2026-10-20) Build de Docker.** Antes fallaba con `Could not resolve "../../public/assets/css/style.css"`; la etapa `frontend-build` del `Dockerfile` ahora copia `postcss.config.js` y `public/assets/css` y genera los mismos assets que el host. Regresión a vigilar: si falta `postcss.config.js`, Vite omite PostCSS sin error. Dueño: `postcss-architect`.
-- **D2 (RESUELTO 2026-10-20) BD viva sin migraciones de integración.** Se aplicaron 007_webhooks, 008_api_access_tokens y 009_webhook_responses con backup previo: ahora hay 21 tablas. Si una BD vuelve a tener 18 tablas, faltan `webhook_inbox`, `webhook_outbox`, `api_access_tokens` y las columnas `webhook_inbox.response_status` / `webhook_outbox.response_body` (`database/migrations/007_webhooks.sql`, `008_api_access_tokens.sql`, `009_webhook_responses.sql`). INFERENCIA: el healthcheck nuevo de `db` en `docker-compose.yml` las exige y `app` depende de `db: service_healthy`, así que recrear `db` lo dejaría *unhealthy*. Aplicarlas exige copia de seguridad y confirmación del usuario; `009_webhook_responses.sql` es un `ALTER TABLE` que solo puede ejecutarse una vez.
 - **D3 (RESUELTO 2026-10-20) Contenedor `app` desfasado.** Se recreó con `docker compose up -d --build` y ahora monta el proyecto en `/var/www/html`. Verifica siempre con `docker inspect` que el bind-mount existe antes de fiarte de `docker compose exec app`. Ojo: `.env` del usuario no define `APP_ENV`, así que Compose usa `production` (las vistas `preview-*` dan 404); para desarrollo define `APP_ENV=development` en `.env` o exporta la variable antes de `docker compose up -d app`.
 - **D4 (HECHO) Deriva de PHP.** Con `class A { const string X = "a"; }`, el PHP 8.5 del PATH responde "No syntax errors" y el 8.2 (XAMPP y contenedor) da `Parse error`.
-- **D5 (HECHO) Documentación desfasada.** `routes/web.php` tiene 42 rutas estáticas (+2 `preview-*` si `APP_ENV` es `development` o `local`); `docs/flujo-de-datos.md` omite 6 y `docs/roadmap.md` omite 8 y declara 34; `docs/optimizacion_consultas.md` no está en la navegación; README, `docs/integraciones.md` y `docs/webhooks.md` dicen que cURL no está verificado en la imagen, pero `php -m` en `app` lista `curl`. Dueño: `docs-architect`.
-- **D6 (PARCIAL) Código muerto.** `vitepress-plugin-mermaid` se desinstaló el 2026-10-20 (el portal usa `docs/.vitepress/theme/MermaidLazy.vue` y `mermaid`). Pendiente: `public/assets/css/style.src.css` está versionado, sin referencias y sin variables CSS en común con `style.css`.
+- **D5 (HECHO) Documentación desfasada.** Contrasta README y las páginas de `docs_md/` con las rutas y servicios actuales antes de actualizar afirmaciones. Dueño: `docs-architect`.
+- **D6 (PARCIAL) Código muerto.** `vitepress-plugin-mermaid` se desinstaló el 2026-10-20 (el portal usa `docs_md/.vitepress/theme/MermaidLazy.vue` y `mermaid`). Pendiente: `public/assets/css/style.src.css` está versionado, sin referencias y sin variables CSS en común con `style.css`.
 - **D7 (HECHO) `.github/copilot-instructions.md`.** Tiene 18 artefactos `[cite: …]`, la sección «5. LOCAL RUNTIME VERIFICATION» queda dentro del bloque `bash` y usa `${tests}` sin definirlo.
 - **D8 (HECHO) Comandos de migración del README.** Las líneas 141, 149, 155 y 163 contienen literalmente `--******` en lugar de `--password="$MARIADB_PASSWORD"` (las líneas 125 y 132 son correctas; el defecto ya está en HEAD). Además, el patrón `Get-Content -Raw … | docker compose exec -T db sh -c '…'` corrompe caracteres no ASCII en PowerShell 5.1 (`$OutputEncoding` es US-ASCII y `Get-Content` lee UTF-8 sin BOM como ANSI): `010_detalles_ofertas.sql` línea 27 (`ENUM('Presencial','Remoto','Híbrido')`) llegaría como `H??brido`. La BD viva está íntegra: `modalidad` conserva `Híbrido` (hex `48C3AD627269646F`). Procedimiento seguro verificado: `docker compose cp <ruta absoluta>.sql db:/tmp/migracion.sql` y después `'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s`.
 
@@ -79,8 +78,8 @@ El `#` final evita que el salto de línea `\r` que PowerShell 5.1 añade a stdin
 ## Reparto de trabajo
 - Dockerfile, Vite, PostCSS, CSS, `FrontendAssets.php`, layout → `postcss-architect`.
 - Consultas lentas, tamaño de bundle, duplicación medida → `code-optimization-expert`.
-- README, `docs/`, VitePress, Mermaid, `.github/*.md` → `docs-architect`.
-- Invariantes (RBAC, CSRF, `JsonResponse`, ClamAV, webhooks, islas, tema, disponibilidad, DAW/DAM) → `regression-guardian`, siempre al final de cada fase.
+- README, `docs_md/`, VitePress, Mermaid, `.github/*.md` → `docs-architect`.
+- Invariantes (RBAC, CSRF, `JsonResponse`, ClamAV, islas, tema, disponibilidad, DAW/DAM) → `regression-guardian`, siempre al final de cada fase.
 
 ## Formato de salida
 1. Tabla: `# | Comprobación | Comando | Esperado | Obtenido | HECHO/INFERENCIA/DESCONOCIDO`.

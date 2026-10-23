@@ -139,11 +139,11 @@ class Usuario {
         $update->execute(['nif' => $nif, 'id' => $usuarioId]);
     }
 
-    public function actualizarCifEmpresa(int $usuarioId, string $cif): void
+    public function actualizarNifPersonaJuridica(int $usuarioId, string $nif): void
     {
-        $cif = SpanishDataValidator::normalizeFiscalIdentifier($cif);
-        if (!SpanishDataValidator::isCifFormat($cif)) {
-            throw new InvalidArgumentException('Introduce un CIF con formato válido.');
+        $nif = SpanishDataValidator::normalizeFiscalIdentifier($nif);
+        if (!SpanishDataValidator::isNifPersonaJuridica($nif)) {
+            throw new InvalidArgumentException('Introduce un NIF de persona jurídica válido.');
         }
 
         $user = $this->db->prepare(
@@ -151,14 +151,14 @@ class Usuario {
         );
         $user->execute(['id' => $usuarioId]);
         if ($user->fetchColumn() === false) {
-            throw new DomainException('Solo se puede asignar un CIF a una cuenta de empresa.');
+            throw new DomainException('Solo se puede asignar un NIF de persona jurídica a una cuenta de empresa.');
         }
 
-        $this->assertIdentificadorFiscalDisponible($cif, $usuarioId);
+        $this->assertIdentificadorFiscalDisponible($nif, $usuarioId);
         $update = $this->db->prepare(
             'UPDATE empresas SET cif_empresa = :cif WHERE usuario_id = :id'
         );
-        $update->execute(['cif' => $cif, 'id' => $usuarioId]);
+        $update->execute(['cif' => $nif, 'id' => $usuarioId]);
     }
 
     private function validarNifPersonal(string $nif): string

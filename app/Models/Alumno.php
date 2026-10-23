@@ -2,6 +2,7 @@
 // app/Models/Alumno.php
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 
 class Alumno {
     private PDO $db;
@@ -13,7 +14,7 @@ class Alumno {
     public function obtenerPorUsuario(int $usuarioId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT a.id, a.nombre, a.apellidos, a.fecha_nacimiento, a.dni,
+            'SELECT a.id, a.nombre, a.apellidos, a.fecha_nacimiento, a.dni, a.tipo_documento,
                     a.numero_seguridad_social, a.codigo_postal, u.email AS correo,
                     es.nombre_especialidad,
                     (SELECT dt.telefono
@@ -49,7 +50,8 @@ class Alumno {
         string $telefono,
         string $direccion,
         string $codigoPostal,
-        ?array $tutor = null
+        ?array $tutor = null,
+        string $tipoDocumento = SpanishDataValidator::DOCUMENT_TYPE_NIF_NIE_DNI
     ): void {
         $this->db->beginTransaction();
         try {
@@ -71,7 +73,8 @@ class Alumno {
             $updateStudent = $this->db->prepare(
                 'UPDATE alumnos
                  SET nombre = :nombre, apellidos = :apellidos, fecha_nacimiento = :nacimiento,
-                     dni = :dni, numero_seguridad_social = :nss, codigo_postal = :codigo_postal,
+                     dni = :dni, tipo_documento = :tipo_documento,
+                     numero_seguridad_social = :nss, codigo_postal = :codigo_postal,
                      correo = :email
                  WHERE id = :id'
             );
@@ -80,6 +83,7 @@ class Alumno {
                 'apellidos' => $apellidos,
                 'nacimiento' => $fechaNacimiento,
                 'dni' => $dni,
+                'tipo_documento' => $tipoDocumento,
                 'nss' => $nss,
                 'codigo_postal' => $codigoPostal,
                 'email' => $email,
@@ -232,19 +236,21 @@ class Alumno {
         string $email,
         int $especialidadId,
         int $curso,
-        string $observacionesAdministrativas
+        string $observacionesAdministrativas,
+        string $tipoDocumento = SpanishDataValidator::DOCUMENT_TYPE_NIF_NIE_DNI
     ): int {
         $stmt = $this->db->prepare(
             'INSERT INTO alumnos
-                (usuario_id, nombre, apellidos, dni, correo, especialidad_id, curso, observaciones_administrativas)
+                (usuario_id, nombre, apellidos, dni, tipo_documento, correo, especialidad_id, curso, observaciones_administrativas)
              VALUES
-                (:usuario_id, :nombre, :apellidos, :dni, :correo, :especialidad_id, :curso, :observaciones)'
+                (:usuario_id, :nombre, :apellidos, :dni, :tipo_documento, :correo, :especialidad_id, :curso, :observaciones)'
         );
         $stmt->execute([
             'usuario_id' => $usuarioId,
             'nombre' => $nombre,
             'apellidos' => $apellidos,
             'dni' => $dni,
+            'tipo_documento' => $tipoDocumento,
             'correo' => $email,
             'especialidad_id' => $especialidadId,
             'curso' => $curso,
@@ -257,7 +263,7 @@ class Alumno {
     public function obtenerTodosParaCentro(): array
     {
         $stmt = $this->db->query(
-            'SELECT a.id, a.dni, a.nombre, a.apellidos, a.correo, a.curso,
+            'SELECT a.id, a.dni, a.tipo_documento, a.nombre, a.apellidos, a.correo, a.curso,
                     a.observaciones_administrativas,
                     e.nombre_especialidad, u.activo
              FROM alumnos a

@@ -111,14 +111,6 @@ docker compose up -d --force-recreate app
 
 Este modo comparte los datos de XAMPP y no importa ni borra su base de datos. El servicio MariaDB de Docker puede seguir ejecutándose, pero la aplicación usa el host configurado en `FCT_DB_HOST`.
 
-Para que la aplicación local de pruebas en `http://127.0.0.1:8002/index.php` comparta en tiempo real los datos de Docker, configura en `.env.local` `FCT_DB_HOST=127.0.0.1;port=3307` y usa el mismo `FCT_DB_NAME`, `FCT_DB_USER` y `FCT_DB_PASS` de `.env`. El puerto `3307` es el puerto de MariaDB Docker publicado sólo en la máquina local. El lanzador `scripts\local_webhooks.ps1` carga estas variables para PHP de XAMPP; las dos aplicaciones consultan y actualizan así la misma base, sin una copia periódica ni una fusión de bases. Arranca el entorno con:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode All
-```
-
-Elige una sola instalación de MariaDB como fuente de datos para ambas aplicaciones; no apuntes una de ellas a XAMPP y la otra a Docker si necesitas que los cambios sean compartidos.
-
 Compose crea automáticamente el volumen privado `fct_storage` y lo monta como `/var/lib/fct/storage`, que es el valor de `FCT_STORAGE_PATH` dentro del contenedor. El contenedor verifica y corrige al arrancar la propiedad y los permisos de los directorios de convenios, incluso si el volumen ya existía; no se debe mover a `public/`.
 
 Si ejecutas PHP directamente con XAMPP en vez de Docker, configura `FCT_STORAGE_PATH` como una ruta absoluta a un directorio existente, con permisos de escritura para Apache y separado del document root. La aplicación rechaza rutas inexistentes o dentro de `public/`.
@@ -159,17 +151,19 @@ Los volúmenes de base de datos, archivos subidos, firmas ClamAV y dependencias 
 
 ## 5. Base de datos, cuentas de desarrollo y phpMyAdmin
 
-En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica las migraciones de dominio, disponibilidad, ofertas, webhooks, aprovisionamiento/activación de cuentas y trazabilidad administrativa. Los nombres de algunas migraciones comparten prefijo porque proceden de líneas de trabajo paralelas; Compose les asigna nombres de inicialización únicos para conservar el orden y evitar colisiones. La inicialización oficial de MariaDB sólo procesa estos archivos al crear una base de datos nueva; no vuelve a ejecutarlos en cada arranque.
+En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica las migraciones de dominio, disponibilidad, ofertas, tokens API, aprovisionamiento/activación de cuentas y trazabilidad administrativa. Los nombres de algunas migraciones comparten prefijo porque proceden de líneas de trabajo paralelas; Compose les asigna nombres de inicialización únicos para conservar el orden y evitar colisiones. La inicialización oficial de MariaDB sólo procesa estos archivos al crear una base de datos nueva; no vuelve a ejecutarlos en cada arranque. En bases ya inicializadas, las tablas persistidas de funcionalidades retiradas no se eliminan automáticamente para proteger los datos existentes.
 
-El alta de alumnos es aprovisionamiento interno: Administradores y Coordinadores con sesión iniciada crean las cuentas desde **Alumnado**; no hay registro público de estudiantes. El formulario exige NIF/DNI/NIE, nombre, apellidos, correo, ciclo, curso y observaciones. El sistema genera una contraseña aleatoria que no se comparte y envía un enlace de activación de un solo uso, válido 24 horas, para que el alumno establezca su contraseña definitiva. La URL del enlace debe usar HTTPS; la única excepción es el circuito de desarrollo local con Mailpit, `APP_ENV=development` y una URL HTTP de loopback (`localhost`, `127.0.0.1` o `[::1]`). Solo se almacena el hash del token y la cuenta permanece inactiva hasta completar la activación. En una base existente, aplica una sola vez `012_alta_alumnos_personal.sql` y `013_activacion_cuentas_alumno.sql`, en ese orden, mediante el procedimiento de migración manual de abajo; no basta con reiniciar Compose.
+El alta de alumnos es aprovisionamiento interno: Administradores y Coordinadores con sesión iniciada crean las cuentas desde **Alumnado**; no hay registro público de estudiantes. El formulario exige tipo y número de documento, nombre, apellidos, correo, ciclo, curso y observaciones. Se puede elegir NIF / NIE / DNI (con verificación de letra de control) o Pasaporte, limitado a 6–15 caracteres alfanuméricos. El pasaporte se reserva para casos especiales de alumnado no residente según la normativa de Formación Profesional. El sistema genera una contraseña aleatoria que no se comparte y envía un enlace de activación de un solo uso, válido 24 horas, para que el alumno establezca su contraseña definitiva. La URL del enlace debe usar HTTPS; la única excepción es el circuito de desarrollo local con Mailpit, `APP_ENV=development` y una URL HTTP de loopback (`localhost`, `127.0.0.1` o `[::1]`). Solo se almacena el hash del token y la cuenta permanece inactiva hasta completar la activación. En una base existente, aplica una sola vez `012_alta_alumnos_personal.sql` y `013_activacion_cuentas_alumno.sql`, en ese orden, mediante el procedimiento de migración manual de abajo; no basta con reiniciar Compose.
 
-Desde **Usuarios**, el Administrador aprovisiona cuentas institucionales de Administrador, Coordinador y Observador indicando correo, NIF/DNI/NIE (obligatorio), nombre y apellidos. Se genera una contraseña aleatoria que no se comparte y la cuenta queda inactiva hasta que su titular use el enlace para establecer la contraseña. El enlace es de un solo uso y válido 24 horas; su URL debe ser HTTPS, salvo el circuito local con Mailpit descrito arriba. Solo se almacena el hash del token y, si el correo no se puede enviar, el alta se revierte. En una base existente, aplica una sola vez `015_alta_personal_institucional.sql` después de `014_identificador_fiscal_personal.sql`; la migración conserva los nombres y apellidos ya registrados de Coordinadores.
+Desde **Usuarios**, el Administrador aprovisiona cuentas institucionales de Administrador, Coordinador y Observador indicando correo, NIF / NIE / DNI con letra de control válida, nombre y apellidos. Se genera una contraseña aleatoria que no se comparte y la cuenta queda inactiva hasta que su titular use el enlace para establecer la contraseña. El enlace es de un solo uso y válido 24 horas; su URL debe ser HTTPS, salvo el circuito local con Mailpit descrito arriba. Solo se almacena el hash del token y, si el correo no se puede enviar, el alta se revierte. En una base existente, aplica una sola vez `015_alta_personal_institucional.sql` después de `014_identificador_fiscal_personal.sql`; la migración conserva los nombres y apellidos ya registrados de Coordinadores.
 
-Si un enlace caduca o no es válido, se puede solicitar otro indicando el correo y NIF/DNI/NIE asociados a la cuenta. La respuesta pública es genérica y no confirma si los datos corresponden a una cuenta. El control se aplica por cuenta: no se crea otra solicitud mientras haya una pendiente ni durante las 24 horas posteriores a la solicitud anterior. Un Administrador revisa la bandeja **Reenvíos de activación** y aprueba manualmente el envío; entonces se invalida el enlace anterior y se envía otro, de un solo uso y válido 24 horas. Si falla el envío, la solicitud permanece pendiente y la transacción revierte la invalidación. En una base existente, aplica una sola vez `016_solicitudes_reenvio_activacion.sql` después de las migraciones de activación `013_activacion_cuentas_alumno.sql` y `015_alta_personal_institucional.sql`.
+Si un enlace caduca o no es válido, se puede solicitar otro indicando el correo y el documento de identidad asociado a la cuenta: NIF / NIE / DNI o pasaporte del alumnado, y NIF / NIE / DNI del personal. La respuesta pública es genérica y no confirma si los datos corresponden a una cuenta. El control se aplica por cuenta: no se crea otra solicitud mientras haya una pendiente ni durante las 24 horas posteriores a la solicitud anterior. Un Administrador revisa la bandeja **Reenvíos de activación** y aprueba manualmente el envío; entonces se invalida el enlace anterior y se envía otro, de un solo uso y válido 24 horas. Si falla el envío, la solicitud permanece pendiente y la transacción revierte la invalidación. En una base existente, aplica una sola vez `016_solicitudes_reenvio_activacion.sql` después de las migraciones de activación `013_activacion_cuentas_alumno.sql` y `015_alta_personal_institucional.sql`.
 
 Los eventos administrativos instrumentados se registran mediante `AuditLogService` en `audit_logs` y se conserva también el registro histórico en `auditoria`. La tabla incluye identificador y nombre completo del actor, acción, entidad afectada, ID del registro modificado, dirección IP, evento, detalle y fecha/hora (`timestamp`). En una base existente que aún no la tenga, aplica una sola vez `017_trazabilidad_administrativa.sql`, después de `016_solicitudes_reenvio_activacion.sql`; reiniciar Compose no ejecuta migraciones en un volumen existente.
 
-El acceso usa el identificador fiscal y la contraseña: Alumno, Administrador, Coordinador y Observador entran con NIF/DNI/NIE; Empresa entra con CIF. El correo no sirve como identificador de login. El personal existente debe tener un NIF asignado en **Usuarios**; aplica una sola vez `014_identificador_fiscal_personal.sql` y conserva abierta la sesión actual del administrador hasta que este asigne allí su NIF y los del resto del personal. Si se perdió esa sesión, el administrador local puede ejecutar `docker compose exec -it app php scripts/asignar_nif_personal.php` para asignar su identificador en desarrollo; el asistente solicita correo y NIF interactivamente y no muestra contraseñas. Las cuentas antiguas sin NIF no podrán iniciar sesión hasta que se actualicen.
+En una base existente, aplica una sola vez `018_tipo_documento_alumno.sql` después de las migraciones anteriores y antes de desplegar esta versión. Añade el tipo de documento al expediente del alumnado y clasifica como NIF / NIE / DNI los documentos existentes.
+
+El acceso usa el documento de identidad y la contraseña: Alumno entra con NIF / NIE / DNI o pasaporte, el personal con NIF / NIE / DNI y Empresa con NIF (Persona Jurídica). El correo no sirve como identificador de login. El personal existente debe tener un NIF asignado en **Usuarios**; aplica una sola vez `014_identificador_fiscal_personal.sql` y conserva abierta la sesión actual del administrador hasta que este asigne allí su NIF y los del resto del personal. Si se perdió esa sesión, el administrador local puede ejecutar `docker compose exec -it app php scripts/asignar_nif_personal.php` para asignar su identificador en desarrollo; el asistente solicita correo y NIF interactivamente y no muestra contraseñas. Las cuentas antiguas sin NIF no podrán iniciar sesión hasta que se actualicen.
 
 Para probar mensajes en local sin enviar correos reales, usa Mailpit: configura `FCT_MAIL_TRANSPORT=mailpit`, `FCT_MAIL_HOST=mailpit`, `FCT_MAIL_PORT=1025`, `FCT_MAIL_ENCRYPTION=none`, un remitente válido en `FCT_MAIL_FROM` y `FCT_APP_URL` con la URL local de la aplicación. Sin cambios locales de puertos, los valores de referencia son `http://localhost:8080` para la aplicación y <http://localhost:8025> para consultar Mailpit. La aplicación acepta un enlace HTTP sólo en `APP_ENV=development` y con host loopback (`localhost`, `127.0.0.1` o `[::1]`); para cualquier otro destino el enlace debe usar HTTPS. No envíes mensajes de prueba a alumnos. Para correo real con Gmail/Google Workspace, usa `FCT_MAIL_TRANSPORT=smtp`, `FCT_MAIL_USERNAME`, `FCT_MAIL_PASSWORD` (contraseña de aplicación), `FCT_MAIL_FROM` y una URL HTTPS accesible desde los dispositivos del alumnado. Gmail requiere verificación en dos pasos; no uses la contraseña normal ni guardes credenciales en el repositorio.
 
@@ -194,7 +188,7 @@ foreach ($migration in Get-ChildItem .\database\migrations\*.sql | Sort-Object N
 }
 ```
 
-Cada migración se aplica una sola vez y en orden; no ejecutes este bucle sobre un volumen que ya haya recibido esas migraciones durante la inicialización de Compose. En particular, `009_webhook_responses.sql` no es idempotente (es un `ALTER TABLE` que falla si las columnas ya existen).
+Cada migración se aplica una sola vez y en orden; no ejecutes este bucle sobre un volumen que ya haya recibido esas migraciones durante la inicialización de Compose.
 
 Para una base existente que ya tiene las migraciones de dominio hasta la 006, aplica `007_horarios_ofertas.sql` y `008_disponibilidad_indiferente.sql` en orden, y sólo si no se aplicaron previamente:
 
@@ -234,13 +228,13 @@ La migración es idempotente. Los datos de ofertas históricas reciben valores p
 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e "SHOW COLUMNS FROM empresa_especialidades_plazas LIKE ''modalidad''" #' | docker compose exec -T db sh -s
 ```
 
-Las migraciones `007_webhooks.sql`, `008_api_access_tokens.sql` y `009_webhook_responses.sql` también se aplican al crear un volumen nuevo; Compose las ejecuta con nombres de inicialización únicos después de las migraciones de dominio. Si conservas una base creada antes de la integración de webhooks, aplica esas tres migraciones una sola vez, en ese orden y con el procedimiento `docker compose cp` descrito arriba, antes de desplegar el nuevo código. La última es un `ALTER TABLE` y no debe ejecutarse de nuevo si ya existen las columnas de respuesta.
+Compose aplica `008_api_access_tokens.sql` al crear un volumen nuevo. Si conservas una base existente, aplica esa migración una sola vez con el procedimiento `docker compose cp` descrito arriba para habilitar los tokens de API.
 
 Para habilitar el NIF del personal en una base local ya inicializada, aplica **una sola vez** la migración `014_identificador_fiscal_personal.sql`:
 
 ```powershell
 docker compose cp (Resolve-Path .\database\migrations\014_identificador_fiscal_personal.sql).Path db:/tmp/migracion.sql
-'mariadb --user="$MARIADB_USER" --****** "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
 ```
 
 No repitas este `ALTER TABLE` si `usuarios.identificador_fiscal` ya existe. Después recarga la página de la aplicación. Desde **Usuarios**, asigna y guarda el NIF/DNI/NIE válido del administrador actual y de cada miembro del personal antes de cerrar la sesión; no se puede inferir el NIF real a partir del correo.
@@ -268,6 +262,13 @@ docker compose cp (Resolve-Path .\database\migrations\017_trazabilidad_administr
 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
 ```
 
+Para habilitar el tipo de documento de alumnado en una base existente, aplica también y una sola vez `018_tipo_documento_alumno.sql`:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\018_tipo_documento_alumno.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --****** "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
 Si la sesión de administrador ya no está disponible, dentro de Docker Desktop y en modo desarrollo ejecuta `docker compose exec -it app php scripts/asignar_nif_personal.php`; escribe el correo existente y el NIF real cuando el asistente los solicite. Repite para cada cuenta del personal que necesite acceso. Este asistente está limitado a ejecución CLI en `APP_ENV=development` o `local`.
 
 Genera las cinco cuentas de prueba actuales (Administrador, Coordinador, Observador, Empresa y Alumno) sólo en la base local autorizada:
@@ -280,7 +281,7 @@ El script imprime identificadores fiscales y contraseñas aleatorias una sola ve
 
 La cuenta demo de Administrador usa el correo `demo.admin@fct.local`, pero el formulario de inicio de sesión no admite correo: entra con el NIF aleatorio y la contraseña que aparecen en la salida de esa ejecución. Las contraseñas no se guardan en texto legible ni se pueden consultar después. Si perdiste la salida, puedes volver a ejecutar el comando únicamente en desarrollo local; generará credenciales nuevas y cambiará las contraseñas de **todas** las cuentas demo, así que guarda de forma segura la nueva salida.
 
-Consulta [la matriz de roles y permisos](docs/roles_y_permisos.md) para conocer el acceso restringido al catálogo y el alcance de solo lectura del perfil Observador.
+Consulta [la matriz de roles y permisos](docs_md/roles_y_permisos.md) para conocer el acceso restringido al catálogo y el alcance de solo lectura del perfil Observador.
 
 Abre phpMyAdmin en <http://localhost:8082>. Inicia sesión con el servidor `db`, puerto `3306`, base `sistema_fct` y las credenciales `FCT_DB_USER`/`FCT_DB_PASS` de `.env` (por defecto, `fct`). El usuario `root` y `MARIADB_ROOT_PASSWORD` deben reservarse para administración local cuando sea necesaria; no uses phpMyAdmin para exponer el servicio a la red.
 
@@ -304,7 +305,7 @@ En el portal del alumno, la disponibilidad tiene tres pasos de configuración:
 
 Con franjas exactas, cada intervalo ofertado `[inicio, fin]` debe quedar contenido en un intervalo de disponibilidad del mismo día (`disponibilidad.inicio <= oferta.inicio` y `disponibilidad.fin >= oferta.fin`). La opción indiferente omite únicamente esa comparación horaria: no omite el ciclo, las fechas, la aprobación, las franjas publicadas ni el control de plazas. Las ofertas históricas sin horarios semanales exactos no participan en el matching hasta volver a publicarse con su horario.
 
-Administrador y Coordinador registran calificaciones de prácticas cerradas; se admiten notas de **0.00 a 10.00**, con hasta dos decimales y sin caracteres alfanuméricos. El alumno consulta sus propias notas. El tema claro/oscuro se administra mediante Pinia, conserva la elección en `localStorage` y ofrece un selector visual SVG. El perfil Observador es de solo lectura y recibe datos anonimizados, sin acceso a documentos privados. La política completa está en [Roles y permisos](docs/roles_y_permisos.md).
+Administrador y Coordinador registran calificaciones de prácticas cerradas; se admiten notas de **0.00 a 10.00**, con hasta dos decimales y sin caracteres alfanuméricos. El alumno consulta sus propias notas. El tema claro/oscuro se administra mediante Pinia, conserva la elección en `localStorage` y ofrece un selector visual SVG. El perfil Observador es de solo lectura y recibe datos anonimizados, sin acceso a documentos privados. La política completa está en [Roles y permisos](docs_md/roles_y_permisos.md).
 
 | Rol | Permisos principales |
 |---|---|
@@ -330,7 +331,7 @@ reservadas a Administrador. Comparte el sobre JSON de éxito/error de
 `JsonResponse`: éxito `{ "success": true, "data": T }` y error
 `{ "success": false, "error": "..." }`. En las listas, la paginación va en
 `data.items` y `data.meta`; los códigos de error se envían en
-`X-API-Error-Code`. Consulta [API REST](docs/api-rest.md)
+`X-API-Error-Code`. Consulta [API REST](docs_md/api-rest.md)
 antes de emitir tokens o integrar clientes; las vistas anonimizadas de
 Observador del MVC no equivalen a la salida REST.
 
@@ -342,7 +343,7 @@ Si necesitas comprobar el comportamiento de fallo cerrado, establece `FCT_CLAMAV
 
 ## 7. Acceso a la aplicación y herramientas
 
-Consulta la [guía de acceso para usuarios](docs/guia-acceso.pdf) o su [fuente editable](docs/guia-acceso.html) para iniciar el entorno y acceder según el perfil.
+Consulta la [guía de acceso para usuarios](docs_pdf/guia-acceso.pdf) o su [fuente editable](docs_md/guia-acceso.md) para iniciar el entorno y acceder según el perfil.
 
 | Servicio | Dirección local |
 |---|---|
@@ -357,7 +358,7 @@ Estas direcciones reflejan los puertos predeterminados de `docker-compose.yml` y
 
 El acceso a páginas y acciones dentro de la aplicación continúa gobernado por `routes/web.php` y el rol de la sesión; conocer la URL no concede permisos.
 
-La pestaña **Integraciones**, visible sólo para Administrador, reúne la consola de la API propia y los historiales de webhooks recibidos y enviados, agrupados por empresa.
+La página **Integraciones**, visible sólo para Administrador, ofrece una consola para probar la API REST propia.
 
 ## 8. Frontend y Vite HMR
 
@@ -395,7 +396,7 @@ docker compose --profile frontend-dev up -d
 
 El perfil instala dependencias con `npm ci`, ejecuta Vite escuchando en todas las interfaces del contenedor y publica `VITE_PORT` (5173 por defecto). Para regresar al bundle de producción incluido en la imagen, detén el perfil y vacía `FCT_VITE_DEV_SERVER` en `.env`.
 
-Las vistas siguen renderizándose en PHP y conservan sus formularios como fallback; Vue se monta sólo en elementos marcados `data-vue-island`. Las acciones JSON del MVC usan el contrato `{ success, data }` / `{ success, error }`, envían `X-CSRF-Token` y no reemplazan la navegación MVC por rutas SPA. La API tokenizada de `public/api.php` conserva ese sobre discriminado y añade `items`/`meta` en las listas; consulta [API REST](docs/api-rest.md).
+Las vistas siguen renderizándose en PHP y conservan sus formularios como fallback; Vue se monta sólo en elementos marcados `data-vue-island`. Las acciones JSON del MVC usan el contrato `{ success, data }` / `{ success, error }`, envían `X-CSRF-Token` y no reemplazan la navegación MVC por rutas SPA. La API tokenizada de `public/api.php` conserva ese sobre discriminado y añade `items`/`meta` en las listas; consulta [API REST](docs_md/api-rest.md).
 
 ### CSS compartido y PostCSS
 
@@ -408,20 +409,6 @@ npm run typecheck
 npm run build
 npm run docs:build
 ```
-
-### Webhooks para integraciones externas
-
-La integración actual usa un destino saliente único configurable por entorno, no una tabla de endpoints registrados por usuario. Configura en `.env` `FCT_WEBHOOK_OUTBOUND_URL` y `FCT_WEBHOOK_OUTBOUND_SECRET`; el secreto de entrada se configura por separado con `FCT_WEBHOOK_INBOUND_SECRET`. No guardes secretos reales en Git. Compose pasa esas variables al contenedor PHP.
-
-Cuando `FCT_WEBHOOK_OUTBOUND_URL` está configurada, los eventos se guardan en `webhook_outbox` dentro de la misma transacción que la operación de negocio y se envían después mediante el worker CLI; si no hay destino, no se encolan. Los eventos recibidos se registran en `webhook_inbox`. Se emiten `oferta.creada`, `oferta.revisada`, `convenio.creado`, `convenio.revisado`, `practica.asignada`, `practica.cerrada` y `student.availability_updated`. El evento de disponibilidad lleva `student_id`, `fecha_inicio`, `fecha_fin`, `turno`, `es_indiferente` y `horarios`; no incluye nombre ni correo.
-
-El worker firma el cuerpo JSON exacto con HMAC-SHA256: `X-FCT-Timestamp` contiene la marca temporal y `X-FCT-Signature` lleva `sha256=` seguido de la firma de `timestamp.cuerpo`. El endpoint receptor verifica también la firma y la ventana temporal. Las entregas pendientes se reintentan mediante `scripts/dispatch_webhooks.php`; requiere PHP CLI con la extensión cURL habilitada, URL y secreto de salida válidos, y habilitar la ejecución explícitamente con `FCT_WEBHOOK_DISPATCH_ALLOW=1`:
-
-```powershell
-docker compose exec -e FCT_WEBHOOK_DISPATCH_ALLOW=1 app php scripts/dispatch_webhooks.php
-```
-
-En la imagen Docker actual, PHP cURL está disponible: `docker compose exec -T app php -m` lista `curl` (la imagen base `php:8.2-apache` la incluye; el `Dockerfile` no la instala por separado). Si cambias la imagen base, repite `php -m` dentro de `app` antes de programar el worker; con un PHP CLI externo, comprueba que cURL esté habilitado. Esta comprobación confirma la extensión, pero no se ha verificado la entrega desde la imagen Docker actual. El límite opcional se configura con `FCT_WEBHOOK_DISPATCH_LIMIT` (1–100; por defecto 25). Configura el worker operativo para entregar los eventos de forma asíncrona. El destino remoto debe usar HTTPS y resolver a direcciones públicas; el worker permite HTTP sólo para pruebas en loopback. Para registrar el receptor local y verificar el flujo completo, sigue [la guía de webhooks](docs/webhooks.md) y el script `scripts/local_webhooks.ps1`.
 
 ### Cuando los cambios de una isla Vue no aparecen
 
@@ -443,7 +430,7 @@ Usa `npm ci` desde la raíz si aún no instalaste las dependencias Node. Para ev
 npm run docs:dev -- --port 5174
 ```
 
-Abre <http://localhost:5174>; si el puerto indicado también está ocupado, VitePress asignará otro puerto disponible y lo mostrará en la terminal. El portal está en `docs/` y renderiza los diagramas Mermaid.
+Abre <http://localhost:5174>; si el puerto indicado también está ocupado, VitePress asignará otro puerto disponible y lo mostrará en la terminal. El portal está en `docs_md/` y renderiza los diagramas Mermaid.
 
 Compila el portal para verificar páginas Markdown, configuración y diagramas:
 
@@ -478,6 +465,8 @@ $tests = (Resolve-Path .\tests).Path -replace '\\', '/'
 docker compose run --rm --no-deps -v "${tests}:/var/www/html/tests:ro" app php tests/file_security.php
 ```
 
+Las pruebas de documentos pueden ejecutarse sin base de datos con `docker compose exec -T app php tests/identity_documents.php`. Cubren la letra de control de DNI/NIE bajo la etiqueta visible **NIF**, el formato de pasaporte (6–15 caracteres alfanuméricos), el cambio de validación según el tipo seleccionado, la nota informativa accesible y los mensajes del registro de empresas sin referencias a CIF. También se ejecutan desde `tests/file_security.php`.
+
 `tests/run.php` es una prueba de integración y debe apuntar exclusivamente a una base de datos desechable cuyo nombre empiece por `fct_test_`; configura `FCT_TEST_DB_NAME` y `FCT_DB_NAME` con el mismo nombre antes de ejecutarla. No la ejecutes contra `sistema_fct` ni una base que quieras conservar.
 
 ## Restablecimiento de Base de Datos por Cambios de Esquema o Migraciones
@@ -501,7 +490,7 @@ Para restablecer **todos** los datos locales después de añadir cambios de esqu
    docker compose down -v
    ```
 
-2. Reconstruye e inicia los servicios. MariaDB importará el esquema y ejecutará todas las migraciones configuradas al crear su volumen vacío, incluidas las tablas de webhooks:
+2. Reconstruye e inicia los servicios. MariaDB importará el esquema y ejecutará las migraciones configuradas al crear su volumen vacío:
 
    ```powershell
    docker compose up -d --build
@@ -586,9 +575,9 @@ Para volver a inicializar la base de datos tras cambios de esquema o migraciones
 
 ## Más información
 
-- [Guía de Integraciones en PDF](docs/public/guia-integraciones.pdf)
-- [Guía de Integraciones editable](docs/integraciones.md)
-- [Hoja de ruta de migración](docs/roadmap.md)
-- [Flujo de datos y ciclo de vida](docs/flujo-de-datos.md)
-- [Diagrama completo de arquitectura](docs/diagrama-completo.md)
+- [Guía de Integraciones en PDF](docs_pdf/guia-integraciones.pdf)
+- [Guía de Integraciones editable](docs_md/integraciones.md)
+- [Hoja de ruta de migración](docs_md/roadmap.md)
+- [Flujo de datos y ciclo de vida](docs_md/flujo-de-datos.md)
+- [Diagrama completo de arquitectura](docs_md/diagrama-completo.md)
 - Configuración y fuentes de verdad: `routes/web.php`, `config/`, `database/` y `docker-compose.yml`.

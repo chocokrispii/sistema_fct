@@ -238,8 +238,26 @@ assertFileSecurity(SpanishDataValidator::isDniNie('X-1234567-L'), 'Se rechazó u
 assertFileSecurity(!SpanishDataValidator::isDniNie('12345678A'), 'Se aceptó un DNI con letra de control incorrecta.');
 assertFileSecurity(!SpanishDataValidator::isDniNie('X1234567A'), 'Se aceptó un NIE con letra de control incorrecta.');
 assertFileSecurity(SpanishDataValidator::isDniNieFormat('12345678A'), 'El login debe reconocer el formato de DNI de cuentas históricas.');
-assertFileSecurity(SpanishDataValidator::isCifFormat('B12345678'), 'Se rechazó un CIF con formato válido.');
-assertFileSecurity(!SpanishDataValidator::isCifFormat('B1234'), 'Se aceptó un CIF mal formado.');
+assertFileSecurity(
+    SpanishDataValidator::isNifPersonaJuridica('B12345674'),
+    'Se rechazó un NIF de persona jurídica con carácter de control válido.'
+);
+assertFileSecurity(
+    !SpanishDataValidator::isNifPersonaJuridica('B12345678'),
+    'Se aceptó un NIF de persona jurídica con carácter de control incorrecto.'
+);
+assertFileSecurity(
+    SpanishDataValidator::isNifPersonaJuridica('P1234567D'),
+    'Se rechazó un NIF de persona jurídica con control alfabético válido.'
+);
+assertFileSecurity(SpanishDataValidator::isPassport('AB123456'), 'Se rechazó un pasaporte alfanumérico válido.');
+assertFileSecurity(SpanishDataValidator::isPassport('123456'), 'Se rechazó un pasaporte numérico de seis caracteres.');
+assertFileSecurity(SpanishDataValidator::isPassport('abc123456789012'), 'Se rechazó un pasaporte alfanumérico de quince caracteres.');
+assertFileSecurity(!SpanishDataValidator::isPassport('ABC 123'), 'Se aceptó un pasaporte con espacios interiores.');
+assertFileSecurity(!SpanishDataValidator::isNifPersonaJuridica('P1234567E'), 'Se aceptó un NIF de persona jurídica con letra de control incorrecta.');
+assertFileSecurity(!SpanishDataValidator::isPassport('ABC-123'), 'Se aceptó un pasaporte con separadores.');
+assertFileSecurity(!SpanishDataValidator::isPassport('ABC12'), 'Se aceptó un pasaporte demasiado corto.');
+assertFileSecurity(!SpanishDataValidator::isPassport('ABCDEFGHIJKLMNO1'), 'Se aceptó un pasaporte demasiado largo.');
 assertFileSecurity(SpanishDataValidator::isSpanishPhone('+34 612 345 678'), 'Se rechazó un teléfono válido con prefijo +34.');
 assertFileSecurity(!SpanishDataValidator::isSpanishPhone('512345678'), 'Se aceptó un teléfono con prefijo nacional no permitido.');
 assertFileSecurity(SpanishDataValidator::isSpanishPostcode('28013'), 'Se rechazó un código postal válido.');
@@ -409,5 +427,7 @@ try {
         putenv('APP_ENV=' . $originalAppEnvironment);
     }
 }
+
+require_once __DIR__ . '/identity_documents.php';
 
 echo "OK: validadores españoles, matriz de rutas, almacenamiento privado y política antivirus fail-closed.\n";

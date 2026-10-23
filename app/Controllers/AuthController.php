@@ -64,10 +64,11 @@ class AuthController {
 
         if (
             !SpanishDataValidator::isDniNieFormat($identificadorNormalizado)
-            && !SpanishDataValidator::isCifFormat($identificadorNormalizado)
+            && !SpanishDataValidator::isNifPersonaJuridicaFormat($identificadorNormalizado)
+            && !SpanishDataValidator::isPassport($identifier)
         ) {
             $intentos->registrarFallo($identificadorNormalizado, $ip, $ahora);
-            $this->mostrarFormulario('Introduce un NIF/DNI/NIE válido o el CIF de la empresa.', 422);
+            $this->mostrarFormulario('Introduce un NIF, un NIF de persona jurídica o un pasaporte válido.', 422);
             return;
         }
 

@@ -22,7 +22,7 @@ class EmpresaController {
             return;
         }
 
-        $fields = ['email', 'password', 'cif', 'nombre_comercial', 'telefono', 'direccion', 'persona_contacto'];
+        $fields = ['email', 'password', 'nif_persona_juridica', 'nombre_comercial', 'telefono', 'direccion', 'persona_contacto'];
         $input = [];
         foreach ($fields as $field) {
             $value = $_POST[$field] ?? '';
@@ -35,11 +35,16 @@ class EmpresaController {
         }
         $email = $input['email'];
         $password = $input['password'];
-        $cif = SpanishDataValidator::normalizeFiscalIdentifier($input['cif']);
+        $nif = SpanishDataValidator::normalizeFiscalIdentifier($input['nif_persona_juridica']);
         $nombreComercial = $input['nombre_comercial'];
         $telefono = $input['telefono'];
         $direccion = $input['direccion'];
         $contacto = $input['persona_contacto'];
+
+        if (!SpanishDataValidator::isNifPersonaJuridica($nif)) {
+            $this->mostrarFormulario('Introduce un NIF (Persona Jurídica) con un carácter de control válido.');
+            return;
+        }
 
         if (
             !filter_var($email, FILTER_VALIDATE_EMAIL)
@@ -47,7 +52,6 @@ class EmpresaController {
             || strlen($password) < 12
             || strlen($password) > 72
             || trim($password) === ''
-            || !SpanishDataValidator::isCifFormat($cif)
             || $nombreComercial === ''
             || mb_strlen($nombreComercial) > 150
             || mb_strlen($contacto) > 150
@@ -61,7 +65,7 @@ class EmpresaController {
 
         try {
             $this->db->beginTransaction();
-            $this->usuarioModel->assertIdentificadorFiscalDisponible($cif);
+            $this->usuarioModel->assertIdentificadorFiscalDisponible($nif);
 
             $usuarioId = $this->usuarioModel->crear($email, $password, 'Empresa');
             if ($usuarioId < 1) {
@@ -70,7 +74,7 @@ class EmpresaController {
 
             $empresaId = $this->empresaModel->crear(
                 $usuarioId,
-                $cif,
+                $nif,
                 $nombreComercial,
                 $telefono,
                 $direccion,
@@ -88,7 +92,7 @@ class EmpresaController {
                 $this->db->rollBack();
             }
             error_log('Error al registrar empresa: ' . $e->getMessage());
-            $this->mostrarFormulario('No se pudo completar el registro. Comprueba que el correo y el CIF no estén ya registrados.');
+            $this->mostrarFormulario('No se pudo completar el registro. Comprueba que el correo y el NIF de persona jurídica no estén ya registrados.');
         }
     }
 
