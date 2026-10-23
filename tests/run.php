@@ -82,6 +82,7 @@ $required = [
     'turno' => ['table' => 'empresa_especialidades_plazas', 'column' => 'turno'],
     'especialidad_id' => ['table' => 'convenios', 'column' => 'especialidad_id'],
     'curso_alumno' => ['table' => 'alumnos', 'column' => 'curso'],
+    'tipo_documento_alumno' => ['table' => 'alumnos', 'column' => 'tipo_documento'],
     'observaciones_administrativas_alumno' => ['table' => 'alumnos', 'column' => 'observaciones_administrativas'],
     'estado_ciclo' => ['table' => 'especialidades', 'column' => 'activo'],
     'dia_semana' => ['table' => 'alumno_disponibilidad_semanal', 'column' => 'dia_semana'],
@@ -335,7 +336,7 @@ try {
             && (int)($lookups['admin']['id'] ?? 0) === $createdUsers[4]
             && (int)($lookups['observer']['id'] ?? 0) === $createdUsers[5]
             && $lookups['email'] === null,
-        'El inicio de sesión debe resolver NIF del personal, DNI/NIE del alumnado y CIF de empresas, pero no correo. '
+        'El inicio de sesión debe resolver NIF del personal, DNI/NIE del alumnado y NIF de personas jurídicas, pero no correo. '
             . json_encode(array_map(
                 static fn(?array $user): ?int => $user === null ? null : (int)$user['id'],
                 $lookups
@@ -344,16 +345,29 @@ try {
     assertTrue(
         SpanishDataValidator::isDniNieFormat('12345678A')
             && !SpanishDataValidator::isDniNieFormat('1234')
-            && SpanishDataValidator::isCifFormat('B12345678')
-            && !SpanishDataValidator::isCifFormat('B1234'),
-        'La autenticación debe distinguir formatos NIF/DNI/NIE y CIF y rechazar identificadores mal formados.'
+            && SpanishDataValidator::isNifPersonaJuridica('B12345674')
+            && !SpanishDataValidator::isNifPersonaJuridica('B12345678')
+            && SpanishDataValidator::isPassport('AB123456')
+            && !SpanishDataValidator::isPassport('ABC-123'),
+        'La validación debe comprobar documentos personales, NIF de persona jurídica y pasaportes.'
     );
-    $updatedCif = 'B' . str_pad((string)(hexdec(substr($fixture, 1, 6)) % 10000000), 7, '0', STR_PAD_LEFT) . '7';
-    $userModel->actualizarCifEmpresa($createdUsers[0], $updatedCif);
+    $companyNifNumber = str_pad((string)(hexdec(substr($fixture, 2, 6)) % 10000000), 7, '0', STR_PAD_LEFT);
+    $companyNifSum = 0;
+    for ($index = 0; $index < 7; $index++) {
+        $digit = (int)$companyNifNumber[$index];
+        if ($index % 2 === 0) {
+            $doubled = $digit * 2;
+            $companyNifSum += intdiv($doubled, 10) + ($doubled % 10);
+        } else {
+            $companyNifSum += $digit;
+        }
+    }
+    $updatedNifPersonaJuridica = 'B' . $companyNifNumber . (string)((10 - ($companyNifSum % 10)) % 10);
+    $userModel->actualizarNifPersonaJuridica($createdUsers[0], $updatedNifPersonaJuridica);
     assertTrue(
-        (int)($userModel->obtenerPorIdentificador($updatedCif)['id'] ?? 0) === $createdUsers[0]
+        (int)($userModel->obtenerPorIdentificador($updatedNifPersonaJuridica)['id'] ?? 0) === $createdUsers[0]
             && $userModel->obtenerPorIdentificador($cifs[0]) === null,
-        'El administrador debe poder corregir el CIF y la autenticación debe usar el valor actualizado.'
+        'El administrador debe poder corregir el NIF de persona jurídica y la autenticación debe usar el valor actualizado.'
     );
     $duplicateStaffNifRejected = false;
     try {
@@ -384,10 +398,11 @@ try {
         "center-student-$fixture@example.test",
         $cycleId,
         2,
-        'Observación de prueba'
+        'Observación de prueba',
+        SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
     );
     $createdStudentByCenter = $db->prepare(
-        'SELECT curso, observaciones_administrativas, especialidad_id
+        'SELECT curso, observaciones_administrativas, especialidad_id, dni, tipo_documento
          FROM alumnos WHERE id = :id'
     );
     $createdStudentByCenter->execute(['id' => $createdAdminStudentProfileId]);
@@ -396,8 +411,15 @@ try {
         is_array($createdStudentByCenterRow)
             && (int)$createdStudentByCenterRow['curso'] === 2
             && $createdStudentByCenterRow['observaciones_administrativas'] === 'Observación de prueba'
-            && (int)$createdStudentByCenterRow['especialidad_id'] === $cycleId,
+            && (int)$createdStudentByCenterRow['especialidad_id'] === $cycleId
+            && $createdStudentByCenterRow['dni'] === 'D' . $fixture
+            && $createdStudentByCenterRow['tipo_documento'] === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT,
         'El alta del centro debe guardar ciclo, curso y observaciones administrativas.'
+    );
+    assertTrue(
+        (int)($userModel->obtenerPorIdentificador(strtolower($createdStudentByCenterRow['dni']))['id'] ?? 0)
+            === $createdAdminStudentUserId,
+        'El acceso debe permitir localizar al alumnado con su pasaporte guardado.'
     );
     $studentModel->actualizarPerfil(
         $createdUsers[1],
@@ -450,6 +472,13 @@ try {
     (new AlumnoController($db))->editarPerfil();
     $profileHtml = ob_get_clean();
     assertTrue(
+        str_contains($profileHtml, '>NIF</option>')
+            && str_contains($profileHtml, '>Pasaporte</option>')
+            && str_contains($profileHtml, 'aria-describedby="profile-document-help"')
+            && str_contains($profileHtml, 'Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional'),
+        'El perfil debe mostrar NIF y Pasaporte con su nota informativa accesible.'
+    );
+    assertTrue(
         is_string($profileHtml)
             && str_contains($profileHtml, 'Ángela')
             && str_contains($profileHtml, '28013')
@@ -463,6 +492,7 @@ try {
         'apellidos' => "O'Connor",
         'fecha_nacimiento' => '2005-01-01',
         'dni' => '12345678A',
+        'tipo_documento' => SpanishDataValidator::DOCUMENT_TYPE_NIF_NIE_DNI,
         'nss' => '12345-67890',
         'telefono' => '+34 612 345 678',
         'direccion' => 'Calle O’Donnell, 1',
@@ -513,6 +543,7 @@ try {
         'apellidos' => 'Apellidos Legado',
         'fecha_nacimiento' => '2010-01-01',
         'dni' => '87654321X',
+        'tipo_documento' => SpanishDataValidator::DOCUMENT_TYPE_NIF_NIE_DNI,
         'nss' => "NSS-$fixture-2",
         'telefono' => '612345679',
         'direccion' => 'Calle Nueva 2',

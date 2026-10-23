@@ -78,9 +78,10 @@ En una base ya inicializada no reimportes el esquema ni repitas migraciones indi
 - `015_alta_personal_institucional.sql` añade nombre y apellidos del personal y los tokens de activación por correo para sus cuentas.
 - `016_solicitudes_reenvio_activacion.sql` crea la bandeja de solicitudes pendientes de reenvío supervisado de enlaces.
 - `017_trazabilidad_administrativa.sql` crea `audit_logs` con el actor, nombre completo, acción, entidad, registro afectado, IP y fecha/hora.
+- `018_tipo_documento_alumno.sql` añade el tipo de documento del alumnado y conserva los registros existentes como NIF / NIE / DNI.
 - `008_api_access_tokens.sql` crea la tabla de tokens para la API REST.
 
-`009_desarrollo_aplicaciones_multiplataforma.sql` y `010_detalles_ofertas.sql` son idempotentes. Trata también `012`–`017` como migraciones de aplicación única y comprueba cuáles ya están en la base antes de ejecutar nada. Los scripts de inicialización de Compose no vuelven a ejecutarse al arrancar un volumen existente.
+`009_desarrollo_aplicaciones_multiplataforma.sql` y `010_detalles_ofertas.sql` son idempotentes. Trata también `012`–`018` como migraciones de aplicación única y comprueba cuáles ya están en la base antes de ejecutar nada. Los scripts de inicialización de Compose no vuelven a ejecutarse al arrancar un volumen existente.
 
 En una base existente, aplica `012_alta_alumnos_personal.sql` una sola vez con el procedimiento `docker compose cp` descrito en el README. La migración permite que los expedientes creados por el centro no incluyan un número de Seguridad Social, y añade curso y observaciones administrativas; los expedientes existentes se conservan.
 
@@ -95,6 +96,8 @@ Las URL de activación deben usar HTTPS. La única excepción es el circuito loc
 Aplica también `016_solicitudes_reenvio_activacion.sql` una sola vez, después de las migraciones de activación de alumnado `013` y personal `015`, para habilitar las solicitudes de reenvío. Para formatos válidos, la respuesta pública es genérica y no confirma si el correo y el identificador corresponden a una cuenta. El límite se aplica por cuenta: no se duplican solicitudes pendientes ni se admite una nueva durante las 24 horas posteriores a la solicitud. El Administrador revisa la bandeja **Reenvíos de activación** y aprueba manualmente cada envío; al aprobar, se invalida el enlace anterior y se emite otro válido 24 horas. Si falla el correo, la solicitud queda pendiente y el enlace anterior no se invalida.
 
 La migración `017_trazabilidad_administrativa.sql` crea `audit_logs`; en una base existente aplícala una sola vez después de `016`. `AuditLogService`, a través de `Auditoria`, registra en esa tabla los eventos instrumentados y mantiene también la tabla histórica `auditoria`. Los campos de trazabilidad incluyen ID y nombre completo del actor, acción, entidad afectada, ID del registro modificado, IP, evento, detalle y fecha/hora.
+
+La migración `018_tipo_documento_alumno.sql` añade el tipo de documento del expediente. En bases existentes, aplícala una sola vez antes de desplegar esta versión; los documentos ya guardados se clasifican como NIF / NIE / DNI. El alta y la edición permiten seleccionar Pasaporte para casos especiales de alumnado no residente; se validan de 6 a 15 caracteres alfanuméricos.
 
 Para aplicar una migración pendiente en una base existente, usa el procedimiento `docker compose cp` del README, sustituyendo el nombre del archivo. Por ejemplo, para `017`:
 

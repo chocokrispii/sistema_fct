@@ -3,6 +3,7 @@ export interface ProfileUpdatePayload {
     nombre: string;
     apellidos: string;
     fecha_nacimiento: string;
+    tipo_documento: 'NIF_NIE_DNI' | 'PASAPORTE';
     dni: string;
     nss: string;
     telefono: string;

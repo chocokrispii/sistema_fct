@@ -8,6 +8,7 @@ interface ProfileValues {
     nombre: string;
     apellidos: string;
     fecha_nacimiento: string;
+    tipo_documento: 'NIF_NIE_DNI' | 'PASAPORTE';
     dni: string;
     nss: string;
     telefono: string;
@@ -41,6 +42,7 @@ const profileStore = useStudentProfileStore();
 const studentFields: Array<keyof ProfileValues> = [
     'nombre',
     'apellidos',
+    'tipo_documento',
     'dni',
     'nss',
     'fecha_nacimiento',
@@ -110,6 +112,10 @@ function validDocument(value: string): boolean {
     return 'TRWAGMYFPDXBNJZSQVHLCKE'[digits % 23] === control;
 }
 
+function validPassport(value: string): boolean {
+    return /^[A-Z0-9]{6,15}$/.test(value.trim().toUpperCase());
+}
+
 function validPhone(value: string): boolean {
     const digits = value.trim()
         .replace(/^(?:\+34|0034)\s*/i, '')
@@ -136,9 +142,24 @@ function validateField(field: keyof ProfileValues): boolean {
                 message = 'Introduce apellidos válidos de hasta 100 caracteres.';
             }
             break;
+        case 'tipo_documento':
+            if (!['NIF_NIE_DNI', 'PASAPORTE'].includes(value)) {
+                message = 'Selecciona un tipo de documento válido.';
+            }
+            break;
         case 'dni':
+            if (
+                values.tipo_documento === 'PASAPORTE'
+                    ? !validPassport(value)
+                    : !validDocument(value)
+            ) {
+                message = values.tipo_documento === 'PASAPORTE'
+                    ? 'Introduce un pasaporte de 6 a 15 caracteres alfanuméricos.'
+                    : 'Introduce un NIF con una letra de control válida.';
+            }
+            break;
         case 'tutor_dni':
-            if ((field === 'dni' || (isMinor.value && value !== '')) && !validDocument(value)) {
+            if (isMinor.value && value !== '' && !validDocument(value)) {
                 message = 'Introduce un DNI/NIE con una letra de control válida.';
             }
             break;
@@ -210,6 +231,13 @@ function onInput(field: keyof ProfileValues): void {
     }
 }
 
+function onDocumentTypeChange(): void {
+    if (touched.dni || fieldErrors.dni) {
+        touched.dni = true;
+        validateField('dni');
+    }
+}
+
 async function saveProfile(): Promise<void> {
     const fieldsToValidate = isMinor.value ? [...studentFields, ...guardianFields] : studentFields;
     const invalidFields = fieldsToValidate.filter((field) => !validateField(field));
@@ -264,9 +292,15 @@ async function saveProfile(): Promise<void> {
                         <small v-if="fieldErrors.apellidos" :id="fieldErrorId('apellidos')" data-field-error role="alert">{{ fieldErrors.apellidos }}</small>
                     </div>
                     <div class="student-registration__field">
-                        <label for="profile-dni">DNI/NIE</label>
-                        <input id="profile-dni" v-model="values.dni" name="dni" maxlength="10" autocomplete="off" :aria-invalid="fieldErrors.dni ? 'true' : 'false'" :aria-describedby="fieldErrors.dni ? fieldErrorId('dni') : undefined" required @input="onInput('dni')" @blur="validateField('dni')">
-                        <small>Se valida la letra de control del DNI/NIE.</small>
+                        <label for="profile-document-type">Tipo de documento</label>
+                        <select id="profile-document-type" v-model="values.tipo_documento" name="tipo_documento" aria-describedby="profile-document-help" required @change="onDocumentTypeChange">
+                            <option value="NIF_NIE_DNI">NIF</option>
+                            <option value="PASAPORTE">Pasaporte</option>
+                        </select>
+                        <label for="profile-dni">Número de documento</label>
+                        <input id="profile-dni" v-model="values.dni" name="dni" :maxlength="values.tipo_documento === 'PASAPORTE' ? 15 : 20" autocomplete="off" :aria-invalid="fieldErrors.dni ? 'true' : 'false'" :aria-describedby="fieldErrors.dni ? fieldErrorId('dni') : undefined" required @input="onInput('dni')" @blur="validateField('dni')">
+                        <small id="profile-document-help">Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional.</small>
+                        <small>Para NIF se valida la letra de control.</small>
                         <small v-if="fieldErrors.dni" :id="fieldErrorId('dni')" data-field-error role="alert">{{ fieldErrors.dni }}</small>
                     </div>
                     <div class="student-registration__field">

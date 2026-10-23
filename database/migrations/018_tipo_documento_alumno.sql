@@ -1,0 +1,3 @@
+ALTER TABLE alumnos
+    ADD COLUMN tipo_documento ENUM('NIF_NIE_DNI', 'PASAPORTE')
+        NOT NULL DEFAULT 'NIF_NIE_DNI' AFTER dni;

@@ -163,7 +163,7 @@ Crear una cuenta de empresa como Administrador o Coordinador:
 $company = @{
     email = 'contacto@empresa.example'
     password = 'ContraseñaInicialSegura'
-    cif = 'B12345678'
+    nif_persona_juridica = 'B12345674'
     nombre_comercial = 'Empresa FCT'
     telefono = '612345678'
     direccion = 'Calle Ejemplo 1, Madrid'
@@ -174,11 +174,17 @@ Invoke-RestMethod -Method Post `
     -Headers $headers -ContentType 'application/json' -Body $company
 ```
 
+La API acepta `nif_persona_juridica`; las integraciones existentes que aún envían
+el campo `cif` siguen siendo compatibles.
+
 Crear un expediente de alumno como Administrador o Coordinador requiere
 `email`, `password`, `nombre`, `apellidos`, `fecha_nacimiento`, `dni`, `nss`,
 `telefono`, `direccion`, `codigo_postal` y `especialidad_id`. Para menores de
 18 años añade `tutor` como objeto con `nombre`, `dni`, `nss`, `direccion`,
-`telefono` y `correo`.
+`telefono` y `correo`. El campo opcional `tipo_documento` acepta
+`NIF_NIE_DNI` (predeterminado) o `PASAPORTE`. El primer tipo valida la letra de
+control; los pasaportes aceptan únicamente entre 6 y 15 caracteres
+alfanuméricos.
 
 Registrar convenio con PDF aprobado por ClamAV:
 

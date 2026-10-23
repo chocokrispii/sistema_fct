@@ -46,7 +46,7 @@ class UsuarioAdminController
                 || !SpanishDataValidator::isPersonName($nombre, 50)
                 || !SpanishDataValidator::isPersonName($apellidos, 100)
             ) {
-                $error = 'Indica un correo, NIF/DNI/NIE, nombre, apellidos y rol válidos.';
+                $error = 'Indica un correo, NIF válido, nombre, apellidos y rol.';
             } else {
                 $activationToken = bin2hex(random_bytes(32));
                 try {
@@ -123,7 +123,7 @@ class UsuarioAdminController
             if (in_array($role, ['Administrador', 'Coordinador', 'Observador'], true)) {
                 $this->model->asignarNifPersonal((int)$id, $identifier);
             } elseif ($role === 'Empresa') {
-                $this->model->actualizarCifEmpresa((int)$id, $identifier);
+                $this->model->actualizarNifPersonaJuridica((int)$id, $identifier);
             } else {
                 throw new DomainException('Solo se pueden actualizar identificadores fiscales de personal o empresas.');
             }

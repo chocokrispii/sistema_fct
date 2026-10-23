@@ -28,7 +28,7 @@ class AlumnoAdminController
         $error = '';
         $values = [];
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            foreach (['dni', 'nombre', 'apellidos', 'email', 'especialidad_id', 'curso', 'observaciones_administrativas'] as $field) {
+            foreach (['tipo_documento', 'dni', 'nombre', 'apellidos', 'email', 'especialidad_id', 'curso', 'observaciones_administrativas'] as $field) {
                 $value = $_POST[$field] ?? '';
                 if (!is_string($value)) {
                     $error = 'Los datos del alumno no tienen un formato válido.';
@@ -38,7 +38,10 @@ class AlumnoAdminController
             }
 
             if ($error === '') {
-                $dni = SpanishDataValidator::normalizeDniNie($values['dni']);
+                $documentType = $values['tipo_documento'];
+                $dni = $documentType === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
+                    ? strtoupper($values['dni'])
+                    : SpanishDataValidator::normalizeDniNie($values['dni']);
                 $nombre = $values['nombre'];
                 $apellidos = $values['apellidos'];
                 $email = $values['email'];
@@ -51,7 +54,10 @@ class AlumnoAdminController
                 $observations = $values['observaciones_administrativas'];
 
                 if (
-                    !SpanishDataValidator::isDniNie($dni)
+                    !SpanishDataValidator::isStudentDocumentType($documentType)
+                    || ($documentType === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
+                        ? !SpanishDataValidator::isPassport($dni)
+                        : !SpanishDataValidator::isDniNie($dni))
                     || !SpanishDataValidator::isPersonName($nombre, 50)
                     || !SpanishDataValidator::isPersonName($apellidos, 100)
                     || !SpanishDataValidator::isEmail($email)
@@ -60,7 +66,7 @@ class AlumnoAdminController
                     || mb_strlen($observations) > 2000
                     || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $observations) === 1
                 ) {
-                    $error = 'Revisa el NIF/DNI/NIE, nombre, apellidos, correo, ciclo, curso y observaciones.';
+                    $error = 'Revisa el tipo y número de documento, nombre, apellidos, correo, ciclo, curso y observaciones.';
                 } elseif (!$this->especialidadModel->existe((int)$cycleId)) {
                     $error = 'Selecciona un ciclo formativo activo.';
                 } else {
@@ -86,7 +92,8 @@ class AlumnoAdminController
                             $email,
                             (int)$cycleId,
                             (int)$course,
-                            $observations
+                            $observations,
+                            $documentType
                         );
                         (new Auditoria($this->db))->registrar(
                             (int)$_SESSION['usuario_id'],
@@ -120,7 +127,7 @@ class AlumnoAdminController
                         }
                         if ($exception instanceof PDOException) {
                             error_log('Error de base de datos al crear alumno desde el centro: ' . $exception->getMessage());
-                            $error = 'No se pudo crear la cuenta. Comprueba si el correo o el NIF/DNI/NIE ya están registrados.';
+                            $error = 'No se pudo crear la cuenta. Comprueba si el correo o el documento de identidad ya están registrados.';
                         } elseif ($exception instanceof DomainException) {
                             $error = $exception->getMessage();
                         } elseif ($exception instanceof RuntimeException) {
