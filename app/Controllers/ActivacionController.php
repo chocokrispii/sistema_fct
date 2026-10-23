@@ -16,11 +16,7 @@ class ActivacionController
 
         $db = getPDOConnection();
         $activation = $this->findActivation($db, $token);
-        if (
-            !is_array($activation)
-            || $activation['used_at'] !== null
-            || strtotime($activation['expires_at']) <= time()
-        ) {
+        if (!is_array($activation)) {
             $this->render('El enlace ha caducado o no es válido.', '', false, true);
             return;
         }
@@ -44,11 +40,7 @@ class ActivacionController
             $db->beginTransaction();
             try {
                 $activation = $this->findActivation($db, $token, true);
-                if (
-                    !is_array($activation)
-                    || $activation['used_at'] !== null
-                    || strtotime($activation['expires_at']) <= time()
-                ) {
+                if (!is_array($activation)) {
                     throw new DomainException('El enlace ya se utilizó o ha caducado. Contacta con el centro para solicitar uno nuevo.');
                 }
 
@@ -106,8 +98,12 @@ class ActivacionController
         $tokenHash = hash('sha256', $token);
         foreach (['student' => 'student_activation_tokens', 'staff' => 'staff_activation_tokens'] as $type => $table) {
             $stmt = $db->prepare(
-                'SELECT usuario_id, expires_at, used_at
-                 FROM ' . $table . ' WHERE token_hash = :token_hash LIMIT 1' . $suffix
+                'SELECT usuario_id
+                 FROM ' . $table . '
+                 WHERE token_hash = :token_hash
+                   AND used_at IS NULL
+                   AND expires_at > CURRENT_TIMESTAMP
+                 LIMIT 1' . $suffix
             );
             $stmt->execute(['token_hash' => $tokenHash]);
             $activation = $stmt->fetch(PDO::FETCH_ASSOC);

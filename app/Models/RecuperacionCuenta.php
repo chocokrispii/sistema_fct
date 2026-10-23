@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/Usuario.php';
+require_once __DIR__ . '/Auditoria.php';
 
 /**
  * No hay envío de correo. La persona solicita el cambio y un administrador
@@ -52,7 +53,7 @@ class RecuperacionCuenta
         )->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function emitirEnlace(int $id, DateTimeImmutable $ahora): ?string
+    public function emitirEnlace(int $id, DateTimeImmutable $ahora, int $actorId): ?string
     {
         $this->db->beginTransaction();
         try {
@@ -76,6 +77,14 @@ class RecuperacionCuenta
                 'expira' => $ahora->modify('+' . self::VALIDEZ_MINUTOS . ' minutes')->format('Y-m-d H:i:s'),
                 'id' => $id,
             ]);
+            (new Auditoria($this->db))->registrar(
+                $actorId,
+                'recuperacion.aprobada',
+                'recuperaciones_cuenta',
+                $id,
+                'enlace de restablecimiento emitido',
+                'aprobación'
+            );
             $this->db->commit();
             return $token;
         } catch (Throwable $e) {

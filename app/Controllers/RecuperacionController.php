@@ -44,7 +44,13 @@ class RecuperacionController
     public function verificar(): void
     {
         $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $token = $id === false ? null : $this->recuperaciones->emitirEnlace((int)$id, new DateTimeImmutable());
+        $token = $id === false
+            ? null
+            : $this->recuperaciones->emitirEnlace(
+                (int)$id,
+                new DateTimeImmutable(),
+                (int)$_SESSION['usuario_id']
+            );
         if ($token === null) {
             header('Location: index.php?action=recuperaciones&error=1');
             exit;

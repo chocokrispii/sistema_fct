@@ -120,6 +120,17 @@ $activationTable->execute(['schema' => $testDatabase, 'table' => 'staff_activati
 assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de enlaces de activación del personal.');
 $activationTable->execute(['schema' => $testDatabase, 'table' => 'activation_resend_requests']);
 assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de solicitudes de reenvío de activación.');
+$activationTable->execute(['schema' => $testDatabase, 'table' => 'audit_logs']);
+assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de trazabilidad administrativa.');
+$auditColumns = $db->query(
+    "SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audit_logs'
+       AND COLUMN_NAME IN (
+           'id_usuario_admin', 'nombre_completo', 'accion', 'entidad_afectada',
+           'id_registro_modificado', 'ip_address', 'timestamp'
+       )"
+)->fetchColumn();
+assertTrue((int)$auditColumns === 7, 'La tabla audit_logs debe incluir todos los datos de trazabilidad requeridos.');
 $webhookTables = $db->query(
     "SELECT COUNT(*) FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('webhook_inbox', 'webhook_outbox')"
@@ -1332,6 +1343,26 @@ try {
     assertTrue($nonAdminDeleteBlocked, 'Solo un administrador activo debe poder realizar una eliminación permanente.');
 
     (new Auditoria($db))->registrar($createdUsers[6], 'prueba.auditada', 'usuarios', $createdUsers[6], 'fixture de retención');
+    $auditLog = $db->prepare(
+        "SELECT id_usuario_admin, nombre_completo, accion, entidad_afectada,
+                id_registro_modificado, ip_address, evento, `timestamp`
+         FROM audit_logs
+         WHERE id_usuario_admin = :actor AND evento = 'prueba.auditada'
+         ORDER BY id DESC LIMIT 1"
+    );
+    $auditLog->execute(['actor' => $createdUsers[6]]);
+    $auditLogRow = $auditLog->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_array($auditLogRow)
+            && (int)$auditLogRow['id_usuario_admin'] === $createdUsers[6]
+            && $auditLogRow['nombre_completo'] !== ''
+            && $auditLogRow['accion'] === 'edición'
+            && $auditLogRow['entidad_afectada'] === 'usuarios'
+            && (int)$auditLogRow['id_registro_modificado'] === $createdUsers[6]
+            && $auditLogRow['ip_address'] !== ''
+            && $auditLogRow['timestamp'] !== null,
+        'Toda acción auditada debe copiar actor, nombre, acción, entidad, registro, IP y fecha en audit_logs.'
+    );
     $auditedUserDeleteBlocked = false;
     try {
         (new Usuario($db))->eliminarPermanentemente($createdUsers[6], $adminId);
@@ -1350,6 +1381,24 @@ try {
     );
     $deletionAudit->execute(['actor' => $adminId, 'entidad' => $createdUsers[5]]);
     assertTrue((int)$deletionAudit->fetchColumn() === 1, 'La eliminación permanente debe quedar registrada en auditoría.');
+    $deletionAuditLog = $db->prepare(
+        "SELECT nombre_completo, accion, ip_address, `timestamp`
+         FROM audit_logs
+         WHERE id_usuario_admin = :actor
+           AND entidad_afectada = 'usuarios'
+           AND id_registro_modificado = :entidad
+         ORDER BY id DESC LIMIT 1"
+    );
+    $deletionAuditLog->execute(['actor' => $adminId, 'entidad' => $createdUsers[5]]);
+    $deletionAuditLogRow = $deletionAuditLog->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_array($deletionAuditLogRow)
+            && $deletionAuditLogRow['nombre_completo'] !== ''
+            && $deletionAuditLogRow['accion'] === 'borrado'
+            && $deletionAuditLogRow['ip_address'] !== ''
+            && $deletionAuditLogRow['timestamp'] !== null,
+        'El borrado debe dejar un registro completo aunque la cuenta modificada ya no exista.'
+    );
 
     $_SESSION = [];
     $token = CsrfMiddleware::token();

@@ -54,6 +54,13 @@ assertFileSecurity(
         && $routes['aprobar-reenvio-activacion']['roles'] === ['Administrador'],
     'Los reenvíos de activación deben solicitarse con respuesta genérica y aprobarse solo por administrador.'
 );
+$activationController = file_get_contents(__DIR__ . '/../app/Controllers/ActivacionController.php');
+assertFileSecurity(
+    is_string($activationController)
+        && str_contains($activationController, 'expires_at > CURRENT_TIMESTAMP')
+        && str_contains($activationController, 'AND used_at IS NULL'),
+    'Los enlaces de activación deben rechazarse al expirar según el reloj de la base de datos y ser de un solo uso.'
+);
 assertFileSecurity(
     $routes['mis-calificaciones']['roles'] === ['Alumno']
         && $routes['calificaciones']['roles'] === ['Administrador', 'Coordinador', 'Observador']

@@ -77,6 +77,7 @@ En una base ya inicializada no repitas migraciones indiscriminadamente ni reimpo
 - `014_identificador_fiscal_personal.sql` añade un NIF único para las cuentas de Administrador, Coordinador y Observador.
 - `015_alta_personal_institucional.sql` añade nombre y apellidos del personal y los tokens de activación por correo para sus cuentas.
 - `016_solicitudes_reenvio_activacion.sql` crea la bandeja de solicitudes pendientes de reenvío supervisado de enlaces.
+- `017_trazabilidad_administrativa.sql` crea `audit_logs` con el actor, nombre completo, acción, entidad, registro afectado, IP y fecha/hora.
 - `007_webhooks.sql` crea las bandejas `webhook_inbox` y `webhook_outbox`; `008_api_access_tokens.sql` crea la tabla de tokens API; `009_webhook_responses.sql` añade las columnas de respuesta HTTP y se ejecuta una sola vez.
 
 Las dos primeras son idempotentes; `009_webhook_responses.sql` contiene `ALTER TABLE` no condicional y no debe repetirse cuando las columnas ya existen. Para las migraciones de webhook y tokens, consulta [Integraciones y webhooks](/webhooks). Los scripts de inicialización de Compose no vuelven a ejecutarse al arrancar un volumen existente.
