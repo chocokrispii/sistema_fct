@@ -115,13 +115,13 @@ try {
     }
 
     // Se inspecciona el HTML real, incluyendo el estado tras un envío fallido.
-    foreach (['NIF_NIE_DNI' => 'NIF', 'PASAPORTE' => 'Pasaporte'] as $type => $label) {
+    foreach (['NIF_NIE_DNI' => 'NIF / NIE / DNI', 'PASAPORTE' => 'Pasaporte'] as $type => $label) {
         $html = captureIdentityOutput(fn() => View::render('admin/alumnos', [
             'error' => '', 'creado' => false, 'values' => ['tipo_documento' => $type, 'dni' => 'AB1234'],
             'especialidades' => [], 'alumnos' => [],
         ]));
         assertIdentity(
-            preg_match('/<option value="' . $type . '"\s+selected\s*>' . $label . '<\/option>/', $html) === 1,
+            preg_match('/<option value="' . preg_quote($type, '/') . '"\s+selected\s*>' . preg_quote($label, '/') . '<\/option>/', $html) === 1,
             'El selector debe conservar el tipo seleccionado y mostrar NIF o Pasaporte.'
         );
         assertIdentity(
@@ -131,7 +131,6 @@ try {
             'La nota del pasaporte debe estar visible y asociada al selector.'
         );
         assertIdentity(preg_match('/\bCIF\b/i', $html) === 0, 'El alta de alumnado no debe mostrar CIF.');
-        assertIdentity(!str_contains($html, 'NIF / NIE / DNI'), 'La etiqueta visible debe ser NIF.');
     }
 
     $company = new EmpresaController($identityDb);
@@ -139,10 +138,16 @@ try {
         'error' => '', 'eliminado' => false, 'creado' => false, 'usuarios' => [],
     ]));
     assertIdentity(
-        str_contains($staffHtml, 'NIF (identificador de acceso)')
-            && !str_contains($staffHtml, 'NIF / NIE / DNI')
+        str_contains($staffHtml, 'NIF / NIE / DNI (identificador de acceso)')
             && preg_match('/\bCIF\b/i', $staffHtml) === 0,
-        'El alta de usuarios individuales debe mostrar NIF y no CIF.'
+        'El alta de usuarios individuales debe mostrar NIF / NIE / DNI y no CIF.'
+    );
+    $companyHtml = captureIdentityOutput(fn() => View::render('empresas/registro', ['error' => '']));
+    assertIdentity(
+        str_contains($companyHtml, 'NIF (Persona Jurídica)')
+            && !str_contains($companyHtml, 'name="password"')
+            && !str_contains($companyHtml, 'CIF'),
+        'El alta de empresa debe etiquetar su NIF de persona jurídica y no solicitar contraseña antes de activar.'
     );
     foreach (['B12345678', 'P1234567E', '12345678Z', 'AB1234', '', ['B12345674']] as $invalidNif) {
         $_POST = [
@@ -172,4 +177,4 @@ try {
     }
 }
 
-echo "OK: documentos por tipo, selector NIF/Pasaporte, nota accesible y registro de empresas sin CIF.\n";
+echo "OK: documentos NIF/NIE/DNI y Pasaporte, nota accesible, NIF jurídico y activación sin contraseña inicial.\n";

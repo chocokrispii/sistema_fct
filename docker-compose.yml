@@ -100,6 +100,7 @@ services:
       - ./database/migrations/016_solicitudes_reenvio_activacion.sql:/docker-entrypoint-initdb.d/020-solicitudes-reenvio-activacion.sql:ro
       - ./database/migrations/017_trazabilidad_administrativa.sql:/docker-entrypoint-initdb.d/021-trazabilidad-administrativa.sql:ro
       - ./database/migrations/018_tipo_documento_alumno.sql:/docker-entrypoint-initdb.d/022-tipo-documento-alumno.sql:ro
+      - ./database/migrations/019_activacion_cuentas_empresa.sql:/docker-entrypoint-initdb.d/023-activacion-cuentas-empresa.sql:ro
     healthcheck:
       test:
         - CMD-SHELL

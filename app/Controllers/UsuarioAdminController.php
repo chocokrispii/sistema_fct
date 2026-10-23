@@ -46,7 +46,7 @@ class UsuarioAdminController
                 || !SpanishDataValidator::isPersonName($nombre, 50)
                 || !SpanishDataValidator::isPersonName($apellidos, 100)
             ) {
-                $error = 'Indica un correo, NIF válido, nombre, apellidos y rol.';
+                $error = 'Indica un correo, NIF / NIE / DNI válido, nombre, apellidos y rol.';
             } else {
                 $activationToken = bin2hex(random_bytes(32));
                 try {

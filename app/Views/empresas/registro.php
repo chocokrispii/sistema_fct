@@ -8,6 +8,12 @@
     <?php if ($error !== ''): ?>
         <p class="message message-error company-registration__error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
     <?php endif; ?>
+    <?php if (isset($_GET['registrada'])): ?>
+        <section class="message message-success" role="status">
+            <h3>Solicitud registrada</h3>
+            <p>Revisa tu correo para activar la cuenta y elegir una contraseña. El enlace caduca en 24 horas.</p>
+        </section>
+    <?php endif; ?>
 
     <form class="company-registration__form" method="POST" action="index.php?action=registro-empresa">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
@@ -22,11 +28,6 @@
                     <input id="company-email" type="email" name="email" maxlength="100" autocomplete="email" placeholder="nombre@empresa.es" required>
                 </div>
 
-                <div class="company-registration__field">
-                    <label for="company-password">Contraseña <span aria-hidden="true">*</span></label>
-                    <input id="company-password" type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" aria-describedby="company-password-help" placeholder="Mínimo 12 caracteres" required>
-                    <small id="company-password-help">Debe tener entre 12 y 72 caracteres. Los espacios cuentan.</small>
-                </div>
             </div>
         </fieldset>
 

@@ -45,9 +45,12 @@ class ActivacionController
                 }
 
                 $staffActivation = $activation['type'] === 'staff';
-                $roleFilter = $staffActivation
-                    ? "rol IN ('Administrador', 'Coordinador', 'Observador')"
-                    : "rol = 'Alumno'";
+                $companyActivation = $activation['type'] === 'company';
+                $roleFilter = match (true) {
+                    $staffActivation => "rol IN ('Administrador', 'Coordinador', 'Observador')",
+                    $companyActivation => "rol = 'Empresa'",
+                    default => "rol = 'Alumno'",
+                };
                 $updateUser = $db->prepare(
                     'UPDATE usuarios
                      SET password_hash = :password_hash, activo = 1
@@ -61,7 +64,11 @@ class ActivacionController
                     throw new DomainException('La cuenta ya está activada o no está disponible.');
                 }
 
-                $table = $staffActivation ? 'staff_activation_tokens' : 'student_activation_tokens';
+                $table = match ($activation['type']) {
+                    'staff' => 'staff_activation_tokens',
+                    'company' => 'company_activation_tokens',
+                    default => 'student_activation_tokens',
+                };
                 $markUsed = $db->prepare(
                     'UPDATE ' . $table . ' SET used_at = CURRENT_TIMESTAMP WHERE token_hash = :token_hash'
                 );
@@ -96,7 +103,11 @@ class ActivacionController
     {
         $suffix = $forUpdate ? ' FOR UPDATE' : '';
         $tokenHash = hash('sha256', $token);
-        foreach (['student' => 'student_activation_tokens', 'staff' => 'staff_activation_tokens'] as $type => $table) {
+        foreach ([
+            'student' => 'student_activation_tokens',
+            'staff' => 'staff_activation_tokens',
+            'company' => 'company_activation_tokens',
+        ] as $type => $table) {
             $stmt = $db->prepare(
                 'SELECT usuario_id
                  FROM ' . $table . '

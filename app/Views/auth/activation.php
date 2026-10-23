@@ -30,7 +30,7 @@
             <input id="activation-email" type="email" name="email" maxlength="100" autocomplete="email" required>
             <label for="activation-identifier">Documento de identidad</label>
             <input id="activation-identifier" type="text" name="identificador_fiscal" maxlength="20" autocomplete="off" required>
-            <small>Alumnado: NIF o pasaporte. Personal: NIF.</small>
+            <small>Alumnado: NIF / NIE / DNI o pasaporte. Personal: NIF / NIE / DNI. Empresa: NIF (Persona Jurídica).</small>
             <button type="submit">Solicitar nuevo enlace al Centro</button>
         </form>
     <?php endif; ?>

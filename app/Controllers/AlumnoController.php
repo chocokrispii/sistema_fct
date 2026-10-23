@@ -147,7 +147,7 @@ class AlumnoController
             if (!$documentTypeValid || !$documentValid) {
                 $fieldErrors['dni'] = $values['tipo_documento'] === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
                     ? 'Introduce un pasaporte de 6 a 15 caracteres alfanuméricos.'
-                    : 'Introduce un NIF con una letra de control válida.';
+                    : 'Introduce un NIF / NIE / DNI con dígito o letra de control válida.';
             }
             if (!$nss) {
                 $fieldErrors['nss'] = 'Introduce entre 5 y 20 caracteres alfanuméricos, espacios, puntos o guiones.';

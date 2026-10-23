@@ -46,7 +46,7 @@ $turnoTxt = static fn(string $t): string => $t === 'M' ? 'Mañana' : ($t === 'T'
             </div>
             <dl class="sp-details">
                 <div><span class="sp-details__icon sp-tone--blue"><?= $st($icoMail) ?></span><div><dt>Correo electrónico</dt><dd><?= $h($alumno['correo']) ?></dd></div></div>
-                <div><span class="sp-details__icon sp-tone--purple"><?= $st($icoId) ?></span><div><dt><?= $h($alumno['tipo_documento'] === 'PASAPORTE' ? 'Pasaporte' : 'NIF') ?></dt><dd><?= $h($alumno['dni']) ?></dd></div></div>
+                <div><span class="sp-details__icon sp-tone--purple"><?= $st($icoId) ?></span><div><dt><?= $h($alumno['tipo_documento'] === 'PASAPORTE' ? 'Pasaporte' : 'NIF / NIE / DNI') ?></dt><dd><?= $h($alumno['dni']) ?></dd></div></div>
                 <div><span class="sp-details__icon sp-tone--orange"><?= $st($icoCal) ?></span><div><dt>Fecha de nacimiento</dt><dd><?= $h($alumno['fecha_nacimiento'] ?? 'No registrada') ?></dd></div></div>
                 <div><span class="sp-details__icon sp-tone--green"><?= $st($icoTel) ?></span><div><dt>Teléfono</dt><dd><?= $h($alumno['telefono'] ?? 'No registrado') ?></dd></div></div>
                 <div><span class="sp-details__icon sp-tone--blue"><?= $st($icoPin) ?></span><div><dt>Dirección</dt><dd><?= $h($alumno['direccion'] ?? 'No registrada') ?></dd></div></div>

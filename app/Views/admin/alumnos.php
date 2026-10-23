@@ -21,7 +21,7 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
 
     <label for="student-document-type">Tipo de documento</label>
     <select id="student-document-type" name="tipo_documento" aria-describedby="student-document-help" required>
-        <option value="NIF_NIE_DNI" <?= ($values['tipo_documento'] ?? 'NIF_NIE_DNI') === 'NIF_NIE_DNI' ? 'selected' : '' ?>>NIF</option>
+        <option value="NIF_NIE_DNI" <?= ($values['tipo_documento'] ?? 'NIF_NIE_DNI') === 'NIF_NIE_DNI' ? 'selected' : '' ?>>NIF / NIE / DNI</option>
         <option value="PASAPORTE" <?= ($values['tipo_documento'] ?? '') === 'PASAPORTE' ? 'selected' : '' ?>>Pasaporte</option>
     </select>
     <label for="student-dni">Número de documento</label>
@@ -69,7 +69,7 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
     <tbody>
         <?php foreach ($alumnos as $alumno): ?>
             <tr>
-                <td><?= $escape($alumno['tipo_documento'] === 'PASAPORTE' ? 'Pasaporte' : 'NIF') ?>: <?= $escape($alumno['dni']) ?></td>
+                <td><?= $escape($alumno['tipo_documento'] === 'PASAPORTE' ? 'Pasaporte' : 'NIF / NIE / DNI') ?>: <?= $escape($alumno['dni']) ?></td>
                 <td><?= $escape($alumno['nombre'] . ' ' . $alumno['apellidos']) ?></td>
                 <td><?= $escape($alumno['correo']) ?></td>
                 <td><?= $escape($alumno['nombre_especialidad'] ?? '—') ?></td>

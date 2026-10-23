@@ -117,6 +117,8 @@ $activationTable->execute(['schema' => $testDatabase, 'table' => 'student_activa
 assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de enlaces de activación de alumnado.');
 $activationTable->execute(['schema' => $testDatabase, 'table' => 'staff_activation_tokens']);
 assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de enlaces de activación del personal.');
+$activationTable->execute(['schema' => $testDatabase, 'table' => 'company_activation_tokens']);
+assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de enlaces de activación de empresas.');
 $activationTable->execute(['schema' => $testDatabase, 'table' => 'activation_resend_requests']);
 assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de solicitudes de reenvío de activación.');
 $activationTable->execute(['schema' => $testDatabase, 'table' => 'audit_logs']);
@@ -1186,6 +1188,115 @@ try {
         $usedToken->execute(['token_hash' => hash('sha256', $activationToken)]);
         assertTrue($usedToken->fetchColumn() !== null, 'El enlace de activación debe quedar consumido.');
     }
+
+    $companyActivationEmail = "activation-company-$fixture@example.test";
+    $companyActivationUserId = $userModel->crear(
+        $companyActivationEmail,
+        bin2hex(random_bytes(32)),
+        'Empresa',
+        false
+    );
+    $createdUsers[] = $companyActivationUserId;
+    $companyActivationToken = bin2hex(random_bytes(32));
+    $companyActivationInsert = $db->prepare(
+        'INSERT INTO company_activation_tokens (usuario_id, token_hash, expires_at)
+         VALUES (:usuario_id, :token_hash, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 24 HOUR))'
+    );
+    $companyActivationInsert->execute([
+        'usuario_id' => $companyActivationUserId,
+        'token_hash' => hash('sha256', $companyActivationToken),
+    ]);
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_GET = [];
+    $_POST = [
+        'token' => $companyActivationToken,
+        'password' => 'EmpresaActivation123!',
+        'password_confirmation' => 'EmpresaActivation123!',
+    ];
+    ob_start();
+    (new ActivacionController())->activar();
+    $companyActivationHtml = (string)ob_get_clean();
+    $companyActivationAccount = $db->prepare(
+        'SELECT activo, password_hash FROM usuarios WHERE id = :id'
+    );
+    $companyActivationAccount->execute(['id' => $companyActivationUserId]);
+    $companyActivationResult = $companyActivationAccount->fetch(PDO::FETCH_ASSOC);
+    $companyUsedToken = $db->prepare(
+        'SELECT used_at FROM company_activation_tokens WHERE token_hash = :token_hash'
+    );
+    $companyUsedToken->execute(['token_hash' => hash('sha256', $companyActivationToken)]);
+    assertTrue(
+        is_array($companyActivationResult)
+            && (int)$companyActivationResult['activo'] === 1
+            && password_verify('EmpresaActivation123!', $companyActivationResult['password_hash'])
+            && $companyUsedToken->fetchColumn() !== null
+            && str_contains($companyActivationHtml, 'Tu cuenta está activada.'),
+        'La activación de empresas debe guardar la contraseña definitiva, habilitar la cuenta y consumir el token.'
+    );
+
+    $companyRequestNumber = str_pad(
+        (string)((hexdec(substr($fixture, 1, 6)) + 12345) % 10000000),
+        7,
+        '0',
+        STR_PAD_LEFT
+    );
+    $companyRequestSum = 0;
+    for ($index = 0; $index < 7; $index++) {
+        $digit = (int)$companyRequestNumber[$index];
+        if ($index % 2 === 0) {
+            $doubled = $digit * 2;
+            $companyRequestSum += intdiv($doubled, 10) + ($doubled % 10);
+        } else {
+            $companyRequestSum += $digit;
+        }
+    }
+    $companyRequestNif = 'B' . $companyRequestNumber
+        . (string)((10 - ($companyRequestSum % 10)) % 10);
+    $companyRequestEmail = "resend-company-$fixture@example.test";
+    $companyRequestUserId = $userModel->crear(
+        $companyRequestEmail,
+        bin2hex(random_bytes(32)),
+        'Empresa',
+        false
+    );
+    $createdUsers[] = $companyRequestUserId;
+    $companyRequestProfile = $db->prepare(
+        'INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto)
+         VALUES (:usuario_id, :nombre, :nif, :contacto)'
+    );
+    $companyRequestProfile->execute([
+        'usuario_id' => $companyRequestUserId,
+        'nombre' => "Empresa de reenvío $fixture",
+        'nif' => $companyRequestNif,
+        'contacto' => '',
+    ]);
+    $companyRequestToken = bin2hex(random_bytes(32));
+    $companyRequestTokenInsert = $db->prepare(
+        'INSERT INTO company_activation_tokens (usuario_id, token_hash, expires_at)
+         VALUES (:usuario_id, :token_hash, DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 HOUR))'
+    );
+    $companyRequestTokenInsert->execute([
+        'usuario_id' => $companyRequestUserId,
+        'token_hash' => hash('sha256', $companyRequestToken),
+    ]);
+    $resendRequests = new SolicitudReenvioActivacion($db);
+    $resendRequests->solicitar($companyRequestEmail, $companyRequestNif);
+    $companyPendingRequest = $db->prepare(
+        "SELECT COUNT(*) FROM activation_resend_requests
+         WHERE usuario_id = :usuario_id AND estado = 'Pendiente de Reenvío'"
+    );
+    $companyPendingRequest->execute(['usuario_id' => $companyRequestUserId]);
+    $companyListedRequest = array_values(array_filter(
+        $resendRequests->pendientes(),
+        static fn(array $request): bool => (int)$request['usuario_id'] === $companyRequestUserId
+    ))[0] ?? null;
+    assertTrue(
+        (int)$companyPendingRequest->fetchColumn() === 1
+            && is_array($companyListedRequest)
+            && $companyListedRequest['identificador_fiscal'] === $companyRequestNif
+            && $companyListedRequest['nombre_completo'] === "Empresa de reenvío $fixture",
+        'Las empresas deben poder solicitar reenvíos usando su NIF (Persona Jurídica), sin exponer su existencia.'
+    );
 
     // Ticket 2 lifecycle coverage: expired-link UI, opaque mismatches, cooldown, and admin resend.
     $resendNifNumber = ($staffIdentifierBase + 10) % 100000000;

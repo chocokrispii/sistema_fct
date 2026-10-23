@@ -155,7 +155,7 @@ function validateField(field: keyof ProfileValues): boolean {
             ) {
                 message = values.tipo_documento === 'PASAPORTE'
                     ? 'Introduce un pasaporte de 6 a 15 caracteres alfanuméricos.'
-                    : 'Introduce un NIF con una letra de control válida.';
+                    : 'Introduce un NIF / NIE / DNI con dígito o letra de control válida.';
             }
             break;
         case 'tutor_dni':
@@ -294,13 +294,13 @@ async function saveProfile(): Promise<void> {
                     <div class="student-registration__field">
                         <label for="profile-document-type">Tipo de documento</label>
                         <select id="profile-document-type" v-model="values.tipo_documento" name="tipo_documento" aria-describedby="profile-document-help" required @change="onDocumentTypeChange">
-                            <option value="NIF_NIE_DNI">NIF</option>
+                            <option value="NIF_NIE_DNI">NIF / NIE / DNI</option>
                             <option value="PASAPORTE">Pasaporte</option>
                         </select>
                         <label for="profile-dni">Número de documento</label>
                         <input id="profile-dni" v-model="values.dni" name="dni" :maxlength="values.tipo_documento === 'PASAPORTE' ? 15 : 20" autocomplete="off" :aria-invalid="fieldErrors.dni ? 'true' : 'false'" :aria-describedby="fieldErrors.dni ? fieldErrorId('dni') : undefined" required @input="onInput('dni')" @blur="validateField('dni')">
                         <small id="profile-document-help">Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional.</small>
-                        <small>Para NIF se valida la letra de control.</small>
+                        <small>Para NIF / NIE / DNI se valida el dígito o letra de control.</small>
                         <small v-if="fieldErrors.dni" :id="fieldErrorId('dni')" data-field-error role="alert">{{ fieldErrors.dni }}</small>
                     </div>
                     <div class="student-registration__field">

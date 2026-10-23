@@ -88,10 +88,10 @@ Para ver que las empresas de la muestra tienen convenios asociados, cierra la se
 
 |                 |                                  |
 |-----------------|----------------------------------|
-| CIF             | `B90000001`                      |
+| NIF (Persona Jurídica) | `B90000001`                |
 | Contraseña      | `Benchmark data only`            |
 
-El script de benchmark asigna a la primera empresa el correo `bench.company.01@bench.invalid`, pero para iniciar sesión usa el CIF `B90000001`, no el correo.
+El script de benchmark asigna a la primera empresa el correo `bench.company.01@bench.invalid`, pero para iniciar sesión usa el NIF (Persona Jurídica) `B90000001`, no el correo.
 
 1.  Abre [la página de convenios](http://127.0.0.1:8002/index.php?action=convenios).
 2.  En «Historial de convenios», comprueba el convenio `BENCH-CNV-01` y su estado aprobado.
@@ -193,7 +193,7 @@ La prueba correcta termina con mensajes `OK` sobre validadores, rutas, almacenam
 | Error de conexión a MariaDB. | Comprueba MySQL/MariaDB en XAMPP y que `FCT_DB_HOST` y `FCT_DB_NAME` se definieron antes de arrancar el servidor. |
 | No aparece Siguiente. | Confirma que estás en `fct_bench_distribucion_local` y en la ruta correcta. La página no necesita un enlace si no hay más registros. |
 | El matching no muestra candidatos. | Revisa que estás en las ofertas sintéticas aprobadas y vigentes y que la fecha del equipo sea correcta. |
-| El login rechaza las credenciales. | Revisa el NIF/DNI/NIE del personal o alumno, o el CIF de la empresa, junto con la contraseña. El correo no es identificador de acceso. Comprueba también que el servidor PHP apunta a `fct_bench_distribucion_local`. No alteres el volcado para resolver un problema de sesión. |
+| El login rechaza las credenciales. | Revisa el NIF / NIE / DNI del personal o alumnado, o el NIF (Persona Jurídica) de la empresa, junto con la contraseña. El correo no es identificador de acceso. Comprueba también que el servidor PHP apunta a `fct_bench_distribucion_local`. No alteres el volcado para resolver un problema de sesión. |
 | El benchmark exige una variable de permiso. | En esa misma ventana define `$env:FCT_BENCH_ALLOW = '1'` antes de ejecutar el script. |
 | El benchmark dice que faltan filas. | Confirma el nombre de la base y que ya se ejecutó una vez `seed_benchmark.php` en ella. No repitas el seed si ya hay 500 alumnos `bench.student.*@bench.invalid`. |
 | La suite automatizada rechaza la base. | Define `FCT_DB_NAME` y `FCT_TEST_DB_NAME` ambos como `fct_test_local`. |

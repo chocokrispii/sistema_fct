@@ -17,10 +17,14 @@ final class SolicitudReenvioActivacion
         $email = mb_strtolower(trim($email));
         $identifier = SpanishDataValidator::isPassport($identifier)
             ? strtoupper(trim($identifier))
-            : SpanishDataValidator::normalizeDniNie($identifier);
+            : SpanishDataValidator::normalizeFiscalIdentifier($identifier);
         if (
             !SpanishDataValidator::isEmail($email)
-            || (!SpanishDataValidator::isDniNie($identifier) && !SpanishDataValidator::isPassport($identifier))
+            || (
+                !SpanishDataValidator::isDniNie($identifier)
+                && !SpanishDataValidator::isPassport($identifier)
+                && !SpanishDataValidator::isNifPersonaJuridica($identifier)
+            )
         ) {
             return;
         }
@@ -31,10 +35,11 @@ final class SolicitudReenvioActivacion
                 "SELECT u.id
                  FROM usuarios u
                  LEFT JOIN alumnos a ON a.usuario_id = u.id AND u.rol = 'Alumno'
+                 LEFT JOIN empresas e ON e.usuario_id = u.id AND u.rol = 'Empresa'
                  WHERE u.email = :email
-                   AND COALESCE(u.identificador_fiscal, a.dni) = :identifier
+                   AND COALESCE(u.identificador_fiscal, a.dni, e.cif_empresa) = :identifier
                    AND u.activo = 0
-                   AND u.rol IN ('Alumno', 'Administrador', 'Coordinador', 'Observador')
+                   AND u.rol IN ('Alumno', 'Administrador', 'Coordinador', 'Observador', 'Empresa')
                    AND (
                         (u.rol = 'Alumno' AND EXISTS (
                             SELECT 1 FROM student_activation_tokens t
@@ -42,6 +47,10 @@ final class SolicitudReenvioActivacion
                         ))
                         OR (u.rol IN ('Administrador', 'Coordinador', 'Observador') AND EXISTS (
                             SELECT 1 FROM staff_activation_tokens t
+                            WHERE t.usuario_id = u.id AND t.used_at IS NULL
+                        ))
+                        OR (u.rol = 'Empresa' AND EXISTS (
+                            SELECT 1 FROM company_activation_tokens t
                             WHERE t.usuario_id = u.id AND t.used_at IS NULL
                         ))
                    )
@@ -80,7 +89,7 @@ final class SolicitudReenvioActivacion
     {
         return $this->db->query(
             "SELECT r.id AS solicitud_id, r.creada, u.id AS usuario_id, u.email, u.rol,
-                    COALESCE(u.identificador_fiscal, a.dni) AS identificador_fiscal,
+                    COALESCE(u.identificador_fiscal, a.dni, e.cif_empresa) AS identificador_fiscal,
                     COALESCE(
                         NULLIF(CONCAT_WS(' ', u.nombre, u.apellidos), ''),
                         NULLIF(CONCAT_WS(' ', c.nombre, c.apellidos), ''),
@@ -90,6 +99,7 @@ final class SolicitudReenvioActivacion
              FROM activation_resend_requests r
              INNER JOIN usuarios u ON u.id = r.usuario_id
              LEFT JOIN alumnos a ON a.usuario_id = u.id AND u.rol = 'Alumno'
+             LEFT JOIN empresas e ON e.usuario_id = u.id AND u.rol = 'Empresa'
              LEFT JOIN coordinadores c ON c.usuario_id = u.id
              WHERE r.estado = 'Pendiente de Reenvío'
              ORDER BY r.creada, r.id"
@@ -122,10 +132,12 @@ final class SolicitudReenvioActivacion
                             NULLIF(CONCAT_WS(' ', u.nombre, u.apellidos), ''),
                             NULLIF(CONCAT_WS(' ', c.nombre, c.apellidos), ''),
                             NULLIF(CONCAT_WS(' ', a.nombre, a.apellidos), ''),
+                            NULLIF(e.nombre_empresa, ''),
                             'Usuario'
                         ) AS nombre_completo
                  FROM usuarios u
                  LEFT JOIN alumnos a ON a.usuario_id = u.id AND u.rol = 'Alumno'
+                 LEFT JOIN empresas e ON e.usuario_id = u.id AND u.rol = 'Empresa'
                  LEFT JOIN coordinadores c ON c.usuario_id = u.id
                  WHERE u.id = :id
                  FOR UPDATE"
@@ -135,12 +147,16 @@ final class SolicitudReenvioActivacion
             if (
                 !is_array($user)
                 || (int)$user['activo'] !== 0
-                || !in_array($user['rol'], ['Alumno', 'Administrador', 'Coordinador', 'Observador'], true)
+                || !in_array($user['rol'], ['Alumno', 'Administrador', 'Coordinador', 'Observador', 'Empresa'], true)
             ) {
                 throw new DomainException('La cuenta ya está activada o no está disponible para reenvío.');
             }
 
-            $table = $user['rol'] === 'Alumno' ? 'student_activation_tokens' : 'staff_activation_tokens';
+            $table = match ($user['rol']) {
+                'Alumno' => 'student_activation_tokens',
+                'Empresa' => 'company_activation_tokens',
+                default => 'staff_activation_tokens',
+            };
             $pendingToken = $this->db->prepare(
                 'SELECT id FROM ' . $table . '
                  WHERE usuario_id = :usuario_id AND used_at IS NULL

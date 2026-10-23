@@ -68,7 +68,7 @@ class AuthController {
             && !SpanishDataValidator::isPassport($identifier)
         ) {
             $intentos->registrarFallo($identificadorNormalizado, $ip, $ahora);
-            $this->mostrarFormulario('Introduce un NIF, un NIF de persona jurídica o un pasaporte válido.', 422);
+            $this->mostrarFormulario('Introduce un NIF / NIE / DNI, pasaporte o NIF (Persona Jurídica) válido.', 422);
             return;
         }
 
