@@ -166,6 +166,7 @@ $createdAssignmentId = null;
 $createdCycleId = null;
 $createdAdminStudentUserId = null;
 $createdAdminStudentProfileId = null;
+$activationAuditRequestId = null;
 $webhookEventId = null;
 $availabilityWebhookEventId = null;
 
@@ -468,14 +469,26 @@ try {
     $userModel->asignarNifPersonal($createdUsers[3], $staffNif);
     $userModel->asignarNifPersonal($createdUsers[4], $adminNif);
     $userModel->asignarNifPersonal($createdUsers[5], $observerNif);
+    $lookups = [
+        'student' => $userModel->obtenerPorIdentificador(strtolower($dnis[1])),
+        'company' => $userModel->obtenerPorIdentificador(strtolower($cifs[0])),
+        'coordinator' => $userModel->obtenerPorIdentificador($staffNif),
+        'admin' => $userModel->obtenerPorIdentificador($adminNif),
+        'observer' => $userModel->obtenerPorIdentificador($observerNif),
+        'email' => $userModel->obtenerPorIdentificador($emails[4]),
+    ];
     assertTrue(
-        (int)($userModel->obtenerPorIdentificador(strtolower($dnis[0]))['id'] ?? 0) === $createdUsers[1]
-            && (int)($userModel->obtenerPorIdentificador(strtolower($cifs[0]))['id'] ?? 0) === $createdUsers[0]
-            && (int)($userModel->obtenerPorIdentificador($staffNif)['id'] ?? 0) === $createdUsers[3]
-            && (int)($userModel->obtenerPorIdentificador($adminNif)['id'] ?? 0) === $createdUsers[4]
-            && (int)($userModel->obtenerPorIdentificador($observerNif)['id'] ?? 0) === $createdUsers[5]
-            && $userModel->obtenerPorIdentificador($emails[4]) === null,
-        'El inicio de sesión debe resolver NIF del personal, DNI/NIE del alumnado y CIF de empresas, pero no correo.'
+        (int)($lookups['student']['id'] ?? 0) === $createdUsers[1]
+            && (int)($lookups['company']['id'] ?? 0) === $createdUsers[0]
+            && (int)($lookups['coordinator']['id'] ?? 0) === $createdUsers[3]
+            && (int)($lookups['admin']['id'] ?? 0) === $createdUsers[4]
+            && (int)($lookups['observer']['id'] ?? 0) === $createdUsers[5]
+            && $lookups['email'] === null,
+        'El inicio de sesión debe resolver NIF del personal, DNI/NIE del alumnado y CIF de empresas, pero no correo. '
+            . json_encode(array_map(
+                static fn(?array $user): ?int => $user === null ? null : (int)$user['id'],
+                $lookups
+            ), JSON_THROW_ON_ERROR)
     );
     assertTrue(
         SpanishDataValidator::isDniNieFormat('12345678A')
@@ -1313,6 +1326,200 @@ try {
         assertTrue($usedToken->fetchColumn() !== null, 'El enlace de activación debe quedar consumido.');
     }
 
+    // Ticket 2 lifecycle coverage: expired-link UI, opaque mismatches, cooldown, and admin resend.
+    $resendNifNumber = ($staffIdentifierBase + 10) % 100000000;
+    $resendNif = str_pad((string)$resendNifNumber, 8, '0', STR_PAD_LEFT)
+        . 'TRWAGMYFPDXBNJZSQVHLCKE'[$resendNifNumber % 23];
+    $resendEmail = "resend-$fixture@example.test";
+    $resendUserId = $userModel->crearCuentaStaff(
+        $resendEmail,
+        'Observador',
+        $resendNif,
+        'Reenvío',
+        'Prueba'
+    );
+    $createdStaffUsers[] = $resendUserId;
+
+    $expiredPlainToken = bin2hex(random_bytes(32));
+    $oldPlainToken = bin2hex(random_bytes(32));
+    $insertResendToken = $db->prepare(
+        'INSERT INTO staff_activation_tokens (usuario_id, token_hash, expires_at)
+         VALUES (:usuario_id, :token_hash, :expires_at)'
+    );
+    $insertResendToken->execute([
+        'usuario_id' => $resendUserId,
+        'token_hash' => hash('sha256', $expiredPlainToken),
+        'expires_at' => date('Y-m-d H:i:s', time() - 3600),
+    ]);
+    $insertResendToken->execute([
+        'usuario_id' => $resendUserId,
+        'token_hash' => hash('sha256', $oldPlainToken),
+        'expires_at' => date('Y-m-d H:i:s', time() + 86400),
+    ]);
+
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_GET = ['token' => $expiredPlainToken];
+    ob_start();
+    (new ActivacionController())->activar();
+    $expiredActivationHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($expiredActivationHtml, 'El enlace ha caducado o no es válido.')
+            && str_contains($expiredActivationHtml, 'Solicitar nuevo enlace al Centro')
+            && !str_contains($expiredActivationHtml, 'name="token"'),
+        'Un token expirado debe mostrar el error genérico y la opción de solicitud, sin formulario de activación.'
+    );
+    $_GET = ['token' => 'token-invalido'];
+    ob_start();
+    (new ActivacionController())->activar();
+    $invalidActivationHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($invalidActivationHtml, 'El enlace ha caducado o no es válido.')
+            && str_contains($invalidActivationHtml, 'name="email"')
+            && str_contains($invalidActivationHtml, 'name="identificador_fiscal"'),
+        'Un token malformado debe tener el mismo manejo genérico y ofrecer la solicitud con correo y NIF.'
+    );
+    $_GET = ['solicitud' => '1'];
+    ob_start();
+    (new ActivacionController())->activar();
+    $requestConfirmationHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($requestConfirmationHtml, 'Si los datos corresponden a una cuenta pendiente de activación')
+            && !str_contains($requestConfirmationHtml, 'no existe'),
+        'La confirmación pública de una solicitud no debe revelar si la cuenta existe.'
+    );
+    $_GET = [];
+
+    $resendRequests = new SolicitudReenvioActivacion($db);
+    $resendRequests->solicitar($resendEmail, $resendNif);
+    $resendRequests->solicitar($resendEmail, $resendNif);
+    $resendRequests->solicitar('no-existe-' . $fixture . '@example.test', $resendNif);
+    $requestCount = $db->prepare(
+        'SELECT COUNT(*) FROM activation_resend_requests WHERE usuario_id = :usuario_id'
+    );
+    $requestCount->execute(['usuario_id' => $resendUserId]);
+    assertTrue(
+        (int)$requestCount->fetchColumn() === 1,
+        'Los datos inexistentes no deben crear solicitudes y los duplicados pendientes deben quedar deduplicados.'
+    );
+
+    $markOldRequest = $db->prepare(
+        "UPDATE activation_resend_requests
+         SET estado = 'Reenviada', resuelta = CURRENT_TIMESTAMP,
+             creada = DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1439 MINUTE)
+         WHERE usuario_id = :usuario_id"
+    );
+    $markOldRequest->execute(['usuario_id' => $resendUserId]);
+    $resendRequests->solicitar($resendEmail, $resendNif);
+    $requestCount->execute(['usuario_id' => $resendUserId]);
+    assertTrue(
+        (int)$requestCount->fetchColumn() === 1,
+        'No debe admitirse una nueva solicitud antes de que transcurran 24 horas.'
+    );
+    $ageRequest = $db->prepare(
+        'UPDATE activation_resend_requests
+         SET creada = DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 24 HOUR) - INTERVAL 1 SECOND
+         WHERE usuario_id = :usuario_id'
+    );
+    $ageRequest->execute(['usuario_id' => $resendUserId]);
+    $resendRequests->solicitar($resendEmail, $resendNif);
+    $requestCount->execute(['usuario_id' => $resendUserId]);
+    assertTrue(
+        (int)$requestCount->fetchColumn() === 2,
+        'Debe permitirse una nueva solicitud una vez superado el límite de 24 horas.'
+    );
+    $pendingRequestQuery = $db->prepare(
+        "SELECT id FROM activation_resend_requests
+         WHERE usuario_id = :usuario_id AND estado = 'Pendiente de Reenvío'
+         ORDER BY id DESC LIMIT 1"
+    );
+    $pendingRequestQuery->execute(['usuario_id' => $resendUserId]);
+    $resendRequestId = (int)$pendingRequestQuery->fetchColumn();
+    assertTrue($resendRequestId > 0, 'Debe existir una solicitud pendiente para probar la aprobación.');
+
+    $originalMailEnvironment = [];
+    foreach (['FCT_MAIL_TRANSPORT', 'FCT_APP_URL'] as $environmentKey) {
+        $originalMailEnvironment[$environmentKey] = getenv($environmentKey);
+    }
+    putenv('FCT_MAIL_TRANSPORT=invalid-test-transport');
+    putenv('FCT_APP_URL=https://test.invalid');
+    $mailFailureObserved = false;
+    try {
+        $resendRequests->aprobar($resendRequestId, $adminId, 'https://test.invalid');
+    } catch (Throwable $exception) {
+        $mailFailureObserved = true;
+    } finally {
+        foreach ($originalMailEnvironment as $environmentKey => $environmentValue) {
+            putenv($environmentValue === false ? $environmentKey : $environmentKey . '=' . $environmentValue);
+        }
+    }
+    $oldTokenState = $db->prepare(
+        'SELECT used_at FROM staff_activation_tokens
+         WHERE token_hash = :token_hash'
+    );
+    $oldTokenState->execute(['token_hash' => hash('sha256', $oldPlainToken)]);
+    $oldTokenUsedAt = $oldTokenState->fetchColumn();
+    $unusedTokenCount = $db->prepare(
+        'SELECT COUNT(*) FROM staff_activation_tokens
+         WHERE usuario_id = :usuario_id AND used_at IS NULL'
+    );
+    $unusedTokenCount->execute(['usuario_id' => $resendUserId]);
+    $requestStatus = $db->prepare(
+        'SELECT estado FROM activation_resend_requests WHERE id = :id'
+    );
+    $requestStatus->execute(['id' => $resendRequestId]);
+    assertTrue(
+        $mailFailureObserved
+            && $oldTokenUsedAt === null
+            && (int)$unusedTokenCount->fetchColumn() === 2
+            && $requestStatus->fetchColumn() === 'Pendiente de Reenvío',
+        'Si falla el correo, la aprobación debe revertirse: solicitud pendiente y tokens originales sin invalidar.'
+    );
+
+    // Exercise the successful mail path only when the configured sink is explicitly local Mailpit.
+    $localMailpitReady = getenv('FCT_MAIL_TRANSPORT') === 'mailpit'
+        && getenv('FCT_MAIL_HOST') === 'mailpit'
+        && (int)getenv('FCT_MAIL_PORT') === 1025
+        && getenv('FCT_MAIL_ENCRYPTION') === 'none'
+        && is_string(getenv('FCT_MAIL_FROM'))
+        && filter_var(getenv('FCT_MAIL_FROM'), FILTER_VALIDATE_EMAIL) !== false;
+    if ($localMailpitReady) {
+        $mailpitSocket = @fsockopen('mailpit', 1025, $mailpitErrno, $mailpitError, 1);
+        $localMailpitReady = is_resource($mailpitSocket);
+        if (is_resource($mailpitSocket)) {
+            fclose($mailpitSocket);
+        }
+    }
+    if ($localMailpitReady) {
+        $originalAppEnvironment = getenv('APP_ENV');
+        putenv('APP_ENV=development');
+        try {
+            $resendRequests->aprobar($resendRequestId, $adminId, 'http://localhost:8080');
+        } finally {
+            putenv($originalAppEnvironment === false ? 'APP_ENV' : 'APP_ENV=' . $originalAppEnvironment);
+        }
+        $tokenLifecycle = $db->prepare(
+            'SELECT token_hash, used_at, expires_at,
+                    expires_at > DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 23 HOUR) AS expires_after_23h,
+                    expires_at <= DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 24 HOUR) AS expires_by_24h
+             FROM staff_activation_tokens WHERE usuario_id = :usuario_id ORDER BY id'
+        );
+        $tokenLifecycle->execute(['usuario_id' => $resendUserId]);
+        $lifecycleTokens = $tokenLifecycle->fetchAll(PDO::FETCH_ASSOC);
+        $requestStatus->execute(['id' => $resendRequestId]);
+        assertTrue(
+            count($lifecycleTokens) === 3
+                && $lifecycleTokens[0]['used_at'] !== null
+                && $lifecycleTokens[1]['used_at'] !== null
+                && $lifecycleTokens[2]['used_at'] === null
+                && $lifecycleTokens[2]['token_hash'] !== hash('sha256', $oldPlainToken)
+                && (int)$lifecycleTokens[2]['expires_after_23h'] === 1
+                && (int)$lifecycleTokens[2]['expires_by_24h'] === 1
+                && $requestStatus->fetchColumn() === 'Reenviada',
+            'La aprobación debe consumir los enlaces anteriores y crear un token distinto válido por casi 24 horas.'
+        );
+        $activationAuditRequestId = $resendRequestId;
+    }
+
     $historicalStudentDeleteBlocked = false;
     try {
         (new Usuario($db))->eliminarPermanentemente($createdUsers[1], $adminId);
@@ -1489,6 +1696,12 @@ try {
     if ($createdCompany !== null) {
         $stmt = $db->prepare('DELETE FROM empresas WHERE id = :id');
         $stmt->execute(['id' => $createdCompany]);
+    }
+    if ($activationAuditRequestId !== null) {
+        $stmt = $db->prepare('DELETE FROM auditoria WHERE entidad = :entidad AND entidad_id = :id');
+        $stmt->execute(['entidad' => 'activation_resend_requests', 'id' => $activationAuditRequestId]);
+        $stmt = $db->prepare('DELETE FROM audit_logs WHERE entidad_afectada = :entidad AND id_registro_modificado = :id');
+        $stmt->execute(['entidad' => 'activation_resend_requests', 'id' => $activationAuditRequestId]);
     }
     if ($createdStaffUsers !== []) {
         $stmt = $db->prepare('DELETE FROM coordinadores WHERE usuario_id = :id');

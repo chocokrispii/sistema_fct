@@ -46,14 +46,14 @@ Para desarrollo sin antivirus, define ambos valores `APP_ENV=development` y `FCT
 |---|---|
 | Aplicación PHP | `http://localhost:8080` (configurable con `APP_PORT`) |
 | phpMyAdmin | `http://localhost:8082` (configurable con `PMA_PORT`, sólo loopback) |
-| MariaDB desde el host | `127.0.0.1:3307` (mapeo fijo en `docker-compose.yml`) |
+| MariaDB desde el host | `127.0.0.1:3307` (mapeo predeterminado en `docker-compose.yml`) |
 | ClamAV desde el host, para pruebas | `127.0.0.1:3310` (sólo loopback) |
 | Vista previa de disponibilidad | `http://localhost:8080/index.php?action=preview-disponibilidad` |
 | Vista previa de oferta | `http://localhost:8080/dev/preview-publicar-oferta` |
 | Vite HMR (opcional) | `http://localhost:5173` (`npm run dev` o perfil `frontend-dev`) |
 | Portal VitePress (opcional) | `http://localhost:5174` (`npm run docs:dev -- --port 5174`) |
 
-Las vistas previas (`preview-disponibilidad` y `preview-publicar-oferta`) sólo se registran cuando `APP_ENV` es `development` o `local` (`DevelopmentPreviewController::isEnabled()`); con cualquier otro valor, incluido el `production` de reserva de Compose, las rutas no existen. No confundas este criterio con el bypass de ClamAV, que sólo acepta `development`, `test` o `testing` (no `local`). El puerto de MariaDB no tiene variable `.env`; para cambiarlo, edita el mapeo `127.0.0.1:3307:3306` en Compose. Consulta [Disponibilidad](/componentes/disponibilidad) para el flujo de guardado.
+La tabla muestra los puertos predeterminados de Compose. Un archivo `docker-compose.override.yml` puede reemplazar los mapeos para una instalación local; consulta ese archivo y usa la dirección resultante al configurar `FCT_APP_URL`. En este working tree, el override local redefine varios puertos y `FCT_APP_URL`; esos valores no son predeterminados compartidos. Las vistas previas (`preview-disponibilidad` y `preview-publicar-oferta`) sólo se registran cuando `APP_ENV` es `development` o `local` (`DevelopmentPreviewController::isEnabled()`); con cualquier otro valor, incluido el `production` de reserva de Compose, las rutas no existen. No confundas este criterio con el bypass de ClamAV, que sólo acepta `development`, `test` o `testing` (no `local`). El puerto de MariaDB predeterminado no tiene variable `.env`; para cambiarlo sin un override, edita el mapeo de host en Compose. Consulta [Disponibilidad](/componentes/disponibilidad) para el flujo de guardado.
 
 Para instalar dependencias Node y servir el portal de documentación:
 
@@ -68,7 +68,7 @@ La documentación se compila con `npm run docs:build`. VitePress puede escoger o
 
 En un volumen nuevo, MariaDB importa `database/sistema_fct.sql` y Compose ejecuta las migraciones listadas explícitamente en `docker-compose.yml`. Varias líneas de migración tienen prefijos numéricos repetidos; identifica cada archivo por su nombre completo, no sólo por el número.
 
-En una base ya inicializada no repitas migraciones indiscriminadamente ni reimportes el esquema. Aplica sólo las pendientes y en el orden que corresponda a esa base:
+En una base ya inicializada no reimportes el esquema ni repitas migraciones indiscriminadamente. Aplica sólo las que falten, una sola vez y respetando el orden y las dependencias de esa base. En particular, para activar el aprovisionamiento y la trazabilidad, el orden es `012`, `013`, `014`, `015`, `016` y `017`; puede haber otras migraciones intercaladas según la historia de la base:
 
 - `009_desarrollo_aplicaciones_multiplataforma.sql` añade DAM si aún no existe.
 - `010_detalles_ofertas.sql` añade los campos persistidos de título, descripción, modalidad, ubicación, requisitos y tecnologías.
@@ -80,19 +80,32 @@ En una base ya inicializada no repitas migraciones indiscriminadamente ni reimpo
 - `017_trazabilidad_administrativa.sql` crea `audit_logs` con el actor, nombre completo, acción, entidad, registro afectado, IP y fecha/hora.
 - `007_webhooks.sql` crea las bandejas `webhook_inbox` y `webhook_outbox`; `008_api_access_tokens.sql` crea la tabla de tokens API; `009_webhook_responses.sql` añade las columnas de respuesta HTTP y se ejecuta una sola vez.
 
-Las dos primeras son idempotentes; `009_webhook_responses.sql` contiene `ALTER TABLE` no condicional y no debe repetirse cuando las columnas ya existen. Para las migraciones de webhook y tokens, consulta [Integraciones y webhooks](/webhooks). Los scripts de inicialización de Compose no vuelven a ejecutarse al arrancar un volumen existente.
+`009_desarrollo_aplicaciones_multiplataforma.sql` y `010_detalles_ofertas.sql` son idempotentes; `009_webhook_responses.sql` contiene `ALTER TABLE` no condicional y no debe repetirse cuando las columnas ya existen. Trata también `012`–`017` como migraciones de aplicación única y comprueba cuáles ya están en la base antes de ejecutar nada. Para las migraciones de webhook y tokens, consulta [Integraciones y webhooks](/webhooks). Los scripts de inicialización de Compose no vuelven a ejecutarse al arrancar un volumen existente.
 
 En una base existente, aplica `012_alta_alumnos_personal.sql` una sola vez con el procedimiento `docker compose cp` descrito en el README. La migración permite que los expedientes creados por el centro no incluyan un número de Seguridad Social, y añade curso y observaciones administrativas; los expedientes existentes se conservan.
 
 En una base existente, aplica `014_identificador_fiscal_personal.sql` una sola vez antes de usar el nuevo login. Conserva abierta la sesión del administrador y, después de aplicar la migración, asigna en **Usuarios** el NIF/DNI/NIE del administrador y del resto del personal. Las cuentas antiguas no tienen ese dato. En esa misma pantalla el administrador puede corregir los CIF de empresas existentes. El acceso usa NIF/DNI/NIE para Alumno y personal, y CIF para Empresa; el correo no es un identificador de acceso.
 
-Para crear nuevas cuentas de Administrador, Coordinador u Observador desde **Usuarios**, aplica después `015_alta_personal_institucional.sql` una sola vez. El alta requiere correo, NIF/DNI/NIE, nombre y apellidos; envía un enlace de activación de un solo uso y válido por 24 horas. La cuenta permanece inactiva hasta que su titular establezca la contraseña. Consulta la sección de migraciones del README para el comando de aplicación en una base existente.
+El alumnado no dispone de autorregistro público: Administradores y Coordinadores aprovisionan las cuentas desde **Alumnado**. El alta requiere NIF/DNI/NIE, nombre, apellidos, correo, ciclo, curso y observaciones administrativas; crea una cuenta inactiva y envía un token de activación de un solo uso, válido 24 horas, para que el alumno establezca su contraseña. Solo se guarda el hash del token. Para una base existente, aplica una sola vez `012_alta_alumnos_personal.sql` y después `013_activacion_cuentas_alumno.sql`.
 
-Aplica también `016_solicitudes_reenvio_activacion.sql` una sola vez para habilitar la bandeja de reenvíos. Las solicitudes se crean solo al coincidir correo, identificador fiscal y cuenta inactiva; el aviso público no confirma si la cuenta existe. El Administrador aprueba el reenvío desde **Reenvíos de activación**.
+Para aprovisionar desde **Usuarios** cuentas de Administrador, Coordinador u Observador, el Administrador debe indicar correo, NIF/DNI/NIE (obligatorio), nombre y apellidos. Aplica `014_identificador_fiscal_personal.sql` y luego `015_alta_personal_institucional.sql`, una sola vez cada una y solo si aún no se han aplicado. Las cuentas creadas quedan inactivas hasta que su titular establece la contraseña mediante el enlace de activación, de un solo uso y válido 24 horas.
+
+Las URL de activación deben usar HTTPS. La única excepción es el circuito local de Mailpit: `FCT_MAIL_TRANSPORT=mailpit` con `APP_ENV=development` y una URL HTTP de loopback (`localhost`, `127.0.0.1` o `[::1]`). Mailpit se limita a ese entorno local; no uses esa excepción para correo real ni para enlaces accesibles desde otros dispositivos.
+
+Aplica también `016_solicitudes_reenvio_activacion.sql` una sola vez, después de las migraciones de activación de alumnado `013` y personal `015`, para habilitar las solicitudes de reenvío. Para formatos válidos, la respuesta pública es genérica y no confirma si el correo y el identificador corresponden a una cuenta. El límite se aplica por cuenta: no se duplican solicitudes pendientes ni se admite una nueva durante las 24 horas posteriores a la solicitud. El Administrador revisa la bandeja **Reenvíos de activación** y aprueba manualmente cada envío; al aprobar, se invalida el enlace anterior y se emite otro válido 24 horas. Si falla el correo, la solicitud queda pendiente y el enlace anterior no se invalida.
+
+La migración `017_trazabilidad_administrativa.sql` crea `audit_logs`; en una base existente aplícala una sola vez después de `016`. `AuditLogService`, a través de `Auditoria`, registra en esa tabla los eventos instrumentados y mantiene también la tabla histórica `auditoria`. Los campos de trazabilidad incluyen ID y nombre completo del actor, acción, entidad afectada, ID del registro modificado, IP, evento, detalle y fecha/hora.
+
+Para aplicar una migración pendiente en una base existente, usa el procedimiento `docker compose cp` del README, sustituyendo el nombre del archivo. Por ejemplo, para `017`:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\017_trazabilidad_administrativa.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
 
 Si se perdió la sesión administrativa, en desarrollo local asigna el NIF con el asistente interactivo: `docker compose exec -it app php scripts/asignar_nif_personal.php`. Introduce el correo existente y el NIF real de la persona; el asistente solo funciona por CLI en `APP_ENV=development` o `local`.
 
-Para pruebas locales sin enviar correo externo, configura `FCT_MAIL_TRANSPORT=mailpit`, `FCT_MAIL_HOST=mailpit`, `FCT_MAIL_PORT=1025`, `FCT_MAIL_ENCRYPTION=none`, `FCT_MAIL_FROM` y `FCT_APP_URL=http://localhost:8080` en `.env`; los mensajes se consultan en `http://localhost:8025`. Mailpit solo se acepta con `APP_ENV=development`, y el enlace localhost funciona únicamente en el ordenador que ejecuta el proyecto.
+Para pruebas locales sin enviar correo externo, configura `FCT_MAIL_TRANSPORT=mailpit`, `FCT_MAIL_HOST=mailpit`, `FCT_MAIL_PORT=1025`, `FCT_MAIL_ENCRYPTION=none`, `FCT_MAIL_FROM` y `FCT_APP_URL` con la URL local efectiva de la aplicación; los valores predeterminados son `http://localhost:8080` y `http://localhost:8025` para consultar los mensajes. Mailpit y los enlaces HTTP de loopback solo se aceptan con `APP_ENV=development`; el enlace local funciona únicamente en el equipo que ejecuta el proyecto.
 
 Para enviar correo real, usa `FCT_MAIL_TRANSPORT=smtp` y configura `FCT_MAIL_USERNAME`, `FCT_MAIL_PASSWORD` (contraseña de aplicación), `FCT_MAIL_FROM` y una `FCT_APP_URL` HTTPS accesible desde los dispositivos del alumnado. Gmail necesita verificación en dos pasos; no uses la contraseña normal de la cuenta. Recrea el servicio `app` después de editar `.env`. No guardes secretos en Git ni en el chat.
 

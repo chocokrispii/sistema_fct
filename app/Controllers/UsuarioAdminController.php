@@ -4,6 +4,7 @@ require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../Core/AccountActivationMailer.php';
+require_once __DIR__ . '/../Core/ActivationUrl.php';
 
 class UsuarioAdminController
 {
@@ -50,7 +51,7 @@ class UsuarioAdminController
                 $activationToken = bin2hex(random_bytes(32));
                 try {
                     $appUrl = rtrim(getenv('FCT_APP_URL') ?: '', '/');
-                    if (filter_var($appUrl, FILTER_VALIDATE_URL) === false) {
+                    if (!ActivationUrl::isAllowedBaseUrl($appUrl)) {
                         throw new RuntimeException('FCT_APP_URL debe contener una URL válida y accesible para el personal.');
                     }
                     $this->db->beginTransaction();

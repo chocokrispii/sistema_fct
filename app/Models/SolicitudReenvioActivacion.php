@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../Core/AccountActivationMailer.php';
+require_once __DIR__ . '/../Core/ActivationUrl.php';
 require_once __DIR__ . '/Auditoria.php';
 
 final class SolicitudReenvioActivacion
@@ -93,7 +94,7 @@ final class SolicitudReenvioActivacion
     public function aprobar(int $requestId, int $adminId, string $appUrl): void
     {
         $appUrl = rtrim($appUrl, '/');
-        if (filter_var($appUrl, FILTER_VALIDATE_URL) === false) {
+        if (!ActivationUrl::isAllowedBaseUrl($appUrl)) {
             throw new RuntimeException('FCT_APP_URL debe contener una URL válida y accesible.');
         }
 
