@@ -6,11 +6,25 @@ class ActivacionController
     {
         $token = $_GET['token'] ?? $_POST['token'] ?? '';
         if (!is_string($token) || preg_match('/\A[a-f0-9]{64}\z/', $token) !== 1) {
-            $this->render('El enlace de activación no es válido.');
+            if (isset($_GET['solicitud']) && $_GET['solicitud'] === '1') {
+                $this->render('', '', false, true);
+                return;
+            }
+            $this->render('El enlace ha caducado o no es válido.', '', false, true);
             return;
         }
 
         $db = getPDOConnection();
+        $activation = $this->findActivation($db, $token);
+        if (
+            !is_array($activation)
+            || $activation['used_at'] !== null
+            || strtotime($activation['expires_at']) <= time()
+        ) {
+            $this->render('El enlace ha caducado o no es válido.', '', false, true);
+            return;
+        }
+
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $password = $_POST['password'] ?? null;
             $confirmation = $_POST['password_confirmation'] ?? null;
@@ -29,14 +43,7 @@ class ActivacionController
 
             $db->beginTransaction();
             try {
-                $stmt = $db->prepare(
-                    'SELECT t.usuario_id, t.expires_at, t.used_at
-                     FROM student_activation_tokens t
-                     WHERE t.token_hash = :token_hash
-                     FOR UPDATE'
-                );
-                $stmt->execute(['token_hash' => hash('sha256', $token)]);
-                $activation = $stmt->fetch(PDO::FETCH_ASSOC);
+                $activation = $this->findActivation($db, $token, true);
                 if (
                     !is_array($activation)
                     || $activation['used_at'] !== null
@@ -45,10 +52,14 @@ class ActivacionController
                     throw new DomainException('El enlace ya se utilizó o ha caducado. Contacta con el centro para solicitar uno nuevo.');
                 }
 
+                $staffActivation = $activation['type'] === 'staff';
+                $roleFilter = $staffActivation
+                    ? "rol IN ('Administrador', 'Coordinador', 'Observador')"
+                    : "rol = 'Alumno'";
                 $updateUser = $db->prepare(
                     'UPDATE usuarios
                      SET password_hash = :password_hash, activo = 1
-                     WHERE id = :usuario_id AND rol = \'Alumno\' AND activo = 0'
+                     WHERE id = :usuario_id AND ' . $roleFilter . ' AND activo = 0'
                 );
                 $updateUser->execute([
                     'password_hash' => password_hash($password, PASSWORD_DEFAULT),
@@ -58,8 +69,9 @@ class ActivacionController
                     throw new DomainException('La cuenta ya está activada o no está disponible.');
                 }
 
+                $table = $staffActivation ? 'staff_activation_tokens' : 'student_activation_tokens';
                 $markUsed = $db->prepare(
-                    'UPDATE student_activation_tokens SET used_at = CURRENT_TIMESTAMP WHERE token_hash = :token_hash'
+                    'UPDATE ' . $table . ' SET used_at = CURRENT_TIMESTAMP WHERE token_hash = :token_hash'
                 );
                 $markUsed->execute(['token_hash' => hash('sha256', $token)]);
                 $db->commit();
@@ -73,38 +85,52 @@ class ActivacionController
                 if ($db->inTransaction()) {
                     $db->rollBack();
                 }
-                $this->render($exception->getMessage(), $token);
+                $this->render('El enlace ha caducado o no es válido.', '', false, true);
                 return;
             } catch (Throwable $exception) {
                 if ($db->inTransaction()) {
                     $db->rollBack();
                 }
-                error_log('Error al activar cuenta de alumno: ' . $exception->getMessage());
+                error_log('Error al activar cuenta: ' . $exception->getMessage());
                 $this->render('No se pudo activar la cuenta. Inténtalo más tarde o contacta con el centro.', $token);
                 return;
             }
         }
 
-        $stmt = $db->prepare(
-            'SELECT 1 FROM student_activation_tokens
-             WHERE token_hash = :token_hash AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
-             LIMIT 1'
-        );
-        $stmt->execute(['token_hash' => hash('sha256', $token)]);
-        if (!$stmt->fetchColumn()) {
-            $this->render('El enlace ya se utilizó o ha caducado. Contacta con el centro para solicitar uno nuevo.');
-            return;
-        }
-
         $this->render('', $token);
     }
 
-    private function render(string $error, string $token = ''): void
+    private function findActivation(PDO $db, string $token, bool $forUpdate = false): ?array
     {
+        $suffix = $forUpdate ? ' FOR UPDATE' : '';
+        $tokenHash = hash('sha256', $token);
+        foreach (['student' => 'student_activation_tokens', 'staff' => 'staff_activation_tokens'] as $type => $table) {
+            $stmt = $db->prepare(
+                'SELECT usuario_id, expires_at, used_at
+                 FROM ' . $table . ' WHERE token_hash = :token_hash LIMIT 1' . $suffix
+            );
+            $stmt->execute(['token_hash' => $tokenHash]);
+            $activation = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (is_array($activation)) {
+                $activation['type'] = $type;
+                return $activation;
+            }
+        }
+        return null;
+    }
+
+    private function render(
+        string $error,
+        string $token = '',
+        bool $activated = false,
+        bool $showResendRequest = false
+    ): void {
         View::render('auth/activation', [
             'error' => $error,
             'token' => $token,
-            'activated' => false,
+            'activated' => $activated,
+            'showResendRequest' => $showResendRequest,
+            'requestSent' => isset($_GET['solicitud']) && $_GET['solicitud'] === '1',
         ]);
     }
 }

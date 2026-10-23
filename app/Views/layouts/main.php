@@ -2,6 +2,12 @@
 /** @var string $contenido HTML generado por el controlador */
 $rolActual = $_SESSION['rol'] ?? null;
 $usuarioAutenticado = $rolActual !== null;
+$pendientesReenvioActivacion = 0;
+if ($rolActual === 'Administrador') {
+    $pendientesReenvioActivacion = (int)getPDOConnection()->query(
+        "SELECT COUNT(*) FROM activation_resend_requests WHERE estado = 'Pendiente de Reenvío'"
+    )->fetchColumn();
+}
 $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php')), '/');
 $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
 ?>
@@ -59,6 +65,12 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                 <a href="index.php?action=recuperaciones">Recuperaciones</a>
                 <?php if ($rolActual === 'Administrador'): ?>
                     <a href="index.php?action=usuarios">Usuarios</a>
+                    <a href="index.php?action=solicitudes-activacion">
+                        Reenvíos de activación
+                        <?php if ($pendientesReenvioActivacion > 0): ?>
+                            <span class="status-badge status-badge--pending"><?= $pendientesReenvioActivacion ?> pendientes</span>
+                        <?php endif; ?>
+                    </a>
                     <a href="index.php?action=ciclos">Ciclos formativos</a>
                     <a href="index.php?action=archivo-convenios">Archivo de convenios</a>
                     <a href="index.php?action=integraciones">Integraciones</a>

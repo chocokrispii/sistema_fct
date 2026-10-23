@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/SpanishDataValidator.php';
+require_once __DIR__ . '/../Core/AccountActivationMailer.php';
 
 class UsuarioAdminController
 {
@@ -20,45 +21,40 @@ class UsuarioAdminController
         $error = '';
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $emailRaw = $_POST['email'] ?? '';
-            $password = $_POST['password'] ?? '';
             $role = $_POST['rol'] ?? '';
             $nifRaw = $_POST['identificador_fiscal'] ?? '';
+            $nombreRaw = $_POST['nombre'] ?? '';
+            $apellidosRaw = $_POST['apellidos'] ?? '';
             if (
                 !is_string($emailRaw)
-                || !is_string($password)
                 || !is_string($role)
                 || !is_string($nifRaw)
+                || !is_string($nombreRaw)
+                || !is_string($apellidosRaw)
             ) {
                 throw new InvalidArgumentException('Los datos de la cuenta no tienen un formato válido.');
             }
             $email = trim($emailRaw);
             $nif = SpanishDataValidator::normalizeDniNie($nifRaw);
+            $nombre = trim($nombreRaw);
+            $apellidos = trim($apellidosRaw);
             if (
-                !filter_var($email, FILTER_VALIDATE_EMAIL)
-                || strlen($email) > 100
-                || strlen($password) < 12
-                || strlen($password) > 72
-                || trim($password) === ''
+                !SpanishDataValidator::isEmail($email)
                 || !SpanishDataValidator::isDniNie($nif)
+                || !in_array($role, ['Administrador', 'Coordinador', 'Observador'], true)
+                || !SpanishDataValidator::isPersonName($nombre, 50)
+                || !SpanishDataValidator::isPersonName($apellidos, 100)
             ) {
-                $error = 'Indica un correo válido, un NIF/DNI/NIE correcto y una contraseña de 12 a 72 caracteres.';
+                $error = 'Indica un correo, NIF/DNI/NIE, nombre, apellidos y rol válidos.';
             } else {
+                $activationToken = bin2hex(random_bytes(32));
                 try {
+                    $appUrl = rtrim(getenv('FCT_APP_URL') ?: '', '/');
+                    if (filter_var($appUrl, FILTER_VALIDATE_URL) === false) {
+                        throw new RuntimeException('FCT_APP_URL debe contener una URL válida y accesible para el personal.');
+                    }
                     $this->db->beginTransaction();
-                    $nombreRaw = $_POST['nombre'] ?? '';
-                    $apellidosRaw = $_POST['apellidos'] ?? '';
-                    if (!is_string($nombreRaw) || !is_string($apellidosRaw)) {
-                        throw new InvalidArgumentException('El nombre y los apellidos deben ser texto.');
-                    }
-                    $nombre = trim($nombreRaw);
-                    $apellidos = trim($apellidosRaw);
-                    if (
-                        $role === 'Coordinador'
-                        && ($nombre === '' || $apellidos === '' || mb_strlen($nombre) > 50 || mb_strlen($apellidos) > 100)
-                    ) {
-                        throw new InvalidArgumentException('Los coordinadores necesitan nombre y apellidos.');
-                    }
-                    $id = $this->model->crearCuentaStaff($email, $password, $role, $nif);
+                    $id = $this->model->crearCuentaStaff($email, $role, $nif, $nombre, $apellidos);
                     if ($role === 'Coordinador') {
                         $profile = $this->db->prepare(
                             'INSERT INTO coordinadores (usuario_id, nombre, apellidos)
@@ -66,26 +62,47 @@ class UsuarioAdminController
                         );
                         $profile->execute(['usuario' => $id, 'nombre' => $nombre, 'apellidos' => $apellidos]);
                     }
+                    $activationInsert = $this->db->prepare(
+                        'INSERT INTO staff_activation_tokens (usuario_id, token_hash, expires_at)
+                         VALUES (:usuario_id, :token_hash, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 24 HOUR))'
+                    );
+                    $activationInsert->execute([
+                        'usuario_id' => $id,
+                        'token_hash' => hash('sha256', $activationToken),
+                    ]);
+                    $activationUrl = $appUrl . '/index.php?action=activar-cuenta&token=' . rawurlencode($activationToken);
+                    (new AccountActivationMailer())->send($email, $nombre . ' ' . $apellidos, $activationUrl);
                     $this->audit('usuario.creado', $id, 'rol=' . $role);
                     $this->db->commit();
-                    header('Location: index.php?action=usuarios');
+                    $_SESSION['usuario_creado_email'] = $email;
+                    header('Location: index.php?action=usuarios&creado=1');
                     exit;
                 } catch (Throwable $e) {
                     if ($this->db->inTransaction()) {
                         $this->db->rollBack();
                     }
                     error_log('Error al crear cuenta de personal: ' . $e->getMessage());
-                    $error = $e instanceof InvalidArgumentException || $e instanceof DomainException
-                        ? $e->getMessage()
-                        : 'No se pudo crear la cuenta. Comprueba si el correo y el identificador fiscal no están ya registrados.';
+                    if ($e instanceof InvalidArgumentException || $e instanceof DomainException) {
+                        $error = $e->getMessage();
+                    } elseif ($e instanceof PDOException) {
+                        $error = 'No se pudo crear la cuenta. Comprueba si el correo y el identificador fiscal no están ya registrados.';
+                    } elseif ($e instanceof RuntimeException) {
+                        $error = 'No se pudo completar el alta o enviar el enlace de activación. Comprueba la configuración del correo e inténtalo de nuevo.';
+                    } else {
+                        $error = 'No se pudo crear la cuenta. Comprueba si el correo y el identificador fiscal no están ya registrados.';
+                    }
                 }
             }
         }
 
+        $sentTo = $_SESSION['usuario_creado_email'] ?? null;
+        unset($_SESSION['usuario_creado_email']);
         View::render('admin/usuarios', [
             'usuarios' => $this->model->obtenerTodos(),
             'error' => $error !== '' ? $error : (is_string($_GET['error'] ?? null) ? $_GET['error'] : ''),
             'eliminado' => isset($_GET['eliminado']),
+            'creado' => isset($_GET['creado']) && is_string($sentTo),
+            'sentTo' => is_string($sentTo) ? $sentTo : '',
         ]);
     }
 

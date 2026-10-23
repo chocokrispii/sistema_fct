@@ -75,6 +75,8 @@ En una base ya inicializada no repitas migraciones indiscriminadamente ni reimpo
 - `012_alta_alumnos_personal.sql` habilita altas de alumnos por personal, guardando ciclo, curso y observaciones administrativas.
 - `013_activacion_cuentas_alumno.sql` almacena hashes de enlaces de activación de un solo uso.
 - `014_identificador_fiscal_personal.sql` añade un NIF único para las cuentas de Administrador, Coordinador y Observador.
+- `015_alta_personal_institucional.sql` añade nombre y apellidos del personal y los tokens de activación por correo para sus cuentas.
+- `016_solicitudes_reenvio_activacion.sql` crea la bandeja de solicitudes pendientes de reenvío supervisado de enlaces.
 - `007_webhooks.sql` crea las bandejas `webhook_inbox` y `webhook_outbox`; `008_api_access_tokens.sql` crea la tabla de tokens API; `009_webhook_responses.sql` añade las columnas de respuesta HTTP y se ejecuta una sola vez.
 
 Las dos primeras son idempotentes; `009_webhook_responses.sql` contiene `ALTER TABLE` no condicional y no debe repetirse cuando las columnas ya existen. Para las migraciones de webhook y tokens, consulta [Integraciones y webhooks](/webhooks). Los scripts de inicialización de Compose no vuelven a ejecutarse al arrancar un volumen existente.
@@ -82,6 +84,10 @@ Las dos primeras son idempotentes; `009_webhook_responses.sql` contiene `ALTER T
 En una base existente, aplica `012_alta_alumnos_personal.sql` una sola vez con el procedimiento `docker compose cp` descrito en el README. La migración permite que los expedientes creados por el centro no incluyan un número de Seguridad Social, y añade curso y observaciones administrativas; los expedientes existentes se conservan.
 
 En una base existente, aplica `014_identificador_fiscal_personal.sql` una sola vez antes de usar el nuevo login. Conserva abierta la sesión del administrador y, después de aplicar la migración, asigna en **Usuarios** el NIF/DNI/NIE del administrador y del resto del personal. Las cuentas antiguas no tienen ese dato. En esa misma pantalla el administrador puede corregir los CIF de empresas existentes. El acceso usa NIF/DNI/NIE para Alumno y personal, y CIF para Empresa; el correo no es un identificador de acceso.
+
+Para crear nuevas cuentas de Administrador, Coordinador u Observador desde **Usuarios**, aplica después `015_alta_personal_institucional.sql` una sola vez. El alta requiere correo, NIF/DNI/NIE, nombre y apellidos; envía un enlace de activación de un solo uso y válido por 24 horas. La cuenta permanece inactiva hasta que su titular establezca la contraseña. Consulta la sección de migraciones del README para el comando de aplicación en una base existente.
+
+Aplica también `016_solicitudes_reenvio_activacion.sql` una sola vez para habilitar la bandeja de reenvíos. Las solicitudes se crean solo al coincidir correo, identificador fiscal y cuenta inactiva; el aviso público no confirma si la cuenta existe. El Administrador aprueba el reenvío desde **Reenvíos de activación**.
 
 Si se perdió la sesión administrativa, en desarrollo local asigna el NIF con el asistente interactivo: `docker compose exec -it app php scripts/asignar_nif_personal.php`. Introduce el correo existente y el NIF real de la persona; el asistente solo funciona por CLI en `APP_ENV=development` o `local`.
 

@@ -159,11 +159,15 @@ Los volúmenes de base de datos, archivos subidos, firmas ClamAV y dependencias 
 
 ## 5. Base de datos, cuentas de desarrollo y phpMyAdmin
 
-En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica las migraciones de dominio, disponibilidad y ofertas, además de las tablas de webhooks, tokens API y sus respuestas. Los nombres de algunas migraciones comparten prefijo porque proceden de líneas de trabajo paralelas; Compose les asigna nombres de inicialización únicos para conservar el orden y evitar colisiones. La inicialización oficial de MariaDB sólo procesa estos archivos al crear una base de datos nueva; no vuelve a ejecutarlos en cada arranque.
+En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica las migraciones de dominio, disponibilidad, ofertas, webhooks y aprovisionamiento/activación de cuentas. Los nombres de algunas migraciones comparten prefijo porque proceden de líneas de trabajo paralelas; Compose les asigna nombres de inicialización únicos para conservar el orden y evitar colisiones. La inicialización oficial de MariaDB sólo procesa estos archivos al crear una base de datos nueva; no vuelve a ejecutarlos en cada arranque.
 
 Las cuentas de alumnos se crean desde **Alumnado**, disponible para Administradores y Coordinadores con sesión iniciada. La creación solicita NIF/DNI/NIE, nombre, apellidos, correo, ciclo, curso y observaciones; el sistema envía al correo un enlace de activación de un solo uso y válido durante 24 horas para que el alumno elija su contraseña. La cuenta permanece inactiva hasta activarla. No existe un formulario público de alta de alumnos. En una base existente, aplica una sola vez `012_alta_alumnos_personal.sql` y `013_activacion_cuentas_alumno.sql` mediante el procedimiento de migración manual de abajo; no basta con reiniciar Compose.
 
-El acceso usa el identificador fiscal y la contraseña: Alumno, Administrador, Coordinador y Observador entran con NIF/DNI/NIE; Empresa entra con CIF. El correo no sirve como identificador de login. El personal existente debe tener un NIF asignado en **Usuarios**; aplica una sola vez `014_identificador_fiscal_personal.sql` y conserva abierta la sesión actual del administrador hasta que este asigne allí su NIF y los del resto del personal. Si se perdió esa sesión, el administrador local puede ejecutar `docker compose exec -it app php scripts/asignar_nif_personal.php` para asignar su identificador en desarrollo; el asistente solicita correo y NIF interactivamente y no muestra contraseñas. Las cuentas antiguas sin NIF no podrán iniciar sesión hasta que se actualicen. Las nuevas cuentas de personal solicitan el NIF/DNI/NIE durante su creación.
+Desde **Usuarios**, el Administrador puede aprovisionar cuentas institucionales de Administrador, Coordinador y Observador indicando correo, NIF/DNI/NIE, nombre y apellidos. La cuenta se crea inactiva y recibe un enlace de un solo uso, válido 24 horas, para establecer su contraseña; si el correo no se puede enviar, el alta se revierte. No se introduce ni comparte una contraseña inicial desde el panel. En una base existente, aplica una sola vez `015_alta_personal_institucional.sql` después de `014_identificador_fiscal_personal.sql`; la migración conserva los nombres y apellidos ya registrados de Coordinadores.
+
+Si un enlace de activación caduca o no es válido, la persona puede solicitar uno nuevo indicando el correo y NIF/DNI/NIE asociados a la cuenta. El sistema no revela si esos datos existen y evita duplicar solicitudes o generar avisos repetidos durante 24 horas. Un Administrador revisa las solicitudes en **Reenvíos de activación** y aprueba manualmente el envío; solo entonces se invalida el enlace anterior y se envía otro enlace de un solo uso, válido 24 horas. Si el correo falla, la solicitud sigue pendiente y no se consume el enlace vigente. En una base existente aplica una sola vez `016_solicitudes_reenvio_activacion.sql` después de las migraciones de activación de alumnado `013_activacion_cuentas_alumno.sql` y personal `015_alta_personal_institucional.sql`.
+
+El acceso usa el identificador fiscal y la contraseña: Alumno, Administrador, Coordinador y Observador entran con NIF/DNI/NIE; Empresa entra con CIF. El correo no sirve como identificador de login. El personal existente debe tener un NIF asignado en **Usuarios**; aplica una sola vez `014_identificador_fiscal_personal.sql` y conserva abierta la sesión actual del administrador hasta que este asigne allí su NIF y los del resto del personal. Si se perdió esa sesión, el administrador local puede ejecutar `docker compose exec -it app php scripts/asignar_nif_personal.php` para asignar su identificador en desarrollo; el asistente solicita correo y NIF interactivamente y no muestra contraseñas. Las cuentas antiguas sin NIF no podrán iniciar sesión hasta que se actualicen.
 
 Para probar mensajes en local sin enviar correos reales, usa Mailpit: configura `FCT_MAIL_TRANSPORT=mailpit`, `FCT_MAIL_HOST=mailpit`, `FCT_MAIL_PORT=1025`, `FCT_MAIL_ENCRYPTION=none`, un remitente válido en `FCT_MAIL_FROM` y `FCT_APP_URL=http://localhost:8080`. Abre <http://localhost:8025> para ver los mensajes capturados. Esta modalidad solo se acepta en `APP_ENV=development` y el enlace localhost solo funciona en el mismo equipo; no envíes esos mensajes a alumnos. Para enviar correo real con Gmail/Google Workspace, usa `FCT_MAIL_TRANSPORT=smtp`, `FCT_MAIL_USERNAME`, `FCT_MAIL_PASSWORD` (contraseña de aplicación), y `FCT_MAIL_FROM`; usa una URL HTTPS accesible desde los dispositivos del alumnado. Gmail requiere verificación en dos pasos; no uses la contraseña normal ni guardes credenciales en el repositorio.
 
@@ -238,6 +242,22 @@ docker compose cp (Resolve-Path .\database\migrations\014_identificador_fiscal_p
 ```
 
 No repitas este `ALTER TABLE` si `usuarios.identificador_fiscal` ya existe. Después recarga la página de la aplicación. Desde **Usuarios**, asigna y guarda el NIF/DNI/NIE válido del administrador actual y de cada miembro del personal antes de cerrar la sesión; no se puede inferir el NIF real a partir del correo.
+
+Para habilitar el alta institucional de personal, aplica después y una sola vez `015_alta_personal_institucional.sql`:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\015_alta_personal_institucional.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --****** "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+Esta migración añade nombre y apellidos para las cuentas de personal, conserva los datos ya guardados de Coordinadores y crea la tabla de enlaces de activación de personal.
+
+Para habilitar las solicitudes y aprobación de reenvíos de activación, aplica después y una sola vez `016_solicitudes_reenvio_activacion.sql`:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\016_solicitudes_reenvio_activacion.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --****** "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
 
 Si la sesión de administrador ya no está disponible, dentro de Docker Desktop y en modo desarrollo ejecuta `docker compose exec -it app php scripts/asignar_nif_personal.php`; escribe el correo existente y el NIF real cuando el asistente los solicite. Repite para cada cuenta del personal que necesite acceso. Este asistente está limitado a ejecución CLI en `APP_ENV=development` o `local`.
 

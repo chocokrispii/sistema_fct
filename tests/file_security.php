@@ -46,6 +46,15 @@ assertFileSecurity(
     'La actualización de identificadores fiscales debe ser POST y estar limitada a administradores.'
 );
 assertFileSecurity(
+    $routes['solicitar-reenvio-activacion']['method'] === 'POST'
+        && $routes['solicitar-reenvio-activacion']['roles'] === []
+        && $routes['solicitudes-activacion']['method'] === 'GET'
+        && $routes['solicitudes-activacion']['roles'] === ['Administrador']
+        && $routes['aprobar-reenvio-activacion']['method'] === 'POST'
+        && $routes['aprobar-reenvio-activacion']['roles'] === ['Administrador'],
+    'Los reenvíos de activación deben solicitarse con respuesta genérica y aprobarse solo por administrador.'
+);
+assertFileSecurity(
     $routes['mis-calificaciones']['roles'] === ['Alumno']
         && $routes['calificaciones']['roles'] === ['Administrador', 'Coordinador', 'Observador']
         && $routes['guardar-calificacion']['roles'] === ['Administrador', 'Coordinador'],

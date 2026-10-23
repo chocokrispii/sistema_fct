@@ -21,6 +21,8 @@ require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
 require_once __DIR__ . '/../app/Controllers/CalificacionController.php';
 require_once __DIR__ . '/../app/Controllers/DisponibilidadController.php';
 require_once __DIR__ . '/../app/Controllers/UsuarioAdminController.php';
+require_once __DIR__ . '/../app/Controllers/ActivacionController.php';
+require_once __DIR__ . '/../app/Models/SolicitudReenvioActivacion.php';
 require_once __DIR__ . '/../app/Models/Oferta.php';
 require_once __DIR__ . '/../app/Models/Asignacion.php';
 require_once __DIR__ . '/../app/Models/Alumno.php';
@@ -75,6 +77,8 @@ foreach ($demoUsers as $demoUser) {
 
 $required = [
     'identificador_fiscal_personal' => ['table' => 'usuarios', 'column' => 'identificador_fiscal'],
+    'nombre_personal' => ['table' => 'usuarios', 'column' => 'nombre'],
+    'apellidos_personal' => ['table' => 'usuarios', 'column' => 'apellidos'],
     'persona_contacto' => ['table' => 'empresas', 'column' => 'persona_contacto'],
     'fecha_nacimiento' => ['table' => 'alumnos', 'column' => 'fecha_nacimiento'],
     'turno' => ['table' => 'empresa_especialidades_plazas', 'column' => 'turno'],
@@ -112,6 +116,10 @@ $activationTable = $db->prepare(
 );
 $activationTable->execute(['schema' => $testDatabase, 'table' => 'student_activation_tokens']);
 assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de enlaces de activación de alumnado.');
+$activationTable->execute(['schema' => $testDatabase, 'table' => 'staff_activation_tokens']);
+assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de enlaces de activación del personal.');
+$activationTable->execute(['schema' => $testDatabase, 'table' => 'activation_resend_requests']);
+assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de solicitudes de reenvío de activación.');
 $webhookTables = $db->query(
     "SELECT COUNT(*) FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('webhook_inbox', 'webhook_outbox')"
@@ -138,6 +146,7 @@ $emails = [
 $dnis = ["A$fixture", "B$fixture", "C$fixture"];
 $cifs = ["T$fixture"];
 $createdUsers = [];
+$createdStaffUsers = [];
 $createdCompany = null;
 $createdStudents = [];
 $createdOffer = null;
@@ -1167,6 +1176,12 @@ try {
     assertTrue(
         str_contains($adminViewHtml, 'Coordinadora Álvarez O&#039;Connor')
             && str_contains($adminViewHtml, 'name="identificador_fiscal"')
+            && str_contains($adminViewHtml, 'name="nombre"')
+            && str_contains($adminViewHtml, 'name="apellidos"')
+            && !str_contains($adminViewHtml, 'name="password"')
+            && str_contains($adminViewHtml, 'value="Coordinador"')
+            && str_contains($adminViewHtml, 'value="Observador"')
+            && str_contains($adminViewHtml, 'value="Administrador"')
             && str_contains($adminViewHtml, 'actualizar-identificador-fiscal-usuario')
             && str_contains($adminViewHtml, 'data-delete-user=')
             && (
@@ -1181,6 +1196,111 @@ try {
             ),
         'La administración debe mostrar los usuarios y habilitar el diálogo Vue o su fallback PHP.'
     );
+
+    $staffRoles = ['Administrador', 'Coordinador', 'Observador'];
+    $staffIdentifierBase = (hexdec(substr($fixture, 0, 7)) + 1000) % 100000000;
+    foreach ($staffRoles as $index => $staffRole) {
+        $number = ($staffIdentifierBase + $index) % 100000000;
+        $staffNif = str_pad((string)$number, 8, '0', STR_PAD_LEFT)
+            . 'TRWAGMYFPDXBNJZSQVHLCKE'[$number % 23];
+        $staffEmail = strtolower($staffRole) . "-$fixture@example.test";
+        $staffId = $userModel->crearCuentaStaff(
+            $staffEmail,
+            $staffRole,
+            $staffNif,
+            'Personal',
+            $staffRole . ' Prueba'
+        );
+        $createdStaffUsers[] = $staffId;
+        if ($staffRole === 'Coordinador') {
+            $coordinatorProfile = $db->prepare(
+                'INSERT INTO coordinadores (usuario_id, nombre, apellidos)
+                 VALUES (:usuario, :nombre, :apellidos)'
+            );
+            $coordinatorProfile->execute([
+                'usuario' => $staffId,
+                'nombre' => 'Personal',
+                'apellidos' => 'Coordinador Prueba',
+            ]);
+        }
+
+        $activationToken = bin2hex(random_bytes(32));
+        $activationInsert = $db->prepare(
+            'INSERT INTO staff_activation_tokens (usuario_id, token_hash, expires_at)
+             VALUES (:usuario_id, :token_hash, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 24 HOUR))'
+        );
+        $activationInsert->execute([
+            'usuario_id' => $staffId,
+            'token_hash' => hash('sha256', $activationToken),
+        ]);
+        $staffRow = $db->prepare(
+            'SELECT activo, nombre, apellidos FROM usuarios WHERE id = :id'
+        );
+        $staffRow->execute(['id' => $staffId]);
+        $staffAccount = $staffRow->fetch(PDO::FETCH_ASSOC);
+        assertTrue(
+            is_array($staffAccount)
+                && (int)$staffAccount['activo'] === 0
+                && $staffAccount['nombre'] === 'Personal'
+                && $staffAccount['apellidos'] === $staffRole . ' Prueba',
+            "La cuenta nueva de $staffRole debe guardar los datos institucionales y permanecer inactiva."
+        );
+
+        $initialToken = $db->prepare(
+            'INSERT INTO staff_activation_tokens (usuario_id, token_hash, expires_at)
+             VALUES (:usuario_id, :token_hash, DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 HOUR))'
+        );
+        $initialToken->execute([
+            'usuario_id' => $staffId,
+            'token_hash' => hash('sha256', bin2hex(random_bytes(32))),
+        ]);
+        $resendRequests = new SolicitudReenvioActivacion($db);
+        $resendRequests->solicitar($staffEmail, $staffNif);
+        $resendRequests->solicitar($staffEmail, $staffNif);
+        $pendingRequest = $db->prepare(
+            "SELECT COUNT(*) FROM activation_resend_requests
+             WHERE usuario_id = :usuario_id AND estado = 'Pendiente de Reenvío'"
+        );
+        $pendingRequest->execute(['usuario_id' => $staffId]);
+        assertTrue(
+            (int)$pendingRequest->fetchColumn() === 1,
+            'El reenvío debe quedar pendiente y las solicitudes duplicadas no deben generar avisos repetidos.'
+        );
+        $resendRequests->solicitar($staffEmail, '00000000T');
+        $pendingRequest->execute(['usuario_id' => $staffId]);
+        assertTrue(
+            (int)$pendingRequest->fetchColumn() === 1,
+            'La solicitud debe exigir que el correo y el identificador correspondan a la misma cuenta.'
+        );
+
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_GET = [];
+        $_POST = [
+            'token' => $activationToken,
+            'password' => 'PersonalTest123!',
+            'password_confirmation' => 'PersonalTest123!',
+        ];
+        ob_start();
+        (new ActivacionController())->activar();
+        $activationHtml = (string)ob_get_clean();
+        $activatedAccount = $db->prepare(
+            'SELECT activo, password_hash FROM usuarios WHERE id = :id'
+        );
+        $activatedAccount->execute(['id' => $staffId]);
+        $activated = $activatedAccount->fetch(PDO::FETCH_ASSOC);
+        assertTrue(
+            is_array($activated)
+                && (int)$activated['activo'] === 1
+                && password_verify('PersonalTest123!', $activated['password_hash'])
+                && str_contains($activationHtml, 'Tu cuenta está activada.'),
+            "La activación segura debe habilitar la cuenta de $staffRole y guardar la contraseña elegida."
+        );
+        $usedToken = $db->prepare(
+            'SELECT used_at FROM staff_activation_tokens WHERE token_hash = :token_hash'
+        );
+        $usedToken->execute(['token_hash' => hash('sha256', $activationToken)]);
+        assertTrue($usedToken->fetchColumn() !== null, 'El enlace de activación debe quedar consumido.');
+    }
 
     $historicalStudentDeleteBlocked = false;
     try {
@@ -1269,6 +1389,14 @@ try {
             && ($routes['activar-cuenta']['method'] ?? null) === ['GET', 'POST'],
         'La activación debe aceptar enlaces públicos y proteger el cambio de contraseña mediante CSRF.'
     );
+    assertTrue(
+        ($routes['solicitar-reenvio-activacion']['roles'] ?? null) === []
+            && ($routes['solicitar-reenvio-activacion']['method'] ?? null) === 'POST'
+            && ($routes['solicitudes-activacion']['roles'] ?? null) === ['Administrador']
+            && ($routes['aprobar-reenvio-activacion']['roles'] ?? null) === ['Administrador']
+            && ($routes['aprobar-reenvio-activacion']['method'] ?? null) === 'POST',
+        'Las solicitudes de reenvío deben ser públicas con respuesta genérica y aprobarse solo por Administrador mediante POST.'
+    );
 
     echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, disponibilidad, calificaciones, usuarios y CSRF.\n";
 } finally {
@@ -1313,9 +1441,18 @@ try {
         $stmt = $db->prepare('DELETE FROM empresas WHERE id = :id');
         $stmt->execute(['id' => $createdCompany]);
     }
-    if ($createdUsers !== [] || $createdAdminStudentUserId !== null) {
+    if ($createdStaffUsers !== []) {
+        $stmt = $db->prepare('DELETE FROM coordinadores WHERE usuario_id = :id');
+        foreach ($createdStaffUsers as $userId) {
+            $stmt->execute(['id' => $userId]);
+        }
+    }
+    if ($createdUsers !== [] || $createdStaffUsers !== [] || $createdAdminStudentUserId !== null) {
         $stmt = $db->prepare('DELETE FROM usuarios WHERE id = :id');
         foreach ($createdUsers as $userId) {
+            $stmt->execute(['id' => $userId]);
+        }
+        foreach ($createdStaffUsers as $userId) {
             $stmt->execute(['id' => $userId]);
         }
         if ($createdAdminStudentUserId !== null) {
