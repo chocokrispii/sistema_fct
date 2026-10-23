@@ -4,6 +4,13 @@ $vueEnabled = FrontendAssets::isEnabled();
 ?>
 <?php if ($error !== ''): ?><p class="message message-error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if ($eliminado): ?><p class="message message-success" role="status">Usuario eliminado permanentemente.</p><?php endif; ?>
+<?php if ($creado): ?>
+    <section class="message message-success" role="status">
+        <h3>Cuenta creada y correo enviado</h3>
+        <p>Se ha enviado a <strong><?= htmlspecialchars($sentTo, ENT_QUOTES, 'UTF-8') ?></strong> un enlace seguro para elegir contraseña y activar la cuenta.</p>
+        <p>El enlace caduca en 24 horas y solo se puede utilizar una vez.</p>
+    </section>
+<?php endif; ?>
 <h2>Gestión de cuentas</h2>
 <p>El alumnado y personal acceden con NIF/DNI/NIE; las empresas, con CIF. Desde esta tabla puedes corregir el identificador del personal o de una empresa existente.</p>
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=usuarios">
@@ -11,10 +18,8 @@ $vueEnabled = FrontendAssets::isEnabled();
     <label>Correo <input type="email" name="email" required></label>
     <label>NIF/DNI/NIE (identificador de acceso) <input type="text" name="identificador_fiscal" maxlength="20" autocomplete="off" required></label>
     <small>Debe ser un NIF, DNI o NIE válido y no puede estar asignado a otra cuenta.</small>
-    <label>Contraseña inicial (12-72 caracteres) <input type="password" name="password" minlength="12" maxlength="72" aria-describedby="staff-password-help" required></label>
-    <small id="staff-password-help">Debe tener entre 12 y 72 caracteres. Los espacios cuentan.</small>
-    <label>Nombre (para coordinador) <input type="text" name="nombre"></label>
-    <label>Apellidos (para coordinador) <input type="text" name="apellidos"></label>
+    <label>Nombre <input type="text" name="nombre" maxlength="50" autocomplete="given-name" required></label>
+    <label>Apellidos <input type="text" name="apellidos" maxlength="100" autocomplete="family-name" required></label>
     <label>Rol
         <select name="rol" required>
             <option value="Coordinador">Coordinador</option>
@@ -22,6 +27,7 @@ $vueEnabled = FrontendAssets::isEnabled();
             <option value="Administrador">Administrador</option>
         </select>
     </label>
+    <p>Se enviará un enlace de un solo uso y válido durante 24 horas para que la persona establezca su contraseña y active la cuenta.</p>
     <button type="submit">Crear cuenta del centro</button>
 </form>
 <table>

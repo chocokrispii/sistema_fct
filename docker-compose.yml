@@ -101,6 +101,9 @@ services:
       - ./database/migrations/012_alta_alumnos_personal.sql:/docker-entrypoint-initdb.d/016-alta-alumnos-personal.sql:ro
       - ./database/migrations/013_activacion_cuentas_alumno.sql:/docker-entrypoint-initdb.d/017-activacion-cuentas-alumno.sql:ro
       - ./database/migrations/014_identificador_fiscal_personal.sql:/docker-entrypoint-initdb.d/018-identificador-fiscal-personal.sql:ro
+      - ./database/migrations/015_alta_personal_institucional.sql:/docker-entrypoint-initdb.d/019-alta-personal-institucional.sql:ro
+      - ./database/migrations/016_solicitudes_reenvio_activacion.sql:/docker-entrypoint-initdb.d/020-solicitudes-reenvio-activacion.sql:ro
+      - ./database/migrations/017_trazabilidad_administrativa.sql:/docker-entrypoint-initdb.d/021-trazabilidad-administrativa.sql:ro
     healthcheck:
       test:
         - CMD-SHELL

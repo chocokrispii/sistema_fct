@@ -73,7 +73,11 @@ class Usuario {
         $stmt = $this->db->query(
             "SELECT u.id, u.email, COALESCE(u.identificador_fiscal, a.dni, e.cif_empresa) AS identificador_fiscal,
                     u.rol, u.activo, u.fecha_creacion,
-                    COALESCE(NULLIF(CONCAT_WS(' ', c.nombre, c.apellidos), ''), '—') AS nombre_completo
+                    COALESCE(
+                        NULLIF(CONCAT_WS(' ', u.nombre, u.apellidos), ''),
+                        NULLIF(CONCAT_WS(' ', c.nombre, c.apellidos), ''),
+                        '—'
+                    ) AS nombre_completo
              FROM usuarios u
              LEFT JOIN coordinadores c ON c.usuario_id = u.id
              LEFT JOIN alumnos a ON a.usuario_id = u.id AND u.rol = 'Alumno'
@@ -83,21 +87,33 @@ class Usuario {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function crearCuentaStaff(string $email, string $password, string $rol, string $nif): int
+    public function crearCuentaStaff(string $email, string $rol, string $nif, string $nombre, string $apellidos): int
     {
         if (!in_array($rol, ['Administrador', 'Coordinador', 'Observador'], true)) {
             throw new InvalidArgumentException('Solo se pueden crear cuentas de personal del centro.');
         }
+        $email = trim($email);
+        $nombre = trim($nombre);
+        $apellidos = trim($apellidos);
+        if (
+            !SpanishDataValidator::isEmail($email)
+            || !SpanishDataValidator::isPersonName($nombre, 50)
+            || !SpanishDataValidator::isPersonName($apellidos, 100)
+        ) {
+            throw new InvalidArgumentException('Indica un correo, nombre y apellidos válidos para el personal.');
+        }
         $nif = $this->validarNifPersonal($nif);
         $this->assertIdentificadorFiscalDisponible($nif);
-        $passwordHash = $this->hashPassword($password);
+        $passwordHash = $this->hashPassword(bin2hex(random_bytes(32)));
         $stmt = $this->db->prepare(
-            'INSERT INTO usuarios (email, identificador_fiscal, password_hash, rol)
-             VALUES (:email, :nif, :hash, :rol)'
+            'INSERT INTO usuarios (email, identificador_fiscal, nombre, apellidos, password_hash, rol, activo)
+             VALUES (:email, :nif, :nombre, :apellidos, :hash, :rol, 0)'
         );
         $stmt->execute([
             'email' => $email,
             'nif' => $nif,
+            'nombre' => $nombre,
+            'apellidos' => $apellidos,
             'hash' => $passwordHash,
             'rol' => $rol,
         ]);

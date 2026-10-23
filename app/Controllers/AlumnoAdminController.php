@@ -5,7 +5,8 @@ require_once __DIR__ . '/../Models/Alumno.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/SpanishDataValidator.php';
-require_once __DIR__ . '/../Core/StudentActivationMailer.php';
+require_once __DIR__ . '/../Core/AccountActivationMailer.php';
+require_once __DIR__ . '/../Core/ActivationUrl.php';
 
 class AlumnoAdminController
 {
@@ -103,11 +104,11 @@ class AlumnoAdminController
                             'token_hash' => hash('sha256', $activationToken),
                         ]);
                         $appUrl = rtrim(getenv('FCT_APP_URL') ?: '', '/');
-                        if (filter_var($appUrl, FILTER_VALIDATE_URL) === false) {
+                        if (!ActivationUrl::isAllowedBaseUrl($appUrl)) {
                             throw new RuntimeException('FCT_APP_URL debe contener una URL válida y accesible para el alumno.');
                         }
                         $activationUrl = $appUrl . '/index.php?action=activar-cuenta&token=' . rawurlencode($activationToken);
-                        (new StudentActivationMailer())->send($email, $nombre . ' ' . $apellidos, $activationUrl);
+                        (new AccountActivationMailer())->send($email, $nombre . ' ' . $apellidos, $activationUrl);
                         $this->db->commit();
 
                         $_SESSION['alumno_creado_email'] = $email;

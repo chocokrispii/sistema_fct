@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 use PHPMailer\PHPMailer\Exception as MailException;
 use PHPMailer\PHPMailer\PHPMailer;
 
-final class StudentActivationMailer
+final class AccountActivationMailer
 {
     public function send(string $recipient, string $name, string $activationUrl): void
     {
@@ -63,15 +63,15 @@ final class StudentActivationMailer
             $mail->setFrom($from, $fromName);
             $mail->addAddress($recipient, $name);
             $mail->isHTML(true);
-            $mail->Subject = 'Activa tu cuenta del Sistema FCT';
+            $mail->Subject = 'Enlace para activar tu cuenta del Sistema FCT';
             $safeName = htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $safeUrl = htmlspecialchars($activationUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $mail->Body = '<p>Hola ' . $safeName . ':</p>'
-                . '<p>El centro ha creado tu cuenta del Sistema FCT. Para elegir tu contraseña y activar el acceso, utiliza este enlace:</p>'
-                . '<p><a href="' . $safeUrl . '">Activar mi cuenta</a></p>'
+                . '<p>Utiliza este enlace para activar tu cuenta del Sistema FCT y elegir tu contraseña:</p>'
+                . '<p><a href="' . $safeUrl . '">Activar cuenta</a></p>'
                 . '<p>Por seguridad, el enlace caduca en 24 horas y solo se puede utilizar una vez. Si no esperabas este mensaje, contacta con tu centro.</p>';
-            $mail->AltBody = "Hola $name:\n\nEl centro ha creado tu cuenta del Sistema FCT. "
-                . "Para elegir tu contraseña y activar el acceso, visita:\n$activationUrl\n\n"
+            $mail->AltBody = "Hola $name:\n\n"
+                . "Para activar tu cuenta del Sistema FCT y elegir tu contraseña, visita:\n$activationUrl\n\n"
                 . 'El enlace caduca en 24 horas y solo se puede utilizar una vez.';
             $mail->send();
         } catch (MailException $exception) {
