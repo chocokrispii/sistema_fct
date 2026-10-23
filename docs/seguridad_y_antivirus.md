@@ -27,7 +27,7 @@ Si `APP_ENV` no es `development`, `test` o `testing`, el valor `false`, un valor
 
 ### Usar ClamAV desde XAMPP
 
-Al ejecutar PHP en XAMPP mientras ClamAV corre en Compose, configura el entorno del proceso PHP con `FCT_CLAMAV_ENABLED=true`, `FCT_CLAMD_HOST=127.0.0.1` y `FCT_CLAMD_PORT=3310`. El puerto de Compose está vinculado a `127.0.0.1`; el servicio `app` dentro de Docker se conecta directamente a `clamav:3310`. El lanzador `scripts/local_webhooks.ps1` establece `127.0.0.1:3310` como destino predeterminado si no se especifica otro.
+Al ejecutar PHP en XAMPP mientras ClamAV corre en Compose, configura el entorno del proceso PHP con `FCT_CLAMAV_ENABLED=true`, `FCT_CLAMD_HOST=127.0.0.1` y `FCT_CLAMD_PORT=3310`. El puerto de Compose está vinculado a `127.0.0.1`; el servicio `app` dentro de Docker se conecta directamente a `clamav:3310`.
 
 Si se usa `clamscan` en vez de `clamd`, `FileScanner` admite `FCT_CLAMSCAN` como ruta absoluta al ejecutable y, opcionalmente, `FCT_CLAMAV_DATABASE` como ruta absoluta a la base de firmas. Define esas variables en el entorno que inicia Apache o el proceso CLI; crear un `.env` por sí solo no hace que PHP lo cargue. No publiques el puerto 3310 en interfaces de red compartidas ni públicas.
 

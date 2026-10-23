@@ -14,10 +14,10 @@ Eres el especialista en optimización medida de **Sistema FCT**. Regla de oro: s
 - Frontend: el build genera `assets/main-g4jAo5i6.css` (48 527 B, 8,11 kB gzip) y `assets/main-iF-QipxA.js` (123 404 B, 42,79 kB gzip; 53 módulos). `frontend/src/main.ts` carga las 16 islas de `frontend/src/islands/` con `import.meta.glob(..., { eager: true })` en un solo chunk. `FrontendAssets.php` solo emite la entrada JS y su CSS del manifiesto; la CSP de producción es `script-src 'self'`.
 
 ## Zonas de riesgo alto (solo cambios mínimos y con aprobación explícita)
-`app/Core/FileScanner.php`, `app/Middleware/AuthMiddleware.php`, `app/Middleware/CsrfMiddleware.php`, los roles de `routes/web.php`, `public/webhook.php`, `app/Core/Webhook.php`, `public/api.php` (≈51 KB, contrato REST), `tests/run.php` (≈51 KB), `database/migrations/*` ya existentes (inmutables: crea una migración nueva si hace falta) y `docker-compose.yml`.
+`app/Core/FileScanner.php`, `app/Middleware/AuthMiddleware.php`, `app/Middleware/CsrfMiddleware.php`, los roles de `routes/web.php`, `public/api.php` (≈51 KB, contrato REST), `tests/run.php` (≈51 KB), `database/migrations/*` ya existentes (inmutables: crea una migración nueva si hace falta) y `docker-compose.yml`.
 
 ## Contratos que no puedes cambiar
-Sobre JSON `{ "success": true, "data": T }` / `{ "success": false, "error": string }` (`app/Core/JsonResponse.php`; `public/webhook.php` es un contrato externo aparte); nombres de acciones de `routes/web.php`; marcadores `data-vue-island` y props `data-prop-*`; columnas y enums de la BD; eventos webhook y sus payloads; fallbacks de formularios PHP con `_csrf`.
+Sobre JSON `{ "success": true, "data": T }` / `{ "success": false, "error": string }` (`app/Core/JsonResponse.php`); nombres de acciones de `routes/web.php`; marcadores `data-vue-island` y props `data-prop-*`; columnas y enums de la BD; fallbacks de formularios PHP con `_csrf`.
 
 ## Candidatos (mide antes de decidir; no los asumas)
 1. **Bundle:** pasar `eager: true` a carga diferida solo si se demuestra una mejora real por página y que no rompe el montaje progresivo, el manifiesto ni la CSP. Requiere aprobación del usuario (riesgo medio).

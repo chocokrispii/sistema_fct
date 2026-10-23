@@ -49,7 +49,6 @@ export default defineConfig({
           { text: 'Disponibilidad', link: '/componentes/disponibilidad' },
           { text: 'Seguridad y antivirus', link: '/seguridad_y_antivirus' },
           { text: 'Integraciones y PostCSS', link: '/integraciones' },
-          { text: 'Webhooks', link: '/webhooks' },
           { text: 'Solución de problemas', link: '/troubleshooting' },
         ],
       },

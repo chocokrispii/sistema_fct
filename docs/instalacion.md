@@ -78,9 +78,9 @@ En una base ya inicializada no reimportes el esquema ni repitas migraciones indi
 - `015_alta_personal_institucional.sql` añade nombre y apellidos del personal y los tokens de activación por correo para sus cuentas.
 - `016_solicitudes_reenvio_activacion.sql` crea la bandeja de solicitudes pendientes de reenvío supervisado de enlaces.
 - `017_trazabilidad_administrativa.sql` crea `audit_logs` con el actor, nombre completo, acción, entidad, registro afectado, IP y fecha/hora.
-- `007_webhooks.sql` crea las bandejas `webhook_inbox` y `webhook_outbox`; `008_api_access_tokens.sql` crea la tabla de tokens API; `009_webhook_responses.sql` añade las columnas de respuesta HTTP y se ejecuta una sola vez.
+- `008_api_access_tokens.sql` crea la tabla de tokens para la API REST.
 
-`009_desarrollo_aplicaciones_multiplataforma.sql` y `010_detalles_ofertas.sql` son idempotentes; `009_webhook_responses.sql` contiene `ALTER TABLE` no condicional y no debe repetirse cuando las columnas ya existen. Trata también `012`–`017` como migraciones de aplicación única y comprueba cuáles ya están en la base antes de ejecutar nada. Para las migraciones de webhook y tokens, consulta [Integraciones y webhooks](/webhooks). Los scripts de inicialización de Compose no vuelven a ejecutarse al arrancar un volumen existente.
+`009_desarrollo_aplicaciones_multiplataforma.sql` y `010_detalles_ofertas.sql` son idempotentes. Trata también `012`–`017` como migraciones de aplicación única y comprueba cuáles ya están en la base antes de ejecutar nada. Los scripts de inicialización de Compose no vuelven a ejecutarse al arrancar un volumen existente.
 
 En una base existente, aplica `012_alta_alumnos_personal.sql` una sola vez con el procedimiento `docker compose cp` descrito en el README. La migración permite que los expedientes creados por el centro no incluyan un número de Seguridad Social, y añade curso y observaciones administrativas; los expedientes existentes se conservan.
 

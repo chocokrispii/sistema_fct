@@ -139,7 +139,7 @@ $env:FCT_DB_NAME = 'fct_bench_distribucion_local'
 & 'C:\xampp\php\php.exe' -S 127.0.0.1:8002 -t public</pre>
         <ol start="3">
             <li>Deja esta ventana abierta. Es el servidor; si la cierras o pulsas Ctrl+C, la web deja de estar disponible.</li>
-            <li>El mensaje de PHP indicará que escucha en <code>http://127.0.0.1:8002</code>. Este puerto separado deja intactos el servidor habitual (8000) y la instancia local de webhooks (8001).</li>
+            <li>El mensaje de PHP indicará que escucha en <code>http://127.0.0.1:8002</code>. Este puerto separado deja intacto el servidor habitual (8000).</li>
         </ol>
         <div class="callout warning">
             El proceso de PHP hereda las variables de entorno de esta ventana. Por eso se configuran <em>antes</em> de iniciar el servidor. No cambies el nombre de la base a <code>sistema_fct</code> para estas pruebas.

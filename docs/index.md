@@ -65,10 +65,9 @@ Para parar el entorno sin borrar la información persistida, usa `docker compose
 
 ## Integraciones
 
-La guía para Administradores explica la consola de la API propia y cómo consultar los historiales de webhooks recibidos y enviados agrupados por empresa:
+La guía para Administradores explica cómo usar la consola de la API propia:
 
 - [Leer la Guía de Integraciones](/integraciones)
-- [Descargar la Guía de Integraciones en PDF](/guia-integraciones.pdf)
 
 ## Funciones clave de FCT
 

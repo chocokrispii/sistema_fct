@@ -111,14 +111,6 @@ docker compose up -d --force-recreate app
 
 Este modo comparte los datos de XAMPP y no importa ni borra su base de datos. El servicio MariaDB de Docker puede seguir ejecutándose, pero la aplicación usa el host configurado en `FCT_DB_HOST`.
 
-Para que la aplicación local de pruebas en `http://127.0.0.1:8002/index.php` comparta en tiempo real los datos de Docker, configura en `.env.local` `FCT_DB_HOST=127.0.0.1;port=3307` y usa el mismo `FCT_DB_NAME`, `FCT_DB_USER` y `FCT_DB_PASS` de `.env`. El puerto `3307` es el puerto de MariaDB Docker publicado sólo en la máquina local. El lanzador `scripts\local_webhooks.ps1` carga estas variables para PHP de XAMPP; las dos aplicaciones consultan y actualizan así la misma base, sin una copia periódica ni una fusión de bases. Arranca el entorno con:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.ps1 -Mode All
-```
-
-Elige una sola instalación de MariaDB como fuente de datos para ambas aplicaciones; no apuntes una de ellas a XAMPP y la otra a Docker si necesitas que los cambios sean compartidos.
-
 Compose crea automáticamente el volumen privado `fct_storage` y lo monta como `/var/lib/fct/storage`, que es el valor de `FCT_STORAGE_PATH` dentro del contenedor. El contenedor verifica y corrige al arrancar la propiedad y los permisos de los directorios de convenios, incluso si el volumen ya existía; no se debe mover a `public/`.
 
 Si ejecutas PHP directamente con XAMPP en vez de Docker, configura `FCT_STORAGE_PATH` como una ruta absoluta a un directorio existente, con permisos de escritura para Apache y separado del document root. La aplicación rechaza rutas inexistentes o dentro de `public/`.
@@ -159,7 +151,7 @@ Los volúmenes de base de datos, archivos subidos, firmas ClamAV y dependencias 
 
 ## 5. Base de datos, cuentas de desarrollo y phpMyAdmin
 
-En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica las migraciones de dominio, disponibilidad, ofertas, webhooks, aprovisionamiento/activación de cuentas y trazabilidad administrativa. Los nombres de algunas migraciones comparten prefijo porque proceden de líneas de trabajo paralelas; Compose les asigna nombres de inicialización únicos para conservar el orden y evitar colisiones. La inicialización oficial de MariaDB sólo procesa estos archivos al crear una base de datos nueva; no vuelve a ejecutarlos en cada arranque.
+En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica las migraciones de dominio, disponibilidad, ofertas, tokens API, aprovisionamiento/activación de cuentas y trazabilidad administrativa. Los nombres de algunas migraciones comparten prefijo porque proceden de líneas de trabajo paralelas; Compose les asigna nombres de inicialización únicos para conservar el orden y evitar colisiones. La inicialización oficial de MariaDB sólo procesa estos archivos al crear una base de datos nueva; no vuelve a ejecutarlos en cada arranque. En bases ya inicializadas, las tablas persistidas de funcionalidades retiradas no se eliminan automáticamente para proteger los datos existentes.
 
 El alta de alumnos es aprovisionamiento interno: Administradores y Coordinadores con sesión iniciada crean las cuentas desde **Alumnado**; no hay registro público de estudiantes. El formulario exige NIF/DNI/NIE, nombre, apellidos, correo, ciclo, curso y observaciones. El sistema genera una contraseña aleatoria que no se comparte y envía un enlace de activación de un solo uso, válido 24 horas, para que el alumno establezca su contraseña definitiva. La URL del enlace debe usar HTTPS; la única excepción es el circuito de desarrollo local con Mailpit, `APP_ENV=development` y una URL HTTP de loopback (`localhost`, `127.0.0.1` o `[::1]`). Solo se almacena el hash del token y la cuenta permanece inactiva hasta completar la activación. En una base existente, aplica una sola vez `012_alta_alumnos_personal.sql` y `013_activacion_cuentas_alumno.sql`, en ese orden, mediante el procedimiento de migración manual de abajo; no basta con reiniciar Compose.
 
@@ -194,7 +186,7 @@ foreach ($migration in Get-ChildItem .\database\migrations\*.sql | Sort-Object N
 }
 ```
 
-Cada migración se aplica una sola vez y en orden; no ejecutes este bucle sobre un volumen que ya haya recibido esas migraciones durante la inicialización de Compose. En particular, `009_webhook_responses.sql` no es idempotente (es un `ALTER TABLE` que falla si las columnas ya existen).
+Cada migración se aplica una sola vez y en orden; no ejecutes este bucle sobre un volumen que ya haya recibido esas migraciones durante la inicialización de Compose.
 
 Para una base existente que ya tiene las migraciones de dominio hasta la 006, aplica `007_horarios_ofertas.sql` y `008_disponibilidad_indiferente.sql` en orden, y sólo si no se aplicaron previamente:
 
@@ -234,7 +226,7 @@ La migración es idempotente. Los datos de ofertas históricas reciben valores p
 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e "SHOW COLUMNS FROM empresa_especialidades_plazas LIKE ''modalidad''" #' | docker compose exec -T db sh -s
 ```
 
-Las migraciones `007_webhooks.sql`, `008_api_access_tokens.sql` y `009_webhook_responses.sql` también se aplican al crear un volumen nuevo; Compose las ejecuta con nombres de inicialización únicos después de las migraciones de dominio. Si conservas una base creada antes de la integración de webhooks, aplica esas tres migraciones una sola vez, en ese orden y con el procedimiento `docker compose cp` descrito arriba, antes de desplegar el nuevo código. La última es un `ALTER TABLE` y no debe ejecutarse de nuevo si ya existen las columnas de respuesta.
+Compose aplica `008_api_access_tokens.sql` al crear un volumen nuevo. Si conservas una base existente, aplica esa migración una sola vez con el procedimiento `docker compose cp` descrito arriba para habilitar los tokens de API.
 
 Para habilitar el NIF del personal en una base local ya inicializada, aplica **una sola vez** la migración `014_identificador_fiscal_personal.sql`:
 
@@ -357,7 +349,7 @@ Estas direcciones reflejan los puertos predeterminados de `docker-compose.yml` y
 
 El acceso a páginas y acciones dentro de la aplicación continúa gobernado por `routes/web.php` y el rol de la sesión; conocer la URL no concede permisos.
 
-La pestaña **Integraciones**, visible sólo para Administrador, reúne la consola de la API propia y los historiales de webhooks recibidos y enviados, agrupados por empresa.
+La página **Integraciones**, visible sólo para Administrador, ofrece una consola para probar la API REST propia.
 
 ## 8. Frontend y Vite HMR
 
@@ -408,20 +400,6 @@ npm run typecheck
 npm run build
 npm run docs:build
 ```
-
-### Webhooks para integraciones externas
-
-La integración actual usa un destino saliente único configurable por entorno, no una tabla de endpoints registrados por usuario. Configura en `.env` `FCT_WEBHOOK_OUTBOUND_URL` y `FCT_WEBHOOK_OUTBOUND_SECRET`; el secreto de entrada se configura por separado con `FCT_WEBHOOK_INBOUND_SECRET`. No guardes secretos reales en Git. Compose pasa esas variables al contenedor PHP.
-
-Cuando `FCT_WEBHOOK_OUTBOUND_URL` está configurada, los eventos se guardan en `webhook_outbox` dentro de la misma transacción que la operación de negocio y se envían después mediante el worker CLI; si no hay destino, no se encolan. Los eventos recibidos se registran en `webhook_inbox`. Se emiten `oferta.creada`, `oferta.revisada`, `convenio.creado`, `convenio.revisado`, `practica.asignada`, `practica.cerrada` y `student.availability_updated`. El evento de disponibilidad lleva `student_id`, `fecha_inicio`, `fecha_fin`, `turno`, `es_indiferente` y `horarios`; no incluye nombre ni correo.
-
-El worker firma el cuerpo JSON exacto con HMAC-SHA256: `X-FCT-Timestamp` contiene la marca temporal y `X-FCT-Signature` lleva `sha256=` seguido de la firma de `timestamp.cuerpo`. El endpoint receptor verifica también la firma y la ventana temporal. Las entregas pendientes se reintentan mediante `scripts/dispatch_webhooks.php`; requiere PHP CLI con la extensión cURL habilitada, URL y secreto de salida válidos, y habilitar la ejecución explícitamente con `FCT_WEBHOOK_DISPATCH_ALLOW=1`:
-
-```powershell
-docker compose exec -e FCT_WEBHOOK_DISPATCH_ALLOW=1 app php scripts/dispatch_webhooks.php
-```
-
-En la imagen Docker actual, PHP cURL está disponible: `docker compose exec -T app php -m` lista `curl` (la imagen base `php:8.2-apache` la incluye; el `Dockerfile` no la instala por separado). Si cambias la imagen base, repite `php -m` dentro de `app` antes de programar el worker; con un PHP CLI externo, comprueba que cURL esté habilitado. Esta comprobación confirma la extensión, pero no se ha verificado la entrega desde la imagen Docker actual. El límite opcional se configura con `FCT_WEBHOOK_DISPATCH_LIMIT` (1–100; por defecto 25). Configura el worker operativo para entregar los eventos de forma asíncrona. El destino remoto debe usar HTTPS y resolver a direcciones públicas; el worker permite HTTP sólo para pruebas en loopback. Para registrar el receptor local y verificar el flujo completo, sigue [la guía de webhooks](docs/webhooks.md) y el script `scripts/local_webhooks.ps1`.
 
 ### Cuando los cambios de una isla Vue no aparecen
 
@@ -501,7 +479,7 @@ Para restablecer **todos** los datos locales después de añadir cambios de esqu
    docker compose down -v
    ```
 
-2. Reconstruye e inicia los servicios. MariaDB importará el esquema y ejecutará todas las migraciones configuradas al crear su volumen vacío, incluidas las tablas de webhooks:
+2. Reconstruye e inicia los servicios. MariaDB importará el esquema y ejecutará las migraciones configuradas al crear su volumen vacío:
 
    ```powershell
    docker compose up -d --build
@@ -586,7 +564,6 @@ Para volver a inicializar la base de datos tras cambios de esquema o migraciones
 
 ## Más información
 
-- [Guía de Integraciones en PDF](docs/public/guia-integraciones.pdf)
 - [Guía de Integraciones editable](docs/integraciones.md)
 - [Hoja de ruta de migración](docs/roadmap.md)
 - [Flujo de datos y ciclo de vida](docs/flujo-de-datos.md)

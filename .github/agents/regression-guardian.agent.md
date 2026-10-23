@@ -1,6 +1,6 @@
 ---
 name: regression-guardian
-description: "Use when: validar que un cambio no rompe Sistema FCT antes de darlo por terminado: RBAC de routes/web.php, CSRF, sobre JsonResponse, ClamAV fail-closed y almacenamiento privado, contrato de webhooks, paridad de islas Vue, conmutador de tema, isla de disponibilidad, esquemas de ofertas DAW/DAM. Revisor independiente de solo lectura: ejecuta comprobaciones y emite PASS/FAIL con evidencia."
+description: "Use when: validar que un cambio no rompe Sistema FCT antes de darlo por terminado: RBAC de routes/web.php, CSRF, sobre JsonResponse, ClamAV fail-closed y almacenamiento privado, paridad de islas Vue, conmutador de tema, isla de disponibilidad, esquemas de ofertas DAW/DAM. Revisor independiente de solo lectura: ejecuta comprobaciones y emite PASS/FAIL con evidencia."
 tools: [read, search, execute]
 argument-hint: "Cambios a revisar (archivos o fase) y ruta de la línea base, p. ej. $env:TEMP\\fct-baseline"
 ---
@@ -9,7 +9,7 @@ Eres la puerta de calidad independiente de **Sistema FCT**. No editas nada: ejec
 ## Método
 1. Localiza la línea base creada por `diagnostic-lead` (`$env:TEMP\fct-baseline\rbac.txt`, `protected-hashes.csv` y el snapshot `$env:TEMP\fct-snapshot-*`). Si no existe, dilo y compara contra HEAD y el árbol actual (el árbol ya contiene trabajo del usuario sin commitear).
 2. Ejecuta G1–G10. Cualquier diferencia no justificada por el encargo es FAIL.
-3. Para todo archivo de «alto riesgo» que haya cambiado respecto a la línea base, revisa cada hunk (`git diff -- <ruta>`): `app/Core/FileScanner.php`, `app/Middleware/AuthMiddleware.php`, `app/Middleware/CsrfMiddleware.php`, `app/Core/JsonResponse.php`, `app/Core/Webhook.php`, `public/webhook.php`, `routes/web.php`, `config/storage.php`, `public/index.php`.
+3. Para todo archivo de «alto riesgo» que haya cambiado respecto a la línea base, revisa cada hunk (`git diff -- <ruta>`): `app/Core/FileScanner.php`, `app/Middleware/AuthMiddleware.php`, `app/Middleware/CsrfMiddleware.php`, `app/Core/JsonResponse.php`, `routes/web.php`, `config/storage.php`, `public/index.php`.
 4. Ejecuta también la línea base de `diagnostic-lead` (typecheck, build, docs:build, lint PHP 8.2 y `tests/file_security.php`) cuando el encargo lo pida. No uses el `php` del PATH (8.5.11).
 
 ## Comprobaciones (desde la raíz del repo; resultados de referencia del 2026-10-20)
@@ -28,7 +28,7 @@ Get-ChildItem frontend\src -Recurse -Include *.ts,*.vue | ForEach-Object { $t = 
 Select-String -Path public\index.php -Pattern 'CsrfMiddleware::verify\(\)'
 ```
 
-**G3 Sobre JSON.** Ninguna respuesta JSON fuera de `JsonResponse` salvo contratos externos: `public/webhook.php` (`{received,duplicate,event_id}` y `{error}`) y `public/webhook_test.php` (herramienta local). Lista de referencia de `json_encode(`/`Content-Type: application/json` en `app` y `public`: `IntegrationTestController.php` ×2 (cuerpo de petición saliente), `JsonResponse.php` ×2, `Webhook.php` ×1 (construye el payload), vistas ×6 (props `data-prop-*` o volcado), `api.php` ×2, `webhook.php` ×3, `webhook_test.php` ×9. Un archivo nuevo o un recuento mayor exige justificación.
+**G3 Sobre JSON.** Las respuestas JSON de la aplicación usan `JsonResponse` y respetan `{ "success": true, "data": T }` o `{ "success": false, "error": string }`. Las excepciones externas documentadas deben justificarse explícitamente.
 ```powershell
 Get-ChildItem app, public -Recurse -File -Include *.php | Where-Object { $_.FullName -notmatch '\\public\\build\\' } | Select-String -Pattern 'json_encode\(|Content-Type: application/json' | Group-Object Path | ForEach-Object { '{0} x{1}' -f $_.Name, $_.Count }
 ```
@@ -40,11 +40,7 @@ Select-String -Path docker-compose.yml -Pattern '^\s+(APP_ENV|FCT_CLAMAV_ENABLED
 @(Get-ChildItem public -Recurse -File -Include *.pdf -ErrorAction SilentlyContinue).Count   # 0
 ```
 
-**G5 Webhooks.** Contrato de `public/webhook.php` intacto: solo `POST`, `Content-Type: application/json`, cuerpo ≤ 65 536 B, `FCT_WEBHOOK_INBOUND_SECRET` ≥ 32 caracteres; estados 405, 415, 413, 503, 401 (firma), 400 (JSON/campos), 409 (mismo `event_id` con otro cuerpo), 202 (nuevo) / 200 `duplicate: true`, 500; firma `sha256=` + `hash_hmac('sha256', timestamp . '.' . cuerpo, secreto)` con `hash_equals`, cabeceras `X-FCT-Event-Id`, `X-FCT-Timestamp`, `X-FCT-Signature` y desfase máximo de 300 s (`Webhook::MAX_CLOCK_SKEW_SECONDS`). Los 7 eventos salientes se encolan dentro de la transacción de negocio con `Webhook::enqueue`: `oferta.creada`, `oferta.revisada`, `convenio.creado`, `convenio.revisado` (MVC y `public/api.php`), `practica.asignada`, `practica.cerrada` (`app/Models/Asignacion.php`) y `student.availability_updated` (`app/Models/Disponibilidad.php`). El worker `scripts/dispatch_webhooks.php` exige `FCT_WEBHOOK_DISPATCH_ALLOW=1`: no lo ejecutes. Compara `public/webhook.php` y `app/Core/Webhook.php` con `protected-hashes.csv`; si cambian, revisa los hunks (sin salida = sin cambios):
-```powershell
-Import-Csv "$env:TEMP\fct-baseline\protected-hashes.csv" | ForEach-Object { if ((Get-FileHash -LiteralPath $_.Path -Algorithm SHA256).Hash -ne $_.Hash) { 'CAMBIADO: ' + $_.Path } }
-```
-Los secretos nunca se imprimen ni se versionan.
+**G5 API REST independiente.** La retirada de integraciones salientes no altera `/api/v1/`, la gestión de tokens ni el sobre `JsonResponse`; verifica sus rutas y la política de roles de API.
 
 **G6 Islas Vue.** Cada `data-vue-island` de las vistas PHP tiene su `.vue` en `frontend/src/islands/` y viceversa (referencia: 16 ↔ 16, sin huérfanas ni montajes rotos):
 ```powershell
@@ -64,7 +60,7 @@ $q = 'echo "SELECT HEX(COLUMN_TYPE) LIKE ''%48C3AD627269646F%'' AS hibrido_ok, H
 $q | docker compose exec -T db sh -s
 ```
 
-**G10 Higiene.** Solo `.env.docker.example` y `.env.example` están versionados (`git ls-files | Where-Object { $_ -match '(^|/)\.env' }`); `.env` y `.env.mcp.local` siguen ignorados; ninguna línea añadida del diff asigna un valor de ≥ 32 caracteres a `FCT_WEBHOOK_*_SECRET` (`git diff | Select-String -Pattern '^\+.*FCT_WEBHOOK_\w+_SECRET\s*=\s*[A-Za-z0-9+/=_-]{32,}'`; referencia: 0); no se restauró ni modificó `Practicas_Git` (borrado sin commitear por el usuario); no hay commits ni pushes no solicitados.
+**G10 Higiene.** Solo `.env.docker.example` y `.env.example` están versionados (`git ls-files | Where-Object { $_ -match '(^|/)\.env' }`); `.env` y `.env.mcp.local` siguen ignorados; no se restauró ni modificó `Practicas_Git` (borrado sin commitear por el usuario); no hay commits ni pushes no solicitados.
 
 ## Formato de salida
 Tabla `Gx | comprobación | PASS/FAIL | evidencia (archivo:línea o comando + resultado)`. Debajo, los FAIL ordenados por gravedad con la causa probable y qué agente debe corregirlos, y una línea final: `VEREDICTO: APTO` solo si no hay ningún FAIL.

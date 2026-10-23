@@ -8,7 +8,6 @@ require_once __DIR__ . '/../app/Core/JsonResponse.php';
 require_once __DIR__ . '/../app/Core/ApiResponseAdapter.php';
 require_once __DIR__ . '/../app/Core/ApiRolePolicy.php';
 require_once __DIR__ . '/../app/Core/PhpIni.php';
-require_once __DIR__ . '/../app/Core/Webhook.php';
 require_once __DIR__ . '/../app/Models/Auditoria.php';
 require_once __DIR__ . '/../app/Models/Oferta.php';
 require_once __DIR__ . '/../app/Models/Asignacion.php';
@@ -522,26 +521,7 @@ function apiCreateOffer(PDO $db, int $userId, ?int $companyId, Closure $respond,
                 ]);
             }
         }
-        $cycleName = (string)$cycleName;
         (new Auditoria($db))->registrar($userId, 'oferta.creada', 'ofertas', $offerId);
-        Webhook::enqueue($db, 'oferta.creada', [
-            'oferta_id' => $offerId,
-            'empresa_id' => $companyId,
-            'especialidad_id' => (int)$specialtyId,
-            'ciclo' => $cycleName,
-            'estado' => 'Pendiente',
-            'plazas' => (int)$seats,
-            'fecha_inicio' => $start->format('Y-m-d'),
-            'fecha_fin' => $end->format('Y-m-d'),
-            'titulo' => $title,
-            'descripcion' => $description,
-            'turno' => $shift,
-            'modalidad' => $modality,
-            'ubicacion' => $location !== '' ? $location : null,
-            'requisitos_tecnologicos' => $requirements !== '' ? $requirements : null,
-            'tecnologias' => $technologies !== '' ? $technologies : null,
-            'horarios' => $weeklyHours,
-        ]);
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -906,7 +886,6 @@ function apiReviewOffer(PDO $db, int $id, int $userId, Closure $respond, Closure
             $fail(404, 'not_found', 'La oferta no existe o ya fue revisada.');
         }
         (new Auditoria($db))->registrar($userId, 'oferta.revisada', 'ofertas', $id, 'estado=' . $decision);
-        Webhook::enqueue($db, 'oferta.revisada', ['oferta_id' => $id, 'estado' => $decision]);
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -933,7 +912,6 @@ function apiReviewAgreement(PDO $db, int $id, int $userId, Closure $respond, Clo
             $fail(404, 'not_found', 'El convenio no existe o ya fue revisado.');
         }
         (new Auditoria($db))->registrar($userId, 'convenio.revisado', 'convenios', $id, 'estado=' . $decision);
-        Webhook::enqueue($db, 'convenio.revisado', ['convenio_id' => $id, 'estado' => $decision]);
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -1038,14 +1016,6 @@ function apiCreateAgreement(PDO $db, int $userId, ?int $companyId, Closure $resp
         ]);
         $agreementId = (int)$db->lastInsertId();
         (new Auditoria($db))->registrar($userId, 'convenio.creado', 'convenios', $agreementId, 'estado=Pendiente');
-        Webhook::enqueue($db, 'convenio.creado', [
-            'convenio_id' => $agreementId,
-            'empresa_id' => $companyId,
-            'especialidad_id' => (int)$specialtyId,
-            'estado' => 'Pendiente',
-            'fecha_inicio' => $start->format('Y-m-d'),
-            'fecha_fin' => $end->format('Y-m-d'),
-        ]);
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {

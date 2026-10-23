@@ -14,21 +14,13 @@ Si la carpeta local tiene otro nombre, sustituye `proyecto-practicas`. En
 Docker Apache, cuyo document root apunta a `public/`, la forma directa es
 `http://localhost:8080/api.php?path=ofertas`.
 
-El alias de rutas `/api/v1/...` lo implementa `public/dev-router.php`, usado
-por `scripts\local_webhooks.ps1 -Mode All`; en ese modo la base es
-`http://127.0.0.1:8002/api/v1/`. El `.htaccess` y el VirtualHost Apache
-incluidos no configuran ese alias. En Apache usa `api.php?path=...` o añade
-una regla de reescritura en la configuración del servidor antes de usar el
-alias. Las rutas de esta API están implementadas en `public/api.php`, no en
-`routes/web.php`.
-
-Por defecto, el lanzador local usa MariaDB de XAMPP. Para que las solicitudes
-hechas desde esta API y desde la aplicación Docker vean los mismos datos,
-configura `.env.local` para conectarse a MariaDB Docker por
-`127.0.0.1;port=3307` y copia `FCT_DB_NAME`, `FCT_DB_USER` y `FCT_DB_PASS` de
-`.env`. Después inicia el lanzador con `-Mode All`. Ambas aplicaciones
-compartirán la misma base en tiempo real; esto no copia ni fusiona los registros
-que ya existan únicamente en la otra base de datos.
+El alias de rutas `/api/v1/...` lo implementa `public/dev-router.php` y puede
+usarse con el servidor integrado de PHP, por ejemplo
+`php -S 127.0.0.1:8002 -t public public/dev-router.php`. El `.htaccess` y el
+VirtualHost Apache incluidos no configuran ese alias. En Apache usa
+`api.php?path=...` o añade una regla de reescritura en la configuración del
+servidor antes de usar el alias. Las rutas de esta API están implementadas en
+`public/api.php`, no en `routes/web.php`.
 
 Antes de usarla en una base ya existente, importa la migración:
 
@@ -44,21 +36,18 @@ de Empresa a su empresa y los de Alumno a su propio expediente. Desactivar o
 eliminar la cuenta invalida sus tokens; el administrador también puede
 revocarlos explícitamente. En la base solo se guarda el hash SHA-256.
 
-Administración dispone de **Pruebas API y webhooks** para introducir el token
-y enviar solicitudes manuales. El probador API llama al alias `/api/v1/`; por
-tanto, requiere un servidor configurado con esa reescritura, como el lanzador
-local. El Apache incluido en Docker no la configura. El token solo se usa en
-la solicitud del navegador y no se guarda en el servidor. Las operaciones
-POST y PATCH modifican la base de datos actual; usa únicamente registros de
-prueba y revisa el cuerpo antes de confirmar.
+En **Integraciones**, Administración dispone de una consola para introducir
+el token y enviar solicitudes manuales. El probador API llama al alias
+`/api/v1/`, por tanto requiere un servidor configurado con esa reescritura; el
+Apache incluido en Docker no la configura. El token solo se usa en la solicitud
+del navegador y no se guarda en el servidor. Las operaciones POST y PATCH
+modifican la base de datos actual; usa únicamente registros de prueba y revisa
+el cuerpo antes de confirmar.
 
-La pestaña **Integraciones** del menú de Administrador reúne la consola para
-probar esta API y los historiales separados de webhooks recibidos y enviados.
-El panel de tokens sigue disponible desde la propia consola. En Docker Apache,
-usa la ruta directa `api.php?path=...`; el alias `/api/v1/` está configurado por
-el lanzador local, no por el Apache Docker incluido. Consulta la
-[Guía de Integraciones](./integraciones.md) o su
-[versión PDF](/guia-integraciones.pdf).
+La página **Integraciones** reúne la consola para probar esta API. El panel de
+tokens sigue disponible desde la propia consola. En Docker Apache, usa la ruta
+directa `api.php?path=...`; el alias `/api/v1/` requiere configurar el servidor.
+Consulta la [Guía de Integraciones](./integraciones.md).
 
 Envía el token en cada solicitud mediante `Authorization: Bearer <API_TOKEN>`.
 Sustituye el marcador por el token creado en **Tokens API**; no lo incluyas en
@@ -132,9 +121,7 @@ acorde con los datos que exponen.
 
 No hay endpoints DELETE. La gestión de sedes permanece en los formularios
 actuales. Las cuentas se crean con contraseña inicial y los datos de alumnos se
-validan con las reglas de registro del sistema. Todas las escrituras registran
-auditoría; las ofertas, convenios y asignaciones también generan los webhooks
-de sus flujos correspondientes.
+validan con las reglas de registro del sistema. Todas las escrituras registran auditoría.
 
 ## Ejemplos
 

@@ -131,9 +131,8 @@ flowchart TB
     account["usuarios · estado-usuario<br/>PENDING"]:::pending
     delete["eliminar-usuario<br/>IN_PROGRESS"]:::inprogress
     queries["consultas<br/>PENDING"]:::pending
-    tokens["api-tokens · pruebas-integracion<br/>PENDING"]:::pending
-    webhooks["webhook-inbox · webhooks-recibidos<br/>webhooks-enviados · webhooks-empresa<br/>PENDING"]:::pending
-    account --> delete --> queries --> tokens --> webhooks
+    tokens["api-tokens<br/>PENDING"]:::pending
+    account --> delete --> queries --> tokens
     classDef completed fill:#e8f7ee,stroke:#29804b,color:#174b2b,stroke-width:2px
     classDef inprogress fill:#fff9df,stroke:#9b7b00,color:#493b00,stroke-width:2px
     classDef pending fill:#f1f3f5,stroke:#868e96,color:#343a40,stroke-width:2px
@@ -184,11 +183,6 @@ flowchart TB
 | Administración | `POST eliminar-usuario` | IN_PROGRESS | Confirmación `UserDeleteDialog` en Vue; mutación todavía HTML/PHP | Añadir contrato JSON y store sólo si se preservan confirmación y fallback | Rol Administrador, restricciones referenciales y auditoría | P2 |
 | Administración | `GET consultas` | PENDING | Búsqueda/reportes renderizados por PHP | Mantener lectura PHP; aplicar mejora Vue sólo para búsqueda interactiva | Autorización por roles; limitar campos y resultados | P3 |
 | Administración | `GET, POST api-tokens` | PENDING | Formularios PHP (`ApiTokenAdminController::gestionar`, vista `admin/api_tokens`); sin isla | Mantener lectura PHP; las mutaciones siguen en formulario PHP con CSRF | Sólo Administrador; se guarda `token_hash` y el valor en claro se muestra una vez al crearlo; la revocación fija `revoked_at` | P3 |
-| Administración | `GET, POST pruebas-integracion` | PENDING | Formularios PHP (`IntegrationTestController::gestionar`, vista `admin/integration_test`); sin isla | Mantener lectura PHP; las pruebas siguen en formulario PHP con CSRF | Sólo Administrador; eventos sintéticos de recepción y envío; requiere los secretos de webhook configurados | P3 |
-| Administración | `GET webhook-inbox` | PENDING | Listado PHP de `webhook_inbox` (`WebhookInboxController::listarRecibidos`, vista `admin/webhooks_received`); sin isla | Mantener lectura PHP | Sólo Administrador; últimos 50 eventos; misma acción de controlador que `webhooks-recibidos` | P3 |
-| Administración | `GET webhooks-recibidos` | PENDING | Listado PHP de `webhook_inbox` (`WebhookInboxController::listarRecibidos`, vista `admin/webhooks_received`); sin isla | Mantener lectura PHP | Sólo Administrador; últimos 50 eventos | P3 |
-| Administración | `GET webhooks-enviados` | PENDING | Listado PHP de `webhook_outbox` (`WebhookInboxController::listarEnviados`, vista `admin/webhooks_sent`); sin isla | Mantener lectura PHP | Sólo Administrador; últimos 50 eventos | P3 |
-| Administración | `GET webhooks-empresa` | PENDING | Listado PHP filtrado por `empresa_id` (`WebhookCompanyActivityController::listar`, vista `admin/webhooks_company`); sin isla | Mantener lectura PHP | Sólo Administrador; `empresa_id` validado contra `empresas`; hasta 50 eventos por sentido | P3 |
 
 > Nota: `logout` está declarado una sola vez en `routes/web.php`; aparece en el dominio de sesión y no representa dos acciones distintas. La ruta `descargar-convenio` y la carga de `convenios` se mantienen deliberadamente como PHP por su manejo seguro de archivos.
 

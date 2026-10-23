@@ -27,9 +27,6 @@ require_once __DIR__ . '/../app/Controllers/SolicitudReenvioActivacionController
 require_once __DIR__ . '/../app/Controllers/EspecialidadAdminController.php';
 require_once __DIR__ . '/../app/Controllers/ConsultaController.php';
 require_once __DIR__ . '/../app/Controllers/ApiTokenAdminController.php';
-require_once __DIR__ . '/../app/Controllers/IntegrationTestController.php';
-require_once __DIR__ . '/../app/Controllers/WebhookInboxController.php';
-require_once __DIR__ . '/../app/Controllers/WebhookCompanyActivityController.php';
 require_once __DIR__ . '/../app/Controllers/IntegrationHubController.php';
 
 $contentLength = $_SERVER['CONTENT_LENGTH'] ?? null;

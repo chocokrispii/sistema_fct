@@ -2,7 +2,6 @@
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/Auditoria.php';
-require_once __DIR__ . '/../Core/Webhook.php';
 require_once __DIR__ . '/../Core/Paginacion.php';
 
 class Asignacion
@@ -240,11 +239,6 @@ class Asignacion
                 $asignacionId,
                 'alumno_id=' . $alumnoId
             );
-            Webhook::enqueue($this->db, 'practica.asignada', [
-                'asignacion_id' => $asignacionId,
-                'oferta_id' => $ofertaId,
-                'alumno_id' => $alumnoId,
-            ]);
             $this->db->commit();
             return $asignacionId;
         } catch (Throwable $e) {
@@ -270,9 +264,6 @@ class Asignacion
             }
 
             (new Auditoria($this->db))->registrar($usuarioId, 'asignacion.cerrada', 'asignaciones_fct', $id);
-            Webhook::enqueue($this->db, 'practica.cerrada', [
-                'asignacion_id' => $id,
-            ]);
             $this->db->commit();
             return true;
         } catch (Throwable $e) {

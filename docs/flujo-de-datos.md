@@ -209,10 +209,6 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 |  | `usuarios` | GET, POST | Administrador; aprovisiona Administrador, Coordinador y Observador con NIF, nombre, apellidos y activación por correo |
 |  | `estado-usuario`, `eliminar-usuario` | POST | Administrador |
 | Integraciones | `api-tokens` | GET, POST | Administrador; emite (el valor en claro se muestra una vez) y revoca tokens de la API |
-|  | `pruebas-integracion` | GET, POST | Administrador; pruebas sintéticas de recepción y envío de webhooks |
-|  | `webhook-inbox`, `webhooks-recibidos` | GET | Administrador; ambas acciones ejecutan `WebhookInboxController::listarRecibidos` (últimos 50 eventos de `webhook_inbox`) |
-|  | `webhooks-enviados` | GET | Administrador; últimos 50 eventos de `webhook_outbox` |
-|  | `webhooks-empresa` | GET | Administrador; actividad de webhooks filtrada por `empresa_id` |
 
 `routes/web.php` declara las acciones estáticas recogidas arriba. Además, `preview-disponibilidad` y `preview-publicar-oferta` (públicas, GET, vistas de desarrollo) se registran sólo cuando `APP_ENV` es `development` o `local`; no forman parte del catálogo de producción.
 
