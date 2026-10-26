@@ -53,14 +53,24 @@ final class AuthMiddleware
         $role = $user['rol'];
 
         if ($role === 'Empresa' && ($user['estado_empresa'] ?? null) !== 'Aprobada') {
-            $message = match ($user['estado_empresa'] ?? null) {
+            $estadoSolicitud = $user['estado_empresa'] ?? 'SinSolicitud';
+            $message = match ($estadoSolicitud) {
                 'Pendiente_Aprobacion' => 'La solicitud de empresa está pendiente de aprobación; todavía no puedes acceder a los módulos privados.',
                 'Rechazada' => 'La solicitud de empresa ha sido rechazada. Contacta con el centro educativo.',
                 default => 'No se encontró un perfil de empresa aprobado para esta cuenta.',
             };
             $_SESSION = [];
             session_regenerate_id(true);
-            throw new CompanyApprovalRequiredException($message);
+            $_SESSION['empresa_solicitud_estado'] = in_array(
+                $estadoSolicitud,
+                ['Pendiente_Aprobacion', 'Rechazada'],
+                true
+            ) ? $estadoSolicitud : 'SinSolicitud';
+            if (JsonResponse::wantsJson()) {
+                throw new CompanyApprovalRequiredException($message);
+            }
+            header('Location: index.php?action=solicitud-pendiente');
+            exit;
         }
 
         if (!in_array($role, $roles, true)) {

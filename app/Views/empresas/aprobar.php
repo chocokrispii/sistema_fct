@@ -3,6 +3,7 @@
     <?php if ($empresa !== []): ?>
         <dl class="company-approval-page__details">
             <dt>Razón social</dt><dd><?= htmlspecialchars($empresa['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></dd>
+            <dt>Sector</dt><dd><?= htmlspecialchars($empresa['categoria'] ?? '', ENT_QUOTES, 'UTF-8') ?></dd>
             <dt>CIF / NIF</dt><dd><?= htmlspecialchars($empresa['cif_empresa'], ENT_QUOTES, 'UTF-8') ?></dd>
             <dt>Correo</dt><dd><?= htmlspecialchars($empresa['email'], ENT_QUOTES, 'UTF-8') ?></dd>
             <dt>Representante legal</dt><dd><?= htmlspecialchars($empresa['representante_legal'] ?? '', ENT_QUOTES, 'UTF-8') ?></dd>

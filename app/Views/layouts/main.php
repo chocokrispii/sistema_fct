@@ -48,7 +48,7 @@ if ($rolActual === 'Empresa') {
     ]);
     if ($rolActual === 'Administrador') {
         $navItems = array_merge($navItems, [
-            ['Solicitudes de empresa', 'index.php?action=solicitudes-empresa', 'check'],
+            ['Solicitudes de empresa', 'admin/convenios', 'check'],
             ['Usuarios', 'index.php?action=usuarios', 'usuario'],
             ['Tokens API', 'index.php?action=api-tokens', 'refrescar'],
             ['Pruebas API y webhooks', 'index.php?action=pruebas-integracion', 'refrescar'],

@@ -156,9 +156,9 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
         representative.focus();
         return;
     }
-    if (representativeDni?.value.trim() && !isDniNie(representativeDni.value)) {
+    if (representativeDni && (!representativeDni.value.trim() || !isDniNie(representativeDni.value))) {
         status.value = 'error';
-        message.value = 'El DNI/NIE del representante no tiene un formato válido.';
+        message.value = 'El DNI/NIE del representante es obligatorio y debe tener un formato válido.';
         setFieldError('dni_representante', message.value);
         await nextTick();
         representativeDni.focus();
@@ -174,7 +174,7 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
     }
 
     try {
-        const result = await requestApi<{ message: string }>('api/public/empresas/registro', {
+        const result = await requestApi<{ message: string }>('api/public/empresas/solicitud', {
             method: 'POST',
             headers: { 'X-CSRF-Token': props.csrf },
             body: new FormData(form),

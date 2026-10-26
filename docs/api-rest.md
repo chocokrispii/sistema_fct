@@ -117,15 +117,18 @@ el formulario PHP conserva un fallback síncrono.
 
 | Método | Ruta | Acceso y acción |
 |---|---|---|
-| POST | `/api/public/empresas/registro` | Público con CSRF; crea la cuenta en `Pendiente_Aprobacion` y devuelve HTTP 201. |
-| POST | `/api/admin/empresas/{id}/aprobar` | Sesión Administrador con CSRF; requiere `numero_convenio` y `pdf_convenio` (PDF, máximo 10 MiB). |
+| POST | `/api/public/empresas/solicitud` | Público con CSRF; crea la cuenta en `Pendiente_Aprobacion` y devuelve HTTP 201. `/api/public/empresas/registro` se mantiene como alias compatible. |
+| POST | `/api/admin/empresas/{id}/aprobar-convenio` | Sesión Administrador con CSRF; requiere `numero_convenio` y `pdf_convenio` (PDF, máximo 10 MiB). `/aprobar` se mantiene como alias compatible. |
+| GET | `/admin/convenios` | Sesión Administrador; lista solicitudes de empresa pendientes y permite abrir el diálogo de formalización. |
 
 La solicitud pública contiene correo, contraseña, razón social, nombre
-comercial opcional, CIF/NIF, representante legal, DNI/NIE opcional, teléfono y
-dirección. Una empresa pendiente o rechazada recibe HTTP 403 al iniciar sesión
-y no puede utilizar las rutas privadas. La aprobación asigna el número de
-Convenio Marco, registra `fecha_aprobacion` y habilita el acceso de la empresa.
-El PDF se escanea con ClamAV y se guarda como archivo aleatorio en
+comercial, sector, CIF/NIF, representante legal, DNI/NIE, teléfono y dirección.
+Una empresa pendiente o rechazada recibe HTTP 403 en las respuestas JSON y se
+envía a la página MVC de estado `solicitud-pendiente` en navegación HTML. La
+aprobación asigna el número de Convenio Marco, registra
+`fecha_firma_convenio` (y `fecha_aprobacion` por compatibilidad) y habilita el
+acceso de la empresa. El PDF se valida como PDF de hasta 10 MiB, se escanea con
+ClamAV y se guarda como archivo aleatorio en
 `FCT_STORAGE_PATH/uploads/convenios-marco`; nunca se sirve desde `public/`.
 
 ### Relación con los permisos MVC

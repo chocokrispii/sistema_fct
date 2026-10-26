@@ -184,10 +184,11 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 |  | `recuperaciones` | GET | Administrador, Coordinador |
 |  | `verificar-recuperacion` | POST | Administrador, Coordinador |
 | Registro y catálogo autenticado | `registro-alumno`, `registro-empresa` | GET, POST | Público |
-|  | `api-registro-empresa` | POST | Público; sesión MVC y CSRF para `/api/public/empresas/registro` |
+|  | `api-registro-empresa` | POST | Público; sesión MVC y CSRF para `/api/public/empresas/solicitud` (alias `/registro`) |
 |  | `empresas-centro` | GET | Administrador, Coordinador |
-|  | `solicitudes-empresa`, `formulario-aprobar-empresa` | GET | Administrador |
+|  | `solicitudes-empresa`, `admin-convenios`, `formulario-aprobar-empresa` | GET | Administrador |
 |  | `aprobar-empresa`, `api-aprobar-empresa` | POST | Administrador; CSRF |
+|  | `solicitud-pendiente` | GET | Público con estado flash de sesión; estado MVC para solicitudes no aprobadas |
 |  | `ofertas` | GET | Administrador, Coordinador, Observador, Empresa |
 | Alumno | `portal-alumno`, `mis-asignaciones`, `mis-calificaciones` | GET | Alumno |
 |  | `perfil-alumno`, `disponibilidad` | GET, POST | Alumno |

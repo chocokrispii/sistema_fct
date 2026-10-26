@@ -40,16 +40,18 @@ El único POST disponible es `logout`, para invalidar la propia sesión; es una 
 
 ## Alta y aprobación de empresas
 
-El registro público crea la cuenta con estado `Pendiente_Aprobacion`. El login,
-la sesión y las rutas privadas MVC y de API deniegan el acceso con HTTP 403
-hasta que un Administrador aprueba la solicitud. Las empresas existentes al
+El registro público crea la cuenta con estado `Pendiente_Aprobacion`. El login, la sesión y las rutas privadas MVC y de API deniegan el acceso con
+HTTP 403 hasta que un Administrador aprueba la solicitud. En navegación HTML,
+las cuentas pendientes o rechazadas llegan a `solicitud-pendiente`; las
+respuestas JSON conservan el sobre de error 403. Las empresas existentes al
 aplicar la migración se conservan como aprobadas.
 
-Sólo Administrador puede consultar `solicitudes-empresa` y aprobar mediante
-`aprobar-empresa` o el endpoint de sesión
-`POST /api/admin/empresas/{id}/aprobar`. La aprobación requiere un número de
-Convenio Marco y un PDF firmado; el archivo se analiza con ClamAV y se guarda
-fuera de `public/` dentro de `FCT_STORAGE_PATH`.
+Sólo Administrador puede consultar `solicitudes-empresa` (también
+`/admin/convenios`) y aprobar mediante `aprobar-empresa` o el endpoint de
+sesión `POST /api/admin/empresas/{id}/aprobar-convenio` (el alias `/aprobar`
+sigue disponible). La aprobación requiere un número de Convenio Marco y un PDF
+firmado; el archivo se valida y analiza con ClamAV y se guarda fuera de
+`public/` dentro de `FCT_STORAGE_PATH`.
 
 ## Privacidad del alumnado
 

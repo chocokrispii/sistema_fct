@@ -133,10 +133,17 @@ final class RegressionHttpClient
         ?string $cookieOverride = null,
         string $query = ''
     ): array {
-        $headerLines = ['Accept: application/json', 'Connection: close'];
+        $headerLines = ['Connection: close'];
+        $acceptHeader = null;
         foreach ($headers as $name => $value) {
-            $headerLines[] = is_int($name) ? (string)$value : $name . ': ' . $value;
+            $headerLine = is_int($name) ? (string)$value : $name . ': ' . $value;
+            if (preg_match('/\AAccept\s*:/i', $headerLine) === 1) {
+                $acceptHeader = $headerLine;
+            } else {
+                $headerLines[] = $headerLine;
+            }
         }
+        array_unshift($headerLines, $acceptHeader ?? 'Accept: application/json');
 
         $cookieHeader = $cookieOverride ?? $this->cookieHeader();
         if ($cookieHeader !== '') {
@@ -345,7 +352,7 @@ function assertFeatureSchema(PDO $db, string $databaseName): void
         'empresas' => [
             'id', 'usuario_id', 'nombre_empresa', 'nombre_comercial', 'cif_empresa',
             'representante_legal', 'dni_representante', 'estado', 'numero_convenio',
-            'pdf_convenio_path', 'fecha_aprobacion',
+            'categoria', 'pdf_convenio_path', 'fecha_aprobacion', 'fecha_firma_convenio',
         ],
         'especialidades' => ['id', 'nombre_especialidad'],
         'convenios' => ['id', 'empresa_id', 'especialidad_id', 'numero_convenio', 'fecha_firma', 'fecha_inicio', 'fecha_fin', 'archivo_path'],
@@ -664,9 +671,49 @@ try {
 
     $registrationClient = new RegressionHttpClient($baseUrl);
     $registrationCsrf = fetchCsrfToken($registrationClient);
+    $registrationPage = $registrationClient->request('GET', '/registro-empresa', ['Accept' => 'text/html']);
+    expectRegression(
+        $registrationPage['status'] === 200
+            && str_contains($registrationPage['body'], 'name="sector"')
+            && str_contains($registrationPage['body'], 'name="dni_representante"'),
+        'The MVC company registration page should expose the required sector and representative identity fields.'
+    );
     $registrationEmail = 'http-regression-' . $nonce . '-public-company@example.invalid';
     $registrationPassword = 'Regression-Pass-' . substr($nonce, 0, 12);
     $registrationTaxId = validFixtureCif($nonce);
+    $missingSectorEmail = 'http-regression-' . $nonce . '-missing-sector@example.invalid';
+    $missingSectorBoundary = 'fct-missing-sector-' . $nonce;
+    $missingSectorBody = multipartFieldsBody([
+        '_csrf' => $registrationCsrf,
+        'email' => $missingSectorEmail,
+        'password' => $registrationPassword,
+        'razon_social' => 'Missing Sector ' . $nonce . ' S.L.',
+        'nombre_comercial' => 'Missing Sector ' . $nonce,
+        'cif' => $registrationTaxId,
+        'representante_legal' => 'Representante de prueba',
+        'dni_representante' => '12345678Z',
+        'telefono' => '600123456',
+        'direccion' => 'Calle de prueba 1, Madrid',
+    ], $missingSectorBoundary) . '--' . $missingSectorBoundary . "--\r\n";
+    $missingSectorResponse = $registrationClient->request(
+        'POST',
+        '/api/public/empresas/solicitud',
+        [
+            'Content-Type' => 'multipart/form-data; boundary=' . $missingSectorBoundary,
+            'Content-Length' => (string)strlen($missingSectorBody),
+            'X-CSRF-Token' => $registrationCsrf,
+        ],
+        $missingSectorBody
+    );
+    responseFailure($missingSectorResponse, 422);
+    $missingSectorUserCount = $database->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $missingSectorUserCount->execute(['email' => $missingSectorEmail]);
+    expectRegression(
+        (int)$missingSectorUserCount->fetchColumn() === 0,
+        'A company registration without a sector must not create a user.'
+    );
+    $passedTests[] = 'Company registration page and API require sector before persisting the account';
+
     $registrationBoundary = 'fct-registration-' . $nonce;
     $registrationBody = multipartFieldsBody([
         '_csrf' => $registrationCsrf,
@@ -674,6 +721,7 @@ try {
         'password' => $registrationPassword,
         'razon_social' => 'HTTP Registration ' . $nonce . ' S.L.',
         'nombre_comercial' => 'HTTP Registration ' . $nonce,
+        'sector' => 'Tecnología',
         'cif' => $registrationTaxId,
         'representante_legal' => 'Representante de prueba',
         'dni_representante' => '12345678Z',
@@ -682,7 +730,7 @@ try {
     ], $registrationBoundary) . '--' . $registrationBoundary . "--\r\n";
     $registrationResponse = $registrationClient->request(
         'POST',
-        '/api/public/empresas/registro',
+        '/api/public/empresas/solicitud',
         [
             'Content-Type' => 'multipart/form-data; boundary=' . $registrationBoundary,
             'Content-Length' => (string)strlen($registrationBody),
@@ -698,7 +746,7 @@ try {
         'Public registration should return the pending approval state and confirmation message.'
     );
     $findRegistration = $database->prepare(
-        'SELECT e.id, e.usuario_id, e.nombre_empresa, e.nombre_comercial, e.cif_empresa,
+        'SELECT e.id, e.usuario_id, e.nombre_empresa, e.nombre_comercial, e.categoria, e.cif_empresa,
                 e.representante_legal, e.dni_representante, e.estado
          FROM empresas e
          INNER JOIN usuarios u ON u.id = e.usuario_id
@@ -713,6 +761,7 @@ try {
     expectRegression(
         $registeredCompany['estado'] === 'Pendiente_Aprobacion'
             && $registeredCompany['nombre_comercial'] === 'HTTP Registration ' . $nonce
+            && $registeredCompany['categoria'] === 'Tecnología'
             && $registeredCompany['cif_empresa'] === $registrationTaxId
             && $registeredCompany['representante_legal'] === 'Representante de prueba'
             && $registeredCompany['dni_representante'] === '12345678Z',
@@ -736,11 +785,21 @@ try {
         str_contains($pendingLoginFailure['error'], 'pendiente de aprobación'),
         'A pending company should receive an explanatory HTTP 403 at login.'
     );
+    $pendingStatusPage = $registrationClient->request(
+        'GET',
+        'solicitud-pendiente',
+        ['Accept' => 'text/html']
+    );
+    expectRegression(
+        $pendingStatusPage['status'] === 200
+            && str_contains($pendingStatusPage['body'], 'Su solicitud de convenio se encuentra en proceso de validación administrativa.'),
+        'Pending companies should receive the MVC application-status page after JSON login is rejected.'
+    );
     $passedTests[] = 'Public company registration persists a pending request and blocks login until approval';
 
     $adminClient = new RegressionHttpClient($baseUrl);
     $adminCsrf = loginFixture($adminClient, $admin['email'], $admin['password'], 'Administrador');
-    $pendingList = $adminClient->request('GET', 'solicitudes-empresa');
+    $pendingList = $adminClient->request('GET', '/admin/convenios');
     expectRegression(
         $pendingList['status'] === 200
             && str_contains($pendingList['body'], 'HTTP Registration ' . $nonce . ' S.L.')
@@ -755,7 +814,7 @@ try {
     ], 'convenio-firmado.pdf', $pdfBytes, $approvalBoundary, 'pdf_convenio');
     $approvalResponse = $adminClient->request(
         'POST',
-        '/api/admin/empresas/' . (int)$registeredCompany['id'] . '/aprobar',
+        '/api/admin/empresas/' . (int)$registeredCompany['id'] . '/aprobar-convenio',
         [
             'Content-Type' => 'multipart/form-data; boundary=' . $approvalBoundary,
             'Content-Length' => (string)strlen($approvalBody),
@@ -770,7 +829,7 @@ try {
         'The admin approval endpoint should return the approved company.'
     );
     $approvedCompanyQuery = $database->prepare(
-        'SELECT estado, numero_convenio, pdf_convenio_path, fecha_aprobacion
+        'SELECT estado, numero_convenio, pdf_convenio_path, fecha_aprobacion, fecha_firma_convenio
          FROM empresas WHERE id = :id'
     );
     $approvedCompanyQuery->execute(['id' => $registeredCompany['id']]);
@@ -780,6 +839,8 @@ try {
             && $approvedCompany['estado'] === 'Aprobada'
             && $approvedCompany['numero_convenio'] === $approvalNumber
             && is_string($approvedCompany['fecha_aprobacion'])
+            && is_string($approvedCompany['fecha_firma_convenio'])
+            && $approvedCompany['fecha_firma_convenio'] === $approvedCompany['fecha_aprobacion']
             && preg_match('#\Auploads/convenios-marco/[a-f0-9]{48}\.pdf\z#', (string)$approvedCompany['pdf_convenio_path']) === 1,
         'Approval should persist its state, agreement number, approval date, and private PDF path.'
     );
@@ -801,6 +862,13 @@ try {
         $registrationPassword,
         'Empresa'
     );
+    $approvedCompanyHtmlClient = new RegressionHttpClient($baseUrl);
+    loginFixture(
+        $approvedCompanyHtmlClient,
+        $registrationEmail,
+        $registrationPassword,
+        'Empresa'
+    );
     $setPending = $database->prepare("UPDATE empresas SET estado = 'Pendiente_Aprobacion' WHERE id = :id");
     $setPending->execute(['id' => $registeredCompany['id']]);
     try {
@@ -809,6 +877,26 @@ try {
         expectRegression(
             str_contains($blockedCompanyFailure['error'], 'pendiente de aprobación'),
             'An existing company session should lose private access when its approval state is pending.'
+        );
+        $blockedHtmlPage = $approvedCompanyHtmlClient->request(
+            'GET',
+            'sedes',
+            ['Accept' => 'text/html']
+        );
+        expectRegression(
+            $blockedHtmlPage['status'] === 302
+                && str_contains($blockedHtmlPage['headers']['location'] ?? '', 'action=solicitud-pendiente'),
+            'HTML requests from a pending company should redirect to the MVC status page.'
+        );
+        $htmlStatusPage = $approvedCompanyHtmlClient->request(
+            'GET',
+            'solicitud-pendiente',
+            ['Accept' => 'text/html']
+        );
+        expectRegression(
+            $htmlStatusPage['status'] === 200
+                && str_contains($htmlStatusPage['body'], 'Su solicitud de convenio se encuentra en proceso de validación administrativa.'),
+            'The protected-route redirect should show the company approval status message.'
         );
     } finally {
         $restoreApproval = $database->prepare("UPDATE empresas SET estado = 'Aprobada' WHERE id = :id");

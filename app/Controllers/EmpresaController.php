@@ -32,6 +32,7 @@ class EmpresaController {
             'password',
             'razon_social',
             'nombre_comercial',
+            'sector',
             'cif',
             'representante_legal',
             'dni_representante',
@@ -66,7 +67,8 @@ class EmpresaController {
         $password = $input['password'];
         $cif = $input['cif'];
         $razonSocial = $input['razon_social'];
-        $nombreComercial = $input['nombre_comercial'] !== '' ? $input['nombre_comercial'] : $razonSocial;
+        $nombreComercial = $input['nombre_comercial'];
+        $sector = $input['sector'];
         $telefono = $input['telefono'];
         $direccion = $input['direccion'];
         $representante = $input['representante_legal'];
@@ -86,17 +88,20 @@ class EmpresaController {
         if ($razonSocial === '' || mb_strlen($razonSocial) > 150) {
             $fieldErrors['razon_social'] = 'La razón social es obligatoria y no puede superar 150 caracteres.';
         }
-        if ($input['nombre_comercial'] !== '' && mb_strlen($nombreComercial) > 150) {
-            $fieldErrors['nombre_comercial'] = 'El nombre comercial no puede superar 150 caracteres.';
+        if ($nombreComercial === '' || mb_strlen($nombreComercial) > 150) {
+            $fieldErrors['nombre_comercial'] = 'El nombre comercial es obligatorio y no puede superar 150 caracteres.';
+        }
+        if ($sector === '' || mb_strlen($sector) > 100) {
+            $fieldErrors['sector'] = 'Indica un sector de hasta 100 caracteres.';
         }
         if (!SpanishDataValidator::isPersonName($representante, 150)) {
             $fieldErrors['representante_legal'] = 'Introduce un nombre válido para el representante legal.';
         }
-        if ($dniRepresentante !== '' && !SpanishDataValidator::isDniNie($dniRepresentante)) {
-            $fieldErrors['dni_representante'] = 'Introduce un DNI/NIE válido.';
+        if ($dniRepresentante === '' || !SpanishDataValidator::isDniNie($dniRepresentante)) {
+            $fieldErrors['dni_representante'] = 'Introduce un DNI/NIE válido para el representante.';
         }
-        if (mb_strlen($telefono) > 20) {
-            $fieldErrors['telefono'] = 'El teléfono no puede superar 20 caracteres.';
+        if ($telefono === '' || mb_strlen($telefono) > 20) {
+            $fieldErrors['telefono'] = 'El teléfono es obligatorio y no puede superar 20 caracteres.';
         }
         if ($direccion === '' || mb_strlen($direccion) > 255) {
             $fieldErrors['direccion'] = 'La dirección es obligatoria y no puede superar 255 caracteres.';
@@ -141,7 +146,9 @@ class EmpresaController {
                 $representante,
                 $nombreComercial,
                 $representante,
-                $dniRepresentante
+                $dniRepresentante,
+                'Pendiente_Aprobacion',
+                $sector
             );
             if ($empresaId < 1) {
                 throw new RuntimeException('No se pudo crear el perfil de la empresa.');
@@ -193,6 +200,17 @@ class EmpresaController {
             'csrf' => CsrfMiddleware::token(),
             'aprobada' => ($_GET['aprobada'] ?? null) === '1',
         ]);
+    }
+
+    public function estadoSolicitud(): void
+    {
+        $estado = $_SESSION['empresa_solicitud_estado'] ?? null;
+        if (!is_string($estado) || !in_array($estado, ['Pendiente_Aprobacion', 'Rechazada', 'SinSolicitud'], true)) {
+            header('Location: index.php?action=login');
+            exit;
+        }
+
+        View::render('empresas/solicitud-pendiente', ['estado' => $estado]);
     }
 
     public function formularioAprobacion(): void

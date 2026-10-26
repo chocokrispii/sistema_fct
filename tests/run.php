@@ -149,6 +149,7 @@ $required = [
     'codigo_postal' => ['table' => 'alumnos', 'column' => 'codigo_postal'],
     'horario_oferta' => ['table' => 'empresa_oferta_horarios_semanales', 'column' => 'hora_inicio'],
     'jornada_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'jornada'],
+    'fecha_firma_convenio_empresa' => ['table' => 'empresas', 'column' => 'fecha_firma_convenio'],
     'segunda_hora_inicio_oferta' => ['table' => 'empresa_oferta_horarios_semanales', 'column' => 'hora_inicio_2'],
     'segunda_hora_fin_oferta' => ['table' => 'empresa_oferta_horarios_semanales', 'column' => 'hora_fin_2'],
     'titulo_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'titulo'],

@@ -6,6 +6,7 @@ foreach ([
     'password',
     'razon_social',
     'nombre_comercial',
+    'sector',
     'cif',
     'representante_legal',
     'dni_representante',
@@ -70,9 +71,15 @@ foreach ([
                     </div>
 
                     <div class="company-registration__field">
-                        <label for="company-commercial-name">Nombre comercial <span class="company-registration__optional">Opcional</span></label>
-                        <input id="company-commercial-name" type="text" name="nombre_comercial" maxlength="150" autocomplete="organization" value="<?= htmlspecialchars($values['nombre_comercial'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['nombre_comercial']) ? 'true' : 'false' ?>" aria-describedby="company-nombre_comercial-error"<?= $firstInvalidField === 'nombre_comercial' ? ' autofocus' : '' ?>>
+                        <label for="company-commercial-name">Nombre comercial <span aria-hidden="true">*</span></label>
+                        <input id="company-commercial-name" type="text" name="nombre_comercial" maxlength="150" autocomplete="organization" value="<?= htmlspecialchars($values['nombre_comercial'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['nombre_comercial']) ? 'true' : 'false' ?>" aria-describedby="company-nombre_comercial-error"<?= $firstInvalidField === 'nombre_comercial' ? ' autofocus' : '' ?> required>
                         <small id="company-nombre_comercial-error" data-field-error<?= isset($fieldErrors['nombre_comercial']) ? ' role="alert"' : '' ?>><?= htmlspecialchars($fieldErrors['nombre_comercial'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
+                    </div>
+
+                    <div class="company-registration__field">
+                        <label for="company-sector">Sector <span aria-hidden="true">*</span></label>
+                        <input id="company-sector" type="text" name="sector" maxlength="100" autocomplete="organization-title" value="<?= htmlspecialchars($values['sector'] ?? '', ENT_QUOTES, 'UTF-8') ?>" aria-invalid="<?= isset($fieldErrors['sector']) ? 'true' : 'false' ?>" aria-describedby="company-sector-error"<?= $firstInvalidField === 'sector' ? ' autofocus' : '' ?> required>
+                        <small id="company-sector-error" data-field-error<?= isset($fieldErrors['sector']) ? ' role="alert"' : '' ?>><?= htmlspecialchars($fieldErrors['sector'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                     </div>
 
                     <div class="company-registration__field">
@@ -88,14 +95,14 @@ foreach ([
                     </div>
 
                     <div class="company-registration__field">
-                        <label for="company-representative-dni">DNI / NIE del representante <span class="company-registration__optional">Opcional</span></label>
-                        <input id="company-representative-dni" type="text" name="dni_representante" maxlength="20" autocomplete="off" aria-invalid="<?= isset($fieldErrors['dni_representante']) ? 'true' : 'false' ?>" aria-describedby="company-dni_representante-error"<?= $firstInvalidField === 'dni_representante' ? ' autofocus' : '' ?>>
+                        <label for="company-representative-dni">DNI / NIE del representante <span aria-hidden="true">*</span></label>
+                        <input id="company-representative-dni" type="text" name="dni_representante" maxlength="20" autocomplete="off" aria-invalid="<?= isset($fieldErrors['dni_representante']) ? 'true' : 'false' ?>" aria-describedby="company-dni_representante-error"<?= $firstInvalidField === 'dni_representante' ? ' autofocus' : '' ?> required>
                         <small id="company-dni_representante-error" data-field-error<?= isset($fieldErrors['dni_representante']) ? ' role="alert"' : '' ?>><?= htmlspecialchars($fieldErrors['dni_representante'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                     </div>
 
                     <div class="company-registration__field">
-                        <label for="company-phone">Teléfono <span class="company-registration__optional">Opcional</span></label>
-                        <input id="company-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" value="<?= htmlspecialchars($values['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. 600 123 456" aria-invalid="<?= isset($fieldErrors['telefono']) ? 'true' : 'false' ?>" aria-describedby="company-telefono-error"<?= $firstInvalidField === 'telefono' ? ' autofocus' : '' ?>>
+                        <label for="company-phone">Teléfono <span aria-hidden="true">*</span></label>
+                        <input id="company-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" value="<?= htmlspecialchars($values['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. 600 123 456" aria-invalid="<?= isset($fieldErrors['telefono']) ? 'true' : 'false' ?>" aria-describedby="company-telefono-error"<?= $firstInvalidField === 'telefono' ? ' autofocus' : '' ?> required>
                         <small id="company-telefono-error" data-field-error<?= isset($fieldErrors['telefono']) ? ' role="alert"' : '' ?>><?= htmlspecialchars($fieldErrors['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                     </div>
 

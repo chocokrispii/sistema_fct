@@ -50,6 +50,16 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
 
     const fileInput = form.value.querySelector<HTMLInputElement>('input[name="pdf_convenio"]');
     const file = fileInput?.files?.[0];
+    if (
+        file
+        && (!/\.pdf$/i.test(file.name) || (file.type !== '' && file.type !== 'application/pdf'))
+    ) {
+        state.value = 'error';
+        message.value = 'Adjunta un archivo PDF válido.';
+        await nextTick();
+        fileInput.focus();
+        return;
+    }
     if (file && file.size > 10 * 1024 * 1024) {
         state.value = 'error';
         message.value = 'El PDF no puede superar los 10 MB.';
@@ -62,7 +72,7 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
     message.value = '';
     try {
         await requestApi<{ id: number; estado: string; message: string }>(
-            `api/admin/empresas/${companyId.value}/aprobar`,
+            `api/admin/empresas/${companyId.value}/aprobar-convenio`,
             {
                 method: 'POST',
                 headers: { 'X-CSRF-Token': props.csrf },
@@ -97,7 +107,7 @@ onBeforeUnmount(() => {
     <div ref="root" class="company-approval-island">
         <dialog ref="dialog" class="company-approval-dialog" aria-labelledby="company-approval-title" @close="onDialogClose">
             <form ref="form" class="company-approval-dialog__form" method="POST" enctype="multipart/form-data" @submit="onSubmit">
-                <h3 id="company-approval-title">Aprobar {{ companyName }}</h3>
+                <h3 id="company-approval-title">Aprobar y formalizar convenio de {{ companyName }}</h3>
                 <p>La aprobación habilitará el acceso privado de la empresa.</p>
 
                 <p v-if="message" class="message message-error" role="alert" tabindex="-1">{{ message }}</p>
@@ -114,7 +124,7 @@ onBeforeUnmount(() => {
                 <div class="company-approval-dialog__actions">
                     <button type="button" class="company-approval-dialog__cancel" @click="dialog?.close()">Cancelar</button>
                     <button type="submit" :disabled="state === 'submitting'">
-                        {{ state === 'submitting' ? 'Aprobando…' : 'Aprobar empresa' }}
+                        {{ state === 'submitting' ? 'Formalizando…' : 'Aprobar y formalizar convenio' }}
                     </button>
                 </div>
             </form>

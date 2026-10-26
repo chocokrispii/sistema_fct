@@ -20,7 +20,8 @@ class Empresa {
         string $nombreComercial = '',
         string $representanteLegal = '',
         string $dniRepresentante = '',
-        string $estado = 'Pendiente_Aprobacion'
+        string $estado = 'Pendiente_Aprobacion',
+        string $categoria = ''
     ): int {
         if (!in_array($estado, ['Pendiente_Aprobacion', 'Aprobada', 'Rechazada'], true)) {
             throw new InvalidArgumentException('El estado de aprobación de la empresa no es válido.');
@@ -30,10 +31,10 @@ class Empresa {
             $stmt = $this->db->prepare(
                 'INSERT INTO empresas
                     (usuario_id, nombre_empresa, nombre_comercial, cif_empresa, persona_contacto,
-                     representante_legal, dni_representante, estado)
+                     representante_legal, dni_representante, estado, categoria)
                  VALUES
                     (:usuario_id, :nombre, :nombre_comercial, :cif, :contacto,
-                     :representante, :dni_representante, :estado)'
+                     :representante, :dni_representante, :estado, :categoria)'
             );
             $stmt->execute([
                 'usuario_id' => $usuarioId,
@@ -44,6 +45,7 @@ class Empresa {
                 'representante' => $representanteLegal !== '' ? $representanteLegal : null,
                 'dni_representante' => $dniRepresentante !== '' ? $dniRepresentante : null,
                 'estado' => $estado,
+                'categoria' => $categoria !== '' ? $categoria : null,
             ]);
 
             $empresaId = (int)$this->db->lastInsertId();
@@ -89,9 +91,10 @@ class Empresa {
         }
 
         $stmt = $this->db->prepare(
-            'SELECT e.id, e.usuario_id, e.nombre_empresa, e.nombre_comercial, e.cif_empresa,
+            'SELECT e.id, e.usuario_id, e.nombre_empresa, e.nombre_comercial, e.cif_empresa, e.categoria,
                     e.persona_contacto, e.representante_legal, e.dni_representante, e.estado,
-                    e.numero_convenio, e.pdf_convenio_path, e.fecha_aprobacion, u.email,
+                    e.numero_convenio, e.pdf_convenio_path, e.fecha_aprobacion,
+                    e.fecha_firma_convenio, u.email,
                     d.telefono, d.direccion_completa
              FROM empresas e
              INNER JOIN usuarios u ON u.id = e.usuario_id AND u.rol = \'Empresa\'
@@ -109,9 +112,9 @@ class Empresa {
     public function obtenerSolicitudPorId(int $empresaId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT e.id, e.usuario_id, e.nombre_empresa, e.nombre_comercial, e.cif_empresa,
+            'SELECT e.id, e.usuario_id, e.nombre_empresa, e.nombre_comercial, e.cif_empresa, e.categoria,
                     e.representante_legal, e.dni_representante, e.estado, e.numero_convenio,
-                    e.pdf_convenio_path, e.fecha_aprobacion, u.email
+                    e.pdf_convenio_path, e.fecha_aprobacion, e.fecha_firma_convenio, u.email
              FROM empresas e
              INNER JOIN usuarios u ON u.id = e.usuario_id AND u.rol = \'Empresa\'
              WHERE e.id = :id
@@ -127,7 +130,9 @@ class Empresa {
         $stmt = $this->db->prepare(
             "UPDATE empresas
              SET numero_convenio = :numero, pdf_convenio_path = :pdf_path,
-                 estado = 'Aprobada', fecha_aprobacion = CURRENT_TIMESTAMP
+                 estado = 'Aprobada',
+                 fecha_aprobacion = CURRENT_TIMESTAMP,
+                 fecha_firma_convenio = CURRENT_TIMESTAMP
              WHERE id = :id AND estado = 'Pendiente_Aprobacion'"
         );
         $stmt->execute([

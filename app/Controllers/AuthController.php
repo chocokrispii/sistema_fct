@@ -79,15 +79,28 @@ class AuthController {
             return;
         }
         if ($usuario['rol'] === 'Empresa') {
-            $approvalError = $this->empresaApprovalError((int)$usuario['id']);
-            if ($approvalError !== null) {
-                $this->mostrarFormulario($approvalError, 403, $email);
-                return;
+            $approvalState = $this->empresaApprovalState((int)$usuario['id']);
+            if ($approvalState !== 'Aprobada') {
+                $_SESSION = [];
+                session_regenerate_id(true);
+                $_SESSION['empresa_solicitud_estado'] = in_array(
+                    $approvalState,
+                    ['Pendiente_Aprobacion', 'Rechazada'],
+                    true
+                ) ? $approvalState : 'SinSolicitud';
+                $approvalError = $this->empresaApprovalMessage($approvalState);
+                if (JsonResponse::wantsJson()) {
+                    JsonResponse::failure($approvalError, 403);
+                    return;
+                }
+                header('Location: index.php?action=solicitud-pendiente');
+                exit;
             }
         }
 
         session_regenerate_id(true);
         unset($_SESSION['csrf_token']);
+        unset($_SESSION['empresa_solicitud_estado']);
         $_SESSION['usuario_id'] = (int)$usuario['id'];
         $_SESSION['email']      = $usuario['email'];
         $_SESSION['rol']        = $usuario['rol'];
@@ -123,11 +136,16 @@ class AuthController {
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (is_array($row) && (int)$row['activo'] === 1) {
                 if ($row['rol'] === 'Empresa') {
-                    $approvalError = $this->empresaApprovalError((int)$row['id']);
-                    if ($approvalError !== null) {
+                    $approvalState = $this->empresaApprovalState((int)$row['id']);
+                    if ($approvalState !== 'Aprobada') {
                         $_SESSION = [];
                         session_regenerate_id(true);
-                        JsonResponse::failure($approvalError, 403);
+                        $_SESSION['empresa_solicitud_estado'] = in_array(
+                            $approvalState,
+                            ['Pendiente_Aprobacion', 'Rechazada'],
+                            true
+                        ) ? $approvalState : 'SinSolicitud';
+                        JsonResponse::failure($this->empresaApprovalMessage($approvalState), 403);
                         return;
                     }
                 }
@@ -173,7 +191,7 @@ class AuthController {
         ];
     }
 
-    private function empresaApprovalError(int $userId): ?string
+    private function empresaApprovalState(int $userId): ?string
     {
         $stmt = getPDOConnection()->prepare(
             'SELECT estado FROM empresas WHERE usuario_id = :usuario_id LIMIT 1'
@@ -181,8 +199,12 @@ class AuthController {
         $stmt->execute(['usuario_id' => $userId]);
         $estado = $stmt->fetchColumn();
 
+        return is_string($estado) ? $estado : null;
+    }
+
+    private function empresaApprovalMessage(?string $estado): string
+    {
         return match ($estado) {
-            'Aprobada' => null,
             'Pendiente_Aprobacion' => 'La solicitud de empresa está pendiente de aprobación; todavía no puedes acceder a los módulos privados.',
             'Rechazada' => 'La solicitud de empresa ha sido rechazada. Contacta con el centro educativo.',
             default => 'No se encontró un perfil de empresa aprobado para esta cuenta.',

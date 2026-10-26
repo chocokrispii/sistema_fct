@@ -8,6 +8,12 @@ php_value max_input_time 60
 php_flag display_errors Off
 
 RewriteEngine On
-RewriteRule ^api/public/empresas/registro/?$ index.php?action=api-registro-empresa [L]
-RewriteRule ^api/admin/empresas/([1-9][0-9]*)/aprobar/?$ index.php?action=api-aprobar-empresa&id=$1 [L]
+RewriteBase /
+RewriteRule ^registro-empresa/?$ /index.php?action=registro-empresa [QSA,L]
+RewriteRule ^admin/convenios/?$ /index.php?action=admin-convenios [QSA,R=302,L]
+RewriteRule ^api/public/empresas/registro/?$ /index.php?action=api-registro-empresa [L]
+RewriteRule ^api/public/empresas/solicitud/?$ /index.php?action=api-registro-empresa [L]
+RewriteRule ^api/admin/empresas/([1-9][0-9]*)/aprobar/?$ /index.php?action=api-aprobar-empresa&id=$1 [L]
+RewriteRule ^api/admin/empresas/([1-9][0-9]*)/aprobar-convenio/?$ /index.php?action=api-aprobar-empresa&id=$1 [L]
+RewriteRule ^solicitud-pendiente/?$ /index.php?action=solicitud-pendiente [QSA,L]
 RewriteRule ^dev/preview-publicar-oferta/?$ index.php?action=preview-publicar-oferta [QSA,L]

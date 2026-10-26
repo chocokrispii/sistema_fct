@@ -9,14 +9,29 @@ if (!is_string($requestPath)) {
 }
 
 $decodedPath = rawurldecode($requestPath);
-if ($decodedPath === '/api/public/empresas/registro') {
+if (preg_match('/\A\/registro-empresa\/?\z/', $decodedPath) === 1) {
+    $_GET['action'] = 'registro-empresa';
+    require __DIR__ . '/index.php';
+    return true;
+}
+if (preg_match('/\A\/admin\/convenios\/?\z/', $decodedPath) === 1) {
+    $_GET['action'] = 'admin-convenios';
+    require __DIR__ . '/index.php';
+    return true;
+}
+if (in_array($decodedPath, ['/api/public/empresas/registro', '/api/public/empresas/solicitud'], true)) {
     $_GET['action'] = 'api-registro-empresa';
     require __DIR__ . '/index.php';
     return true;
 }
-if (preg_match('/\A\/api\/admin\/empresas\/([1-9][0-9]*)\/aprobar\/?\z/', $decodedPath, $matches) === 1) {
+if (preg_match('/\A\/api\/admin\/empresas\/([1-9][0-9]*)\/(?:aprobar|aprobar-convenio)\/?\z/', $decodedPath, $matches) === 1) {
     $_GET['action'] = 'api-aprobar-empresa';
     $_GET['id'] = $matches[1];
+    require __DIR__ . '/index.php';
+    return true;
+}
+if (preg_match('/\A\/solicitud-pendiente\/?\z/', $decodedPath) === 1) {
+    $_GET['action'] = 'solicitud-pendiente';
     require __DIR__ . '/index.php';
     return true;
 }

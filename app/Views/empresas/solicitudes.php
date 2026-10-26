@@ -33,6 +33,7 @@
                     <tr>
                         <th>Razón social</th>
                         <th>Nombre comercial</th>
+                        <th>Sector</th>
                         <th>CIF / NIF</th>
                         <th>Representante</th>
                         <th>DNI / NIE</th>
@@ -49,6 +50,7 @@
                         <tr>
                             <td><?= htmlspecialchars($empresa['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
                             <td><?= htmlspecialchars($empresa['nombre_comercial'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars($empresa['categoria'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
                             <td><?= htmlspecialchars($empresa['cif_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
                             <td><?= htmlspecialchars($empresa['representante_legal'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
                             <td><?= htmlspecialchars($empresa['dni_representante'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
@@ -67,7 +69,7 @@
                                         data-company-approval-open
                                         data-company-id="<?= (int)$empresa['id'] ?>"
                                         data-company-name="<?= htmlspecialchars($empresa['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?>"
-                                    >Revisar y aprobar</a>
+                                    >Aprobar y formalizar convenio</a>
                                 <?php else: ?>
                                     —
                                 <?php endif; ?>

@@ -71,9 +71,16 @@ async function submitAsJson(event: SubmitEvent): Promise<void> {
     try {
         const user = await session.login({ email, password });
         window.location.assign(`index.php?action=${session.dashboardAction(user.rol)}`);
-    } catch {
+    } catch (cause) {
         if (passwordInput) {
             passwordInput.value = '';
+        }
+        if (
+            cause instanceof Error
+            && /pendiente de aprobación|ha sido rechazada|perfil de empresa aprobado/.test(cause.message)
+        ) {
+            window.location.assign('index.php?action=solicitud-pendiente');
+            return;
         }
         // El store conserva el error para mostrarlo junto al formulario.
         await nextTick();
