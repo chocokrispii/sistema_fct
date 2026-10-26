@@ -34,7 +34,7 @@
                         <th>Razón social</th>
                         <th>Nombre comercial</th>
                         <th>Sector</th>
-                        <th>CIF / NIF</th>
+                        <th>NIF (Persona Jurídica)</th>
                         <th>Representante</th>
                         <th>DNI / NIE</th>
                         <th>Correo</th>

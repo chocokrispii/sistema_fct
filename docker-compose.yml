@@ -89,6 +89,8 @@ services:
       - ./database/migrations/008_api_access_tokens.sql:/docker-entrypoint-initdb.d/013-api-access-tokens.sql:ro
       - ./database/migrations/009_webhook_responses.sql:/docker-entrypoint-initdb.d/014-webhook-responses.sql:ro
       - ./database/migrations/012_jornada_ofertas.sql:/docker-entrypoint-initdb.d/015-jornada-ofertas.sql:ro
+      - ./database/migrations/015_solicitudes_reset_password.sql:/docker-entrypoint-initdb.d/016-reset-password.sql:ro
+      - ./database/migrations/016_audit_logs_aprobacion_empresas.sql:/docker-entrypoint-initdb.d/017-audit-logs.sql:ro
     healthcheck:
       test:
         - CMD-SHELL

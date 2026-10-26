@@ -83,9 +83,9 @@ foreach ([
                     </div>
 
                     <div class="company-registration__field">
-                        <label for="company-cif">CIF / NIF <span aria-hidden="true">*</span></label>
-                        <input id="company-cif" type="text" name="cif" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['cif'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. A28017895" aria-invalid="<?= isset($fieldErrors['cif']) ? 'true' : 'false' ?>" aria-describedby="company-cif-error"<?= $firstInvalidField === 'cif' ? ' autofocus' : '' ?> required>
-                        <small id="company-cif-error" data-field-error<?= isset($fieldErrors['cif']) ? ' role="alert"' : '' ?>><?= htmlspecialchars($fieldErrors['cif'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
+                        <label for="company-nif">NIF (Persona Jurídica) <span aria-hidden="true">*</span></label>
+                        <input id="company-nif" type="text" name="cif" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['cif'] ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="Ej. A28017895" aria-invalid="<?= isset($fieldErrors['cif']) ? 'true' : 'false' ?>" aria-describedby="company-nif-error"<?= $firstInvalidField === 'cif' ? ' autofocus' : '' ?> required>
+                        <small id="company-nif-error" data-field-error<?= isset($fieldErrors['cif']) ? ' role="alert"' : '' ?>><?= htmlspecialchars($fieldErrors['cif'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                     </div>
 
                     <div class="company-registration__field">

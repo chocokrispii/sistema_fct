@@ -479,12 +479,19 @@ se selecciona previamente: el fichero no crea por sí solo la base de datos.
   hashes.
 - [009_webhook_responses.sql](../database/migrations/009_webhook_responses.sql):
   añade las columnas para conservar respuestas HTTP de recepción y envío.
+- [015_solicitudes_reset_password.sql](../database/migrations/015_solicitudes_reset_password.sql):
+  crea solicitudes de restablecimiento de contraseña con aprobación y migra
+  las solicitudes pendientes del flujo anterior.
+- [016_audit_logs_aprobacion_empresas.sql](../database/migrations/016_audit_logs_aprobacion_empresas.sql):
+  crea `audit_logs` para conservar el administrador, la entidad y el registro
+  afectados, la IP y la fecha de las aprobaciones de empresa.
 
 Ninguna migración elige la base de datos mediante `USE`; quien las ejecuta debe
 seleccionar explícitamente la base correcta en phpMyAdmin o en el cliente SQL.
 La migración `001` debe omitirse cuando la columna ya tenga el nombre corregido.
 Las migraciones `002`–`009` admiten volver a ejecutarse tras completarse
-correctamente, pero no reparan objetos preexistentes con definiciones distintas.
+correctamente, al igual que `015` y `016`; no reparan objetos preexistentes con
+definiciones distintas.
 
 ### 9.3 Seeds
 

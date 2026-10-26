@@ -355,7 +355,8 @@ function assertFeatureSchema(PDO $db, string $databaseName): void
          WHERE TABLE_SCHEMA = :schema
            AND TABLE_NAME IN (
                \'usuarios\', \'empresas\', \'especialidades\', \'convenios\',
-               \'auditoria\', \'intentos_login\', \'solicitudes_reset_password\'
+               \'auditoria\', \'audit_logs\', \'intentos_login\',
+               \'solicitudes_reset_password\'
            )'
     );
     $statement->execute(['schema' => $databaseName]);
@@ -374,6 +375,10 @@ function assertFeatureSchema(PDO $db, string $databaseName): void
         'especialidades' => ['id', 'nombre_especialidad'],
         'convenios' => ['id', 'empresa_id', 'especialidad_id', 'numero_convenio', 'fecha_firma', 'fecha_inicio', 'fecha_fin', 'archivo_path'],
         'auditoria' => ['id', 'usuario_id', 'evento', 'entidad', 'entidad_id', 'detalle'],
+        'audit_logs' => [
+            'id', 'id_usuario_admin', 'nombre_completo', 'accion', 'entidad_afectada',
+            'id_registro_modificado', 'ip_address', 'timestamp',
+        ],
         'intentos_login' => ['id', 'email', 'ip', 'fecha'],
         'solicitudes_reset_password' => [
             'id', 'usuario_id', 'email', 'estado', 'token', 'expira_en',
@@ -862,8 +867,10 @@ try {
     expectRegression(
         $registrationPage['status'] === 200
             && str_contains($registrationPage['body'], 'name="sector"')
-            && str_contains($registrationPage['body'], 'name="dni_representante"'),
-        'The MVC company registration page should expose the required sector and representative identity fields.'
+            && str_contains($registrationPage['body'], 'name="dni_representante"')
+            && str_contains($registrationPage['body'], 'NIF (Persona Jurídica)')
+            && !str_contains($registrationPage['body'], 'CIF'),
+        'The MVC company registration page should expose the required fields and use the approved legal-person tax-ID terminology.'
     );
     $registrationEmail = 'http-regression-' . $nonce . '-public-company@example.invalid';
     $registrationPassword = 'Regression-Pass-' . substr($nonce, 0, 12);
@@ -1031,6 +1038,43 @@ try {
             && preg_match('#\Auploads/convenios-marco/[a-f0-9]{48}\.pdf\z#', (string)$approvedCompany['pdf_convenio_path']) === 1,
         'Approval should persist its state, agreement number, approval date, and private PDF path.'
     );
+    $approvalAuditQuery = $database->prepare(
+        "SELECT id_usuario_admin, nombre_completo, accion, entidad_afectada,
+                id_registro_modificado, ip_address, `timestamp`
+         FROM audit_logs
+         WHERE accion = 'APROBAR_EMPRESA' AND id_registro_modificado = :id
+         ORDER BY id DESC LIMIT 1"
+    );
+    $approvalAuditQuery->execute(['id' => $registeredCompany['id']]);
+    $approvalAudit = $approvalAuditQuery->fetch(PDO::FETCH_ASSOC);
+    expectRegression(
+        is_array($approvalAudit)
+            && (int)$approvalAudit['id_usuario_admin'] === (int)$admin['id']
+            && trim($approvalAudit['nombre_completo']) !== ''
+            && $approvalAudit['accion'] === 'APROBAR_EMPRESA'
+            && $approvalAudit['entidad_afectada'] === 'empresa'
+            && (int)$approvalAudit['id_registro_modificado'] === (int)$registeredCompany['id']
+            && filter_var($approvalAudit['ip_address'], FILTER_VALIDATE_IP) !== false
+            && is_string($approvalAudit['timestamp'])
+            && $approvalAudit['timestamp'] !== '',
+        'Approval should persist the mandatory audit_logs record with the administrator, action, entity, record, IP, and timestamp.'
+    );
+    $legacyApprovalAudit = $database->prepare(
+        "SELECT COUNT(*) FROM auditoria
+         WHERE usuario_id = :admin_id
+           AND evento = 'empresa.aprobada'
+           AND entidad = 'empresas'
+           AND entidad_id = :empresa_id"
+    );
+    $legacyApprovalAudit->execute([
+        'admin_id' => $admin['id'],
+        'empresa_id' => $registeredCompany['id'],
+    ]);
+    expectRegression(
+        (int)$legacyApprovalAudit->fetchColumn() === 1,
+        'Approval should continue writing its existing auditoria event alongside audit_logs.'
+    );
+    $passedTests[] = 'Company approval writes the required audit_logs record';
     $approvalFile = $storageRoot . DIRECTORY_SEPARATOR
         . str_replace('/', DIRECTORY_SEPARATOR, $approvedCompany['pdf_convenio_path']);
     $resolvedApprovalFile = realpath($approvalFile);
@@ -1052,6 +1096,13 @@ try {
     $approvedCompanyHtmlClient = new RegressionHttpClient($baseUrl);
     loginFixture(
         $approvedCompanyHtmlClient,
+        $registrationEmail,
+        $registrationPassword,
+        'Empresa'
+    );
+    $rejectedCompanyClient = new RegressionHttpClient($baseUrl);
+    loginFixture(
+        $rejectedCompanyClient,
         $registrationEmail,
         $registrationPassword,
         'Empresa'
@@ -1084,6 +1135,32 @@ try {
             $htmlStatusPage['status'] === 200
                 && str_contains($htmlStatusPage['body'], 'Su solicitud de convenio se encuentra en proceso de validación administrativa.'),
             'The protected-route redirect should show the company approval status message.'
+        );
+        $setRejected = $database->prepare("UPDATE empresas SET estado = 'Rechazada' WHERE id = :id");
+        $setRejected->execute(['id' => $registeredCompany['id']]);
+        $rejectedMiddleware = responseFailure($rejectedCompanyClient->request('GET', 'sedes'), 403);
+        expectRegression(
+            str_contains($rejectedMiddleware['error'], 'rechazada'),
+            'An existing company session should lose private access when its approval state is rejected.'
+        );
+        $rejectedLoginClient = new RegressionHttpClient($baseUrl);
+        $rejectedLoginCsrf = fetchCsrfToken($rejectedLoginClient);
+        $rejectedLogin = $rejectedLoginClient->request(
+            'POST',
+            'login',
+            [
+                'Content-Type' => 'application/json',
+                'X-CSRF-Token' => $rejectedLoginCsrf,
+            ],
+            json_encode([
+                'email' => $registrationEmail,
+                'password' => $registrationPassword,
+            ], JSON_THROW_ON_ERROR)
+        );
+        $rejectedLoginFailure = responseFailure($rejectedLogin, 403);
+        expectRegression(
+            str_contains($rejectedLoginFailure['error'], 'rechazada'),
+            'A rejected company should be denied login with an explanatory HTTP 403.'
         );
     } finally {
         $restoreApproval = $database->prepare("UPDATE empresas SET estado = 'Aprobada' WHERE id = :id");
@@ -1367,6 +1444,18 @@ try {
             }
             if ($fixtureCompanyIds !== []) {
                 $placeholders = implode(',', array_fill(0, count($fixtureCompanyIds), '?'));
+                $deleteApprovalEvent = $database->prepare(
+                    "DELETE FROM auditoria
+                     WHERE evento = 'empresa.aprobada'
+                       AND entidad = 'empresas'
+                       AND entidad_id IN ($placeholders)"
+                );
+                $deleteApprovalEvent->execute($fixtureCompanyIds);
+                $deleteApprovalAudit = $database->prepare(
+                    "DELETE FROM audit_logs
+                     WHERE accion = 'APROBAR_EMPRESA' AND id_registro_modificado IN ($placeholders)"
+                );
+                $deleteApprovalAudit->execute($fixtureCompanyIds);
                 $deleteCompanies = $database->prepare(
                     'DELETE FROM empresas WHERE id IN (' . $placeholders . ')'
                 );

@@ -6,7 +6,7 @@
     <div class="table-responsive" role="region" aria-label="Empresas registradas" tabindex="0">
     <table>
         <thead>
-            <tr><th>Empresa</th><th>CIF</th><th>Correo de la cuenta</th><th>Aprobación</th><th>Cuenta</th></tr>
+            <tr><th>Empresa</th><th>NIF (Persona Jurídica)</th><th>Correo de la cuenta</th><th>Aprobación</th><th>Cuenta</th></tr>
         </thead>
         <tbody>
             <?php foreach ($empresas as $empresa): ?>

@@ -83,7 +83,7 @@ class EmpresaController {
             $fieldErrors['password'] = 'La contraseña debe tener entre 12 y 72 bytes y no estar vacía.';
         }
         if (!SpanishDataValidator::isSpanishTaxId($cifNormalizado) || mb_strlen($cifNormalizado) > 20) {
-            $fieldErrors['cif'] = 'Introduce un CIF/NIF válido de hasta 20 caracteres.';
+            $fieldErrors['cif'] = 'Introduce un NIF (Persona Jurídica) válido de hasta 20 caracteres.';
         }
         if ($razonSocial === '' || mb_strlen($razonSocial) > 150) {
             $fieldErrors['razon_social'] = 'La razón social es obligatoria y no puede superar 150 caracteres.';
@@ -108,7 +108,7 @@ class EmpresaController {
         }
         if ($fieldErrors !== []) {
             $this->fallarRegistro(
-                'Revisa el correo, el CIF/NIF, la razón social y los datos del representante legal.',
+                'Revisa el correo, el NIF (Persona Jurídica), la razón social y los datos del representante legal.',
                 $values,
                 422,
                 $fieldErrors
@@ -118,12 +118,12 @@ class EmpresaController {
 
         if ($this->registroDuplicado($email, $cifNormalizado)) {
             $this->fallarRegistro(
-                'El correo o el CIF/NIF ya está registrado.',
+                'El correo o el NIF (Persona Jurídica) ya está registrado.',
                 $values,
                 409,
                 [
-                    'email' => 'El correo o el CIF/NIF ya está registrado.',
-                    'cif' => 'El correo o el CIF/NIF ya está registrado.',
+                    'email' => 'El correo o el NIF (Persona Jurídica) ya está registrado.',
+                    'cif' => 'El correo o el NIF (Persona Jurídica) ya está registrado.',
                 ]
             );
             return;
@@ -172,12 +172,12 @@ class EmpresaController {
             }
             if ($this->registroDuplicado($email, $cifNormalizado)) {
                 $this->fallarRegistro(
-                    'El correo o el CIF/NIF ya está registrado.',
+                    'El correo o el NIF (Persona Jurídica) ya está registrado.',
                     $values,
                     409,
                     [
-                        'email' => 'El correo o el CIF/NIF ya está registrado.',
-                        'cif' => 'El correo o el CIF/NIF ya está registrado.',
+                        'email' => 'El correo o el NIF (Persona Jurídica) ya está registrado.',
+                        'cif' => 'El correo o el NIF (Persona Jurídica) ya está registrado.',
                     ]
                 );
                 return;
@@ -350,6 +350,29 @@ class EmpresaController {
                 $empresaId,
                 'numero_convenio=' . trim($numeroConvenio)
             );
+            $adminQuery = $this->db->prepare(
+                "SELECT COALESCE(NULLIF(TRIM(CONCAT_WS(' ', c.nombre, c.apellidos)), ''), u.email) AS nombre_completo
+                 FROM usuarios u
+                 LEFT JOIN coordinadores c ON c.usuario_id = u.id
+                 WHERE u.id = :id"
+            );
+            $adminQuery->execute(['id' => $actorId]);
+            $nombreCompleto = $adminQuery->fetchColumn();
+            if (!is_string($nombreCompleto) || $nombreCompleto === '') {
+                throw new RuntimeException('No se pudo identificar al administrador que aprobó la empresa.');
+            }
+            $auditLog = $this->db->prepare(
+                "INSERT INTO audit_logs
+                    (id_usuario_admin, nombre_completo, accion, entidad_afectada, id_registro_modificado, ip_address)
+                 VALUES
+                    (:admin_id, :nombre_completo, 'APROBAR_EMPRESA', 'empresa', :registro_id, :ip_address)"
+            );
+            $auditLog->execute([
+                'admin_id' => $actorId,
+                'nombre_completo' => $nombreCompleto,
+                'registro_id' => $empresaId,
+                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+            ]);
             $this->db->commit();
         } catch (Throwable $exception) {
             if ($this->db->inTransaction()) {
