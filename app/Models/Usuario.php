@@ -86,9 +86,14 @@ class Usuario {
         return (int)$this->db->lastInsertId();
     }
 
-    public function cambiarContrasena(int $id, string $password): void
+    public function cambiarContrasena(int $id, string $password, bool $revocarSesiones = false): void
     {
-        $stmt = $this->db->prepare('UPDATE usuarios SET password_hash = :hash WHERE id = :id');
+        $sql = 'UPDATE usuarios SET password_hash = :hash';
+        if ($revocarSesiones) {
+            $sql .= ', session_version = session_version + 1';
+        }
+        $sql .= ' WHERE id = :id';
+        $stmt = $this->db->prepare($sql);
         $stmt->execute(['hash' => $this->hashPassword($password), 'id' => $id]);
     }
 

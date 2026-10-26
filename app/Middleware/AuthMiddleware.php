@@ -29,14 +29,18 @@ final class AuthMiddleware
         }
 
         $stmt = getPDOConnection()->prepare(
-            'SELECT u.rol, u.activo, e.estado AS estado_empresa
+            'SELECT u.rol, u.activo, u.session_version, e.estado AS estado_empresa
              FROM usuarios u
              LEFT JOIN empresas e ON e.usuario_id = u.id
              WHERE u.id = :id'
         );
         $stmt->execute(['id' => $userId]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$user || (int)$user['activo'] !== 1) {
+        if (
+            !$user
+            || (int)$user['activo'] !== 1
+            || (int)($user['session_version'] ?? 0) !== (int)($_SESSION['session_version'] ?? -1)
+        ) {
             if ($route === 'descargar-convenio') {
                 self::auditDeniedDownload((int)$userId, 'cuenta_inactiva');
             }

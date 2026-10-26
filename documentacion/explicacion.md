@@ -485,6 +485,12 @@ se selecciona previamente: el fichero no crea por sí solo la base de datos.
 - [016_audit_logs_aprobacion_empresas.sql](../database/migrations/016_audit_logs_aprobacion_empresas.sql):
   crea `audit_logs` para conservar el administrador, la entidad y el registro
   afectados, la IP y la fecha de las aprobaciones de empresa.
+- [017_password_reset_hardening.sql](../database/migrations/017_password_reset_hardening.sql):
+  añade la versión de sesión y los registros de limitación de solicitudes de
+  restablecimiento.
+- [018_estado_pendiente_aprobacion_reset.sql](../database/migrations/018_estado_pendiente_aprobacion_reset.sql):
+  usa `Pendiente_Aprobacion` como estado inicial de las solicitudes de
+  restablecimiento, preservando las solicitudes ya existentes.
 
 Ninguna migración elige la base de datos mediante `USE`; quien las ejecuta debe
 seleccionar explícitamente la base correcta en phpMyAdmin o en el cliente SQL.

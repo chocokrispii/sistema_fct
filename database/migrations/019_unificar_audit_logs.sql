@@ -1,0 +1,8 @@
+ALTER TABLE audit_logs
+    ADD COLUMN IF NOT EXISTS evento VARCHAR(100) NOT NULL DEFAULT 'accion_administrativa',
+    ADD COLUMN IF NOT EXISTS detalle VARCHAR(500) NULL;
+
+ALTER TABLE audit_logs
+    MODIFY COLUMN evento VARCHAR(100) NOT NULL DEFAULT 'accion_administrativa',
+    MODIFY COLUMN detalle VARCHAR(500) NULL,
+    MODIFY COLUMN ip_address VARCHAR(45) NULL;

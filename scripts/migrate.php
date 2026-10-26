@@ -154,6 +154,43 @@ function runMigration(PDO $db, string $file): void
                 $db->exec($statement);
             }
         }
+    } elseif ($version === '017_trazabilidad_administrativa.sql') {
+        $tableExists = $db->query(
+            "SELECT COUNT(*) FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audit_logs'"
+        )->fetchColumn() > 0;
+        if ($tableExists) {
+            $requiredColumns = [
+                'id_usuario_admin',
+                'nombre_completo',
+                'accion',
+                'entidad_afectada',
+                'id_registro_modificado',
+                'ip_address',
+            ];
+            $columnQuery = $db->prepare(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audit_logs'
+                   AND COLUMN_NAME = :column"
+            );
+            foreach ($requiredColumns as $column) {
+                $columnQuery->execute(['column' => $column]);
+                if ((int)$columnQuery->fetchColumn() !== 1) {
+                    throw new RuntimeException(
+                        "No se puede adoptar $version: audit_logs no contiene la columna requerida $column."
+                    );
+                }
+            }
+            echo "ADOPTADA $version (audit_logs ya existe; su esquema se armoniza en una migración posterior)\n";
+        } else {
+            $contents = file_get_contents($file);
+            if (!is_string($contents)) {
+                throw new RuntimeException("No se pudo leer la migración $version.");
+            }
+            foreach (splitSqlStatements($contents) as $statement) {
+                $db->exec($statement);
+            }
+        }
     } else {
         $contents = file_get_contents($file);
         if (!is_string($contents)) {

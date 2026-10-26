@@ -7,7 +7,7 @@ require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 
 class RecuperacionController
 {
-    private const MENSAJE_SOLICITUD = 'Su solicitud de restablecimiento ha sido enviada al Administrador. Recibirá un correo electrónico con las instrucciones una vez que sea aprobada.';
+    private const MENSAJE_SOLICITUD = 'Si la cuenta existe y está activa, se ha registrado la solicitud para revisión del centro.';
     private const MENSAJE_ENLACE_INVALIDO = 'El enlace no es válido o ha caducado.';
     private const SESSION_TOKEN_KEY = 'password_reset_token';
 
@@ -24,13 +24,14 @@ class RecuperacionController
             View::render('auth/recuperar', [
                 'error' => '',
                 'csrf' => CsrfMiddleware::token(),
+                'validezHoras' => SolicitudResetPassword::VALIDEZ_HORAS,
             ]);
             return;
         }
 
-        $email = $_POST['email'] ?? '';
-        if (is_string($email) && SpanishDataValidator::isEmail(trim($email))) {
-            $this->solicitudes->solicitar(mb_strtolower(trim($email)), new DateTimeImmutable());
+        $identifier = $_POST['identifier'] ?? $_POST['email'] ?? '';
+        if (is_string($identifier) && $this->validIdentifier(trim($identifier))) {
+            $this->solicitudes->solicitar($this->normalizeIdentifier(trim($identifier)), new DateTimeImmutable());
         }
         header('Location: index.php?action=recuperar&enviada=1');
         exit;
@@ -43,13 +44,13 @@ class RecuperacionController
             JsonResponse::failure('El cuerpo JSON de la solicitud no es válido.', 400);
             return;
         }
-        $email = $input['email'] ?? null;
-        if (!is_string($email) || !SpanishDataValidator::isEmail(trim($email))) {
-            JsonResponse::failure('Introduce un correo electrónico válido.', 422);
+        $identifier = $input['identifier'] ?? $input['email'] ?? null;
+        if (!is_string($identifier) || !$this->validIdentifier(trim($identifier))) {
+            JsonResponse::failure('Introduce un correo electrónico o documento de identidad válido.', 422);
             return;
         }
 
-        $this->solicitudes->solicitar(mb_strtolower(trim($email)), new DateTimeImmutable());
+        $this->solicitudes->solicitar($this->normalizeIdentifier(trim($identifier)), new DateTimeImmutable());
         JsonResponse::success(['message' => self::MENSAJE_SOLICITUD], 202);
     }
 
@@ -61,6 +62,7 @@ class RecuperacionController
             'aprobada' => ($_GET['aprobada'] ?? null) === '1',
             'rechazada' => ($_GET['rechazada'] ?? null) === '1',
             'error' => ($_GET['error'] ?? null) === '1',
+            'validezHoras' => SolicitudResetPassword::VALIDEZ_HORAS,
         ]);
     }
 
@@ -73,7 +75,11 @@ class RecuperacionController
         }
 
         $adminId = (int)($_SESSION['usuario_id'] ?? 0);
-        $approval = $this->solicitudes->aprobar($id, $adminId);
+        $approval = $this->solicitudes->aprobar(
+            $id,
+            $adminId,
+            is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : null
+        );
         if ($approval === null) {
             $this->respondAdminError(409, 'La solicitud ya no está pendiente.');
             return;
@@ -114,7 +120,11 @@ class RecuperacionController
             $this->respondAdminError(404, 'La solicitud ya no está pendiente.');
             return;
         }
-        if (!$this->solicitudes->rechazar($id)) {
+        if (!$this->solicitudes->rechazar(
+            $id,
+            (int)($_SESSION['usuario_id'] ?? 0),
+            is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : null
+        )) {
             $this->respondAdminError(409, 'La solicitud ya no está pendiente.');
             return;
         }
@@ -155,6 +165,7 @@ class RecuperacionController
                 'token' => '',
                 'csrf' => CsrfMiddleware::token(),
                 'error' => self::MENSAJE_ENLACE_INVALIDO,
+                'validezHoras' => SolicitudResetPassword::VALIDEZ_HORAS,
             ]);
             return;
         }
@@ -166,6 +177,7 @@ class RecuperacionController
                 'token' => $token,
                 'csrf' => CsrfMiddleware::token(),
                 'error' => '',
+                'validezHoras' => SolicitudResetPassword::VALIDEZ_HORAS,
             ]);
             return;
         }
@@ -183,6 +195,7 @@ class RecuperacionController
                 'token' => $token,
                 'csrf' => CsrfMiddleware::token(),
                 'error' => $error,
+                'validezHoras' => SolicitudResetPassword::VALIDEZ_HORAS,
             ]);
             return;
         }
@@ -196,12 +209,14 @@ class RecuperacionController
                 'token' => '',
                 'csrf' => CsrfMiddleware::token(),
                 'error' => self::MENSAJE_ENLACE_INVALIDO,
+                'validezHoras' => SolicitudResetPassword::VALIDEZ_HORAS,
             ]);
             return;
         }
 
         unset($_SESSION[self::SESSION_TOKEN_KEY]);
         (new IntentoLogin())->limpiar($email);
+        $this->cerrarSesionActual();
         header('Location: index.php?action=login&restablecida=1');
         exit;
     }
@@ -236,6 +251,7 @@ class RecuperacionController
             return;
         }
         (new IntentoLogin())->limpiar($email);
+        $this->cerrarSesionActual();
         JsonResponse::success(['message' => 'La contraseña se actualizó correctamente.']);
     }
 
@@ -276,5 +292,28 @@ class RecuperacionController
             return 'La contraseña debe incluir al menos una minúscula, una mayúscula y un número.';
         }
         return null;
+    }
+
+    private function validIdentifier(string $identifier): bool
+    {
+        return SpanishDataValidator::isEmail($identifier)
+            || SpanishDataValidator::isDniNie($identifier)
+            || SpanishDataValidator::isSpanishTaxId($identifier);
+    }
+
+    private function normalizeIdentifier(string $identifier): string
+    {
+        if (SpanishDataValidator::isEmail($identifier)) {
+            return mb_strtolower($identifier);
+        }
+        return SpanishDataValidator::normalizeDniNie($identifier);
+    }
+
+    private function cerrarSesionActual(): void
+    {
+        $_SESSION = [];
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
     }
 }

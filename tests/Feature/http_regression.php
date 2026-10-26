@@ -315,6 +315,12 @@ function validFixtureCif(string $nonce): string
     return 'B' . $digits . (string)((10 - ($sum % 10)) % 10);
 }
 
+function validFixtureDni(string $nonce): string
+{
+    $digits = substr(str_pad((string)hexdec(substr($nonce, 0, 7)), 8, '0', STR_PAD_LEFT), -8);
+    return $digits . 'TRWAGMYFPDXBNJZSQVHLCKE'[(int)$digits % 23];
+}
+
 function insertFixtureUser(
     PDO $db,
     string $nonce,
@@ -355,7 +361,7 @@ function assertFeatureSchema(PDO $db, string $databaseName): void
          WHERE TABLE_SCHEMA = :schema
            AND TABLE_NAME IN (
                \'usuarios\', \'empresas\', \'especialidades\', \'convenios\',
-               \'auditoria\', \'audit_logs\', \'intentos_login\',
+               \'auditoria\', \'audit_logs\', \'intentos_login\', \'intentos_reset_password\',
                \'solicitudes_reset_password\'
            )'
     );
@@ -366,7 +372,7 @@ function assertFeatureSchema(PDO $db, string $databaseName): void
     }
 
     $required = [
-        'usuarios' => ['id', 'email', 'password_hash', 'rol', 'activo'],
+        'usuarios' => ['id', 'email', 'password_hash', 'rol', 'activo', 'session_version'],
         'empresas' => [
             'id', 'usuario_id', 'nombre_empresa', 'nombre_comercial', 'cif_empresa',
             'representante_legal', 'dni_representante', 'estado', 'numero_convenio',
@@ -380,6 +386,9 @@ function assertFeatureSchema(PDO $db, string $databaseName): void
             'id_registro_modificado', 'ip_address', 'timestamp',
         ],
         'intentos_login' => ['id', 'email', 'ip', 'fecha'],
+        'intentos_reset_password' => [
+            'id', 'identificador_hash', 'ip_hash', 'solicitado_en',
+        ],
         'solicitudes_reset_password' => [
             'id', 'usuario_id', 'email', 'estado', 'token', 'expira_en',
             'solicitado_en', 'aprobado_en', 'aprobado_por',
@@ -424,6 +433,7 @@ if (
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../app/Controllers/DevelopmentPreviewController.php';
+require_once __DIR__ . '/../../app/Models/SolicitudResetPassword.php';
 
 $database = null;
 $serverProcess = null;
@@ -496,6 +506,23 @@ try {
     $companyOwner = insertFixtureUser($database, $nonce, 'empresa-a', 'Empresa', $fixtureEmails, $fixtureUserIds);
     $otherCompany = insertFixtureUser($database, $nonce, 'empresa-b', 'Empresa', $fixtureEmails, $fixtureUserIds);
     $admin = insertFixtureUser($database, $nonce, 'admin', 'Administrador', $fixtureEmails, $fixtureUserIds);
+    $studentIdentity = validFixtureDni($nonce);
+    $studentProfile = $database->prepare(
+        'INSERT INTO alumnos
+            (usuario_id, nombre, apellidos, dni, numero_seguridad_social, correo, especialidad_id)
+         VALUES (:usuario_id, \'HTTP\', \'Regression\', :dni, :nss, :correo, :especialidad)'
+    );
+    $studentProfile->execute([
+        'usuario_id' => $student['id'],
+        'dni' => $studentIdentity,
+        'nss' => 'HTTP' . substr($nonce, 0, 10),
+        'correo' => $student['email'],
+        'especialidad' => $fixtureSpecialtyId,
+    ]);
+    $database->prepare(
+        'INSERT INTO coordinadores (usuario_id, nombre, apellidos)
+         VALUES (:usuario_id, \'HTTP\', \'Administrator\')'
+    )->execute(['usuario_id' => $admin['id']]);
 
     $companyInsert = $database->prepare(
         "INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, estado)
@@ -699,6 +726,24 @@ try {
 
     $resetClient = new RegressionHttpClient($baseUrl);
     $resetCsrf = fetchCsrfToken($resetClient);
+    $resetForm = $resetClient->request(
+        'GET',
+        '/index.php?action=recuperar',
+        ['Accept' => 'text/html']
+    );
+    expectRegression(
+        $resetForm['status'] === 200
+            && str_contains($resetForm['body'], 'name="_csrf"')
+            && str_contains($resetForm['body'], 'name="identifier"'),
+        'The password recovery HTML fallback must retain an identifier field and a CSRF token.'
+    );
+    $missingResetCsrf = $resetClient->request(
+        'POST',
+        '/api/auth/solicitar-reset-password',
+        ['Content-Type' => 'application/json'],
+        json_encode(['identifier' => $student['email']], JSON_THROW_ON_ERROR)
+    );
+    responseFailure($missingResetCsrf, 403);
     $resetRequestBody = json_encode(['email' => $student['email']], JSON_THROW_ON_ERROR);
     $resetRequest = $resetClient->request(
         'POST',
@@ -714,14 +759,38 @@ try {
         json_encode(['email' => 'unknown-' . $nonce . '@example.invalid'], JSON_THROW_ON_ERROR)
     );
     $unknownResetData = responseData($unknownResetRequest, 202);
+    $dniResetRequest = $resetClient->request(
+        'POST',
+        '/api/auth/solicitar-reset-password',
+        ['Content-Type' => 'application/json', 'X-CSRF-Token' => $resetCsrf],
+        json_encode(['identifier' => $studentIdentity], JSON_THROW_ON_ERROR)
+    );
+    $dniResetData = responseData($dniResetRequest, 202);
+    $nieResetRequest = $resetClient->request(
+        'POST',
+        '/api/auth/solicitar-reset-password',
+        ['Content-Type' => 'application/json', 'X-CSRF-Token' => $resetCsrf],
+        json_encode(['identifier' => 'X1234567L'], JSON_THROW_ON_ERROR)
+    );
+    $nieResetData = responseData($nieResetRequest, 202);
+    $nifResetRequest = $resetClient->request(
+        'POST',
+        '/api/auth/solicitar-reset-password',
+        ['Content-Type' => 'application/json', 'X-CSRF-Token' => $resetCsrf],
+        json_encode(['identifier' => validFixtureCif('abcdef0123456789')], JSON_THROW_ON_ERROR)
+    );
+    $nifResetData = responseData($nifResetRequest, 202);
     expectRegression(
         $resetRequestData['message'] === $unknownResetData['message']
-            && str_contains($resetRequestData['message'], 'enviada al Administrador'),
-        'Reset requests must confirm identically for known and unknown email addresses.'
+            && $resetRequestData['message'] === $dniResetData['message']
+            && $resetRequestData['message'] === $nieResetData['message']
+            && $resetRequestData['message'] === $nifResetData['message']
+            && $resetRequestData['message'] === 'Si la cuenta existe y está activa, se ha registrado la solicitud para revisión del centro.',
+        'Reset requests must accept email/DNI identifiers and confirm identically for known and unknown accounts.'
     );
     $resetRequestCount = $database->prepare(
         "SELECT COUNT(*) FROM solicitudes_reset_password
-         WHERE usuario_id = :usuario AND estado = 'Pendiente'"
+         WHERE usuario_id = :usuario AND estado = 'Pendiente_Aprobacion'"
     );
     $resetRequestCount->execute(['usuario' => $student['id']]);
     expectRegression(
@@ -739,12 +808,13 @@ try {
         $resetAdminPage['status'] === 200
             && str_contains($resetAdminPage['body'], $student['email'])
             && str_contains($resetAdminPage['body'], 'Aprobar y enviar enlace')
-            && str_contains($resetAdminPage['body'], 'Rechazar'),
+            && str_contains($resetAdminPage['body'], 'Rechazar')
+            && str_contains($resetAdminPage['body'], 'name="_csrf"'),
         'The Administrator reset panel should list pending requests with approve and reject actions.'
     );
     $pendingResetId = (int)$database->query(
         "SELECT id FROM solicitudes_reset_password
-         WHERE usuario_id = " . (int)$student['id'] . " AND estado = 'Pendiente'
+         WHERE usuario_id = " . (int)$student['id'] . " AND estado = 'Pendiente_Aprobacion'
          ORDER BY id DESC LIMIT 1"
     )->fetchColumn();
     expectRegression($pendingResetId > 0, 'The pending reset request should have a request identifier.');
@@ -771,6 +841,71 @@ try {
         'Approving a reset request should dispatch an email containing a 64-character reset token.'
     );
     $resetToken = $resetTokenMatch[1];
+    $approvalAuditQuery = $database->prepare(
+        "SELECT id_usuario_admin, nombre_completo, accion, entidad_afectada,
+                id_registro_modificado, ip_address
+         FROM audit_logs
+         WHERE accion = 'APROBAR_RECUPERACION_PASSWORD'
+           AND id_registro_modificado = :usuario
+         ORDER BY id DESC LIMIT 1"
+    );
+    $approvalAuditQuery->execute(['usuario' => $student['id']]);
+    $resetApprovalAudit = $approvalAuditQuery->fetch(PDO::FETCH_ASSOC);
+    expectRegression(
+        is_array($resetApprovalAudit)
+            && (int)$resetApprovalAudit['id_usuario_admin'] === (int)$admin['id']
+            && $resetApprovalAudit['nombre_completo'] === 'HTTP Administrator'
+            && $resetApprovalAudit['accion'] === 'APROBAR_RECUPERACION_PASSWORD'
+            && $resetApprovalAudit['entidad_afectada'] === 'usuario'
+            && (int)$resetApprovalAudit['id_registro_modificado'] === (int)$student['id']
+            && filter_var($resetApprovalAudit['ip_address'], FILTER_VALIDATE_IP) !== false,
+        'Password reset approval must atomically persist the required administrator audit record.'
+    );
+    $priorReset = $database->prepare(
+        "INSERT INTO solicitudes_reset_password (usuario_id, email, estado)
+         VALUES (:usuario, :email, 'Pendiente_Aprobacion')"
+    );
+    $priorReset->execute(['usuario' => $student['id'], 'email' => $student['email']]);
+    $priorApprovalId = (int)$database->lastInsertId();
+    $secondApproval = $resetAdminClient->request(
+        'POST',
+        '/api/admin/solicitudes-password/' . $priorApprovalId . '/aprobar',
+        ['Content-Type' => 'application/json', 'X-CSRF-Token' => $resetAdminCsrf],
+        '{}'
+    );
+    responseData($secondApproval);
+    $expiredPriorToken = $database->prepare(
+        'SELECT estado, token FROM solicitudes_reset_password WHERE id = :id'
+    );
+    $expiredPriorToken->execute(['id' => $pendingResetId]);
+    $expiredPriorTokenRow = $expiredPriorToken->fetch(PDO::FETCH_ASSOC);
+    expectRegression(
+        is_array($expiredPriorTokenRow)
+            && $expiredPriorTokenRow['estado'] === 'Expirada'
+            && $expiredPriorTokenRow['token'] === null,
+        'Approving a new reset token must invalidate every other active token for the same user.'
+    );
+    $mailMessages = file($storageRoot . DIRECTORY_SEPARATOR . 'mailbox.jsonl', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $secondMail = is_array($mailMessages) && $mailMessages !== []
+        ? json_decode((string)end($mailMessages), true)
+        : null;
+    expectRegression(
+        is_array($secondMail)
+            && preg_match('/[?&]token=([a-f0-9]{64})/', (string)($secondMail['body'] ?? ''), $secondTokenMatch) === 1,
+        'The replacement approved token should be delivered without exposing it in the response.'
+    );
+    $invalidatedTokenResponse = $resetClient->request(
+        'POST',
+        '/api/auth/confirmar-reset-password',
+        ['Content-Type' => 'application/json', 'X-CSRF-Token' => $resetCsrf],
+        json_encode([
+            'token' => $resetToken,
+            'password' => 'NewResetPassword123!',
+            'confirm_password' => 'NewResetPassword123!',
+        ], JSON_THROW_ON_ERROR)
+    );
+    responseFailure($invalidatedTokenResponse, 410);
+    $resetToken = $secondTokenMatch[1];
     $storedReset = $database->prepare(
         'SELECT estado, token, expira_en, aprobado_en, aprobado_por,
                 TIMESTAMPDIFF(SECOND, aprobado_en, expira_en) AS validez_segundos
@@ -825,6 +960,12 @@ try {
             && $usedResetRow['token'] === null,
         'Confirmation should update the password and immediately consume the token.'
     );
+    $revokedSession = $studentClient->request('GET', 'session');
+    expectRegression(
+        responseData($revokedSession)['user'] === null,
+        'A password reset must invalidate an already authenticated session for the account.'
+    );
+    $resetCsrf = fetchCsrfToken($resetClient);
     $reusedToken = $resetClient->request(
         'POST',
         '/api/auth/confirmar-reset-password',
@@ -846,7 +987,7 @@ try {
     );
     $rejectedRequestId = (int)$database->query(
         "SELECT id FROM solicitudes_reset_password
-         WHERE usuario_id = " . (int)$student['id'] . " AND estado = 'Pendiente'
+         WHERE usuario_id = " . (int)$student['id'] . " AND estado = 'Pendiente_Aprobacion'
          ORDER BY id DESC LIMIT 1"
     )->fetchColumn();
     $rejectedRequest = $resetAdminClient->request(
@@ -859,6 +1000,69 @@ try {
         responseData($rejectedRequest)['estado'] === 'Rechazada',
         'An Administrator should be able to reject a pending reset request.'
     );
+    $rejectAudit = $database->prepare(
+        "SELECT id_usuario_admin, nombre_completo, accion, entidad_afectada, id_registro_modificado, ip_address
+         FROM audit_logs
+         WHERE accion = 'RECHAZAR_RECUPERACION_PASSWORD'
+           AND id_registro_modificado = :usuario
+         ORDER BY id DESC LIMIT 1"
+    );
+    $rejectAudit->execute(['usuario' => $student['id']]);
+    $rejectAuditRow = $rejectAudit->fetch(PDO::FETCH_ASSOC);
+    expectRegression(
+        is_array($rejectAuditRow)
+            && (int)$rejectAuditRow['id_usuario_admin'] === (int)$admin['id']
+            && $rejectAuditRow['nombre_completo'] === 'HTTP Administrator'
+            && $rejectAuditRow['accion'] === 'RECHAZAR_RECUPERACION_PASSWORD'
+            && $rejectAuditRow['entidad_afectada'] === 'usuario'
+            && (int)$rejectAuditRow['id_registro_modificado'] === (int)$student['id']
+            && filter_var($rejectAuditRow['ip_address'], FILTER_VALIDATE_IP) !== false,
+        'Password reset rejection must persist the required administrator audit record.'
+    );
+    $originalRemoteAddress = $_SERVER['REMOTE_ADDR'] ?? null;
+    $_SERVER['REMOTE_ADDR'] = '198.51.100.77';
+    $resetModel = new SolicitudResetPassword($database);
+    for ($rateAttempt = 0; $rateAttempt < 31; $rateAttempt++) {
+        $resetModel->solicitar(
+            'rate-limit-' . $rateAttempt . '@example.invalid',
+            new DateTimeImmutable()
+        );
+    }
+    $resetModel->solicitar($companyOwner['email'], new DateTimeImmutable());
+    $companyResetCount = $database->prepare(
+        "SELECT COUNT(*) FROM solicitudes_reset_password
+         WHERE usuario_id = :usuario AND estado = 'Pendiente_Aprobacion'"
+    );
+    $companyResetCount->execute(['usuario' => $companyOwner['id']]);
+    expectRegression(
+        (int)$companyResetCount->fetchColumn() === 0,
+        'Reset requests must enforce a per-IP throttle without exposing rate-limit state to callers.'
+    );
+    if ($originalRemoteAddress === null) {
+        unset($_SERVER['REMOTE_ADDR']);
+    } else {
+        $_SERVER['REMOTE_ADDR'] = $originalRemoteAddress;
+    }
+    for ($identifierAttempt = 0; $identifierAttempt < 5; $identifierAttempt++) {
+        $_SERVER['REMOTE_ADDR'] = '203.0.113.' . ($identifierAttempt + 1);
+        $resetModel->solicitar($companyOwner['email'], new DateTimeImmutable());
+    }
+    $database->prepare(
+        "DELETE FROM solicitudes_reset_password
+         WHERE usuario_id = :usuario AND estado = 'Pendiente_Aprobacion'"
+    )->execute(['usuario' => $companyOwner['id']]);
+    $_SERVER['REMOTE_ADDR'] = '203.0.113.6';
+    $resetModel->solicitar($companyOwner['email'], new DateTimeImmutable());
+    $companyResetCount->execute(['usuario' => $companyOwner['id']]);
+    expectRegression(
+        (int)$companyResetCount->fetchColumn() === 0,
+        'Reset requests must enforce an identifier-specific throttle across source IPs.'
+    );
+    if ($originalRemoteAddress === null) {
+        unset($_SERVER['REMOTE_ADDR']);
+    } else {
+        $_SERVER['REMOTE_ADDR'] = $originalRemoteAddress;
+    }
     $passedTests[] = 'Administrator can reject pending reset requests';
 
     $registrationClient = new RegressionHttpClient($baseUrl);
@@ -1168,6 +1372,7 @@ try {
     }
     $passedTests[] = 'Admin approval scans and stores the private PDF and gates existing company sessions by state';
 
+    $studentCsrf = loginFixture($studentClient, $student['email'], $newPassword, 'Alumno');
     $staleStudentCookie = $studentClient->cookieHeader();
     expectRegression($staleStudentCookie !== '', 'An authenticated HTTP session cookie should be present.');
     $logoutResponse = $studentClient->request(

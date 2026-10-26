@@ -2,14 +2,14 @@
     <p class="message message-error" role="alert">La solicitud ya no está pendiente o no se pudo enviar el correo. Revisa la configuración de correo e inténtalo de nuevo.</p>
 <?php endif; ?>
 <?php if ($aprobada): ?>
-    <p class="message message-success" role="status">La solicitud se aprobó y el enlace de 24 horas se envió por correo.</p>
+    <p class="message message-success" role="status">La solicitud se aprobó y el enlace de <?= (int)($validezHoras ?? SolicitudResetPassword::VALIDEZ_HORAS) ?> horas se envió por correo.</p>
 <?php endif; ?>
 <?php if ($rechazada): ?>
     <p class="message message-success" role="status">La solicitud se rechazó correctamente.</p>
 <?php endif; ?>
 <section class="password-reset-requests" data-password-reset-requests aria-labelledby="password-reset-requests-title">
 <h2 id="password-reset-requests-title">Solicitudes de restablecimiento pendientes</h2>
-<p>Al aprobar, se envía al correo de la cuenta un enlace de un solo uso válido durante 24 horas.</p>
+<p>Al aprobar, se envía al correo de la cuenta un enlace de un solo uso válido durante <?= (int)($validezHoras ?? SolicitudResetPassword::VALIDEZ_HORAS) ?> horas.</p>
 <?php if ($recuperaciones === []): ?>
     <p class="password-reset-requests__empty">No hay solicitudes pendientes.</p>
 <?php else: ?>

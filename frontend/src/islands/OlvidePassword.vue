@@ -14,9 +14,9 @@ async function submitRequest(event: SubmitEvent): Promise<void> {
         return;
     }
 
-    const emailInput = form.querySelector<HTMLInputElement>('input[name="email"]');
-    if (!emailInput || !emailInput.validity.valid) {
-        emailInput?.focus();
+    const identifierInput = form.querySelector<HTMLInputElement>('input[name="identifier"], input[name="email"]');
+    if (!identifierInput || !identifierInput.value.trim()) {
+        identifierInput?.focus();
         return;
     }
 
@@ -32,11 +32,11 @@ async function submitRequest(event: SubmitEvent): Promise<void> {
         const result = await requestApi<{ message: string }>('api/auth/solicitar-reset-password', {
             method: 'POST',
             headers: { 'X-CSRF-Token': props.csrfToken },
-            body: JSON.stringify({ email: emailInput.value }),
+            body: JSON.stringify({ identifier: identifierInput.value }),
         });
         status.value = 'sent';
         message.value = result.message;
-        emailInput.value = '';
+        identifierInput.value = '';
         await nextTick();
         root.value?.querySelector<HTMLElement>('[role="status"]')?.focus();
     } catch (cause) {

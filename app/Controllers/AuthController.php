@@ -104,6 +104,7 @@ class AuthController {
         $_SESSION['usuario_id'] = (int)$usuario['id'];
         $_SESSION['email']      = $usuario['email'];
         $_SESSION['rol']        = $usuario['rol'];
+        $_SESSION['session_version'] = (int)($usuario['session_version'] ?? 0);
 
         if (JsonResponse::wantsJson()) {
             JsonResponse::success([
@@ -130,11 +131,15 @@ class AuthController {
 
         if ($userId !== false) {
             $stmt = getPDOConnection()->prepare(
-                'SELECT id, email, rol, activo FROM usuarios WHERE id = :id'
+                'SELECT id, email, rol, activo, session_version FROM usuarios WHERE id = :id'
             );
             $stmt->execute(['id' => $userId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (is_array($row) && (int)$row['activo'] === 1) {
+            if (
+                is_array($row)
+                && (int)$row['activo'] === 1
+                && (int)($row['session_version'] ?? 0) === (int)($_SESSION['session_version'] ?? -1)
+            ) {
                 if ($row['rol'] === 'Empresa') {
                     $approvalState = $this->empresaApprovalState((int)$row['id']);
                     if ($approvalState !== 'Aprobada') {
@@ -151,6 +156,7 @@ class AuthController {
                 }
                 $_SESSION['email'] = $row['email'];
                 $_SESSION['rol'] = $row['rol'];
+                $_SESSION['session_version'] = (int)$row['session_version'];
                 $user = $this->sessionUser($row);
             } else {
                 $_SESSION = [];

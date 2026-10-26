@@ -135,16 +135,22 @@ ClamAV y se guarda como archivo aleatorio en
 
 | Método | Ruta | Acceso y acción |
 |---|---|---|
-| POST | `/api/auth/solicitar-reset-password` | Público con CSRF; respuesta genérica HTTP 202 para evitar enumerar cuentas. |
-| POST | `/api/admin/solicitudes-password/{id}/aprobar` | Administrador con CSRF; crea un token aleatorio, guarda sólo su SHA-256 y envía un enlace válido 24 horas. |
-| POST | `/api/admin/solicitudes-password/{id}/rechazar` | Administrador con CSRF; rechaza la solicitud pendiente. |
+| POST | `/api/auth/solicitar-reset-password` | Público con CSRF; acepta correo o DNI/NIE/NIF, respuesta genérica HTTP 202 y límites de frecuencia para evitar enumerar cuentas y solicitudes abusivas. |
+| POST | `/api/admin/solicitudes-password/{id}/aprobar` | Administrador con CSRF; invalida tokens anteriores, crea un token aleatorio, guarda sólo su SHA-256, fija una validez de 24 horas, envía el enlace y registra la acción en `audit_logs`. |
+| POST | `/api/admin/solicitudes-password/{id}/rechazar` | Administrador con CSRF; rechaza la solicitud pendiente y registra la acción en `audit_logs`. |
 | POST | `/api/auth/confirmar-reset-password` | Público con CSRF; valida token vigente, contraseña y confirmación, y consume el enlace. |
 
 La gestión MVC está disponible en `/admin/solicitudes-password`; las páginas
-`recuperar` y `/restablecer-password?token=...` mantienen fallback PHP. El envío
-de correo requiere configurar `FCT_PUBLIC_BASE_URL`, `FCT_MAIL_FROM` y un MTA
-compatible con PHP `mail()`. Si falla el envío, la solicitud vuelve a estado
-pendiente y no se muestra ni se registra el token en claro.
+`recuperar` y `/restablecer-password?token=...` mantienen fallback PHP. El
+mensaje de solicitud es idéntico tanto si existe la cuenta como si no; el
+limitador acepta como máximo cinco solicitudes por identificador y treinta por
+IP en quince minutos. En desarrollo, activa el perfil `dev` para usar Mailpit.
+En producción configura `FCT_PUBLIC_BASE_URL` con HTTPS, `FCT_MAIL_HOST`,
+`FCT_MAIL_PORT`, `FCT_MAIL_FROM`, `FCT_MAIL_USERNAME`,
+`FCT_MAIL_PASSWORD`, `FCT_MAIL_ENCRYPTION` (`starttls` o `ssl`) y una clave
+aleatoria y privada en `FCT_RESET_RATE_LIMIT_KEY`. Si falla el envío, la
+solicitud vuelve a estado pendiente; nunca se muestra ni se registra el token
+en claro. Al cambiar la contraseña también se revocan las sesiones existentes.
 
 ### Relación con los permisos MVC
 

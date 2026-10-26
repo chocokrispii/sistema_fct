@@ -22,7 +22,7 @@ Set-Location .\Practicas_Desarrollo
 Copy-Item .env.example .env
 ```
 
-La plantilla local define `PMA_PORT=8082`, `APP_ENV=development` y `FCT_CLAMAV_ENABLED=false`. Ese último valor omite explícitamente el escaneo para facilitar pruebas locales; el bypass sólo se acepta con `APP_ENV=development`, `test` o `testing`. Si no se definen variables, Compose usa `APP_ENV=production` y mantiene el análisis habilitado (`FCT_CLAMAV_ENABLED=true`).
+La plantilla local define `PMA_PORT=8082`, activa el perfil `dev` para Mailpit y establece `APP_ENV=development` y `FCT_CLAMAV_ENABLED=false`. Ese último valor omite explícitamente el escaneo para facilitar pruebas locales; el bypass sólo se acepta con `APP_ENV=development`, `test` o `testing`. Si no se definen variables, Compose usa `APP_ENV=production` y mantiene el análisis habilitado (`FCT_CLAMAV_ENABLED=true`).
 
 Inicia los servicios y genera cuentas demo:
 
@@ -46,6 +46,7 @@ Para desarrollo sin antivirus, define ambos valores `APP_ENV=development` y `FCT
 |---|---|
 | Aplicación PHP | `http://localhost:8080` (configurable con `APP_PORT`) |
 | phpMyAdmin | `http://localhost:8082` (configurable con `PMA_PORT`, sólo loopback) |
+| Mailpit (correo local) | `http://localhost:8026` (perfil `dev`, configurable con `MAILPIT_UI_PORT`; SMTP interno en `mailpit:1025`) |
 | MariaDB desde el host | `127.0.0.1:3307` (mapeo fijo en `docker-compose.yml`) |
 | ClamAV desde el host, para pruebas | `127.0.0.1:3310` (sólo loopback) |
 | Vista previa de disponibilidad | `http://localhost:8080/index.php?action=preview-disponibilidad` |

@@ -15,7 +15,7 @@
     <?php endif; ?>
     <label for="nueva-password">Nueva contraseña</label>
     <input id="nueva-password" type="password" name="password" minlength="12" maxlength="72" autocomplete="new-password" aria-describedby="reset-password-help" required>
-    <small id="reset-password-help">12-72 bytes; incluye mayúscula, minúscula y número.</small>
+    <small id="reset-password-help">12-72 bytes; incluye mayúscula, minúscula y número. El enlace vence a las <?= (int)($validezHoras ?? SolicitudResetPassword::VALIDEZ_HORAS) ?> horas.</small>
     <label for="confirmar-password">Confirmar nueva contraseña</label>
     <input id="confirmar-password" type="password" name="confirm_password" minlength="12" maxlength="72" autocomplete="new-password" required>
     <button type="submit">Guardar contraseña</button>

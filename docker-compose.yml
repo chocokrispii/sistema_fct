@@ -45,6 +45,12 @@ services:
       FCT_WEBHOOK_OUTBOUND_SECRET: ${FCT_WEBHOOK_OUTBOUND_SECRET:-}
       FCT_PUBLIC_BASE_URL: ${FCT_PUBLIC_BASE_URL:-}
       FCT_MAIL_FROM: ${FCT_MAIL_FROM:-}
+      FCT_MAIL_HOST: ${FCT_MAIL_HOST:-mailpit}
+      FCT_MAIL_PORT: ${FCT_MAIL_PORT:-1025}
+      FCT_MAIL_USERNAME: ${FCT_MAIL_USERNAME:-}
+      FCT_MAIL_PASSWORD: ${FCT_MAIL_PASSWORD:-}
+      FCT_MAIL_ENCRYPTION: ${FCT_MAIL_ENCRYPTION:-none}
+      FCT_RESET_RATE_LIMIT_KEY: ${FCT_RESET_RATE_LIMIT_KEY:-${FCT_DB_PASS:-fct_local_dev}}
     ports:
       - "${APP_PORT:-8080}:80"
     volumes:
@@ -91,6 +97,8 @@ services:
       - ./database/migrations/012_jornada_ofertas.sql:/docker-entrypoint-initdb.d/015-jornada-ofertas.sql:ro
       - ./database/migrations/015_solicitudes_reset_password.sql:/docker-entrypoint-initdb.d/016-reset-password.sql:ro
       - ./database/migrations/016_audit_logs_aprobacion_empresas.sql:/docker-entrypoint-initdb.d/017-audit-logs.sql:ro
+      - ./database/migrations/017_password_reset_hardening.sql:/docker-entrypoint-initdb.d/018-password-reset-hardening.sql:ro
+      - ./database/migrations/018_estado_pendiente_aprobacion_reset.sql:/docker-entrypoint-initdb.d/019-password-reset-pending-status.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -134,6 +142,15 @@ services:
       timeout: 5s
       retries: 30
       start_period: 30m
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    profiles:
+      - dev
+    ports:
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1026}:1025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8026}:8025"
     restart: unless-stopped
 
 volumes:

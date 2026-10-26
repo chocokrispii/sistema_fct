@@ -424,7 +424,7 @@ try {
     $recoveryModel->solicitar($emails[0], $recoveryNow);
     $recoveryCount = $db->prepare(
         "SELECT COUNT(*) FROM solicitudes_reset_password
-         WHERE usuario_id = :usuario AND estado = 'Pendiente'"
+         WHERE usuario_id = :usuario AND estado = 'Pendiente_Aprobacion'"
     );
     $recoveryCount->execute(['usuario' => $createdUsers[1]]);
     assertTrue(
@@ -438,7 +438,7 @@ try {
     );
     $recoveryId = (int)$db->query(
         "SELECT id FROM solicitudes_reset_password
-         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente'"
+         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente_Aprobacion'"
     )->fetchColumn();
     $approvedReset = $recoveryModel->aprobar($recoveryId, $createdUsers[4]);
     $recoveryToken = is_array($approvedReset) ? $approvedReset['token'] : null;
@@ -483,7 +483,7 @@ try {
     $recoveryModel->solicitar($emails[0], new DateTimeImmutable());
     $expiryRequestId = (int)$db->query(
         "SELECT id FROM solicitudes_reset_password
-         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente'
+         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente_Aprobacion'
          ORDER BY solicitado_en DESC LIMIT 1"
     )->fetchColumn();
     $expiryRequest = $recoveryModel->aprobar($expiryRequestId, $createdUsers[4]);
@@ -504,11 +504,11 @@ try {
     $recoveryModel->solicitar($emails[0], new DateTimeImmutable());
     $rejectRequestId = (int)$db->query(
         "SELECT id FROM solicitudes_reset_password
-         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente'
+         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente_Aprobacion'
          ORDER BY solicitado_en DESC LIMIT 1"
     )->fetchColumn();
     assertTrue(
-        $recoveryModel->rechazar($rejectRequestId)
+        $recoveryModel->rechazar($rejectRequestId, $createdUsers[4])
             && $db->query(
                 'SELECT estado FROM solicitudes_reset_password WHERE id = ' . $rejectRequestId
             )->fetchColumn() === 'Rechazada',
