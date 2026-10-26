@@ -44,11 +44,11 @@ if ($rolActual === 'Empresa') {
         ['Asignaciones', 'index.php?action=asignaciones', 'calendario'],
         ['Consultas', 'index.php?action=consultas', 'buscar'],
         ['Calificaciones', 'index.php?action=calificaciones', 'estrella'],
-        ['Recuperaciones', 'index.php?action=recuperaciones', 'refrescar'],
     ]);
     if ($rolActual === 'Administrador') {
         $navItems = array_merge($navItems, [
             ['Solicitudes de empresa', 'admin/convenios', 'check'],
+            ['Solicitudes de restablecimiento', 'admin/solicitudes-password', 'refrescar'],
             ['Usuarios', 'index.php?action=usuarios', 'usuario'],
             ['Tokens API', 'index.php?action=api-tokens', 'refrescar'],
             ['Pruebas API y webhooks', 'index.php?action=pruebas-integracion', 'refrescar'],

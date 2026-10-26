@@ -29,7 +29,7 @@ require_once __DIR__ . '/../app/Models/Alumno.php';
 require_once __DIR__ . '/../app/Models/Disponibilidad.php';
 require_once __DIR__ . '/../app/Models/Calificacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
-require_once __DIR__ . '/../app/Models/RecuperacionCuenta.php';
+require_once __DIR__ . '/../app/Models/SolicitudResetPassword.php';
 require_once __DIR__ . '/../app/Models/Usuario.php';
 require_once __DIR__ . '/../app/Models/Especialidad.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
@@ -158,6 +158,10 @@ $required = [
     'ubicacion_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'ubicacion'],
     'requisitos_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'requisitos'],
     'tecnologias_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'tecnologias'],
+    'reset_request_status' => ['table' => 'solicitudes_reset_password', 'column' => 'estado'],
+    'reset_request_token' => ['table' => 'solicitudes_reset_password', 'column' => 'token'],
+    'reset_request_expiry' => ['table' => 'solicitudes_reset_password', 'column' => 'expira_en'],
+    'reset_request_approver' => ['table' => 'solicitudes_reset_password', 'column' => 'aprobado_por'],
 ];
 foreach ($required as $name => $definition) {
     $stmt = $db->prepare(
@@ -397,28 +401,30 @@ try {
 
     $recoveryIndex = $db->prepare(
         "SELECT COUNT(*) FROM information_schema.STATISTICS
-         WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = 'recuperaciones_cuenta'
-           AND INDEX_NAME = 'uq_recuperacion_token_hash' AND NON_UNIQUE = 0"
+         WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = 'solicitudes_reset_password'
+           AND INDEX_NAME = 'uq_reset_token' AND NON_UNIQUE = 0"
     );
     $recoveryIndex->execute(['schema' => $testDatabase]);
     assertTrue((int)$recoveryIndex->fetchColumn() === 1, 'Falta el índice único para tokens de recuperación.');
 
-    $recoveryNow = new DateTimeImmutable('2026-10-16 12:00:00');
+    $recoveryNow = new DateTimeImmutable();
     $oldRecovery = $db->prepare(
-        "INSERT INTO recuperaciones_cuenta (usuario_id, estado, creada)
-         VALUES (:usuario, 'Solicitada', :creada)"
+        "INSERT INTO solicitudes_reset_password
+            (usuario_id, email, estado, solicitado_en)
+         VALUES (:usuario, :email, 'Expirada', :solicitado)"
     );
     $oldRecovery->execute([
         'usuario' => $createdUsers[1],
-        'creada' => $recoveryNow->modify('-' . (RecuperacionCuenta::RETENCION_DIAS + 1) . ' days')->format('Y-m-d H:i:s'),
+        'email' => $emails[1],
+        'solicitado' => $recoveryNow->modify('-' . (SolicitudResetPassword::RETENCION_DIAS + 1) . ' days')->format('Y-m-d H:i:s'),
     ]);
-    $recoveryModel = new RecuperacionCuenta($db);
+    $recoveryModel = new SolicitudResetPassword($db);
     $recoveryModel->solicitar($emails[1], $recoveryNow);
     $recoveryModel->solicitar($emails[0], $recoveryNow);
     $recoveryModel->solicitar($emails[0], $recoveryNow);
     $recoveryCount = $db->prepare(
-        "SELECT COUNT(*) FROM recuperaciones_cuenta
-         WHERE usuario_id = :usuario AND estado = 'Solicitada'"
+        "SELECT COUNT(*) FROM solicitudes_reset_password
+         WHERE usuario_id = :usuario AND estado = 'Pendiente'"
     );
     $recoveryCount->execute(['usuario' => $createdUsers[1]]);
     assertTrue(
@@ -431,37 +437,82 @@ try {
         'Las solicitudes repetidas de recuperación deben conservar una sola petición pendiente.'
     );
     $recoveryId = (int)$db->query(
-        "SELECT id FROM recuperaciones_cuenta
-         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Solicitada'"
+        "SELECT id FROM solicitudes_reset_password
+         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente'"
     )->fetchColumn();
-    $recoveryToken = $recoveryModel->emitirEnlace($recoveryId, $recoveryNow);
+    $approvedReset = $recoveryModel->aprobar($recoveryId, $createdUsers[4]);
+    $recoveryToken = is_array($approvedReset) ? $approvedReset['token'] : null;
+    $approvedResetState = $db->prepare(
+        'SELECT estado, token, expira_en, aprobado_en, aprobado_por,
+                TIMESTAMPDIFF(SECOND, aprobado_en, expira_en) AS validez_segundos
+         FROM solicitudes_reset_password WHERE id = :id'
+    );
+    $approvedResetState->execute(['id' => $recoveryId]);
+    $approvedResetRow = $approvedResetState->fetch(PDO::FETCH_ASSOC);
     assertTrue(
         is_string($recoveryToken) && strlen($recoveryToken) === 64
-            && $recoveryModel->vigente($recoveryToken, $recoveryNow),
-        'El enlace emitido debe ser aleatorio, de un solo uso y vigente.'
+            && is_array($approvedResetRow)
+            && $approvedResetRow['estado'] === 'Aprobada'
+            && $approvedResetRow['token'] === hash('sha256', $recoveryToken)
+            && (int)$approvedResetRow['aprobado_por'] === $createdUsers[4]
+            && (int)$approvedResetRow['validez_segundos'] === 86400
+            && $recoveryModel->vigente($recoveryToken, new DateTimeImmutable()),
+        'La aprobación debe guardar solo el hash del token, el administrador y una validez exacta de 24 horas.'
     );
-    $legacyToken = bin2hex(random_bytes(32));
-    $legacyRecovery = $db->prepare(
-        "INSERT INTO recuperaciones_cuenta
-            (usuario_id, estado, token_hash, expira, creada)
-         VALUES (:usuario, 'EnlaceEmitido', :hash, :expira, :creada)"
-    );
-    $legacyRecovery->execute([
-        'usuario' => $createdUsers[0],
-        'hash' => hash('sha256', $legacyToken),
-        'expira' => $recoveryNow->modify('+30 minutes')->format('Y-m-d H:i:s'),
-        'creada' => $recoveryNow->format('Y-m-d H:i:s'),
-    ]);
     assertTrue(
-        $recoveryModel->consumir($recoveryToken, 'ResetPassword123!', $recoveryNow) === $emails[0]
-            && !$recoveryModel->vigente($legacyToken, $recoveryNow)
+        $recoveryModel->consumir($recoveryToken, 'ResetPassword123!', new DateTimeImmutable()) === $emails[0]
             && password_verify(
                 'ResetPassword123!',
                 (string)$db->query(
                     'SELECT password_hash FROM usuarios WHERE id = ' . $createdUsers[0]
                 )->fetchColumn()
             ),
-        'Restablecer una cuenta debe cambiar la contraseña e invalidar todos sus enlaces anteriores.'
+        'Restablecer una cuenta debe cambiar la contraseña y consumir el enlace de un solo uso.'
+    );
+    $usedResetState = $db->prepare('SELECT estado, token FROM solicitudes_reset_password WHERE id = :id');
+    $usedResetState->execute(['id' => $recoveryId]);
+    $usedResetRow = $usedResetState->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_array($usedResetRow)
+            && $usedResetRow['estado'] === 'Usada'
+            && $usedResetRow['token'] === null
+            && $recoveryModel->consumir($recoveryToken, 'ResetPassword123!', new DateTimeImmutable()) === null,
+        'Un token consumido debe invalidarse inmediatamente.'
+    );
+
+    $recoveryModel->solicitar($emails[0], new DateTimeImmutable());
+    $expiryRequestId = (int)$db->query(
+        "SELECT id FROM solicitudes_reset_password
+         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente'
+         ORDER BY solicitado_en DESC LIMIT 1"
+    )->fetchColumn();
+    $expiryRequest = $recoveryModel->aprobar($expiryRequestId, $createdUsers[4]);
+    $forceExpired = $db->prepare(
+        'UPDATE solicitudes_reset_password
+         SET expira_en = DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 SECOND) WHERE id = :id'
+    );
+    $forceExpired->execute(['id' => $expiryRequestId]);
+    assertTrue(
+        is_array($expiryRequest)
+            && !$recoveryModel->vigente($expiryRequest['token'], new DateTimeImmutable())
+            && $db->query(
+                'SELECT estado FROM solicitudes_reset_password WHERE id = ' . $expiryRequestId
+            )->fetchColumn() === 'Expirada',
+        'Un enlace vencido debe marcarse Expirada y dejar de ser válido.'
+    );
+
+    $recoveryModel->solicitar($emails[0], new DateTimeImmutable());
+    $rejectRequestId = (int)$db->query(
+        "SELECT id FROM solicitudes_reset_password
+         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente'
+         ORDER BY solicitado_en DESC LIMIT 1"
+    )->fetchColumn();
+    assertTrue(
+        $recoveryModel->rechazar($rejectRequestId)
+            && $db->query(
+                'SELECT estado FROM solicitudes_reset_password WHERE id = ' . $rejectRequestId
+            )->fetchColumn() === 'Rechazada',
+        'El Administrador debe poder rechazar la solicitud pendiente.'
     );
 
     $coordinatorProfile = $db->prepare(

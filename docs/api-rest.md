@@ -131,6 +131,21 @@ acceso de la empresa. El PDF se valida como PDF de hasta 10 MiB, se escanea con
 ClamAV y se guarda como archivo aleatorio en
 `FCT_STORAGE_PATH/uploads/convenios-marco`; nunca se sirve desde `public/`.
 
+## Recuperación de contraseña con aprobación
+
+| Método | Ruta | Acceso y acción |
+|---|---|---|
+| POST | `/api/auth/solicitar-reset-password` | Público con CSRF; respuesta genérica HTTP 202 para evitar enumerar cuentas. |
+| POST | `/api/admin/solicitudes-password/{id}/aprobar` | Administrador con CSRF; crea un token aleatorio, guarda sólo su SHA-256 y envía un enlace válido 24 horas. |
+| POST | `/api/admin/solicitudes-password/{id}/rechazar` | Administrador con CSRF; rechaza la solicitud pendiente. |
+| POST | `/api/auth/confirmar-reset-password` | Público con CSRF; valida token vigente, contraseña y confirmación, y consume el enlace. |
+
+La gestión MVC está disponible en `/admin/solicitudes-password`; las páginas
+`recuperar` y `/restablecer-password?token=...` mantienen fallback PHP. El envío
+de correo requiere configurar `FCT_PUBLIC_BASE_URL`, `FCT_MAIL_FROM` y un MTA
+compatible con PHP `mail()`. Si falla el envío, la solicitud vuelve a estado
+pendiente y no se muestra ni se registra el token en claro.
+
 ### Relación con los permisos MVC
 
 `public/api.php` y `routes/web.php` aplican sus permisos por separado. En la

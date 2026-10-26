@@ -19,6 +19,11 @@ if (preg_match('/\A\/admin\/convenios\/?\z/', $decodedPath) === 1) {
     require __DIR__ . '/index.php';
     return true;
 }
+if (preg_match('/\A\/admin\/solicitudes-password\/?\z/', $decodedPath) === 1) {
+    $_GET['action'] = 'admin-solicitudes-password';
+    require __DIR__ . '/index.php';
+    return true;
+}
 if (in_array($decodedPath, ['/api/public/empresas/registro', '/api/public/empresas/solicitud'], true)) {
     $_GET['action'] = 'api-registro-empresa';
     require __DIR__ . '/index.php';
@@ -27,6 +32,33 @@ if (in_array($decodedPath, ['/api/public/empresas/registro', '/api/public/empres
 if (preg_match('/\A\/api\/admin\/empresas\/([1-9][0-9]*)\/(?:aprobar|aprobar-convenio)\/?\z/', $decodedPath, $matches) === 1) {
     $_GET['action'] = 'api-aprobar-empresa';
     $_GET['id'] = $matches[1];
+    require __DIR__ . '/index.php';
+    return true;
+}
+if ($decodedPath === '/api/auth/solicitar-reset-password') {
+    $_GET['action'] = 'api-solicitar-reset-password';
+    require __DIR__ . '/index.php';
+    return true;
+}
+if ($decodedPath === '/api/auth/confirmar-reset-password') {
+    $_GET['action'] = 'api-confirmar-reset-password';
+    require __DIR__ . '/index.php';
+    return true;
+}
+if (preg_match('/\A\/api\/admin\/solicitudes-password\/([1-9][0-9]*)\/aprobar\/?\z/', $decodedPath, $matches) === 1) {
+    $_GET['action'] = 'api-aprobar-reset-password';
+    $_GET['id'] = $matches[1];
+    require __DIR__ . '/index.php';
+    return true;
+}
+if (preg_match('/\A\/api\/admin\/solicitudes-password\/([1-9][0-9]*)\/rechazar\/?\z/', $decodedPath, $matches) === 1) {
+    $_GET['action'] = 'api-rechazar-reset-password';
+    $_GET['id'] = $matches[1];
+    require __DIR__ . '/index.php';
+    return true;
+}
+if ($decodedPath === '/restablecer-password') {
+    $_GET['action'] = 'restablecer';
     require __DIR__ . '/index.php';
     return true;
 }

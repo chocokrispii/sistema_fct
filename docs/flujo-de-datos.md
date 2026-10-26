@@ -181,8 +181,9 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 |  | `session` | GET | Público; la respuesta informa `user: null` si no hay sesión válida y 403 para Empresa sin aprobar |
 |  | `logout` | POST | Administrador, Coordinador, Observador, Empresa, Alumno |
 | Recuperación | `recuperar`, `restablecer` | GET, POST | Público |
-|  | `recuperaciones` | GET | Administrador, Coordinador |
-|  | `verificar-recuperacion` | POST | Administrador, Coordinador |
+|  | `api-solicitar-reset-password`, `api-confirmar-reset-password` | POST | Público con CSRF |
+|  | `recuperaciones`, `admin-solicitudes-password` | GET | Administrador |
+|  | `aprobar-reset-password`, `rechazar-reset-password`, `api-aprobar-reset-password`, `api-rechazar-reset-password` | POST | Administrador; CSRF |
 | Registro y catálogo autenticado | `registro-alumno`, `registro-empresa` | GET, POST | Público |
 |  | `api-registro-empresa` | POST | Público; sesión MVC y CSRF para `/api/public/empresas/solicitud` (alias `/registro`) |
 |  | `empresas-centro` | GET | Administrador, Coordinador |
@@ -238,7 +239,7 @@ La definición completa del rol de auditoría y sus límites está en [Roles y p
 | Consultar empresa asignada | Isla `AssignedCompany` del portal | `GET empresa-asignada` | `AuthMiddleware` (Alumno) → `AsignacionController::empresaAsignada` | Consulta por la identidad autenticada y devuelve detalles de interés sin datos de contacto privados | JSON `{ success: true, data: { nombre_empresa, categoria, nombre_especialidad, fecha_inicio, fecha_fin } }` o error 404 |
 | Subir convenio PDF | Formulario multipart PHP | `POST convenios` con `_csrf` y archivo | `ConvenioController::guardarConvenio` | Valida datos/MIME/tamaño; `FileScanner` → ClamAV; mueve el archivo limpio a almacenamiento privado; `Convenio` guarda metadatos | Redirección de éxito o vista con error; si no se puede analizar, no se guarda |
 | Descargar convenio | Enlace con ID | `GET descargar-convenio&id=...` | `AuthMiddleware` + `ConvenioController::descargar` | Verifica propiedad/rol, registra denegación si aplica, lee almacenamiento privado | Flujo PDF de descarga; no expone la ruta física |
-| Solicitar/restablecer contraseña | Formularios PHP | `POST recuperar` / `GET, POST restablecer` | `RecuperacionController` → `RecuperacionCuenta` | Solicitud, token hash/expiración, actualización de `usuarios`; limpia intentos | Mensaje/redirección genérica o HTML de restablecimiento |
+| Solicitar/restablecer contraseña | Formulario PHP con islas `OlvidePassword` y `RestablecerPassword` | `POST /api/auth/solicitar-reset-password`, `POST /api/auth/confirmar-reset-password`; fallback MVC `recuperar` / `restablecer` | `RecuperacionController` → `SolicitudResetPassword` | Registra solicitud pendiente sin enumerar cuentas; aprobación de Administrador crea hash del token, guarda vencimiento 24h y envía correo; confirmación actualiza `usuarios` y consume el token | Respuesta genérica de solicitud, errores estructurados y formulario HTML fallback |
 | Cambiar estado o borrar usuario | Tabla y `UserDeleteDialog`; confirmación Vue, envío PHP | `POST estado-usuario` / `POST eliminar-usuario` con `_csrf` | `UsuarioAdminController` → `Usuario` | Control de rol, integridad, auditoría y eliminación/actualización | Redirección a gestión de cuentas con resultado |
 
 ### Contratos y persistencia

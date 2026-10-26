@@ -45,8 +45,8 @@ Cada acordeón contiene un diagrama pequeño de arriba hacia abajo. Los diagrama
 ```mermaid
 flowchart TB
     session["login · session · logout<br/>COMPLETED"]:::completed
-    recovery["recuperar · restablecer<br/>PENDING"]:::pending
-    adminReview["recuperaciones · verificar-recuperacion<br/>PENDING"]:::pending
+    recovery["recuperar · restablecer<br/>COMPLETED"]:::completed
+    adminReview["solicitudes-reset · aprobar/rechazar<br/>COMPLETED"]:::completed
     session --> recovery --> adminReview
     classDef completed fill:#e8f7ee,stroke:#29804b,color:#174b2b,stroke-width:2px
     classDef inprogress fill:#fff9df,stroke:#9b7b00,color:#493b00,stroke-width:2px
@@ -151,10 +151,10 @@ flowchart TB
 | Auth y sesión | `GET, POST login` | COMPLETED | Formulario PHP fallback + `AuthLoginEnhancement`, `AuthController` JSON y store `session` | Conservar fallback; endurecer estados del formulario si se amplía | CSRF en POST, regeneración de sesión | P3 |
 | Auth y sesión | `GET session` | COMPLETED | `AuthController::session` devuelve sobre JSON consumido por Pinia | Mantener contrato `ApiResponse` | Cookie de sesión y validación de usuario activo | P3 |
 | Auth y sesión | `POST logout` | COMPLETED | `RoleDashboard`/Pinia usa `AuthController` JSON; fallback formulario | Mantener invalidación de sesión en servidor | CSRF y expiración de cookie | P3 |
-| Recuperación | `GET, POST recuperar` | PENDING | Formulario PHP síncrono | Isla progresiva con respuesta JSON y estado de envío | Respuesta genérica para no filtrar existencia de cuentas; límites de intentos | P2 |
-| Recuperación | `GET, POST restablecer` | PENDING | Formulario PHP síncrono | Isla progresiva con validación y JSON | Token hash, expiración, uso único y política de contraseña | P2 |
-| Administración | `GET recuperaciones` | PENDING | Listado PHP protegido | Mantener lectura PHP; mejorar acciones sólo cuando haya necesidad | Administrador/Coordinador | P3 |
-| Administración | `POST verificar-recuperacion` | PENDING | Formulario PHP síncrono | Isla JSON con estado y errores accesibles | Autorización, CSRF y auditoría/limpieza de token | P2 |
+| Recuperación | `POST /api/auth/solicitar-reset-password` | COMPLETED | Formulario PHP con isla `OlvidePassword` | Envío JSON progresivo y fallback HTML | Respuesta genérica, deduplicación de solicitudes pendientes | P2 |
+| Recuperación | `POST /api/auth/confirmar-reset-password` | COMPLETED | Formulario PHP con isla `RestablecerPassword` | Confirmación JSON y fallback HTML | Hash de token, caducidad 24 h, un solo uso y contraseña 12-72 bytes | P2 |
+| Administración | `GET /admin/solicitudes-password` | COMPLETED | Listado PHP protegido | Acciones accesibles de aprobar/rechazar | Sólo Administrador | P3 |
+| Administración | `POST /api/admin/solicitudes-password/{id}/aprobar` o `/rechazar` | COMPLETED | Acciones MVC multipart/JSON | Respuesta JSON con estados explícitos | Sólo Administrador, CSRF, token oculto y entrega por correo | P2 |
 | Portal del alumno | `GET, POST registro-alumno` | PENDING | Registro PHP síncrono | Isla con JSON/Pinia y fallback | Validadores de identidad y transacción Usuario/Alumno/Tutor | P2 |
 | Portal del alumno | `GET portal-alumno` | PENDING | Vista PHP de expediente | Mantener render inicial PHP; añadir isla sólo para widgets interactivos | Rol Alumno y datos del propio expediente | P3 |
 | Portal del alumno | `GET, POST perfil-alumno` | COMPLETED | Isla `StudentProfile`, DTO JSON, store `student-profile`, fallback PHP | Mantener contrato y ampliar sólo ante nuevos campos | Validación de expediente y transacción del modelo | P3 |

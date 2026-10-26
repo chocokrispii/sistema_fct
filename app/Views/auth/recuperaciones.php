@@ -1,27 +1,37 @@
-<?php if (isset($_GET['error'])): ?>
-    <p class="message message-error" role="alert">Esa solicitud ya no está pendiente.</p>
+<?php if ($error): ?>
+    <p class="message message-error" role="alert">La solicitud ya no está pendiente o no se pudo enviar el correo. Revisa la configuración de correo e inténtalo de nuevo.</p>
 <?php endif; ?>
-<?php if ($token !== ''): ?>
-    <p class="message message-success" role="status">Identidad verificada. Envía a la persona el enlace de un solo uso, válido <?= RecuperacionCuenta::VALIDEZ_MINUTOS ?> minutos: <a href="index.php?action=restablecer&amp;token=<?= rawurlencode($token) ?>">Abrir enlace de recuperación</a></p>
+<?php if ($aprobada): ?>
+    <p class="message message-success" role="status">La solicitud se aprobó y el enlace de 24 horas se envió por correo.</p>
 <?php endif; ?>
-<h2>Recuperaciones pendientes de verificar</h2>
-<p>Verifica la identidad de la persona solicitante antes de emitir el enlace. No se envía correo automáticamente.</p>
+<?php if ($rechazada): ?>
+    <p class="message message-success" role="status">La solicitud se rechazó correctamente.</p>
+<?php endif; ?>
+<section class="password-reset-requests" data-password-reset-requests aria-labelledby="password-reset-requests-title">
+<h2 id="password-reset-requests-title">Solicitudes de restablecimiento pendientes</h2>
+<p>Al aprobar, se envía al correo de la cuenta un enlace de un solo uso válido durante 24 horas.</p>
 <?php if ($recuperaciones === []): ?>
-    <p>No hay solicitudes.</p>
+    <p class="password-reset-requests__empty">No hay solicitudes pendientes.</p>
 <?php else: ?>
 <div class="table-responsive" role="region" aria-label="Recuperaciones pendientes" tabindex="0">
 <table>
-    <thead><tr><th>Correo</th><th>Solicitada</th><th></th></tr></thead>
+    <thead><tr><th>Usuario</th><th>Correo</th><th>Fecha de solicitud</th><th>Acciones</th></tr></thead>
     <tbody>
         <?php foreach ($recuperaciones as $recuperacion): ?>
             <tr>
+                <td><?= (int)$recuperacion['usuario_id'] ?></td>
                 <td><?= htmlspecialchars($recuperacion['email'], ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= htmlspecialchars($recuperacion['creada'], ENT_QUOTES, 'UTF-8') ?></td>
+                <td><?= htmlspecialchars($recuperacion['solicitado_en'], ENT_QUOTES, 'UTF-8') ?></td>
                 <td>
-                    <form method="POST" action="index.php?action=verificar-recuperacion" class="inline-form">
-                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
+                    <form method="POST" action="index.php?action=aprobar-reset-password" class="inline-form" data-reset-password-action="approve">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
                         <input type="hidden" name="id" value="<?= (int)$recuperacion['id'] ?>">
-                        <button type="submit">Verificar y emitir enlace</button>
+                        <button type="submit">Aprobar y enviar enlace</button>
+                    </form>
+                    <form method="POST" action="index.php?action=rechazar-reset-password" class="inline-form" data-reset-password-action="reject">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="id" value="<?= (int)$recuperacion['id'] ?>">
+                        <button type="submit">Rechazar</button>
                     </form>
                 </td>
             </tr>
@@ -30,3 +40,5 @@
 </table>
 </div>
 <?php endif; ?>
+<div data-vue-island="PasswordResetApprovals" data-prop-csrf-token="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>"></div>
+</section>
