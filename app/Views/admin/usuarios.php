@@ -2,94 +2,72 @@
 require_once __DIR__ . '/../../Core/FrontendAssets.php';
 $vueEnabled = FrontendAssets::isEnabled();
 ?>
-<?php if ($error !== ''): ?><p class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
-<?php if ($cuentaCreada): ?><p class="message message-success" role="status">Cuenta creada correctamente.</p><?php endif; ?>
+<?php if ($error !== ''): ?><p class="message message-error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if ($eliminado): ?><p class="message message-success" role="status">Usuario eliminado permanentemente.</p><?php endif; ?>
-<?php if ($estadoActualizado): ?><p class="message message-success" role="status">Estado de la cuenta actualizado.</p><?php endif; ?>
+<?php if ($creado): ?>
+    <section class="message message-success" role="status">
+        <h3>Cuenta creada y correo enviado</h3>
+        <p>Se ha enviado a <strong><?= htmlspecialchars($sentTo, ENT_QUOTES, 'UTF-8') ?></strong> un enlace seguro para elegir contraseña y activar la cuenta.</p>
+        <p>El enlace caduca en 24 horas y solo se puede utilizar una vez.</p>
+    </section>
+<?php endif; ?>
 <h2>Gestión de cuentas</h2>
+<p>El alumnado y personal acceden con NIF/DNI/NIE; las empresas, con NIF (Persona Jurídica). Desde esta tabla puedes corregir el identificador del personal o de una empresa existente.</p>
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=usuarios">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
-    <label for="staff-email">Correo <input id="staff-email" type="email" name="email" maxlength="100" value="<?= htmlspecialchars($formValues['email'] ?? $datosCuenta['email'], ENT_QUOTES, 'UTF-8') ?>" required></label>
-    <label for="staff-password">Contraseña inicial (12-72 caracteres) <input id="staff-password" type="password" name="password" minlength="12" maxlength="72" aria-describedby="staff-password-help" required></label>
-    <small id="staff-password-help">Debe tener entre 12 y 72 caracteres. Los espacios cuentan.</small>
-    <label for="staff-name">Nombre (para coordinador) <input id="staff-name" type="text" name="nombre" maxlength="50" value="<?= htmlspecialchars($formValues['nombre'] ?? $datosCuenta['nombre'], ENT_QUOTES, 'UTF-8') ?>"></label>
-    <label for="staff-surname">Apellidos (para coordinador) <input id="staff-surname" type="text" name="apellidos" maxlength="100" value="<?= htmlspecialchars($formValues['apellidos'] ?? $datosCuenta['apellidos'], ENT_QUOTES, 'UTF-8') ?>"></label>
-    <label for="staff-role">Rol
-        <select id="staff-role" name="rol" required>
-            <option value="Coordinador" <?= ($formValues['rol'] ?? '') === 'Coordinador' ? 'selected' : '' ?>>Coordinador</option>
-            <option value="Observador" <?= ($formValues['rol'] ?? '') === 'Observador' ? 'selected' : '' ?>>Observador</option>
-            <option value="Administrador" <?= ($formValues['rol'] ?? '') === 'Administrador' ? 'selected' : '' ?>>Administrador</option>
+    <label>Correo <input type="email" name="email" required></label>
+    <label>NIF/DNI/NIE (identificador de acceso) <input type="text" name="identificador_fiscal" maxlength="20" autocomplete="off" required></label>
+    <small>Debe ser un NIF, DNI o NIE válido y no puede estar asignado a otra cuenta.</small>
+    <label>Nombre <input type="text" name="nombre" maxlength="50" autocomplete="given-name" required></label>
+    <label>Apellidos <input type="text" name="apellidos" maxlength="100" autocomplete="family-name" required></label>
+    <label>Rol
+        <select name="rol" required>
+            <option value="Coordinador">Coordinador</option>
+            <option value="Observador">Observador</option>
+            <option value="Administrador">Administrador</option>
         </select>
     </label>
+    <p>Se enviará un enlace de un solo uso y válido durante 24 horas para que la persona establezca su contraseña y active la cuenta.</p>
     <button type="submit">Crear cuenta del centro</button>
 </form>
-<form class="page-form page-form--narrow" method="GET" action="index.php">
-    <input type="hidden" name="action" value="usuarios">
-    <label>Buscar por correo o nombre
-        <input type="search" name="buscar" maxlength="100" value="<?= htmlspecialchars($busqueda, ENT_QUOTES, 'UTF-8') ?>">
-    </label>
-    <label>Rol
-        <select name="rol">
-            <option value="">Todos los roles</option>
-            <?php foreach (['Administrador', 'Coordinador', 'Observador', 'Empresa', 'Alumno'] as $rol): ?>
-                <option value="<?= htmlspecialchars($rol, ENT_QUOTES, 'UTF-8') ?>" <?= $rolFiltro === $rol ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($rol, ENT_QUOTES, 'UTF-8') ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-    </label>
-    <label>Estado
-        <select name="activo">
-            <option value="" <?= $estadoFiltro === '' ? 'selected' : '' ?>>Todos</option>
-            <option value="1" <?= $estadoFiltro === '1' ? 'selected' : '' ?>>Activo</option>
-            <option value="0" <?= $estadoFiltro === '0' ? 'selected' : '' ?>>Desactivado</option>
-        </select>
-    </label>
-    <button type="submit">Filtrar cuentas</button>
-    <?php if ($busqueda !== '' || $rolFiltro !== '' || $estadoFiltro !== ''): ?>
-        <a href="index.php?action=usuarios">Limpiar filtros</a>
-    <?php endif; ?>
-</form>
-<?php if ($usuarios !== []): ?>
-<div class="table-responsive" role="region" aria-label="Cuentas de usuario" tabindex="0">
 <table>
-    <caption>Cuentas de usuario</caption>
-    <thead><tr><th scope="col">Correo</th><th scope="col">Nombre</th><th scope="col">Rol</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead>
+    <thead><tr><th>Correo</th><th>Identificador fiscal de acceso</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
     <tbody><?php foreach ($usuarios as $usuario): ?>
-        <?php
-        $esCuentaActual = (int)$usuario['id'] === (int)($_SESSION['usuario_id'] ?? 0);
-        $estaActiva = (int)$usuario['activo'] === 1;
-        ?>
         <tr>
             <td><?= htmlspecialchars($usuario['email'], ENT_QUOTES, 'UTF-8') ?></td>
+            <td>
+                <?php if (in_array($usuario['rol'], ['Administrador', 'Coordinador', 'Observador', 'Empresa'], true)): ?>
+                    <?php $companyAccount = $usuario['rol'] === 'Empresa'; ?>
+                    <form class="action-form" method="POST" action="index.php?action=actualizar-identificador-fiscal-usuario">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="usuario_id" value="<?= (int)$usuario['id'] ?>">
+                        <label class="visually-hidden" for="user-fiscal-id-<?= (int)$usuario['id'] ?>"><?= $companyAccount ? 'NIF (Persona Jurídica)' : 'NIF/DNI/NIE' ?> de <?= htmlspecialchars($usuario['email'], ENT_QUOTES, 'UTF-8') ?></label>
+                        <input id="user-fiscal-id-<?= (int)$usuario['id'] ?>" type="text" name="identificador_fiscal" value="<?= htmlspecialchars((string)($usuario['identificador_fiscal'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" maxlength="20" autocomplete="off" required>
+                        <button type="submit">Guardar <?= $companyAccount ? 'NIF (Persona Jurídica)' : 'NIF' ?></button>
+                    </form>
+                <?php elseif ($usuario['rol'] === 'Alumno'): ?>
+                    <?= htmlspecialchars((string)($usuario['identificador_fiscal'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                <?php else: ?>
+                    —
+                <?php endif; ?>
+            </td>
             <td><?= htmlspecialchars($usuario['nombre_completo'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= htmlspecialchars($usuario['rol'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= $estaActiva ? 'Activo' : 'Desactivado' ?></td>
+            <td><?= (int)$usuario['activo'] === 1 ? 'Activo' : 'Desactivado' ?></td>
             <td><div class="user-actions">
-                <?php if (!$esCuentaActual || !$estaActiva): ?>
                 <form class="action-form" method="POST" action="index.php?action=estado-usuario">
                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
                     <input type="hidden" name="usuario_id" value="<?= (int)$usuario['id'] ?>">
-                    <input type="hidden" name="activo" value="<?= $estaActiva ? '0' : '1' ?>">
-                    <input type="hidden" name="buscar" value="<?= htmlspecialchars($busqueda, ENT_QUOTES, 'UTF-8') ?>">
-                    <input type="hidden" name="rol" value="<?= htmlspecialchars($rolFiltro, ENT_QUOTES, 'UTF-8') ?>">
-                    <input type="hidden" name="activo_filtro" value="<?= htmlspecialchars($estadoFiltro, ENT_QUOTES, 'UTF-8') ?>">
-                    <button type="submit" aria-label="<?= htmlspecialchars(($estaActiva ? 'Desactivar cuenta de ' : 'Activar cuenta de ') . $usuario['email'], ENT_QUOTES, 'UTF-8') ?>"><?= $estaActiva ? 'Desactivar' : 'Activar' ?></button>
+                    <input type="hidden" name="activo" value="<?= (int)$usuario['activo'] === 1 ? '0' : '1' ?>">
+                    <button type="submit"><?= (int)$usuario['activo'] === 1 ? 'Desactivar' : 'Activar' ?></button>
                 </form>
-                <?php else: ?>
-                    <span class="text-muted">Cuenta actual</span>
-                <?php endif; ?>
-                <?php if (!$esCuentaActual): ?>
-                    <button class="user-delete-trigger" type="button" aria-label="<?= htmlspecialchars('Eliminar cuenta de ' . $usuario['email'], ENT_QUOTES, 'UTF-8') ?>" data-delete-user="<?= (int)$usuario['id'] ?>" data-delete-email="<?= htmlspecialchars($usuario['email'], ENT_QUOTES, 'UTF-8') ?>">Eliminar usuario</button>
+                <?php if ((int)$usuario['id'] !== (int)($_SESSION['usuario_id'] ?? 0)): ?>
+                    <button class="user-delete-trigger" type="button" data-delete-user="<?= (int)$usuario['id'] ?>" data-delete-email="<?= htmlspecialchars($usuario['email'], ENT_QUOTES, 'UTF-8') ?>">Eliminar usuario</button>
                 <?php endif; ?>
             </div></td>
         </tr>
     <?php endforeach; ?></tbody>
 </table>
-</div>
-<?php else: ?>
-    <p role="status">No hay cuentas que coincidan con los filtros actuales.</p>
-<?php endif; ?>
 <?php if ($vueEnabled): ?>
     <div
         data-vue-island="UserDeleteDialog"
@@ -100,10 +78,7 @@ $vueEnabled = FrontendAssets::isEnabled();
     <form method="POST" action="index.php?action=eliminar-usuario">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="usuario_id" value="" data-delete-user-id>
-        <input type="hidden" name="buscar" value="<?= htmlspecialchars($busqueda, ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="rol" value="<?= htmlspecialchars($rolFiltro, ENT_QUOTES, 'UTF-8') ?>">
-        <input type="hidden" name="activo_filtro" value="<?= htmlspecialchars($estadoFiltro, ENT_QUOTES, 'UTF-8') ?>">
-        <h3 id="user-delete-title">¿Estás seguro?</h3>
+        <h3 id="user-delete-title">Estás seguro?</h3>
         <p id="user-delete-description">Se eliminará permanentemente <strong data-delete-user-email></strong>. Esta acción no se puede deshacer.</p>
         <div class="user-delete-dialog__actions">
             <button type="button" class="user-delete-dialog__cancel" data-delete-cancel>No, volver.</button>

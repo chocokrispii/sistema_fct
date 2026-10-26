@@ -5,9 +5,6 @@
         <?php if ($error !== ''): ?>
             <p id="login-error" class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
         <?php endif; ?>
-        <?php if (isset($_GET['registrada']) || isset($_GET['registrado'])): ?>
-            <p class="message message-success" role="status">Registro completado. Ya puedes iniciar sesión.</p>
-        <?php endif; ?>
         <?php if (isset($_GET['restablecida'])): ?>
             <p class="message message-success" role="status">Contraseña actualizada. Ya puedes iniciar sesión.</p>
         <?php endif; ?>
@@ -15,8 +12,9 @@
         <?php if (FrontendAssets::isEnabled()): ?>
             <div data-vue-island="AuthLoginEnhancement" data-prop-csrf-token="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>"></div>
         <?php endif; ?>
-        <label for="login-email">Correo electrónico</label>
-        <input id="login-email" type="email" name="email" autocomplete="username" value="<?= htmlspecialchars($email ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+        <label for="login-identifier">Identificador fiscal de acceso</label>
+        <input id="login-identifier" type="text" name="identifier" autocomplete="username" value="<?= htmlspecialchars($identifier ?? $email ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+        <small>Personal y alumnado: NIF/DNI/NIE. Empresas: NIF (Persona Jurídica). No se admite el correo electrónico.</small>
         <label for="login-password">Contraseña</label>
         <input id="login-password" type="password" name="password" maxlength="72" autocomplete="current-password" aria-describedby="login-password-help" required>
         <small id="login-password-help">Máximo 72 bytes; los caracteres acentuados pueden ocupar más de un byte.</small>

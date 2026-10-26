@@ -12,7 +12,6 @@
         <p>Consulta oportunidades de prácticas, encuentra talento para tu empresa y gestiona el proceso de FCT desde un mismo lugar.</p>
         <div class="site-home__actions">
             <?php if ($rolActual === null): ?>
-                <a class="site-home__button" href="index.php?action=registro-alumno">Registro de alumnado</a>
                 <a class="site-home__button site-home__button--secondary" href="index.php?action=login">Iniciar sesión</a>
             <?php elseif ($rolActual === 'Alumno'): ?>
                 <a class="site-home__button" href="index.php?action=portal-alumno">Ir a mi expediente</a>
@@ -34,8 +33,8 @@
     <div class="site-home__features">
         <article class="site-home__feature">
             <h3>Alumnado</h3>
-            <p>Crea tu expediente y registra tu disponibilidad para que el centro pueda asignarte una práctica compatible.</p>
-            <a href="index.php?action=registro-alumno">Crear cuenta de alumno</a>
+            <p>El centro educativo crea las cuentas del alumnado. Si ya tienes acceso, inicia sesión para consultar tu expediente.</p>
+            <a href="index.php?action=login">Acceso del alumnado</a>
         </article>
         <article class="site-home__feature">
             <h3>Empresas</h3>

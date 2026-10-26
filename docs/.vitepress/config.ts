@@ -31,6 +31,7 @@ export default defineConfig({
       { text: 'Roles y permisos', link: '/roles_y_permisos' },
       { text: 'Paginación y consultas', link: '/optimizacion_consultas' },
       { text: 'Rutas y Contratos API', link: '/flujo-de-datos#catalogo-de-rutas-http' },
+      { text: 'Integraciones', link: '/integraciones' },
     ],
     sidebar: [
       {

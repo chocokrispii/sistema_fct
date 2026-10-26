@@ -238,6 +238,51 @@ class Alumno {
         }
     }
 
+    public function crearDesdePersonal(
+        int $usuarioId,
+        string $nombre,
+        string $apellidos,
+        string $dni,
+        string $email,
+        int $especialidadId,
+        int $curso,
+        string $observacionesAdministrativas
+    ): int {
+        $stmt = $this->db->prepare(
+            'INSERT INTO alumnos
+                (usuario_id, nombre, apellidos, dni, correo, especialidad_id, curso, observaciones_administrativas)
+             VALUES
+                (:usuario_id, :nombre, :apellidos, :dni, :correo, :especialidad_id, :curso, :observaciones)'
+        );
+        $stmt->execute([
+            'usuario_id' => $usuarioId,
+            'nombre' => $nombre,
+            'apellidos' => $apellidos,
+            'dni' => $dni,
+            'correo' => $email,
+            'especialidad_id' => $especialidadId,
+            'curso' => $curso,
+            'observaciones' => $observacionesAdministrativas !== '' ? $observacionesAdministrativas : null,
+        ]);
+
+        return (int)$this->db->lastInsertId();
+    }
+
+    public function obtenerTodosParaCentro(): array
+    {
+        $stmt = $this->db->query(
+            'SELECT a.id, a.dni, a.nombre, a.apellidos, a.correo, a.curso,
+                    a.observaciones_administrativas,
+                    e.nombre_especialidad, u.activo
+             FROM alumnos a
+             INNER JOIN usuarios u ON u.id = a.usuario_id AND u.rol = \'Alumno\'
+             LEFT JOIN especialidades e ON e.id = a.especialidad_id
+             ORDER BY a.apellidos, a.nombre, a.id'
+        );
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function registrarTutor(
         int $alumnoId,
         string $nombreTutor,

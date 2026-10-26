@@ -242,7 +242,7 @@ function fetchCsrfToken(RegressionHttpClient $client): string
 
 function loginFixture(
     RegressionHttpClient $client,
-    string $email,
+    string $identifier,
     string $password,
     string $expectedRole
 ): string {
@@ -254,7 +254,7 @@ function loginFixture(
             'Content-Type' => 'application/json',
             'X-CSRF-Token' => $initialToken,
         ],
-        json_encode(['email' => $email, 'password' => $password], JSON_THROW_ON_ERROR)
+        json_encode(['identifier' => $identifier, 'password' => $password], JSON_THROW_ON_ERROR)
     );
     $data = responseData($response);
     expectRegression(
@@ -331,12 +331,19 @@ function insertFixtureUser(
 ): array {
     $email = 'http-regression-' . $nonce . '-' . $label . '@example.invalid';
     $password = bin2hex(random_bytes(20));
+    $identityNonce = substr(hash('sha256', $nonce . ':' . $label), 0, 16);
+    $identifier = match ($role) {
+        'Alumno' => validFixtureDni($nonce),
+        'Empresa' => validFixtureCif($identityNonce),
+        default => validFixtureDni($identityNonce),
+    };
     $statement = $db->prepare(
-        'INSERT INTO usuarios (email, password_hash, rol, activo)
-         VALUES (:email, :password_hash, :rol, 1)'
+        'INSERT INTO usuarios (email, identificador_fiscal, password_hash, rol, activo)
+         VALUES (:email, :identifier, :password_hash, :rol, 1)'
     );
     $statement->execute([
         'email' => $email,
+        'identifier' => in_array($role, ['Administrador', 'Coordinador', 'Observador'], true) ? $identifier : null,
         'password_hash' => password_hash($password, PASSWORD_DEFAULT),
         'rol' => $role,
     ]);
@@ -348,6 +355,7 @@ function insertFixtureUser(
     return [
         'id' => $userId,
         'email' => $email,
+        'identifier' => $identifier,
         'password' => $password,
         'role' => $role,
     ];
@@ -506,7 +514,7 @@ try {
     $companyOwner = insertFixtureUser($database, $nonce, 'empresa-a', 'Empresa', $fixtureEmails, $fixtureUserIds);
     $otherCompany = insertFixtureUser($database, $nonce, 'empresa-b', 'Empresa', $fixtureEmails, $fixtureUserIds);
     $admin = insertFixtureUser($database, $nonce, 'admin', 'Administrador', $fixtureEmails, $fixtureUserIds);
-    $studentIdentity = validFixtureDni($nonce);
+    $studentIdentity = $student['identifier'];
     $studentProfile = $database->prepare(
         'INSERT INTO alumnos
             (usuario_id, nombre, apellidos, dni, numero_seguridad_social, correo, especialidad_id)
@@ -535,7 +543,7 @@ try {
         $companyInsert->execute([
             'usuario' => $companyFixture['user']['id'],
             'nombre' => 'HTTP Regression ' . $nonce . ' ' . $companyFixture['suffix'],
-            'cif' => 'T' . substr($nonce, 0, 12) . $companyFixture['suffix'],
+            'cif' => $companyFixture['user']['identifier'],
         ]);
         $fixtureCompanyIds[] = (int)$database->lastInsertId();
     }
@@ -678,7 +686,7 @@ try {
             'Content-Type' => 'application/json',
             'X-CSRF-Token' => $initialToken,
         ],
-        json_encode(['email' => $student['email'], 'password' => $wrongPassword], JSON_THROW_ON_ERROR)
+        json_encode(['identifier' => $student['identifier'], 'password' => $wrongPassword], JSON_THROW_ON_ERROR)
     );
     $failure = responseFailure($failedLogin, 401);
     expectRegression($failure['error'] === 'Credenciales incorrectas.', 'Invalid credentials should fail with the login error envelope.');
@@ -692,14 +700,14 @@ try {
             'Content-Type' => 'application/json',
             'X-CSRF-Token' => $initialToken,
         ],
-        json_encode(['email' => $student['email'], 'password' => $longUtf8Password], JSON_THROW_ON_ERROR)
+        json_encode(['identifier' => $student['identifier'], 'password' => $longUtf8Password], JSON_THROW_ON_ERROR)
     );
     $oversizedFailure = responseFailure($oversizedPassword, 422);
     expectRegression(
         $oversizedFailure['error'] === 'La contraseña no puede superar 72 bytes.',
         'Passwords longer than 72 UTF-8 bytes must be rejected before password verification.'
     );
-    $studentCsrf = loginFixture($studentClient, $student['email'], $student['password'], 'Alumno');
+    $studentCsrf = loginFixture($studentClient, $student['identifier'], $student['password'], 'Alumno');
     $passedTests[] = 'JSON login handles failure, rejects a 74-byte UTF-8 password before verification, and succeeds';
 
     $authenticatedSession = responseData($studentClient->request('GET', 'session'));
@@ -716,7 +724,7 @@ try {
     $companyAdminClient = new RegressionHttpClient($baseUrl);
     loginFixture(
         $companyAdminClient,
-        $companyOwner['email'],
+        $companyOwner['identifier'],
         $companyOwner['password'],
         'Empresa'
     );
@@ -798,7 +806,7 @@ try {
         'Repeated reset requests should keep a single active pending request.'
     );
     $resetAdminClient = new RegressionHttpClient($baseUrl);
-    $resetAdminCsrf = loginFixture($resetAdminClient, $admin['email'], $admin['password'], 'Administrador');
+    $resetAdminCsrf = loginFixture($resetAdminClient, $admin['identifier'], $admin['password'], 'Administrador');
     $resetAdminPage = $resetAdminClient->request(
         'GET',
         '/admin/solicitudes-password',
@@ -1174,7 +1182,7 @@ try {
             'X-CSRF-Token' => $registrationCsrf,
         ],
         json_encode([
-            'email' => $registrationEmail,
+            'identifier' => $registrationTaxId,
             'password' => $registrationPassword,
         ], JSON_THROW_ON_ERROR)
     );
@@ -1196,7 +1204,7 @@ try {
     $passedTests[] = 'Public company registration persists a pending request and blocks login until approval';
 
     $adminClient = new RegressionHttpClient($baseUrl);
-    $adminCsrf = loginFixture($adminClient, $admin['email'], $admin['password'], 'Administrador');
+    $adminCsrf = loginFixture($adminClient, $admin['identifier'], $admin['password'], 'Administrador');
     $pendingList = $adminClient->request('GET', '/admin/convenios');
     expectRegression(
         $pendingList['status'] === 200
@@ -1293,21 +1301,21 @@ try {
     $approvedCompanyClient = new RegressionHttpClient($baseUrl);
     loginFixture(
         $approvedCompanyClient,
-        $registrationEmail,
+        $registrationTaxId,
         $registrationPassword,
         'Empresa'
     );
     $approvedCompanyHtmlClient = new RegressionHttpClient($baseUrl);
     loginFixture(
         $approvedCompanyHtmlClient,
-        $registrationEmail,
+        $registrationTaxId,
         $registrationPassword,
         'Empresa'
     );
     $rejectedCompanyClient = new RegressionHttpClient($baseUrl);
     loginFixture(
         $rejectedCompanyClient,
-        $registrationEmail,
+        $registrationTaxId,
         $registrationPassword,
         'Empresa'
     );
@@ -1357,7 +1365,7 @@ try {
                 'X-CSRF-Token' => $rejectedLoginCsrf,
             ],
             json_encode([
-                'email' => $registrationEmail,
+                'identifier' => $registrationTaxId,
                 'password' => $registrationPassword,
             ], JSON_THROW_ON_ERROR)
         );
@@ -1372,7 +1380,7 @@ try {
     }
     $passedTests[] = 'Admin approval scans and stores the private PDF and gates existing company sessions by state';
 
-    $studentCsrf = loginFixture($studentClient, $student['email'], $newPassword, 'Alumno');
+    $studentCsrf = loginFixture($studentClient, $student['identifier'], $newPassword, 'Alumno');
     $staleStudentCookie = $studentClient->cookieHeader();
     expectRegression($staleStudentCookie !== '', 'An authenticated HTTP session cookie should be present.');
     $logoutResponse = $studentClient->request(
@@ -1397,7 +1405,7 @@ try {
     );
 
     $expiringClient = new RegressionHttpClient($baseUrl);
-    loginFixture($expiringClient, $student['email'], $newPassword, 'Alumno');
+    loginFixture($expiringClient, $student['identifier'], $newPassword, 'Alumno');
     $disableAccount = $database->prepare('UPDATE usuarios SET activo = 0 WHERE id = :id');
     $disableAccount->execute(['id' => $student['id']]);
     try {
@@ -1415,7 +1423,7 @@ try {
     $companyOwnerClient = new RegressionHttpClient($baseUrl);
     $companyOwnerCsrf = loginFixture(
         $companyOwnerClient,
-        $companyOwner['email'],
+        $companyOwner['identifier'],
         $companyOwner['password'],
         'Empresa'
     );
@@ -1578,7 +1586,7 @@ try {
     $otherCompanyClient = new RegressionHttpClient($baseUrl);
     loginFixture(
         $otherCompanyClient,
-        $otherCompany['email'],
+        $otherCompany['identifier'],
         $otherCompany['password'],
         'Empresa'
     );

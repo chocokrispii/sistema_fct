@@ -52,6 +52,14 @@ la solicitud del navegador y no se guarda en el servidor. Las operaciones
 POST y PATCH modifican la base de datos actual; usa únicamente registros de
 prueba y revisa el cuerpo antes de confirmar.
 
+La pestaña **Integraciones** del menú de Administrador reúne la consola para
+probar esta API y los historiales separados de webhooks recibidos y enviados.
+El panel de tokens sigue disponible desde la propia consola. En Docker Apache,
+usa la ruta directa `api.php?path=...`; el alias `/api/v1/` está configurado por
+el lanzador local, no por el Apache Docker incluido. Consulta la
+[Guía de Integraciones](./integraciones.md) o su
+[versión PDF](/guia-integraciones.pdf).
+
 Envía el token en cada solicitud mediante `Authorization: Bearer <API_TOKEN>`.
 Sustituye el marcador por el token creado en **Tokens API**; no lo incluyas en
 una URL ni lo confirmes en el repositorio.

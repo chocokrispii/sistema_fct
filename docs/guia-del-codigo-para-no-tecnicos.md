@@ -83,6 +83,8 @@ Si Vue no está habilitado, el login conserva su envío HTML tradicional, la pá
 
 En el horario, el alumno puede indicar franjas concretas por día o elegir disponibilidad indiferente para aceptar cualquier turno. Para guardar, envía el formulario; Vue indica si está guardando, si tuvo éxito o si hubo un error, sin guardar automáticamente. En la asignación, el sistema compara el ciclo (por ejemplo, DAW con DAW), las fechas, la aprobación, los horarios y las plazas, y repite las comprobaciones en el servidor.
 
+Un administrador puede añadir ciclos desde **Ciclos formativos** en la navegación. También puede retirarlos del catálogo o reactivarlos. Retirar un ciclo lo quita de las nuevas selecciones y conserva los datos ya registrados para consultas e historial; no borra expedientes ni ofertas. No hace falta ejecutar una migración por cada ciclo. El catálogo se usa automáticamente en convenios, ofertas e inscripción, y el emparejamiento compara el identificador del ciclo de la oferta con el del expediente del alumno.
+
 ### Servicios que ejecutan el proyecto
 
 `docker-compose.yml` describe los servicios de desarrollo:

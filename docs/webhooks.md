@@ -192,7 +192,7 @@ historiales se agrupan y ordenan por empresa; los eventos sin un `empresa_id`
 válido aparecen en **Sin empresa identificada**. Dentro de cada empresa, los
 eventos más recientes se muestran primero.
 La [Guía de Integraciones](./integraciones.md) describe el uso del panel y
-también está disponible en [PDF](./guia-integraciones.pdf).
+también está disponible en [PDF](/guia-integraciones.pdf).
 
 La página **Webhooks por empresa** reúne por separado los eventos enviados y
 recibidos de una empresa seleccionada. Los eventos salientes de convenios,

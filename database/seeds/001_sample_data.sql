@@ -6,12 +6,12 @@ INSERT INTO especialidades (nombre_especialidad) VALUES
 ('Sistemas Microinformáticos y Redes (SMR)');
 
 -- 2. INSERTAR USUARIOS DE PRUEBA
-INSERT INTO usuarios (id, email, password_hash, rol) VALUES
-(1, 'admin@centro.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Administrador'),
-(2, 'coordinador@centro.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Coordinador'),
-(3, 'empresa.tech@gmail.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Empresa'),
-(4, 'alumno.menor@alumno.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Alumno'),
-(5, 'alumno.mayor@alumno.com', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Alumno');
+INSERT INTO usuarios (id, email, identificador_fiscal, password_hash, rol) VALUES
+(1, 'admin@centro.com', '12345678Z', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Administrador'),
+(2, 'coordinador@centro.com', '87654321X', '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Coordinador'),
+(3, 'empresa.tech@gmail.com', NULL, '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Empresa'),
+(4, 'alumno.menor@alumno.com', NULL, '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Alumno'),
+(5, 'alumno.mayor@alumno.com', NULL, '$2y$10$M4pZD5zTKpxWz0juq02YmeG7F5fKnjwunCIitduJMcvdogYaOPzlC', 'Alumno');
 
 -- 3. INSERTAR COORDINADOR
 INSERT INTO coordinadores (usuario_id, nombre, apellidos) VALUES

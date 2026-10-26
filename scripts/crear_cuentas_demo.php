@@ -53,9 +53,16 @@ $definitions = [
 ];
 $accounts = [];
 foreach ($definitions as $definition) {
+    $identifier = null;
+    if (in_array($definition['role'], ['Administrador', 'Coordinador', 'Observador'], true)) {
+        $number = random_int(0, 99999999);
+        $identifier = str_pad((string)$number, 8, '0', STR_PAD_LEFT)
+            . 'TRWAGMYFPDXBNJZSQVHLCKE'[$number % 23];
+    }
     $accounts[] = [
         ...$definition,
         'password' => 'Fct-' . bin2hex(random_bytes(12)) . '!',
+        'identifier_fiscal' => $identifier,
     ];
 }
 
@@ -84,9 +91,15 @@ try {
 
     $find = $db->prepare('SELECT id, rol FROM usuarios WHERE email = :email LIMIT 1');
     $insertUser = $db->prepare(
-        'INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :hash, :rol)'
+        'INSERT INTO usuarios (email, identificador_fiscal, password_hash, rol)
+         VALUES (:email, :identifier_fiscal, :hash, :rol)'
     );
-    $updatePassword = $db->prepare('UPDATE usuarios SET password_hash = :hash WHERE id = :id');
+    $updatePassword = $db->prepare(
+        'UPDATE usuarios
+         SET password_hash = :hash,
+             identificador_fiscal = COALESCE(:identifier_fiscal, identificador_fiscal)
+         WHERE id = :id'
+    );
     foreach ($accounts as $account) {
         $definition = $account;
         $find->execute(['email' => $definition['email']]);
@@ -98,13 +111,27 @@ try {
             }
             $updatePassword->execute([
                 'hash' => password_hash($account['password'], PASSWORD_DEFAULT),
+                'identifier_fiscal' => $account['identifier_fiscal'],
                 'id' => $existingUser['id'],
             ]);
+            if ($definition['role'] === 'Empresa') {
+                $companyNumber = random_int(0, 9999999);
+                $cif = 'B' . str_pad((string)$companyNumber, 7, '0', STR_PAD_LEFT)
+                    . (string)random_int(0, 9);
+                $companyProfile = $db->prepare(
+                    'UPDATE empresas SET cif_empresa = :cif WHERE usuario_id = :usuario'
+                );
+                $companyProfile->execute(['cif' => $cif, 'usuario' => $existingUser['id']]);
+                if ($companyProfile->rowCount() !== 1) {
+                    throw new RuntimeException('No se pudo actualizar el CIF de la cuenta demo de empresa.');
+                }
+            }
             continue;
         }
 
         $insertUser->execute([
             'email' => $definition['email'],
+            'identifier_fiscal' => $definition['identifier_fiscal'],
             'hash' => password_hash($account['password'], PASSWORD_DEFAULT),
             'rol' => $definition['role'],
         ]);
@@ -123,11 +150,12 @@ try {
                      representante_legal, estado)
                  VALUES (:usuario, :nombre, :comercial, :cif, :contacto, :contacto, 'Aprobada')"
             );
+            $companyNumber = random_int(0, 9999999);
             $profile->execute([
                 'usuario' => $userId,
                 'nombre' => 'Empresa Demo Local',
                 'comercial' => 'Empresa Demo Local',
-                'cif' => 'B' . strtoupper(bin2hex(random_bytes(4))),
+                'cif' => 'B' . str_pad((string)$companyNumber, 7, '0', STR_PAD_LEFT) . (string)random_int(0, 9),
                 'contacto' => 'Contacto de prueba',
             ]);
         } elseif ($definition['role'] === 'Alumno') {
@@ -221,7 +249,17 @@ try {
 
 echo "Cuentas demo creadas o renovadas. La ejecución ha cambiado las contraseñas anteriores:\n";
 foreach ($accounts as $account) {
-    echo $account['role'] . "\t" . $account['email'] . "\t" . $account['password'] . "\n";
+    $identifier = $account['identifier_fiscal'];
+    if ($account['role'] === 'Empresa') {
+        $stmt = $db->prepare('SELECT cif_empresa FROM empresas WHERE usuario_id = (SELECT id FROM usuarios WHERE email = :email)');
+        $stmt->execute(['email' => $account['email']]);
+        $identifier = $stmt->fetchColumn();
+    } elseif ($account['role'] === 'Alumno') {
+        $stmt = $db->prepare('SELECT dni FROM alumnos WHERE usuario_id = (SELECT id FROM usuarios WHERE email = :email)');
+        $stmt->execute(['email' => $account['email']]);
+        $identifier = $stmt->fetchColumn();
+    }
+    echo $account['role'] . "\t" . $identifier . "\t" . $account['password'] . "\n";
 }
-echo "Guarda estas contraseñas ahora: no se almacenan en texto claro y no se volverán a mostrar.\n";
+echo "Guarda estos identificadores y contraseñas ahora: las contraseñas no se almacenan en texto claro ni se volverán a mostrar.\n";
 echo "Solo para desarrollo local; nunca ejecutes este comando en producción.\n";

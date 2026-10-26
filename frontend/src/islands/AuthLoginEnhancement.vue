@@ -42,9 +42,9 @@ async function submitAsJson(event: SubmitEvent): Promise<void> {
     }
 
     const fields = new FormData(form);
-    const email = fields.get('email');
+    const identifier = fields.get('identifier');
     const password = fields.get('password');
-    if (typeof email !== 'string' || typeof password !== 'string') {
+    if (typeof identifier !== 'string' || typeof password !== 'string') {
         return;
     }
 
@@ -69,7 +69,7 @@ async function submitAsJson(event: SubmitEvent): Promise<void> {
     }
 
     try {
-        const user = await session.login({ email, password });
+        const user = await session.login({ identifier, password });
         window.location.assign(`index.php?action=${session.dashboardAction(user.rol)}`);
     } catch (cause) {
         if (passwordInput) {

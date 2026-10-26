@@ -77,6 +77,39 @@ class Convenio
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function listarArchivo(): array
+    {
+        $stmt = $this->db->query(
+            'SELECT c.*, e.nombre_empresa, s.nombre AS nombre_sede,
+                    es.nombre_especialidad,
+                    COALESCE(NULLIF(CONCAT_WS(\' \', coord.nombre, coord.apellidos), \'\'), revisor.email, \'Usuario eliminado\') AS nombre_revisor
+             FROM convenios c
+             INNER JOIN empresas e ON e.id = c.empresa_id
+             LEFT JOIN empresa_sedes s ON s.id = c.sede_id
+             LEFT JOIN especialidades es ON es.id = c.especialidad_id
+             LEFT JOIN usuarios revisor ON revisor.id = c.revisado_por
+             LEFT JOIN coordinadores coord ON coord.usuario_id = revisor.id
+             ORDER BY c.creado_en DESC, c.id DESC'
+        );
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function listarEventosArchivo(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT a.entidad_id AS convenio_id, a.evento, a.detalle, a.creado_en,
+                    COALESCE(NULLIF(CONCAT_WS(' ', coord.nombre, coord.apellidos), ''), u.email, 'Usuario eliminado') AS actor
+             FROM auditoria a
+             INNER JOIN convenios c ON c.id = a.entidad_id
+             LEFT JOIN usuarios u ON u.id = a.usuario_id
+             LEFT JOIN coordinadores coord ON coord.usuario_id = u.id
+             WHERE a.entidad = 'convenios'
+               AND a.evento LIKE 'convenio.%'
+             ORDER BY a.creado_en DESC, a.id DESC"
+        );
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function listarParaObservador(): array
     {
         $stmt = $this->db->query(

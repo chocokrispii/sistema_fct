@@ -3,6 +3,7 @@
 .env.mcp.local
 docker.override.yml
 node_modules/
+vendor/
 public/build/
 docs/.vitepress/cache/
 docs/.vitepress/dist/

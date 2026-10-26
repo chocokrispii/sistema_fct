@@ -4,6 +4,7 @@
 require_once __DIR__ . '/../Models/Usuario.php';
 require_once __DIR__ . '/../Models/IntentoLogin.php';
 require_once __DIR__ . '/../Core/JsonResponse.php';
+require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 
 class AuthController {
     /** Mismo coste que password_hash por defecto: el correo inexistente tarda igual que uno real. */
@@ -31,51 +32,61 @@ class AuthController {
             $input = $_POST;
         }
 
-        $emailRaw = $input['email'] ?? '';
+        $identifierRaw = $input['identifier'] ?? '';
         $password = $input['password'] ?? '';
-        if (!is_string($emailRaw) || !is_string($password)) {
+        if (!is_string($identifierRaw) || !is_string($password)) {
             $this->mostrarFormulario(
                 'Los datos de acceso no tienen un formato válido.',
                 422,
-                is_string($emailRaw) ? trim($emailRaw) : ''
+                is_string($identifierRaw) ? trim($identifierRaw) : ''
             );
             return;
         }
-        $email = trim($emailRaw);
+        $identifier = trim($identifierRaw);
 
-        if ($email === '' || $password === '') {
-            $this->mostrarFormulario('Por favor completa todos los campos.', 422, $email);
+        if ($identifier === '' || $password === '') {
+            $this->mostrarFormulario('Por favor completa todos los campos.', 422, $identifier);
             return;
         }
 
         $intentos = new IntentoLogin();
         $ip = is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
         $ahora = new DateTimeImmutable();
-        if ($intentos->estaBloqueado($email, $ip, $ahora)) {
+        $normalizedIdentifier = SpanishDataValidator::normalizeFiscalIdentifier($identifier);
+        if ($intentos->estaBloqueado($normalizedIdentifier, $ip, $ahora)) {
             $this->mostrarFormulario(
                 'Demasiados intentos fallidos. Espera ' . IntentoLogin::VENTANA_MINUTOS . ' minutos y vuelve a intentarlo.',
                 429,
-                $email
+                $identifier
             );
             return;
         }
         if (strlen($password) > 72) {
-            $intentos->registrarFallo($email, $ip, $ahora);
-            $this->mostrarFormulario('La contraseña no puede superar 72 bytes.', 422, $email);
+            $intentos->registrarFallo($normalizedIdentifier, $ip, $ahora);
+            $this->mostrarFormulario('La contraseña no puede superar 72 bytes.', 422, $identifier);
             return;
         }
 
-        $usuario = $this->usuarioModel->obtenerPorEmail($email);
+        if (
+            !SpanishDataValidator::isDniNie($normalizedIdentifier)
+            && !SpanishDataValidator::isSpanishTaxId($normalizedIdentifier)
+        ) {
+            $intentos->registrarFallo($normalizedIdentifier, $ip, $ahora);
+            $this->mostrarFormulario('Introduce un NIF (Persona Jurídica), DNI o NIE válido.', 422, $identifier);
+            return;
+        }
+
+        $usuario = $this->usuarioModel->obtenerPorIdentificador($normalizedIdentifier);
         $correcta = password_verify($password, $usuario['password_hash'] ?? self::HASH_FICTICIO);
 
         if (!$usuario || !$correcta) {
-            $intentos->registrarFallo($email, $ip, $ahora);
-            $this->mostrarFormulario('Credenciales incorrectas.', 401, $email);
+            $intentos->registrarFallo($normalizedIdentifier, $ip, $ahora);
+            $this->mostrarFormulario('Credenciales incorrectas.', 401, $identifier);
             return;
         }
-        $intentos->limpiar($email);
+        $intentos->limpiar($normalizedIdentifier);
         if (isset($usuario['activo']) && (int)$usuario['activo'] !== 1) {
-            $this->mostrarFormulario('La cuenta está desactivada. Contacta con el centro educativo.', 403, $email);
+            $this->mostrarFormulario('La cuenta está desactivada o pendiente de activación. Contacta con el centro educativo.', 403, $identifier);
             return;
         }
         if ($usuario['rol'] === 'Empresa') {

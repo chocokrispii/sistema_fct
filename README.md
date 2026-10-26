@@ -378,7 +378,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\local_webhooks.p
 
 Elige una sola instalación de MariaDB como fuente de datos para ambas aplicaciones; no apuntes una de ellas a XAMPP y la otra a Docker si necesitas que los cambios sean compartidos.
 
-Compose crea automáticamente el volumen privado `fct_storage` y lo monta como `/var/lib/fct/storage`, que es el valor de `FCT_STORAGE_PATH` dentro del contenedor. El Dockerfile prepara el directorio y sus permisos; no se debe mover a `public/`.
+Compose crea automáticamente el volumen privado `fct_storage` y lo monta como `/var/lib/fct/storage`, que es el valor de `FCT_STORAGE_PATH` dentro del contenedor. El contenedor verifica y corrige al arrancar la propiedad y los permisos de los directorios de convenios, incluso si el volumen ya existía; no se debe mover a `public/`.
 
 Si ejecutas PHP directamente con XAMPP en vez de Docker, configura `FCT_STORAGE_PATH` como una ruta absoluta a un directorio existente, con permisos de escritura para Apache y separado del document root. La aplicación rechaza rutas inexistentes o dentro de `public/`.
 
@@ -418,7 +418,19 @@ Los volúmenes de base de datos, archivos subidos, firmas ClamAV y dependencias 
 
 ## 5. Base de datos, cuentas de desarrollo y phpMyAdmin
 
-En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica las migraciones de dominio, disponibilidad y ofertas, además de las tablas de webhooks, tokens API y sus respuestas. Los nombres de algunas migraciones comparten prefijo porque proceden de líneas de trabajo paralelas; Compose les asigna nombres de inicialización únicos para conservar el orden y evitar colisiones. La inicialización oficial de MariaDB sólo procesa estos archivos al crear una base de datos nueva; no vuelve a ejecutarlos en cada arranque.
+En la primera inicialización de un volumen MariaDB vacío, Compose importa `database/sistema_fct.sql` y aplica las migraciones de dominio, disponibilidad, ofertas, webhooks, aprovisionamiento/activación de cuentas y trazabilidad administrativa. Los nombres de algunas migraciones comparten prefijo porque proceden de líneas de trabajo paralelas; Compose les asigna nombres de inicialización únicos para conservar el orden y evitar colisiones. La inicialización oficial de MariaDB sólo procesa estos archivos al crear una base de datos nueva; no vuelve a ejecutarlos en cada arranque.
+
+El alta de alumnos es aprovisionamiento interno: Administradores y Coordinadores con sesión iniciada crean las cuentas desde **Alumnado**; no hay registro público de estudiantes. El formulario exige NIF/DNI/NIE, nombre, apellidos, correo, ciclo, curso y observaciones. El sistema genera una contraseña aleatoria que no se comparte y envía un enlace de activación de un solo uso, válido 24 horas, para que el alumno establezca su contraseña definitiva. La URL del enlace debe usar HTTPS; la única excepción es el circuito de desarrollo local con Mailpit, `APP_ENV=development` y una URL HTTP de loopback (`localhost`, `127.0.0.1` o `[::1]`). Solo se almacena el hash del token y la cuenta permanece inactiva hasta completar la activación. En una base existente, aplica una sola vez `012_alta_alumnos_personal.sql` y `013_activacion_cuentas_alumno.sql`, en ese orden, mediante el procedimiento de migración manual de abajo; no basta con reiniciar Compose.
+
+Desde **Usuarios**, el Administrador aprovisiona cuentas institucionales de Administrador, Coordinador y Observador indicando correo, NIF/DNI/NIE (obligatorio), nombre y apellidos. Se genera una contraseña aleatoria que no se comparte y la cuenta queda inactiva hasta que su titular use el enlace para establecer la contraseña. El enlace es de un solo uso y válido 24 horas; su URL debe ser HTTPS, salvo el circuito local con Mailpit descrito arriba. Solo se almacena el hash del token y, si el correo no se puede enviar, el alta se revierte. En una base existente, aplica una sola vez `015_alta_personal_institucional.sql` después de `014_identificador_fiscal_personal.sql`; la migración conserva los nombres y apellidos ya registrados de Coordinadores.
+
+Si un enlace caduca o no es válido, se puede solicitar otro indicando el correo y NIF/DNI/NIE asociados a la cuenta. La respuesta pública es genérica y no confirma si los datos corresponden a una cuenta. El control se aplica por cuenta: no se crea otra solicitud mientras haya una pendiente ni durante las 24 horas posteriores a la solicitud anterior. Un Administrador revisa la bandeja **Reenvíos de activación** y aprueba manualmente el envío; entonces se invalida el enlace anterior y se envía otro, de un solo uso y válido 24 horas. Si falla el envío, la solicitud permanece pendiente y la transacción revierte la invalidación. En una base existente, aplica una sola vez `016_solicitudes_reenvio_activacion.sql` después de las migraciones de activación `013_activacion_cuentas_alumno.sql` y `015_alta_personal_institucional.sql`.
+
+Los eventos administrativos instrumentados se registran mediante `AuditLogService` en `audit_logs` y se conserva también el registro histórico en `auditoria`. La tabla incluye identificador y nombre completo del actor, acción, entidad afectada, ID del registro modificado, dirección IP, evento, detalle y fecha/hora (`timestamp`). En una base existente que aún no la tenga, aplica una sola vez `017_trazabilidad_administrativa.sql`, después de `016_solicitudes_reenvio_activacion.sql`; reiniciar Compose no ejecuta migraciones en un volumen existente.
+
+El acceso usa el identificador fiscal y la contraseña: Alumno, Administrador, Coordinador y Observador entran con NIF/DNI/NIE; Empresa entra con CIF. El correo no sirve como identificador de login. El personal existente debe tener un NIF asignado en **Usuarios**; aplica una sola vez `014_identificador_fiscal_personal.sql` y conserva abierta la sesión actual del administrador hasta que este asigne allí su NIF y los del resto del personal. Si se perdió esa sesión, el administrador local puede ejecutar `docker compose exec -it app php scripts/asignar_nif_personal.php` para asignar su identificador en desarrollo; el asistente solicita correo y NIF interactivamente y no muestra contraseñas. Las cuentas antiguas sin NIF no podrán iniciar sesión hasta que se actualicen.
+
+Para probar mensajes en local sin enviar correos reales, usa Mailpit: configura `FCT_MAIL_TRANSPORT=mailpit`, `FCT_MAIL_HOST=mailpit`, `FCT_MAIL_PORT=1025`, `FCT_MAIL_ENCRYPTION=none`, un remitente válido en `FCT_MAIL_FROM` y `FCT_APP_URL` con la URL local de la aplicación. Sin cambios locales de puertos, los valores de referencia son `http://localhost:8080` para la aplicación y <http://localhost:8025> para consultar Mailpit. La aplicación acepta un enlace HTTP sólo en `APP_ENV=development` y con host loopback (`localhost`, `127.0.0.1` o `[::1]`); para cualquier otro destino el enlace debe usar HTTPS. No envíes mensajes de prueba a alumnos. Para correo real con Gmail/Google Workspace, usa `FCT_MAIL_TRANSPORT=smtp`, `FCT_MAIL_USERNAME`, `FCT_MAIL_PASSWORD` (contraseña de aplicación), `FCT_MAIL_FROM` y una URL HTTPS accesible desde los dispositivos del alumnado. Gmail requiere verificación en dos pasos; no uses la contraseña normal ni guardes credenciales en el repositorio.
 
 Las ofertas históricas aprobadas no tienen horas exactas inferibles a partir de sus antiguos turnos amplios; se excluyen del matching y del catálogo hasta republicarlas con horario semanal. No asignes horarios aproximados automáticamente.
 
@@ -485,13 +497,49 @@ La migración es idempotente. Los datos de ofertas históricas reciben valores p
 
 Las migraciones `007_webhooks.sql`, `008_api_access_tokens.sql` y `009_webhook_responses.sql` también se aplican al crear un volumen nuevo; Compose las ejecuta con nombres de inicialización únicos después de las migraciones de dominio. Si conservas una base creada antes de la integración de webhooks, aplica esas tres migraciones una sola vez, en ese orden y con el procedimiento `docker compose cp` descrito arriba, antes de desplegar el nuevo código. La última es un `ALTER TABLE` y no debe ejecutarse de nuevo si ya existen las columnas de respuesta.
 
+Para habilitar el NIF del personal en una base local ya inicializada, aplica **una sola vez** la migración `014_identificador_fiscal_personal.sql`:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\014_identificador_fiscal_personal.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --****** "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+No repitas este `ALTER TABLE` si `usuarios.identificador_fiscal` ya existe. Después recarga la página de la aplicación. Desde **Usuarios**, asigna y guarda el NIF/DNI/NIE válido del administrador actual y de cada miembro del personal antes de cerrar la sesión; no se puede inferir el NIF real a partir del correo.
+
+Para habilitar el alta institucional de personal, aplica después y una sola vez `015_alta_personal_institucional.sql`:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\015_alta_personal_institucional.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --****** "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+Esta migración añade nombre y apellidos para las cuentas de personal, conserva los datos ya guardados de Coordinadores y crea la tabla de enlaces de activación de personal.
+
+Para habilitar las solicitudes y aprobación de reenvíos de activación, aplica después y una sola vez `016_solicitudes_reenvio_activacion.sql`:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\016_solicitudes_reenvio_activacion.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --****** "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+En una base existente que todavía no tenga la tabla de trazabilidad, aplica también y una sola vez `017_trazabilidad_administrativa.sql`, después de `016_solicitudes_reenvio_activacion.sql`:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\017_trazabilidad_administrativa.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+Si la sesión de administrador ya no está disponible, dentro de Docker Desktop y en modo desarrollo ejecuta `docker compose exec -it app php scripts/asignar_nif_personal.php`; escribe el correo existente y el NIF real cuando el asistente los solicite. Repite para cada cuenta del personal que necesite acceso. Este asistente está limitado a ejecución CLI en `APP_ENV=development` o `local`.
+
 Genera las cinco cuentas de prueba actuales (Administrador, Coordinador, Observador, Empresa y Alumno) sólo en la base local autorizada:
 
 ```powershell
 docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/crear_cuentas_demo.php
 ```
 
-El script imprime contraseñas aleatorias una sola vez. **Cada ejecución renueva todas las contraseñas demo y deja inválidas las anteriores**; guarda la salida de forma segura. También crea para el alumno demo disponibilidad de lunes a viernes, de 09:00 a 17:00, con franjas exactas. No ejecutes este comando en producción. `database/seeds/001_sample_data.sql` es un conjunto legado de datos de muestra y no se ejecuta automáticamente ni sustituye al generador seguro de cuentas.
+El script imprime identificadores fiscales y contraseñas aleatorias una sola vez. **Cada ejecución renueva todas las contraseñas demo y deja inválidas las anteriores**; guarda la salida de forma segura. También crea para el alumno demo disponibilidad de lunes a viernes, de 09:00 a 17:00, con franjas exactas. No ejecutes este comando en producción. `database/seeds/001_sample_data.sql` es un conjunto legado de datos de muestra y no se ejecuta automáticamente ni sustituye al generador seguro de cuentas.
+
+La cuenta demo de Administrador usa el correo `demo.admin@fct.local`, pero el formulario de inicio de sesión no admite correo: entra con el NIF aleatorio y la contraseña que aparecen en la salida de esa ejecución. Las contraseñas no se guardan en texto legible ni se pueden consultar después. Si perdiste la salida, puedes volver a ejecutar el comando únicamente en desarrollo local; generará credenciales nuevas y cambiará las contraseñas de **todas** las cuentas demo, así que guarda de forma segura la nueva salida.
 
 Consulta [la matriz de roles y permisos](docs/roles_y_permisos.md) para conocer el acceso restringido al catálogo y el alcance de solo lectura del perfil Observador.
 
@@ -528,6 +576,12 @@ Administrador y Coordinador registran calificaciones de prácticas cerradas; se 
 | Empresa | Sus convenios, sedes y ofertas; no decide sus revisiones. |
 | Invitado | Inicio, registro, autenticación y recuperación; las áreas protegidas requieren sesión. |
 
+Los convenios aprobados permanecen en la tabla `convenios`, con sus datos de
+revisión; los PDF se conservan en almacenamiento privado. El administrador
+puede consultar todos los estados y el registro de actividad desde **Archivo
+de convenios** (`index.php?action=archivo-convenios`). La lista de **Revisar
+convenios** sigue destinada a la cola de pendientes.
+
 El botón de tema claro/oscuro sigue la preferencia del sistema si todavía no hay una elección guardada; al cambiarlo manualmente, la elección queda en el almacenamiento local del navegador.
 
 La matriz anterior describe la navegación MVC protegida por `routes/web.php`.
@@ -549,6 +603,8 @@ Si necesitas comprobar el comportamiento de fallo cerrado, establece `FCT_CLAMAV
 
 ## 7. Acceso a la aplicación y herramientas
 
+Consulta la [guía de acceso para usuarios](docs/guia-acceso.pdf) o su [fuente editable](docs/guia-acceso.html) para iniciar el entorno y acceder según el perfil.
+
 | Servicio | Dirección local |
 |---|---|
 | Aplicación PHP | <http://localhost:8080> (o `APP_PORT`) |
@@ -557,6 +613,8 @@ Si necesitas comprobar el comportamiento de fallo cerrado, establece `FCT_CLAMAV
 | Vista previa de publicar oferta (entornos `development` o `local`) | `http://localhost:8080/dev/preview-publicar-oferta` |
 | Vite HMR | <http://localhost:5173> cuando se inicia el frontend |
 | Portal VitePress | <http://localhost:5174> con el comando de desarrollo de documentación |
+
+Estas direcciones reflejan los puertos predeterminados de `docker-compose.yml` y `.env.example`. Si el entorno usa `docker-compose.override.yml`, sus mapeos locales pueden sustituirlos; consulta ese archivo y ajusta `FCT_APP_URL` a la dirección local efectiva. Los valores del override no son los predeterminados compartidos.
 
 El acceso a páginas y acciones dentro de la aplicación continúa gobernado por `routes/web.php` y el rol de la sesión; conocer la URL no concede permisos.
 
@@ -813,7 +871,7 @@ Para volver a inicializar la base de datos tras cambios de esquema o migraciones
 
 ## Más información
 
-- [Guía de Integraciones en PDF](docs/guia-integraciones.pdf)
+- [Guía de Integraciones en PDF](docs/public/guia-integraciones.pdf)
 - [Guía de Integraciones editable](docs/integraciones.md)
 - [Hoja de ruta de migración](docs/roadmap.md)
 - [Flujo de datos y ciclo de vida](docs/flujo-de-datos.md)

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../Core/ApiToken.php';
+require_once __DIR__ . '/../Models/Auditoria.php';
 
 final class ApiTokenAdminController
 {
@@ -81,16 +82,34 @@ final class ApiTokenAdminController
         }
 
         $token = ApiToken::issue();
-        $stmt = $this->db->prepare(
-            'INSERT INTO api_access_tokens (user_id, name, token_hash, created_by)
-             VALUES (:user_id, :name, :token_hash, :created_by)'
-        );
-        $stmt->execute([
-            'user_id' => $userId,
-            'name' => $name,
-            'token_hash' => $token['hash'],
-            'created_by' => (int)$_SESSION['usuario_id'],
-        ]);
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO api_access_tokens (user_id, name, token_hash, created_by)
+                 VALUES (:user_id, :name, :token_hash, :created_by)'
+            );
+            $stmt->execute([
+                'user_id' => $userId,
+                'name' => $name,
+                'token_hash' => $token['hash'],
+                'created_by' => (int)$_SESSION['usuario_id'],
+            ]);
+            $tokenId = (int)$this->db->lastInsertId();
+            (new Auditoria($this->db))->registrar(
+                (int)$_SESSION['usuario_id'],
+                'api_token.creado',
+                'api_access_tokens',
+                $tokenId,
+                'usuario_id=' . (int)$userId . '; nombre=' . $name,
+                'creación'
+            );
+            $this->db->commit();
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $exception;
+        }
 
         return $token['plainText'];
     }
@@ -103,13 +122,32 @@ final class ApiTokenAdminController
             return;
         }
 
-        $stmt = $this->db->prepare(
-            'UPDATE api_access_tokens SET revoked_at = CURRENT_TIMESTAMP
-             WHERE id = :id AND revoked_at IS NULL'
-        );
-        $stmt->execute(['id' => $id]);
-        if ($stmt->rowCount() !== 1) {
-            $error = 'El token no existe o ya fue revocado.';
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare(
+                'UPDATE api_access_tokens SET revoked_at = CURRENT_TIMESTAMP
+                 WHERE id = :id AND revoked_at IS NULL'
+            );
+            $stmt->execute(['id' => $id]);
+            if ($stmt->rowCount() !== 1) {
+                $this->db->rollBack();
+                $error = 'El token no existe o ya fue revocado.';
+                return;
+            }
+            (new Auditoria($this->db))->registrar(
+                (int)$_SESSION['usuario_id'],
+                'api_token.revocado',
+                'api_access_tokens',
+                (int)$id,
+                '',
+                'revocación'
+            );
+            $this->db->commit();
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $exception;
         }
     }
 }

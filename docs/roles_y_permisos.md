@@ -76,6 +76,11 @@ La lista `GET revisar-ofertas` y la revisión documental de convenios permanecen
 
 La política de roles usa los nombres reales del esquema (`Administrador`, `Coordinador`, `Observador`, `Empresa`, `Alumno`). No se inventan roles `Director` ni `Guest` en la base de datos.
 
+El archivo `GET archivo-convenios` está reservado a Administrador. Muestra
+todos los estados, los datos de revisión y los eventos de auditoría asociados.
+Los PDF permanecen en almacenamiento privado y se sirven mediante la ruta
+autorizada `GET descargar-convenio`.
+
 ## API tokenizada
 
 Las reglas anteriores describen las acciones MVC de `routes/web.php`. La API

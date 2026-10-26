@@ -190,6 +190,13 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 |  | `solicitudes-empresa`, `admin-convenios`, `formulario-aprobar-empresa` | GET | Administrador |
 |  | `aprobar-empresa`, `api-aprobar-empresa` | POST | Administrador; CSRF |
 |  | `solicitud-pendiente` | GET | Público con estado flash de sesión; estado MVC para solicitudes no aprobadas |
+|  | `recuperaciones` | GET | Administrador, Coordinador |
+|  | `verificar-recuperacion` | POST | Administrador, Coordinador |
+|  | `alumnos-centro` | GET, POST | Administrador, Coordinador; alta de alumnos con NIF, datos de contacto y ciclo/curso |
+|  | `activar-cuenta` | GET, POST | Público con token de un solo uso; elección de contraseña y activación de cuentas de alumno o personal |
+|  | `solicitar-reenvio-activacion` | POST | Público; verifica correo + NIF/DNI/NIE de una cuenta inactiva y registra una solicitud con respuesta genérica |
+| Administración | `solicitudes-activacion` | GET | Administrador; bandeja de reenvíos pendientes |
+|  | `aprobar-reenvio-activacion` | POST | Administrador; invalida tokens anteriores y envía un enlace nuevo de 24 horas |
 |  | `ofertas` | GET | Administrador, Coordinador, Observador, Empresa |
 | Alumno | `portal-alumno`, `mis-asignaciones`, `mis-calificaciones` | GET | Alumno |
 |  | `perfil-alumno`, `disponibilidad` | GET, POST | Alumno |
@@ -207,7 +214,7 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 | Calificaciones | `calificaciones` | GET | Administrador, Coordinador, Observador |
 |  | `guardar-calificacion` | POST | Administrador, Coordinador |
 | Consultas y administración | `consultas` | GET | Administrador, Coordinador, Observador |
-|  | `usuarios` | GET, POST | Administrador |
+|  | `usuarios` | GET, POST | Administrador; aprovisiona Administrador, Coordinador y Observador con NIF, nombre, apellidos y activación por correo |
 |  | `estado-usuario`, `eliminar-usuario` | POST | Administrador |
 | Integraciones | `api-tokens` | GET, POST | Administrador; emite (el valor en claro se muestra una vez) y revoca tokens de la API |
 |  | `pruebas-integracion` | GET, POST | Administrador; pruebas sintéticas de recepción y envío de webhooks |
@@ -215,7 +222,7 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 |  | `webhooks-enviados` | GET | Administrador; últimos 50 eventos de `webhook_outbox` |
 |  | `webhooks-empresa` | GET | Administrador; actividad de webhooks filtrada por `empresa_id` |
 
-`routes/web.php` declara 48 acciones estáticas, todas recogidas arriba. Además, `preview-disponibilidad` y `preview-publicar-oferta` (públicas, GET, vistas de desarrollo) se registran sólo cuando `APP_ENV` es `development` o `local`; no forman parte del catálogo de producción.
+`routes/web.php` declara las acciones estáticas recogidas arriba. Además, `preview-disponibilidad` y `preview-publicar-oferta` (públicas, GET, vistas de desarrollo) se registran sólo cuando `APP_ENV` es `development` o `local`; no forman parte del catálogo de producción.
 
 La definición completa del rol de auditoría y sus límites está en [Roles y permisos](/roles_y_permisos).
 
@@ -227,7 +234,12 @@ La definición completa del rol de auditoría y sus límites está en [Roles y p
 | Cargar el inicio sin sesión | Navegador; Vue no sustituye el contenido público | `GET inicio` | Entrada → `home/index` | Ninguna obligatoria | Landing HTML PHP |
 | Cargar el login | `AuthLoginEnhancement` se monta junto al formulario PHP | `GET login` | `AuthController::login` | Genera/reutiliza token CSRF de sesión | HTML; isla Vue mejora el envío si Vite está habilitado |
 | Consultar sesión | `RoleDashboard` / Pinia `session` | `GET session`, `Accept: application/json` | `AuthController::session` | Consulta `usuarios` por ID de sesión y verifica `activo` | `{ success: true, data: { user, csrfToken } }`; `user` es `null` si no está autenticado |
-| Iniciar sesión | `AuthLoginEnhancement` → `api/client.ts` → Pinia | `POST login`, JSON `{ email, password }`, `X-CSRF-Token` | `AuthController::login` | `IntentoLogin` + `Usuario`; verificación de hash; `session_regenerate_id` | JSON de éxito con usuario/rol y nuevo token; errores JSON con status HTTP; sin JSON sigue formulario/redirección |
+| Iniciar sesión | `AuthLoginEnhancement` → `api/client.ts` → Pinia | `POST login`, JSON `{ identifier, password }`, `X-CSRF-Token` | `AuthController::login` | `IntentoLogin` + `Usuario`; correo para personal y CIF de empresa o DNI/NIE de alumno según rol; verificación de hash; `session_regenerate_id` | JSON de éxito con usuario/rol y nuevo token; errores JSON con status HTTP; sin JSON sigue formulario/redirección |
+| Enviar activación al alumno | `AlumnoAdminController` | `POST alumnos-centro` | `AuthMiddleware` (Administrador/Coordinador) + `CsrfMiddleware` | Cuenta inactiva, hash de token de 256 bits y expiración de 24 horas; PHPMailer por SMTP TLS | Enlace de un solo uso para elegir contraseña; si SMTP falla, se revierte la creación |
+| Aprovisionar personal del centro | `UsuarioAdminController` | `POST usuarios` | `AuthMiddleware` (Administrador) + `CsrfMiddleware` | Valida NIF, correo, nombre, apellidos y rol; guarda la cuenta inactiva y el hash del token por 24 horas; envía correo y registra auditoría en la transacción | Enlace de un solo uso para elegir contraseña; si el correo falla, se revierte el alta |
+| Activar una cuenta | Formulario PHP de activación | `GET, POST activar-cuenta` | `ActivacionController` | Comprueba token de alumno o personal, expiración y uso; guarda hash de contraseña y consume el token en una transacción | Mensaje de activación; la cuenta queda activa y el enlace no se puede reutilizar |
+| Solicitar un nuevo enlace | Formulario de activación caducada | `POST solicitar-reenvio-activacion` | Ruta pública + CSRF → `SolicitudReenvioActivacionController` | Coincidencia de correo, identificador fiscal y cuenta inactiva; una solicitud pendiente por cuenta y ventana de 24 horas; respuesta genérica para no revelar cuentas | Solicitud registrada como `Pendiente de Reenvío` o respuesta pública idéntica si los datos no coinciden |
+| Aprobar reenvío | Bandeja administrativa de activación | `POST aprobar-reenvio-activacion` | `AuthMiddleware` (Administrador) + CSRF → `SolicitudReenvioActivacionController` | Transacción; invalida tokens anteriores, emite uno de 24 horas, envía correo, actualiza estado y registra auditoría; si falla el correo se revierte la transacción | Mensaje de éxito o error; la solicitud sigue pendiente si no se pudo enviar |
 | Cerrar sesión | Pinia `session` / formulario PHP | `POST logout`; JSON incluye `X-CSRF-Token` o form usa `_csrf` | `AuthController::logout` | Destruye sesión y expira cookie | JSON `{ user: null }` o redirección HTML a login |
 | Editar perfil de alumno | `StudentProfile` + Pinia `student-profile` | `POST perfil-alumno`, JSON con `X-CSRF-Token`; fallback urlencoded con `_csrf` | `AuthMiddleware` (Alumno) + `CsrfMiddleware` → `AlumnoController::editarPerfil` | Validación del servidor y `Alumno::actualizarPerfil`; transacción sobre usuario, alumno, contacto y tutor | JSON `{ success: true, data: { message } }` / `{ success: false, error }`; fallback HTML con redirección |
 | Guardar disponibilidad semanal | `AvailabilitySchedule` dentro del formulario PHP | `POST disponibilidad`, JSON `{ fecha_inicio, fecha_fin, turno, es_indiferente, horarios }` con `X-CSRF-Token`; fallback urlencoded con `_csrf` | `AuthMiddleware` (Alumno) + `CsrfMiddleware` → `DisponibilidadController::gestionar` | Valida periodo y franjas exactas; `turno` se conserva como dato legado y no decide compatibilidad. `Disponibilidad::reemplazar` actualiza las tablas de disponibilidad en una transacción | JSON `{ success: true, data: { message } }` / `{ success: false, error }`; fallback HTML con redirección |

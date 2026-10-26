@@ -429,6 +429,25 @@ class ConvenioController
         ]);
     }
 
+    public function archivo(): void
+    {
+        if (($_SESSION['rol'] ?? null) !== 'Administrador') {
+            http_response_code(403);
+            throw new RuntimeException('El archivo de convenios está reservado a administración.');
+        }
+
+        $eventosPorConvenio = [];
+        foreach ($this->convenioModel->listarEventosArchivo() as $evento) {
+            $convenioId = (int)$evento['convenio_id'];
+            $eventosPorConvenio[$convenioId][] = $evento;
+        }
+
+        View::render('convenios/archivo', [
+            'convenios' => $this->convenioModel->listarArchivo(),
+            'eventosPorConvenio' => $eventosPorConvenio,
+        ]);
+    }
+
     public function auditar(): void
     {
         View::render('convenios/observador', [

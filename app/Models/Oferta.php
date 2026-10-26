@@ -153,6 +153,32 @@ class Oferta {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    private function obtenerPagina(string $where, array $params, string $orderBy, int $pagina, int $porPagina): array
+    {
+        $whereSql = $where !== '' ? ' WHERE ' . $where : '';
+        $count = $this->db->prepare(
+            'SELECT COUNT(*)
+             FROM empresa_especialidades_plazas p
+             INNER JOIN empresas e ON e.id = p.empresa_id
+             INNER JOIN especialidades es ON es.id = p.especialidad_id' . $whereSql
+        );
+        $count->execute($params);
+        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
+
+        $stmt = $this->db->prepare(
+            $this->selectBase() . $whereSql . ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset'
+        );
+        foreach ($params as $name => $value) {
+            $stmt->bindValue(':' . $name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
+        $stmt->execute();
+        $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return $paginacion;
+    }
+
     public function obtenerPaginaPorEmpresa(int $empresaId, int $pagina, int $porPagina = 20): array
     {
         return $this->obtenerPagina('p.empresa_id = :empresa_id', ['empresa_id' => $empresaId], 'p.fecha_inicio DESC, p.id DESC', $pagina, $porPagina);
@@ -233,33 +259,6 @@ class Oferta {
     public function obtenerPaginaPendientes(int $pagina, int $porPagina = 20): array
     {
         return $this->obtenerPagina("p.estado = 'Pendiente'", [], 'p.fecha_inicio, p.id', $pagina, $porPagina);
-    }
-
-    private function obtenerPagina(string $where, array $params, string $orderBy, int $pagina, int $porPagina): array
-    {
-        $countSql = 'SELECT COUNT(*) FROM empresa_especialidades_plazas p';
-        if ($where !== '') {
-            $countSql .= ' WHERE ' . $where;
-        }
-        $count = $this->db->prepare($countSql);
-        $count->execute($params);
-        $paginacion = Paginacion::calcular((int)$count->fetchColumn(), $pagina, $porPagina);
-
-        $sql = $this->selectBase();
-        if ($where !== '') {
-            $sql .= ' WHERE ' . $where;
-        }
-        $sql .= ' ORDER BY ' . $orderBy . ' LIMIT :limite OFFSET :offset';
-        $stmt = $this->db->prepare($sql);
-        foreach ($params as $name => $value) {
-            $stmt->bindValue(':' . $name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
-        }
-        $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
-        $stmt->execute();
-        $paginacion['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        return $paginacion;
     }
 
     public function resolver(int $ofertaId, string $estado, string $motivo, int $revisorId): bool
@@ -516,6 +515,7 @@ class Oferta {
             : 'p.id, a.id, a.nombre, a.apellidos, a.correo, d.turno';
         $sql = "SELECT {$columnas}
                 FROM empresa_especialidades_plazas p
+                INNER JOIN especialidades es ON es.id = p.especialidad_id AND es.activo = 1
                 INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
                 INNER JOIN alumno_disponibilidad d
                     ON d.alumno_id = a.id

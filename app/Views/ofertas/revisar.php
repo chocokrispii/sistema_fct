@@ -12,13 +12,15 @@
             default => 'Jornada no especificada',
         };
         ?>
-        <section class="review-card">
+        <?php $turnLabel = ['M' => 'Mañana', 'T' => 'Tarde', 'P' => 'Partido', 'Indiferente' => 'Indiferente'][$oferta['turno']] ?? 'Sin especificar'; ?>
+        <section class="review-card offer-review-card">
             <span class="offer-create__eyebrow"><?= htmlspecialchars($oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars($oferta['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></span>
             <h3><?= htmlspecialchars(($oferta['titulo'] ?? '') !== '' ? $oferta['titulo'] : $oferta['nombre_empresa'] . ' — ' . $oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></h3>
             <?php if (!empty($oferta['descripcion'])): ?><p><?= nl2br(htmlspecialchars($oferta['descripcion'], ENT_QUOTES, 'UTF-8')) ?></p><?php endif; ?>
             <p>
                 <?= (int)$oferta['plazas_cuantas'] ?> plazas ·
                 <?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?> ·
+                <span class="status-badge status-badge--neutral"><?= htmlspecialchars($turnLabel, ENT_QUOTES, 'UTF-8') ?></span> ·
                 <span class="status-badge status-badge--neutral"><?= htmlspecialchars($jornadaLabel, ENT_QUOTES, 'UTF-8') ?></span> ·
                 <span class="status-badge status-badge--neutral"><?= htmlspecialchars($oferta['modalidad'] ?? 'Presencial', ENT_QUOTES, 'UTF-8') ?></span>
             </p>

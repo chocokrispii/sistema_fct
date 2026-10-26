@@ -41,6 +41,27 @@ assertFileSecurity(
     'La eliminación permanente debe ser POST y estar limitada a administradores.'
 );
 assertFileSecurity(
+    $routes['actualizar-identificador-fiscal-usuario']['method'] === 'POST'
+        && $routes['actualizar-identificador-fiscal-usuario']['roles'] === ['Administrador'],
+    'La actualización de identificadores fiscales debe ser POST y estar limitada a administradores.'
+);
+assertFileSecurity(
+    $routes['solicitar-reenvio-activacion']['method'] === 'POST'
+        && $routes['solicitar-reenvio-activacion']['roles'] === []
+        && $routes['solicitudes-activacion']['method'] === 'GET'
+        && $routes['solicitudes-activacion']['roles'] === ['Administrador']
+        && $routes['aprobar-reenvio-activacion']['method'] === 'POST'
+        && $routes['aprobar-reenvio-activacion']['roles'] === ['Administrador'],
+    'Los reenvíos de activación deben solicitarse con respuesta genérica y aprobarse solo por administrador.'
+);
+$activationController = file_get_contents(__DIR__ . '/../app/Controllers/ActivacionController.php');
+assertFileSecurity(
+    is_string($activationController)
+        && str_contains($activationController, 'expires_at > CURRENT_TIMESTAMP')
+        && str_contains($activationController, 'AND used_at IS NULL'),
+    'Los enlaces de activación deben rechazarse al expirar según el reloj de la base de datos y ser de un solo uso.'
+);
+assertFileSecurity(
     $routes['mis-calificaciones']['roles'] === ['Alumno']
         && $routes['calificaciones']['roles'] === ['Administrador', 'Coordinador', 'Observador']
         && $routes['guardar-calificacion']['roles'] === ['Administrador', 'Coordinador'],
@@ -236,6 +257,9 @@ assertFileSecurity(SpanishDataValidator::isDniNie('00000009D'), 'Se rechazó un 
 assertFileSecurity(SpanishDataValidator::isDniNie('X-1234567-L'), 'Se rechazó un NIE válido con separadores.');
 assertFileSecurity(!SpanishDataValidator::isDniNie('12345678A'), 'Se aceptó un DNI con letra de control incorrecta.');
 assertFileSecurity(!SpanishDataValidator::isDniNie('X1234567A'), 'Se aceptó un NIE con letra de control incorrecta.');
+assertFileSecurity(SpanishDataValidator::isDniNieFormat('12345678A'), 'El login debe reconocer el formato de DNI de cuentas históricas.');
+assertFileSecurity(SpanishDataValidator::isCifFormat('B12345678'), 'Se rechazó un CIF con formato válido.');
+assertFileSecurity(!SpanishDataValidator::isCifFormat('B1234'), 'Se aceptó un CIF mal formado.');
 assertFileSecurity(SpanishDataValidator::isSpanishPhone('+34 612 345 678'), 'Se rechazó un teléfono válido con prefijo +34.');
 assertFileSecurity(SpanishDataValidator::isSpanishPhone('0034 (612) 345-678'), 'Se rechazó un teléfono válido con prefijo 0034.');
 assertFileSecurity(
@@ -411,4 +435,6 @@ try {
     }
 }
 
-echo "OK: validadores españoles, matriz de rutas, almacenamiento privado y política antivirus fail-closed.\n";
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__)) {
+    echo "OK: validadores españoles, matriz de rutas, almacenamiento privado y política antivirus fail-closed.\n";
+}

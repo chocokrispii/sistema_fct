@@ -36,5 +36,11 @@
     "vite": "^6.1.0",
     "vitepress": "^1.6.4",
     "vue-tsc": "^2.2.0"
+  },
+  "overrides": {
+    "katex": "0.18.2",
+    "vitepress": {
+      "vite": "6.4.4"
+    }
   }
 }

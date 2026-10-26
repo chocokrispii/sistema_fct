@@ -2,6 +2,12 @@
 /** @var string $contenido HTML generado por el controlador */
 $rolActual = $_SESSION['rol'] ?? null;
 $usuarioAutenticado = $rolActual !== null;
+$pendientesReenvioActivacion = 0;
+if ($rolActual === 'Administrador') {
+    $pendientesReenvioActivacion = (int)getPDOConnection()->query(
+        "SELECT COUNT(*) FROM activation_resend_requests WHERE estado = 'Pendiente de Reenvío'"
+    )->fetchColumn();
+}
 $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php')), '/');
 
 $iconos = [
@@ -37,6 +43,7 @@ if ($rolActual === 'Empresa') {
 } elseif (in_array($rolActual, ['Administrador', 'Coordinador'], true)) {
     $navItems = array_merge($navItems, [
         ['Empresas', 'index.php?action=empresas-centro', 'edificio'],
+        ['Alumnado', 'index.php?action=alumnos-centro', 'usuarios'],
         ['Convenios', 'index.php?action=revisar-convenios', 'documento'],
         ['Modificar convenios', 'index.php?action=modificar-convenios', 'documento'],
         ['Revisar ofertas', 'index.php?action=revisar-ofertas', 'check'],
@@ -47,9 +54,12 @@ if ($rolActual === 'Empresa') {
     ]);
     if ($rolActual === 'Administrador') {
         $navItems = array_merge($navItems, [
-            ['Solicitudes de empresa', 'admin/convenios', 'check'],
-            ['Solicitudes de restablecimiento', 'admin/solicitudes-password', 'refrescar'],
+            ['Solicitudes de empresa', 'index.php?action=solicitudes-empresa', 'check'],
+            ['Solicitudes de restablecimiento', 'index.php?action=recuperaciones', 'refrescar'],
             ['Usuarios', 'index.php?action=usuarios', 'usuario'],
+            ['Reenvíos de activación', 'index.php?action=solicitudes-activacion', 'refrescar'],
+            ['Ciclos formativos', 'index.php?action=ciclos', 'documento'],
+            ['Archivo de convenios', 'index.php?action=archivo-convenios', 'documento'],
             ['Tokens API', 'index.php?action=api-tokens', 'refrescar'],
             ['Pruebas API y webhooks', 'index.php?action=pruebas-integracion', 'refrescar'],
             ['Webhooks por empresa', 'index.php?action=webhooks-empresa', 'documento'],
@@ -73,7 +83,6 @@ if ($rolActual === 'Empresa') {
 }
 if (!$usuarioAutenticado) {
     $navItems = array_merge($navItems, [
-        ['Registro alumno', 'index.php?action=registro-alumno', 'usuario'],
         ['Registro empresa', 'index.php?action=registro-empresa', 'edificio'],
         ['Iniciar sesión', 'index.php?action=login', 'salir'],
     ]);

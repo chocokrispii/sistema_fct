@@ -8,6 +8,8 @@ title: Seguridad y antivirus
 
 La carga sigue este orden: validación de extensión, MIME y tamaño; análisis mediante `FileScanner` y ClamAV TCP INSTREAM; movimiento del archivo limpio a `FCT_STORAGE_PATH`; y persistencia de metadatos. Los archivos permanecen fuera de `public/`. La descarga pasa por una ruta PHP con control de acceso.
 
+En Docker, el punto de entrada comprueba al iniciar la aplicación que los directorios del volumen de almacenamiento sean propiedad de `www-data` y tengan permisos `0700`. Esto es necesario porque cambiar el propietario del directorio durante la construcción de la imagen no cambia el propietario de un volumen ya montado.
+
 Cuando el análisis está habilitado, ClamAV no disponible, configuración inválida, timeout, firmas con más de tres días o respuesta `FOUND` hacen que la carga se rechace. No se debe convertir un error del antivirus en una carga aceptada.
 
 ## Desarrollo local
