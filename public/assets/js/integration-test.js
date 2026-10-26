@@ -54,6 +54,14 @@
             return;
         }
 
+        const token = tokenInput.value.trim();
+        if (token === '') {
+            status.textContent = 'Introduce un token API activo.';
+            tokenInput.focus();
+            tokenInput.reportValidity();
+            return;
+        }
+
         let requestBody;
         if (method !== 'GET') {
             try {
@@ -67,10 +75,9 @@
             }
         }
 
-        const token = tokenInput.value;
         tokenInput.value = '';
         const path = resource + (resourceId === '' ? '' : '/' + resourceId);
-        const url = new URL('/api/v1/' + path, window.location.origin);
+        const url = new URL('api/v1/' + path, window.location.href);
         if (method === 'GET' && resourceId === '') {
             url.searchParams.set('page', pageInput.value);
             url.searchParams.set('per_page', perPageInput.value);
@@ -87,6 +94,7 @@
         }
 
         status.textContent = 'Enviando solicitud…';
+        sendButton.disabled = true;
         try {
             const result = await fetch(url, options);
             const responseText = await result.text();
@@ -111,6 +119,7 @@
             confirmWrite.checked = false;
             bodyInput.value = '';
             options.headers.Authorization = '';
+            sendButton.disabled = false;
         }
     });
 })();

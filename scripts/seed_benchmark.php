@@ -52,8 +52,9 @@ try {
     );
     $insertarEmpresa = $db->prepare(
         'INSERT INTO empresas
-            (usuario_id, nombre_empresa, cif_empresa, pertenece_grupo_empresa, categoria, persona_contacto)
-         VALUES (:usuario_id, :nombre, :cif, 0, :categoria, :contacto)'
+            (usuario_id, nombre_empresa, nombre_comercial, cif_empresa, pertenece_grupo_empresa,
+             categoria, persona_contacto, representante_legal, estado)
+         VALUES (:usuario_id, :nombre, :comercial, :cif, 0, :categoria, :contacto, :contacto, \'Aprobada\')'
     );
     $insertarAlumno = $db->prepare(
         'INSERT INTO alumnos
@@ -96,6 +97,7 @@ try {
         $insertarEmpresa->execute([
             'usuario_id' => $usuarioId,
             'nombre' => sprintf('Empresa Benchmark %02d', $indice),
+            'comercial' => sprintf('Empresa Benchmark %02d', $indice),
             'cif' => sprintf('B9%07d', $indice),
             'categoria' => 'Desarrollo de software',
             'contacto' => 'Contacto de pruebas',

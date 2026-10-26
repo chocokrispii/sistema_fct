@@ -116,6 +116,50 @@ Ejemplo de error:
 | POST | `/asignaciones` | Administrador o Coordinador asigna un alumno que cumpla las reglas actuales de disponibilidad, ciclo y cupo. |
 | PATCH | `/asignaciones/{id}` | Administrador o Coordinador cierra una asignación activa. |
 
+## Alta pública y aprobación (sesión MVC)
+
+Estas dos rutas de navegador no pertenecen a la API tokenizada `/api/v1`:
+usan la cookie de sesión MVC, el sobre de `JsonResponse` y el token CSRF de la
+sesión. La isla `AltaEmpresa` envía `X-CSRF-Token` y `multipart/form-data`;
+el formulario PHP conserva un fallback síncrono.
+
+| Método | Ruta | Acceso y acción |
+|---|---|---|
+| POST | `/api/public/empresas/solicitud` | Público con CSRF; crea la cuenta en `Pendiente_Aprobacion` y devuelve HTTP 201. `/api/public/empresas/registro` se mantiene como alias compatible. |
+| POST | `/api/admin/empresas/{id}/aprobar-convenio` | Sesión Administrador con CSRF; requiere `numero_convenio` y `pdf_convenio` (PDF, máximo 10 MiB). `/aprobar` se mantiene como alias compatible. |
+| GET | `/admin/convenios` | Sesión Administrador; lista solicitudes de empresa pendientes y permite abrir el diálogo de formalización. |
+
+La solicitud pública contiene correo, contraseña, razón social, nombre
+comercial, sector, CIF/NIF, representante legal, DNI/NIE, teléfono y dirección.
+Una empresa pendiente o rechazada recibe HTTP 403 en las respuestas JSON y se
+envía a la página MVC de estado `solicitud-pendiente` en navegación HTML. La
+aprobación asigna el número de Convenio Marco, registra
+`fecha_firma_convenio` (y `fecha_aprobacion` por compatibilidad) y habilita el
+acceso de la empresa. El PDF se valida como PDF de hasta 10 MiB, se escanea con
+ClamAV y se guarda como archivo aleatorio en
+`FCT_STORAGE_PATH/uploads/convenios-marco`; nunca se sirve desde `public/`.
+
+## Recuperación de contraseña con aprobación
+
+| Método | Ruta | Acceso y acción |
+|---|---|---|
+| POST | `/api/auth/solicitar-reset-password` | Público con CSRF; acepta correo o DNI/NIE/NIF, respuesta genérica HTTP 202 y límites de frecuencia para evitar enumerar cuentas y solicitudes abusivas. |
+| POST | `/api/admin/solicitudes-password/{id}/aprobar` | Administrador con CSRF; invalida tokens anteriores, crea un token aleatorio, guarda sólo su SHA-256, fija una validez de 24 horas, envía el enlace y registra la acción en `audit_logs`. |
+| POST | `/api/admin/solicitudes-password/{id}/rechazar` | Administrador con CSRF; rechaza la solicitud pendiente y registra la acción en `audit_logs`. |
+| POST | `/api/auth/confirmar-reset-password` | Público con CSRF; valida token vigente, contraseña y confirmación, y consume el enlace. |
+
+La gestión MVC está disponible en `/admin/solicitudes-password`; las páginas
+`recuperar` y `/restablecer-password?token=...` mantienen fallback PHP. El
+mensaje de solicitud es idéntico tanto si existe la cuenta como si no; el
+limitador acepta como máximo cinco solicitudes por identificador y treinta por
+IP en quince minutos. En desarrollo, activa el perfil `dev` para usar Mailpit.
+En producción configura `FCT_PUBLIC_BASE_URL` con HTTPS, `FCT_MAIL_HOST`,
+`FCT_MAIL_PORT`, `FCT_MAIL_FROM`, `FCT_MAIL_USERNAME`,
+`FCT_MAIL_PASSWORD`, `FCT_MAIL_ENCRYPTION` (`starttls` o `ssl`) y una clave
+aleatoria y privada en `FCT_RESET_RATE_LIMIT_KEY`. Si falla el envío, la
+solicitud vuelve a estado pendiente; nunca se muestra ni se registra el token
+en claro. Al cambiar la contraseña también se revocan las sesiones existentes.
+
 ### Relación con los permisos MVC
 
 `public/api.php` y `routes/web.php` aplican sus permisos por separado. En la
@@ -155,14 +199,16 @@ $body = @{
     plazas = 2
     fecha_inicio = '2027-03-01'
     fecha_fin = '2027-06-15'
-    turno = 'Indiferente'
-    horarios = @(
-        @{
-            dia_semana = 1
+    jornada = 'partida'
+    horarios = @{
+        '1' = @{
+            activo = '1'
             hora_inicio = '09:00'
-            hora_fin = '17:00'
+            hora_fin = '11:00'
+            hora_inicio_2 = '12:00'
+            hora_fin_2 = '17:00'
         }
-    )
+    }
 } | ConvertTo-Json
 
 Invoke-RestMethod -Method Post `

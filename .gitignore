@@ -1,6 +1,7 @@
 .env
 .env.local
 .env.mcp.local
+docker.override.yml
 node_modules/
 vendor/
 public/build/

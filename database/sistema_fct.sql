@@ -138,7 +138,8 @@ CREATE TABLE `usuarios` (
   `email` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `rol` enum('Administrador','Coordinador','Observador','Empresa','Alumno') NOT NULL,
-  `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp()
+  `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp(),
+  `fecha_actualizacion` datetime NULL DEFAULT NULL ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
@@ -154,6 +155,7 @@ ALTER TABLE `alumnos`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `usuario_id` (`usuario_id`),
   ADD UNIQUE KEY `dni` (`dni`),
+  ADD UNIQUE KEY `uk_alumnos_nss` (`numero_seguridad_social`),
   ADD KEY `especialidad_id` (`especialidad_id`);
 
 --

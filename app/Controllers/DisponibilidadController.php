@@ -83,12 +83,18 @@ class DisponibilidadController
                     'horarios' => [],
                 ];
                 $horarios = [];
+                $diasProcesados = [];
                 foreach ($horariosRaw as $dia => $horarioRaw) {
                     $diaNumero = filter_var($dia, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 7]]);
                     if ($diaNumero === false || !is_array($horarioRaw)) {
                         $error = 'Selecciona días de la semana válidos.';
                         break;
                     }
+                    if (isset($diasProcesados[$diaNumero])) {
+                        $error = 'Selecciona cada día de la semana una sola vez.';
+                        break;
+                    }
+                    $diasProcesados[$diaNumero] = true;
                     $activo = $horarioRaw['activo'] ?? '';
                     if ($jsonRequest && is_bool($activo)) {
                         $activo = $activo ? '1' : '';

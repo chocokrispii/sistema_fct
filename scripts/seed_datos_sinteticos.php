@@ -193,12 +193,15 @@ try {
         $companyId = $findCompany->fetchColumn();
         if ($companyId === false) {
             $insertCompany = $db->prepare(
-                'INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto)
-                 VALUES (:usuario, :nombre, :cif, :contacto)'
+                "INSERT INTO empresas
+                    (usuario_id, nombre_empresa, nombre_comercial, cif_empresa, persona_contacto,
+                     representante_legal, estado)
+                 VALUES (:usuario, :nombre, :comercial, :cif, :contacto, :contacto, 'Aprobada')"
             );
             $insertCompany->execute([
                 'usuario' => $userId,
                 'nombre' => $company['name'],
+                'comercial' => $company['name'],
                 'cif' => $company['cif'],
                 'contacto' => $company['contact'],
             ]);

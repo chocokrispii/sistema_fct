@@ -32,64 +32,90 @@ class AuthController {
             $input = $_POST;
         }
 
-        $identifierRaw = $input['identifier'] ?? $input['email'] ?? '';
+        $identifierRaw = $input['identifier'] ?? '';
         $password = $input['password'] ?? '';
         if (!is_string($identifierRaw) || !is_string($password)) {
-            $this->mostrarFormulario('Los datos de acceso no tienen un formato válido.', 422);
+            $this->mostrarFormulario(
+                'Los datos de acceso no tienen un formato válido.',
+                422,
+                is_string($identifierRaw) ? trim($identifierRaw) : ''
+            );
             return;
         }
         $identifier = trim($identifierRaw);
 
         if ($identifier === '' || $password === '') {
-            $this->mostrarFormulario('Por favor completa todos los campos.', 422);
+            $this->mostrarFormulario('Por favor completa todos los campos.', 422, $identifier);
             return;
         }
 
         $intentos = new IntentoLogin();
         $ip = is_string($_SERVER['REMOTE_ADDR'] ?? null) ? $_SERVER['REMOTE_ADDR'] : '0.0.0.0';
         $ahora = new DateTimeImmutable();
-        $identificadorNormalizado = SpanishDataValidator::normalizeFiscalIdentifier($identifier);
-        if ($intentos->estaBloqueado($identificadorNormalizado, $ip, $ahora)) {
+        $normalizedIdentifier = SpanishDataValidator::normalizeFiscalIdentifier($identifier);
+        if ($intentos->estaBloqueado($normalizedIdentifier, $ip, $ahora)) {
             $this->mostrarFormulario(
                 'Demasiados intentos fallidos. Espera ' . IntentoLogin::VENTANA_MINUTOS . ' minutos y vuelve a intentarlo.',
-                429
+                429,
+                $identifier
             );
             return;
         }
         if (strlen($password) > 72) {
-            $intentos->registrarFallo($identificadorNormalizado, $ip, $ahora);
-            $this->mostrarFormulario('La contraseña no puede superar 72 caracteres.', 422);
+            $intentos->registrarFallo($normalizedIdentifier, $ip, $ahora);
+            $this->mostrarFormulario('La contraseña no puede superar 72 bytes.', 422, $identifier);
             return;
         }
 
         if (
-            !SpanishDataValidator::isDniNieFormat($identificadorNormalizado)
-            && !SpanishDataValidator::isCifFormat($identificadorNormalizado)
+            !SpanishDataValidator::isDniNie($normalizedIdentifier)
+            && !SpanishDataValidator::isSpanishTaxId($normalizedIdentifier)
         ) {
-            $intentos->registrarFallo($identificadorNormalizado, $ip, $ahora);
-            $this->mostrarFormulario('Introduce un NIF/DNI/NIE válido o el CIF de la empresa.', 422);
+            $intentos->registrarFallo($normalizedIdentifier, $ip, $ahora);
+            $this->mostrarFormulario('Introduce un NIF (Persona Jurídica), DNI o NIE válido.', 422, $identifier);
             return;
         }
 
-        $usuario = $this->usuarioModel->obtenerPorIdentificador($identificadorNormalizado);
+        $usuario = $this->usuarioModel->obtenerPorIdentificador($normalizedIdentifier);
         $correcta = password_verify($password, $usuario['password_hash'] ?? self::HASH_FICTICIO);
 
         if (!$usuario || !$correcta) {
-            $intentos->registrarFallo($identificadorNormalizado, $ip, $ahora);
-            $this->mostrarFormulario('Credenciales incorrectas.', 401);
+            $intentos->registrarFallo($normalizedIdentifier, $ip, $ahora);
+            $this->mostrarFormulario('Credenciales incorrectas.', 401, $identifier);
             return;
         }
-        $intentos->limpiar($identificadorNormalizado);
+        $intentos->limpiar($normalizedIdentifier);
         if (isset($usuario['activo']) && (int)$usuario['activo'] !== 1) {
-            $this->mostrarFormulario('La cuenta está desactivada. Contacta con el centro educativo.', 403);
+            $this->mostrarFormulario('La cuenta está desactivada o pendiente de activación. Contacta con el centro educativo.', 403, $identifier);
             return;
+        }
+        if ($usuario['rol'] === 'Empresa') {
+            $approvalState = $this->empresaApprovalState((int)$usuario['id']);
+            if ($approvalState !== 'Aprobada') {
+                $_SESSION = [];
+                session_regenerate_id(true);
+                $_SESSION['empresa_solicitud_estado'] = in_array(
+                    $approvalState,
+                    ['Pendiente_Aprobacion', 'Rechazada'],
+                    true
+                ) ? $approvalState : 'SinSolicitud';
+                $approvalError = $this->empresaApprovalMessage($approvalState);
+                if (JsonResponse::wantsJson()) {
+                    JsonResponse::failure($approvalError, 403);
+                    return;
+                }
+                header('Location: index.php?action=solicitud-pendiente');
+                exit;
+            }
         }
 
         session_regenerate_id(true);
         unset($_SESSION['csrf_token']);
+        unset($_SESSION['empresa_solicitud_estado']);
         $_SESSION['usuario_id'] = (int)$usuario['id'];
         $_SESSION['email']      = $usuario['email'];
         $_SESSION['rol']        = $usuario['rol'];
+        $_SESSION['session_version'] = (int)($usuario['session_version'] ?? 0);
 
         if (JsonResponse::wantsJson()) {
             JsonResponse::success([
@@ -116,13 +142,32 @@ class AuthController {
 
         if ($userId !== false) {
             $stmt = getPDOConnection()->prepare(
-                'SELECT id, email, rol, activo FROM usuarios WHERE id = :id'
+                'SELECT id, email, rol, activo, session_version FROM usuarios WHERE id = :id'
             );
             $stmt->execute(['id' => $userId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (is_array($row) && (int)$row['activo'] === 1) {
+            if (
+                is_array($row)
+                && (int)$row['activo'] === 1
+                && (int)($row['session_version'] ?? 0) === (int)($_SESSION['session_version'] ?? -1)
+            ) {
+                if ($row['rol'] === 'Empresa') {
+                    $approvalState = $this->empresaApprovalState((int)$row['id']);
+                    if ($approvalState !== 'Aprobada') {
+                        $_SESSION = [];
+                        session_regenerate_id(true);
+                        $_SESSION['empresa_solicitud_estado'] = in_array(
+                            $approvalState,
+                            ['Pendiente_Aprobacion', 'Rechazada'],
+                            true
+                        ) ? $approvalState : 'SinSolicitud';
+                        JsonResponse::failure($this->empresaApprovalMessage($approvalState), 403);
+                        return;
+                    }
+                }
                 $_SESSION['email'] = $row['email'];
                 $_SESSION['rol'] = $row['rol'];
+                $_SESSION['session_version'] = (int)$row['session_version'];
                 $user = $this->sessionUser($row);
             } else {
                 $_SESSION = [];
@@ -163,13 +208,33 @@ class AuthController {
         ];
     }
 
-    private function mostrarFormulario(string $error = '', int $status = 200): void {
+    private function empresaApprovalState(int $userId): ?string
+    {
+        $stmt = getPDOConnection()->prepare(
+            'SELECT estado FROM empresas WHERE usuario_id = :usuario_id LIMIT 1'
+        );
+        $stmt->execute(['usuario_id' => $userId]);
+        $estado = $stmt->fetchColumn();
+
+        return is_string($estado) ? $estado : null;
+    }
+
+    private function empresaApprovalMessage(?string $estado): string
+    {
+        return match ($estado) {
+            'Pendiente_Aprobacion' => 'La solicitud de empresa está pendiente de aprobación; todavía no puedes acceder a los módulos privados.',
+            'Rechazada' => 'La solicitud de empresa ha sido rechazada. Contacta con el centro educativo.',
+            default => 'No se encontró un perfil de empresa aprobado para esta cuenta.',
+        };
+    }
+
+    private function mostrarFormulario(string $error = '', int $status = 200, string $email = ''): void {
         if (JsonResponse::wantsJson()) {
             JsonResponse::failure($error, $status);
             return;
         }
 
         http_response_code($status);
-        View::render('auth/login', ['error' => $error]);
+        View::render('auth/login', ['error' => $error, 'email' => $email]);
     }
 }

@@ -21,7 +21,12 @@ final class PhpIni
             'k' => 1,
             default => 0,
         };
+        $multiplier = 1024 ** $power;
 
-        return $size * (1024 ** $power);
+        if ($size > intdiv(PHP_INT_MAX, $multiplier)) {
+            return PHP_INT_MAX;
+        }
+
+        return $size * $multiplier;
     }
 }

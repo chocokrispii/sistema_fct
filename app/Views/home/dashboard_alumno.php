@@ -3,8 +3,9 @@
 /** @var int $totalEmpresas */
 /** @var int $asignacionesActivas */
 /** @var float|null $notaMedia */
-/** @var array $ofertasRecientes */
+/** @var array $ofertasVigentes */
 /** @var array $eventos */
+/** @var bool $tieneAsignacionActiva */
 /** @var bool $tieneDisponibilidad */
 
 $nombreCompleto = trim((string)($_SESSION['nombre'] ?? ''));
@@ -52,13 +53,13 @@ $etiquetaClase = static function (string $texto): string {
             <a class="fct-stat fct-stat--blue" href="index.php?action=ofertas">
                 <span class="fct-stat__icon"><?= $ico($icoMaletin) ?></span>
                 <strong><?= (int)$totalOfertas ?></strong>
-                <span class="fct-stat__label">Ofertas disponibles</span>
+                <span class="fct-stat__label">Ofertas compatibles</span>
                 <span class="fct-stat__go"><?= $arrow ?></span>
             </a>
             <a class="fct-stat fct-stat--green" href="index.php?action=ofertas">
                 <span class="fct-stat__icon"><?= $ico($icoEdificio) ?></span>
                 <strong><?= (int)$totalEmpresas ?></strong>
-                <span class="fct-stat__label">Empresas colaboradoras</span>
+                <span class="fct-stat__label">Empresas compatibles</span>
                 <span class="fct-stat__go"><?= $arrow ?></span>
             </a>
             <a class="fct-stat fct-stat--purple" href="index.php?action=mis-asignaciones">
@@ -77,20 +78,30 @@ $etiquetaClase = static function (string $texto): string {
 
         <section class="fct-card fct-offers" aria-labelledby="fct-offers-title">
             <div class="fct-card__head">
-                <h3 id="fct-offers-title">Ofertas de prácticas recientes</h3>
+                <h3 id="fct-offers-title">Ofertas compatibles con tu perfil</h3>
                 <a class="fct-link" href="index.php?action=ofertas">Ver todas <?= $arrow ?></a>
             </div>
-            <?php if ($ofertasRecientes === []): ?>
-                <p class="fct-empty">No hay ofertas vigentes en este momento.</p>
+            <?php if ($ofertasVigentes === []): ?>
+                <?php if ($tieneAsignacionActiva): ?>
+                    <p class="fct-empty" role="status">Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.</p>
+                <?php elseif (!$tieneDisponibilidad): ?>
+                    <p class="fct-empty" role="status">Registra una disponibilidad vigente para encontrar ofertas compatibles con tu perfil.</p>
+                    <a class="fct-link" href="index.php?action=disponibilidad">Registrar disponibilidad <?= $arrow ?></a>
+                <?php else: ?>
+                    <p class="fct-empty" role="status">No hay ofertas con plazas compatibles con tu ciclo, disponibilidad y turno.</p>
+                <?php endif; ?>
             <?php else: ?>
                 <ul class="fct-offers__list">
-                    <?php foreach ($ofertasRecientes as $i => $oferta): ?>
+                    <?php foreach ($ofertasVigentes as $i => $oferta): ?>
                         <li>
                             <a class="fct-offer" href="index.php?action=ofertas">
                                 <span class="fct-logo fct-logo--<?= ($i % 4) + 1 ?>"><?= $e(mb_strtoupper(mb_substr($oferta['nombre_empresa'], 0, 1, 'UTF-8'), 'UTF-8')) ?></span>
                                 <span class="fct-offer__info">
-                                    <strong><?= $e($oferta['nombre_empresa']) ?></strong>
+                                    <strong><?= $e($oferta['titulo'] !== '' ? $oferta['titulo'] : $oferta['nombre_empresa']) ?></strong>
+                                    <small><?= $e($oferta['nombre_empresa']) ?> · <?= $e($oferta['lugar'] !== '' ? $oferta['lugar'] : 'Lugar no indicado') ?></small>
                                     <small><?= $e($oferta['nombre_especialidad']) ?></small>
+                                    <small>Del <?= $e(date('d/m/Y', strtotime($oferta['fecha_inicio']))) ?> al <?= $e(date('d/m/Y', strtotime($oferta['fecha_fin']))) ?> - <?= $e(($oferta['jornada'] ?? 'normal') === 'partida' ? 'Jornada partida' : 'Jornada normal') ?></small>
+                                    <small class="fct-offer__capacity"><?= (int)$oferta['plazas_disponibles'] ?> <?= $oferta['plazas_disponibles'] === 1 ? 'plaza disponible' : 'plazas disponibles' ?></small>
                                 </span>
                                 <span class="fct-tag fct-tag--<?= $etiquetaClase($oferta['nombre_especialidad']) ?>"><?= $e($oferta['nombre_especialidad']) ?></span>
                                 <span class="fct-offer__chev"><?= $chevron ?></span>
@@ -124,15 +135,18 @@ $etiquetaClase = static function (string $texto): string {
         <section class="fct-card fct-events" aria-labelledby="fct-events-title">
             <div class="fct-card__head">
                 <h3 id="fct-events-title">Próximos eventos</h3>
-                <a class="fct-link" href="index.php?action=mis-asignaciones">Ver calendario <?= $arrow ?></a>
+                <nav class="fct-events__links" aria-label="Accesos relacionados con los eventos">
+                    <a class="fct-link" href="index.php?action=mis-asignaciones">Ver asignaciones <?= $arrow ?></a>
+                    <a class="fct-link" href="index.php?action=disponibilidad">Gestionar disponibilidad <?= $arrow ?></a>
+                </nav>
             </div>
             <?php if ($eventos === []): ?>
-                <p class="fct-empty">No tienes eventos próximos.</p>
+                <p class="fct-empty" role="status">No tienes eventos próximos.</p>
             <?php else: ?>
                 <ol class="fct-events__list">
                     <?php foreach ($eventos as $ev): $ts = strtotime($ev['fecha']); ?>
                         <li>
-                            <span class="fct-date"><strong><?= (int)date('j', $ts) ?></strong><small><?= $e($meses[(int)date('n', $ts)]) ?></small></span>
+                            <span class="fct-date"><strong><?= (int)date('j', $ts) ?></strong><small><?= $e($meses[(int)date('n', $ts)]) ?></small><small><?= $e(date('Y', $ts)) ?></small></span>
                             <span class="fct-events__body"><strong><?= $e($ev['titulo']) ?></strong><small><?= $e($ev['detalle']) ?></small></span>
                         </li>
                     <?php endforeach; ?>

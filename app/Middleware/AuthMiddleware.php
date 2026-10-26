@@ -3,6 +3,10 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../Core/JsonResponse.php';
 
+final class CompanyApprovalRequiredException extends RuntimeException
+{
+}
+
 final class AuthMiddleware
 {
     public static function requireRoles(array $roles, string $route = ''): void
@@ -24,10 +28,19 @@ final class AuthMiddleware
             exit;
         }
 
-        $stmt = getPDOConnection()->prepare('SELECT rol, activo FROM usuarios WHERE id = :id');
+        $stmt = getPDOConnection()->prepare(
+            'SELECT u.rol, u.activo, u.session_version, e.estado AS estado_empresa
+             FROM usuarios u
+             LEFT JOIN empresas e ON e.usuario_id = u.id
+             WHERE u.id = :id'
+        );
         $stmt->execute(['id' => $userId]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$user || (int)$user['activo'] !== 1) {
+        if (
+            !$user
+            || (int)$user['activo'] !== 1
+            || (int)($user['session_version'] ?? 0) !== (int)($_SESSION['session_version'] ?? -1)
+        ) {
             if ($route === 'descargar-convenio') {
                 self::auditDeniedDownload((int)$userId, 'cuenta_inactiva');
             }
@@ -42,6 +55,27 @@ final class AuthMiddleware
         }
         $_SESSION['rol'] = $user['rol'];
         $role = $user['rol'];
+
+        if ($role === 'Empresa' && ($user['estado_empresa'] ?? null) !== 'Aprobada') {
+            $estadoSolicitud = $user['estado_empresa'] ?? 'SinSolicitud';
+            $message = match ($estadoSolicitud) {
+                'Pendiente_Aprobacion' => 'La solicitud de empresa está pendiente de aprobación; todavía no puedes acceder a los módulos privados.',
+                'Rechazada' => 'La solicitud de empresa ha sido rechazada. Contacta con el centro educativo.',
+                default => 'No se encontró un perfil de empresa aprobado para esta cuenta.',
+            };
+            $_SESSION = [];
+            session_regenerate_id(true);
+            $_SESSION['empresa_solicitud_estado'] = in_array(
+                $estadoSolicitud,
+                ['Pendiente_Aprobacion', 'Rechazada'],
+                true
+            ) ? $estadoSolicitud : 'SinSolicitud';
+            if (JsonResponse::wantsJson()) {
+                throw new CompanyApprovalRequiredException($message);
+            }
+            header('Location: index.php?action=solicitud-pendiente');
+            exit;
+        }
 
         if (!in_array($role, $roles, true)) {
             if ($route === 'descargar-convenio') {

@@ -20,7 +20,7 @@
             <p><?= $soloPropias ? 'Cuando el centro cierre y califique una práctica, aparecerá aquí.' : 'Las prácticas y sus calificaciones aparecerán aquí.' ?></p>
         </div>
     <?php else: ?>
-        <div class="assignments-table-wrap">
+        <div class="assignments-table-wrap" role="region" aria-label="Listado de calificaciones" tabindex="0">
             <table class="assignments-table">
                 <thead><tr>
                     <?php if (!$soloPropias): ?><th>Alumno</th><?php endif; ?>
@@ -39,11 +39,11 @@
                         <?php if ($puedeGestionar): ?><td>
                             <?php if ($item['estado_asignacion'] === 'Cerrada'): ?>
                                 <form class="grade-form" method="POST" action="index.php?action=guardar-calificacion">
+                                    <?php $gradeInputId = 'grade-input-' . (int)$item['asignacion_id']; ?>
                                     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
                                     <input type="hidden" name="asignacion_id" value="<?= (int)$item['asignacion_id'] ?>">
-                                    <label>Nota (0–10)
-                                        <input type="text" name="nota" inputmode="decimal" maxlength="5" pattern="(?:10(?:[.,]0{1,2})?|[0-9](?:[.,][0-9]{1,2})?)" value="<?= $item['nota'] !== null ? htmlspecialchars((string)$item['nota'], ENT_QUOTES, 'UTF-8') : '' ?>" required>
-                                    </label>
+                                    <label for="<?= htmlspecialchars($gradeInputId, ENT_QUOTES, 'UTF-8') ?>">Nota (0–10)</label>
+                                    <input id="<?= htmlspecialchars($gradeInputId, ENT_QUOTES, 'UTF-8') ?>" type="text" name="nota" inputmode="decimal" maxlength="5" pattern="(?:10(?:[.,]0{1,2})?|[0-9](?:[.,][0-9]{1,2})?)" value="<?= $item['nota'] !== null ? htmlspecialchars((string)$item['nota'], ENT_QUOTES, 'UTF-8') : '' ?>" aria-invalid="false" required>
                                     <div data-vue-island="GradeForm" data-prop-csrf="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>"></div>
                                     <label>Observaciones
                                         <textarea name="observaciones" maxlength="2000" rows="3"><?= htmlspecialchars($item['observaciones'] ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>

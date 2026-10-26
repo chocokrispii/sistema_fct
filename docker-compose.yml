@@ -29,8 +29,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      mailpit:
-        condition: service_started
     environment:
       APP_ENV: ${APP_ENV:-production}
       FCT_DB_HOST: db
@@ -45,19 +43,22 @@ services:
       FCT_WEBHOOK_INBOUND_SECRET: ${FCT_WEBHOOK_INBOUND_SECRET:-}
       FCT_WEBHOOK_OUTBOUND_URL: ${FCT_WEBHOOK_OUTBOUND_URL:-}
       FCT_WEBHOOK_OUTBOUND_SECRET: ${FCT_WEBHOOK_OUTBOUND_SECRET:-}
+      FCT_PUBLIC_BASE_URL: ${FCT_PUBLIC_BASE_URL:-}
       FCT_APP_URL: ${FCT_APP_URL:-}
-      FCT_MAIL_HOST: ${FCT_MAIL_HOST:-smtp.gmail.com}
-      FCT_MAIL_PORT: ${FCT_MAIL_PORT:-587}
-      FCT_MAIL_ENCRYPTION: ${FCT_MAIL_ENCRYPTION:-tls}
+      FCT_MAIL_FROM: ${FCT_MAIL_FROM:-}
+      FCT_MAIL_HOST: ${FCT_MAIL_HOST:-mailpit}
+      FCT_MAIL_PORT: ${FCT_MAIL_PORT:-1025}
       FCT_MAIL_TRANSPORT: ${FCT_MAIL_TRANSPORT:-smtp}
       FCT_MAIL_USERNAME: ${FCT_MAIL_USERNAME:-}
       FCT_MAIL_PASSWORD: ${FCT_MAIL_PASSWORD:-}
-      FCT_MAIL_FROM: ${FCT_MAIL_FROM:-}
+      FCT_MAIL_ENCRYPTION: ${FCT_MAIL_ENCRYPTION:-none}
       FCT_MAIL_FROM_NAME: ${FCT_MAIL_FROM_NAME:-Sistema FCT}
+      FCT_RESET_RATE_LIMIT_KEY: ${FCT_RESET_RATE_LIMIT_KEY:-${FCT_DB_PASS:-fct_local_dev}}
     ports:
       - "${APP_PORT:-8080}:80"
     volumes:
       - .:/var/www/html
+      - composer_vendor:/var/www/html/vendor
       - fct_storage:/var/lib/fct/storage
     healthcheck:
       test:
@@ -74,7 +75,7 @@ services:
   db:
     image: mariadb:10.4.32
     ports:
-      - "127.0.0.1:3307:3306"
+      - "127.0.0.1:${DB_PORT:-3307}:3306"
     environment:
       MARIADB_DATABASE: ${FCT_DB_NAME:-sistema_fct}
       MARIADB_USER: ${FCT_DB_USER:-fct}
@@ -82,28 +83,8 @@ services:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-root_local_dev}
     volumes:
       - db_data:/var/lib/mysql
-      # MariaDB procesa estos archivos en orden al crear un volumen vacío.
+      # The application applies and records migrations after the database is healthy.
       - ./database/sistema_fct.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
-      - ./database/migrations/001_renombrar_nombre_especialidad.sql:/docker-entrypoint-initdb.d/002-migration.sql:ro
-      - ./database/migrations/002_fct_workflows.sql:/docker-entrypoint-initdb.d/003-migration.sql:ro
-      - ./database/migrations/003_login_y_recuperacion.sql:/docker-entrypoint-initdb.d/004-migration.sql:ro
-      - ./database/migrations/004_convenios_por_especialidad.sql:/docker-entrypoint-initdb.d/005-migration.sql:ro
-      - ./database/migrations/005_horarios_y_calificaciones.sql:/docker-entrypoint-initdb.d/006-migration.sql:ro
-      - ./database/migrations/006_alumno_codigo_postal.sql:/docker-entrypoint-initdb.d/007-migration.sql:ro
-      - ./database/migrations/007_horarios_ofertas.sql:/docker-entrypoint-initdb.d/008-migration.sql:ro
-      - ./database/migrations/008_disponibilidad_indiferente.sql:/docker-entrypoint-initdb.d/009-migration.sql:ro
-      - ./database/migrations/009_desarrollo_aplicaciones_multiplataforma.sql:/docker-entrypoint-initdb.d/010-migration.sql:ro
-      - ./database/migrations/010_detalles_ofertas.sql:/docker-entrypoint-initdb.d/011-migration.sql:ro
-      - ./database/migrations/007_webhooks.sql:/docker-entrypoint-initdb.d/012-webhooks.sql:ro
-      - ./database/migrations/008_api_access_tokens.sql:/docker-entrypoint-initdb.d/013-api-access-tokens.sql:ro
-      - ./database/migrations/009_webhook_responses.sql:/docker-entrypoint-initdb.d/014-webhook-responses.sql:ro
-      - ./database/migrations/011_gestion_ciclos.sql:/docker-entrypoint-initdb.d/015-gestion-ciclos.sql:ro
-      - ./database/migrations/012_alta_alumnos_personal.sql:/docker-entrypoint-initdb.d/016-alta-alumnos-personal.sql:ro
-      - ./database/migrations/013_activacion_cuentas_alumno.sql:/docker-entrypoint-initdb.d/017-activacion-cuentas-alumno.sql:ro
-      - ./database/migrations/014_identificador_fiscal_personal.sql:/docker-entrypoint-initdb.d/018-identificador-fiscal-personal.sql:ro
-      - ./database/migrations/015_alta_personal_institucional.sql:/docker-entrypoint-initdb.d/019-alta-personal-institucional.sql:ro
-      - ./database/migrations/016_solicitudes_reenvio_activacion.sql:/docker-entrypoint-initdb.d/020-solicitudes-reenvio-activacion.sql:ro
-      - ./database/migrations/017_trazabilidad_administrativa.sql:/docker-entrypoint-initdb.d/021-trazabilidad-administrativa.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -111,37 +92,7 @@ services:
           test "$$(mariadb --protocol=TCP --host=127.0.0.1
           --user="$${MARIADB_USER}" --password="$${MARIADB_PASSWORD}"
           "$${MARIADB_DATABASE}" --batch --skip-column-names
-          --execute="SELECT IF(
-          EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alumnos'
-          AND COLUMN_NAME = 'codigo_postal')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'calificaciones_fct')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_oferta_horarios_semanales')
-          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alumno_disponibilidad'
-          AND COLUMN_NAME = 'es_indiferente')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'especialidades')
-          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_especialidades_plazas'
-          AND COLUMN_NAME = 'titulo')
-          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_especialidades_plazas'
-          AND COLUMN_NAME = 'modalidad')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_inbox')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_outbox')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'api_access_tokens')
-          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_outbox'
-          AND COLUMN_NAME = 'response_body')
-          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios'
-          AND COLUMN_NAME = 'identificador_fiscal'), 1, 0)")" = "1"
+          --execute="SELECT 1" 2>/dev/null)" = "1"
       interval: 10s
       timeout: 5s
       retries: 10
@@ -161,12 +112,6 @@ services:
       - "127.0.0.1:${PMA_PORT:-8082}:80"
     restart: unless-stopped
 
-  mailpit:
-    image: axllent/mailpit:v1.27
-    ports:
-      - "127.0.0.1:${MAILPIT_WEB_PORT:-8025}:8025"
-    restart: unless-stopped
-
   clamav:
     image: clamav/clamav:1.5.4
     environment:
@@ -174,7 +119,7 @@ services:
       CLAMD_CONF_TCPAddr: 0.0.0.0
       CLAMD_CONF_TCPSocket: 3310
     ports:
-      - "127.0.0.1:3310:3310"
+      - "127.0.0.1:${CLAMAV_PORT:-3310}:3310"
     volumes:
       - clamav_db:/var/lib/clamav
     healthcheck:
@@ -185,9 +130,17 @@ services:
       start_period: 30m
     restart: unless-stopped
 
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1026}:1025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8026}:8025"
+    restart: unless-stopped
+
 volumes:
   db_data:
   clamav_db:
   fct_storage:
+  composer_vendor:
   node_modules:
   frontend_node_modules:

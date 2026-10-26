@@ -25,23 +25,23 @@ un convenio. No uses este buzón para enviar información personal o documentos.
 
 ## Migración
 
-En las bases existentes selecciona la base correcta y ejecuta una vez:
+El gestor `scripts/migrate.php` aplica en orden las migraciones pendientes y
+registra su versión y checksum en `schema_migrations`. En XAMPP, selecciona la
+base configurando `FCT_DB_NAME` y ejecuta:
 
 ```powershell
-Get-Content -Raw database\migrations\007_webhooks.sql | & 'C:\xampp\mysql\bin\mysql.exe' -h 127.0.0.1 -uroot --database=sistema_fct
-Get-Content -Raw database\migrations\007_webhooks.sql | & 'C:\xampp\mysql\bin\mysql.exe' -h 127.0.0.1 -uroot --database=fct_test_local
-Get-Content -Raw database\migrations\009_webhook_responses.sql | & 'C:\xampp\mysql\bin\mysql.exe' -h 127.0.0.1 -uroot --database=sistema_fct
+$env:FCT_DB_NAME = "sistema_fct"
+& "C:\xampp\php\php.exe" scripts\migrate.php
 ```
 
-Sustituye los nombres por las bases de desarrollo y pruebas que uses. La
-migración crea `webhook_inbox` y `webhook_outbox` mediante `IF NOT EXISTS`; no
-borra datos existentes. Ejecuta la migración `009` una sola vez en cada base
-existente; añade las columnas donde se guardan las respuestas HTTP. Para nuevas
-instalaciones Docker Compose, las migraciones están enlazadas en el orden de
-arranque inicial de MariaDB. Los volúmenes ya inicializados no vuelven a
-ejecutar scripts de inicialización automáticamente. Hay otros archivos con
-prefijo `009`; selecciona siempre `009_webhook_responses.sql` por su nombre
-completo. Este `ALTER TABLE` no debe repetirse si ya existen sus columnas.
+Para Docker Compose, el contenedor de la aplicación ejecuta el mismo gestor
+antes de iniciar Apache. En ambos casos, consulta el estado con
+`php scripts/migrate.php --status`; el gestor no crea la base de datos ni
+selecciona otra base por ti.
+
+El gestor aplica también la migración `009_webhook_responses.sql` junto con las
+migraciones anteriores y registra su checksum, por lo que no ejecutes esos
+archivos SQL manualmente además del gestor.
 
 ## Configuración de secretos
 
@@ -379,7 +379,7 @@ La primera versión encola estos cambios:
 |---|---|---|
 | `convenio.creado` | Una empresa registra un convenio | `convenio_id`, `empresa_id`, `especialidad_id`, estado y periodo |
 | `convenio.revisado` | El centro aprueba o rechaza el convenio | `convenio_id`, estado |
-| `oferta.creada` | Una empresa registra una oferta | IDs de oferta/empresa/especialidad, estado, plazas, fechas y turno |
+| `oferta.creada` | Una empresa registra una oferta | IDs de oferta/empresa/especialidad, estado, plazas, fechas, jornada, turno legado y franjas semanales |
 | `oferta.revisada` | El centro aprueba o rechaza una oferta | `oferta_id`, estado |
 | `practica.asignada` | Se confirma una asignación | `asignacion_id`, `oferta_id`, `alumno_id` |
 | `practica.cerrada` | Se cierra una práctica | `asignacion_id` |
@@ -461,7 +461,9 @@ consola de reintentos con permisos aún no forma parte de esta versión.
 ## Pruebas automatizadas
 
 La suite requiere una base desechable llamada `fct_test_*` que ya tenga el
-volcado y las migraciones `001`–`007`. Configúrala antes de ejecutar:
+volcado, los datos de demostración y las migraciones requeridas por la aplicación.
+Incluye las que agregan el código postal del alumnado, las respuestas de los
+webhooks y la jornada partida (`012_jornada_ofertas.sql`). Configúrala antes de ejecutar:
 
 ```powershell
 $env:FCT_DB_HOST = '127.0.0.1'

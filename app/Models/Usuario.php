@@ -68,9 +68,13 @@ class Usuario {
         return count($users) === 1 ? $users[0] : null;
     }
 
-    public function obtenerTodos(): array
+    public function obtenerTodos(
+        ?string $busqueda = null,
+        ?string $rol = null,
+        ?bool $activo = null
+    ): array
     {
-        $stmt = $this->db->query(
+        $sql =
             "SELECT u.id, u.email, COALESCE(u.identificador_fiscal, a.dni, e.cif_empresa) AS identificador_fiscal,
                     u.rol, u.activo, u.fecha_creacion,
                     COALESCE(
@@ -81,9 +85,34 @@ class Usuario {
              FROM usuarios u
              LEFT JOIN coordinadores c ON c.usuario_id = u.id
              LEFT JOIN alumnos a ON a.usuario_id = u.id AND u.rol = 'Alumno'
-             LEFT JOIN empresas e ON e.usuario_id = u.id AND u.rol = 'Empresa'
-             ORDER BY u.rol, u.email"
-        );
+             LEFT JOIN empresas e ON e.usuario_id = u.id AND u.rol = 'Empresa'";
+        $conditions = [];
+        $params = [];
+        if ($busqueda !== null && $busqueda !== '') {
+            $conditions[] = '(u.email LIKE :email OR CONCAT_WS(\' \', u.nombre, u.apellidos, c.nombre, c.apellidos) LIKE :nombre
+                OR COALESCE(u.identificador_fiscal, a.dni, e.cif_empresa) LIKE :identificador)';
+            $needle = '%' . $busqueda . '%';
+            $params['email'] = $needle;
+            $params['nombre'] = $needle;
+            $params['identificador'] = $needle;
+        }
+        if ($rol !== null) {
+            if (!in_array($rol, ['Administrador', 'Coordinador', 'Observador', 'Empresa', 'Alumno'], true)) {
+                throw new InvalidArgumentException('El rol de búsqueda no es válido.');
+            }
+            $conditions[] = 'u.rol = :rol';
+            $params['rol'] = $rol;
+        }
+        if ($activo !== null) {
+            $conditions[] = 'u.activo = :activo';
+            $params['activo'] = $activo ? 1 : 0;
+        }
+        if ($conditions !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $conditions);
+        }
+        $sql .= ' ORDER BY u.rol, u.email';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -204,9 +233,14 @@ class Usuario {
         }
     }
 
-    public function cambiarContrasena(int $id, string $password): void
+    public function cambiarContrasena(int $id, string $password, bool $revocarSesiones = false): void
     {
-        $stmt = $this->db->prepare('UPDATE usuarios SET password_hash = :hash WHERE id = :id');
+        $sql = 'UPDATE usuarios SET password_hash = :hash';
+        if ($revocarSesiones) {
+            $sql .= ', session_version = session_version + 1';
+        }
+        $sql .= ' WHERE id = :id';
+        $stmt = $this->db->prepare($sql);
         $stmt->execute(['hash' => $this->hashPassword($password), 'id' => $id]);
     }
 

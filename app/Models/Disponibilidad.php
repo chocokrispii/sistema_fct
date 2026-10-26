@@ -22,6 +22,22 @@ class Disponibilidad
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function obtenerVigentesPorUsuario(int $usuarioId, string $fechaDesde): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT d.fecha_inicio, d.fecha_fin
+             FROM alumno_disponibilidad d
+             INNER JOIN alumnos a ON a.id = d.alumno_id
+             WHERE a.usuario_id = :usuario_id AND d.fecha_fin >= :fecha_desde
+             ORDER BY d.fecha_inicio, d.id'
+        );
+        $stmt->execute([
+            'usuario_id' => $usuarioId,
+            'fecha_desde' => $fechaDesde,
+        ]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function tienePorUsuario(int $usuarioId): bool
     {
         $stmt = $this->db->prepare(

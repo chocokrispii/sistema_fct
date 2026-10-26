@@ -16,7 +16,7 @@ $cycleChoices = array_map(
     data-prop-selected="<?= htmlspecialchars($selectedCycle, ENT_QUOTES, 'UTF-8') ?>"
     data-prop-select-id="<?= htmlspecialchars($selectId, ENT_QUOTES, 'UTF-8') ?>"
 >
-    <select id="<?= htmlspecialchars($selectId, ENT_QUOTES, 'UTF-8') ?>" name="especialidad_id" required>
+    <select id="<?= htmlspecialchars($selectId, ENT_QUOTES, 'UTF-8') ?>" name="especialidad_id" <?= isset($especialidadError) ? 'aria-invalid="' . ($especialidadError !== '' ? 'true' : 'false') . '" aria-describedby="student-specialty-error"' : '' ?> required>
         <option value="">-- Selecciona un ciclo formativo --</option>
         <?php foreach ($cycleChoices as $especialidad): ?>
             <option value="<?= $especialidad['id'] ?>" <?= $selectedCycle === (string)$especialidad['id'] ? 'selected' : '' ?>>

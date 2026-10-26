@@ -5,6 +5,9 @@ require_once __DIR__ . '/../Models/Oferta.php';
 require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
+require_once __DIR__ . '/../Models/Asignacion.php';
+require_once __DIR__ . '/../Models/Disponibilidad.php';
+require_once __DIR__ . '/../Core/Webhook.php';
 require_once __DIR__ . '/../Core/JsonResponse.php';
 
 class OfertaController {
@@ -21,8 +24,57 @@ class OfertaController {
     }
 
     public function listar(): void {
-        $ofertas = $this->withWeeklySchedules($this->ofertaModel->obtenerTodas(true));
-        View::render('ofertas/listado', ['ofertas' => $ofertas]);
+        if (($_SESSION['rol'] ?? null) === 'Alumno') {
+            $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+            $hoy = date('Y-m-d');
+            $asignacionesActivas = (new Asignacion($this->db))->listarActivasPorUsuario($usuarioId) !== [];
+            $tieneDisponibilidad = (new Disponibilidad($this->db))
+                ->obtenerVigentesPorUsuario($usuarioId, $hoy) !== [];
+            $ofertas = [];
+            if (!$asignacionesActivas && $tieneDisponibilidad) {
+                $ofertasConPlazas = array_values(array_filter(
+                    array_map(static function (array $oferta): array {
+                        $oferta['plazas_disponibles'] = max(
+                            0,
+                            (int)$oferta['plazas_cuantas'] - (int)$oferta['asignadas']
+                        );
+                        return $oferta;
+                    }, $this->ofertaModel->obtenerVigentesConAsignaciones()),
+                    static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
+                ));
+                $idsCompatibles = array_fill_keys(
+                    $this->ofertaModel->obtenerIdsOfertasVigentesCompatibles(
+                        $usuarioId,
+                        array_map(static fn(array $oferta): int => (int)$oferta['id'], $ofertasConPlazas)
+                    ),
+                    true
+                );
+                $ofertas = array_values(array_filter(
+                    $ofertasConPlazas,
+                    static fn(array $oferta): bool => isset($idsCompatibles[(int)$oferta['id']])
+                ));
+            }
+            View::render('ofertas/listado', [
+                'ofertas' => $this->withWeeklySchedules($ofertas),
+                'soloCompatibles' => true,
+                'tieneAsignacionActiva' => $asignacionesActivas,
+                'tieneDisponibilidad' => $tieneDisponibilidad,
+            ]);
+            return;
+        }
+
+        $resultado = $this->ofertaModel->obtenerPaginaTodas(
+            true,
+            Paginacion::desdeEntrada($_GET['pagina'] ?? null)
+        );
+        $resultado['items'] = $this->withWeeklySchedules($resultado['items']);
+        View::render('ofertas/listado', [
+            'ofertas' => $resultado['items'],
+            'paginacion' => $resultado,
+            'soloCompatibles' => false,
+            'tieneAsignacionActiva' => false,
+            'tieneDisponibilidad' => false,
+        ]);
     }
 
     public function publicar(): void {
@@ -51,9 +103,28 @@ class OfertaController {
         View::render('ofertas/publicar', [
             'empresa' => $empresa,
             'error' => $error,
-            'ofertas' => $this->withWeeklySchedules($this->ofertaModel->obtenerPorEmpresa($empresaId)),
+            'ofertas' => $this->withWeeklySchedules($resultadoOfertas['items']),
+            'paginacion' => $resultadoOfertas,
             'especialidades' => $this->especialidadModel->obtenerTodas(),
             'formValues' => $formValues,
+        ]);
+    }
+
+    public function nuevaParaCentro(): void
+    {
+        $error = '';
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $error = $this->procesarOfertaCentro();
+            if ($error === null) {
+                header('Location: index.php?action=nueva-oferta&creada=1');
+                exit;
+            }
+        }
+
+        View::render('ofertas/nueva-centro', [
+            'empresas' => $this->empresaModel->obtenerTodasParaCentro(),
+            'especialidades' => $this->especialidadModel->obtenerTodas(),
+            'error' => $error,
         ]);
     }
 
@@ -175,7 +246,7 @@ class OfertaController {
                 }
                 if (!$offer || !$agreement->fetchColumn()) {
                     throw new DomainException($offer
-                        ? 'No se puede aprobar: falta un convenio aprobado para el mismo ciclo y que cubra todo el periodo.'
+                        ? $this->describeMissingAgreement($offer)
                         : 'La oferta no existe o ya fue revisada.');
                 }
             }
@@ -221,6 +292,130 @@ class OfertaController {
         exit;
     }
 
+    private function procesarOfertaCentro(): ?string
+    {
+        if (!$this->ofertaModel->tieneDatosDescriptivos()) {
+            return 'La creación de ofertas desde el centro requiere aplicar la migración 011.';
+        }
+
+        $empresaId = filter_var(
+            $_POST['empresa_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $especialidadId = filter_var(
+            $_POST['especialidad_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $plazas = filter_var(
+            $_POST['plazas'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 100]]
+        );
+        $tituloRaw = $_POST['titulo'] ?? null;
+        $lugarRaw = $_POST['lugar'] ?? null;
+        $fechaInicioRaw = $_POST['fecha_inicio'] ?? null;
+        $fechaFinRaw = $_POST['fecha_fin'] ?? null;
+        $turno = $_POST['turno'] ?? null;
+        if (
+            !is_string($tituloRaw)
+            || !is_string($lugarRaw)
+            || !is_string($fechaInicioRaw)
+            || !is_string($fechaFinRaw)
+            || !is_string($turno)
+        ) {
+            return 'Completa los datos de la oferta con valores válidos.';
+        }
+
+        $titulo = trim($tituloRaw);
+        $lugar = trim($lugarRaw);
+        $fechaInicio = $this->parsearFecha($fechaInicioRaw);
+        $fechaFin = $this->parsearFecha($fechaFinRaw);
+        $empresas = $this->empresaModel->obtenerTodasParaCentro();
+        $empresaValida = $empresaId !== false && array_filter(
+            $empresas,
+            static fn(array $empresa): bool => (int)$empresa['id'] === $empresaId
+        ) !== [];
+
+        if (!$empresaValida) {
+            return 'Selecciona una empresa válida.';
+        }
+        if ($titulo === '' || mb_strlen($titulo) > 150) {
+            return 'El nombre de la oferta es obligatorio y no puede superar 150 caracteres.';
+        }
+        if ($lugar === '' || mb_strlen($lugar) > 255) {
+            return 'El lugar de la oferta es obligatorio y no puede superar 255 caracteres.';
+        }
+        if ($especialidadId === false || !$this->especialidadModel->existe($especialidadId)) {
+            return 'Selecciona un ciclo formativo válido.';
+        }
+        if ($plazas === false) {
+            return 'El número de vacantes debe ser un entero entre 1 y 100.';
+        }
+        if ($fechaInicio === null || $fechaFin === null) {
+            return 'Las fechas de inicio y fin deben tener un formato válido.';
+        }
+        if ($fechaInicio < new DateTimeImmutable('today') || $fechaFin <= $fechaInicio) {
+            return 'Indica un periodo futuro cuya fecha de fin sea posterior a la de inicio.';
+        }
+        if (!in_array($turno, ['M', 'T', 'Indiferente'], true)) {
+            return 'Selecciona un turno válido.';
+        }
+        if (!$this->empresaModel->tieneConvenioParaFechas(
+            (int)$empresaId,
+            (int)$especialidadId,
+            $fechaInicio->format('Y-m-d'),
+            $fechaFin->format('Y-m-d')
+        )) {
+            return 'La empresa necesita un convenio aprobado para ese ciclo y durante todo el periodo indicado.';
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $ofertaId = $this->ofertaModel->crearOferta(
+                (int)$empresaId,
+                (int)$especialidadId,
+                (int)$plazas,
+                $fechaInicio->format('Y-m-d'),
+                $fechaFin->format('Y-m-d'),
+                $turno,
+                $titulo,
+                $lugar
+            );
+            if ($ofertaId < 1) {
+                $this->db->rollBack();
+                return 'No se pudo registrar la oferta.';
+            }
+            (new Auditoria($this->db))->registrar(
+                (int)$_SESSION['usuario_id'],
+                'oferta.creada',
+                'ofertas',
+                $ofertaId
+            );
+            Webhook::enqueue($this->db, 'oferta.creada', [
+                'oferta_id' => $ofertaId,
+                'empresa_id' => (int)$empresaId,
+                'especialidad_id' => (int)$especialidadId,
+                'estado' => 'Pendiente',
+                'titulo' => $titulo,
+                'lugar' => $lugar,
+                'plazas' => (int)$plazas,
+                'fecha_inicio' => $fechaInicio->format('Y-m-d'),
+                'fecha_fin' => $fechaFin->format('Y-m-d'),
+                'turno' => $turno,
+            ]);
+            $this->db->commit();
+            return null;
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Error al crear una oferta desde el centro: ' . $e->getMessage());
+            return 'No se pudo registrar la oferta.';
+        }
+    }
+
     /** Devuelve el mensaje de error o null si la oferta se ha creado. */
     private function procesarPublicacion(int $empresaId, array $request): ?string {
         $especialidadId = filter_var($request['especialidad_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
@@ -231,6 +426,7 @@ class OfertaController {
         $tituloRaw = $request['titulo'] ?? null;
         $descripcionRaw = $request['descripcion'] ?? null;
         $turnoRaw = $request['turno'] ?? null;
+        $jornadaRaw = $request['jornada'] ?? 'normal';
         $modalidadRaw = $request['modalidad'] ?? null;
         $ubicacionRaw = $request['ubicacion'] ?? null;
         $requisitosRaw = $request['requisitos'] ?? '';
@@ -241,7 +437,8 @@ class OfertaController {
         if (
             !is_string($tituloRaw)
             || !is_string($descripcionRaw)
-            || !is_string($turnoRaw)
+            || (!is_string($turnoRaw) && $turnoRaw !== null)
+            || !is_string($jornadaRaw)
             || !is_string($modalidadRaw)
             || !is_string($ubicacionRaw)
             || !is_string($requisitosRaw)
@@ -251,7 +448,8 @@ class OfertaController {
         }
         $titulo = trim($tituloRaw);
         $descripcion = trim($descripcionRaw);
-        $turno = $turnoRaw;
+        $turno = $turnoRaw ?? 'Indiferente';
+        $jornada = $jornadaRaw;
         $modalidad = $modalidadRaw;
         $ubicacion = trim($ubicacionRaw);
         $requisitos = trim($requisitosRaw);
@@ -263,8 +461,8 @@ class OfertaController {
         ) {
             return 'Indica un título de hasta 150 caracteres y una descripción de hasta 2.000 caracteres.';
         }
-        if (!in_array($turno, ['M', 'T', 'P', 'Indiferente'], true)) {
-            return 'Selecciona un tipo de turno válido.';
+        if (!in_array($jornada, ['normal', 'partida'], true)) {
+            return 'Selecciona una jornada válida.';
         }
         if (!in_array($modalidad, ['Presencial', 'Remoto', 'Híbrido'], true)) {
             return 'Selecciona una modalidad válida.';
@@ -312,6 +510,8 @@ class OfertaController {
             }
             $horaInicio = $horario['hora_inicio'] ?? null;
             $horaFin = $horario['hora_fin'] ?? null;
+            $horaInicio2 = $horario['hora_inicio_2'] ?? '';
+            $horaFin2 = $horario['hora_fin_2'] ?? '';
             if (
                 !is_string($horaInicio)
                 || !is_string($horaFin)
@@ -321,11 +521,27 @@ class OfertaController {
             ) {
                 return 'Cada día seleccionado necesita una hora válida en intervalos de cinco minutos.';
             }
-            $horarios[] = [
+            $horarioNormalizado = [
                 'dia_semana' => (int)$diaNumero,
                 'hora_inicio' => $horaInicio . ':00',
                 'hora_fin' => $horaFin . ':00',
             ];
+            if ($jornada === 'partida') {
+                if (
+                    !is_string($horaInicio2)
+                    || !is_string($horaFin2)
+                    || preg_match('/^(?:[01]\d|2[0-3]):(?:[0-5][05])$/', $horaInicio2) !== 1
+                    || preg_match('/^(?:[01]\d|2[0-3]):(?:[0-5][05])$/', $horaFin2) !== 1
+                    || $horaFin <= $horaInicio
+                    || $horaInicio2 < $horaFin
+                    || $horaFin2 <= $horaInicio2
+                ) {
+                    return 'Cada día seleccionado necesita dos franjas válidas, no solapadas y en orden horario.';
+                }
+                $horarioNormalizado['hora_inicio_2'] = $horaInicio2 . ':00';
+                $horarioNormalizado['hora_fin_2'] = $horaFin2 . ':00';
+            }
+            $horarios[] = $horarioNormalizado;
         }
         if ($horarios === []) {
             return 'Selecciona al menos un día y una franja horaria semanal.';
@@ -363,7 +579,8 @@ class OfertaController {
                 $ubicacion !== '' ? $ubicacion : null,
                 $requisitos !== '' ? $requisitos : null,
                 $tecnologias !== '' ? $tecnologias : null,
-                $horarios
+                $horarios,
+                $jornada
             );
             if ($ofertaId < 1) {
                 $this->db->rollBack();
@@ -385,6 +602,7 @@ class OfertaController {
                 'fecha_inicio' => $fechaInicio->format('Y-m-d'),
                 'fecha_fin' => $fechaFin->format('Y-m-d'),
                 'turno' => $turno,
+                'jornada' => $jornada,
                 'titulo' => $titulo,
                 'descripcion' => $descripcion,
                 'modalidad' => $modalidad,
@@ -422,14 +640,123 @@ class OfertaController {
         return $offers;
     }
 
+    private function describeMissingAgreement(array $offer): string
+    {
+        $cycleStatement = $this->db->prepare(
+            'SELECT nombre_especialidad FROM especialidades WHERE id = :especialidad_id'
+        );
+        $cycleStatement->execute(['especialidad_id' => $offer['especialidad_id']]);
+        $requiredCycle = $cycleStatement->fetchColumn();
+        $requiredCycle = is_string($requiredCycle) ? $requiredCycle : 'el ciclo de la oferta';
+
+        $stmt = $this->db->prepare(
+            'SELECT c.especialidad_id, e.nombre_especialidad, c.estado, c.fecha_inicio, c.fecha_fin
+             FROM convenios c
+             LEFT JOIN especialidades e ON e.id = c.especialidad_id
+             WHERE c.empresa_id = :empresa_id
+             ORDER BY c.especialidad_id = :especialidad_id DESC, c.fecha_inicio DESC'
+        );
+        $stmt->execute([
+            'empresa_id' => $offer['empresa_id'],
+            'especialidad_id' => $offer['especialidad_id'],
+        ]);
+        $agreements = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $matchingAgreement = null;
+        foreach ($agreements as $agreement) {
+            if ((int)($agreement['especialidad_id'] ?? 0) === (int)$offer['especialidad_id']) {
+                $matchingAgreement = $agreement;
+                break;
+            }
+        }
+
+        $period = 'del ' . $offer['fecha_inicio'] . ' al ' . $offer['fecha_fin'];
+        if ($matchingAgreement !== null) {
+            $cycle = $matchingAgreement['nombre_especialidad'] ?? $requiredCycle;
+            if ($matchingAgreement['estado'] !== 'Aprobado') {
+                return sprintf(
+                    'No se puede aprobar: el convenio de %s está %s y debe estar aprobado. La oferta requiere cobertura durante el periodo %s.',
+                    $cycle,
+                    $matchingAgreement['estado'],
+                    $period
+                );
+            }
+
+            $gaps = [];
+            if ($matchingAgreement['fecha_inicio'] > $offer['fecha_inicio']) {
+                $gaps[] = 'el convenio comienza el ' . $matchingAgreement['fecha_inicio'] . ', después del inicio de la oferta';
+            }
+            if ($matchingAgreement['fecha_fin'] < $offer['fecha_fin']) {
+                $gaps[] = 'el convenio vence el ' . $matchingAgreement['fecha_fin'] . ', antes del fin de la oferta';
+            }
+            if ($gaps !== []) {
+                return sprintf(
+                    'No se puede aprobar: el convenio aprobado de %s cubre del %s al %s, pero la oferta requiere del %s al %s; %s.',
+                    $cycle,
+                    $matchingAgreement['fecha_inicio'],
+                    $matchingAgreement['fecha_fin'],
+                    $offer['fecha_inicio'],
+                    $offer['fecha_fin'],
+                    implode(' y ', $gaps)
+                );
+            }
+        }
+
+        if ($agreements === []) {
+            return 'No se puede aprobar: esta empresa no tiene convenios registrados. Se requiere uno aprobado para '
+                . $requiredCycle . ' que cubra el periodo '
+                . $period . '.';
+        }
+
+        $available = [];
+        foreach (array_slice($agreements, 0, 3) as $agreement) {
+            $cycle = $agreement['nombre_especialidad'] ?? 'ciclo sin clasificar';
+            $available[] = sprintf(
+                '%s (%s, %s a %s)',
+                $cycle,
+                $agreement['estado'],
+                $agreement['fecha_inicio'],
+                $agreement['fecha_fin']
+            );
+        }
+        $suffix = count($agreements) > count($available)
+            ? ' y otros convenios'
+            : '';
+
+        return sprintf(
+            'No se puede aprobar: no hay un convenio aprobado para %s que cubra el periodo %s. Convenios registrados: %s%s.',
+            $requiredCycle,
+            $period,
+            implode('; ', $available),
+            $suffix
+        );
+    }
+
     private function formValues(array $request): array
     {
-        $fields = ['titulo', 'descripcion', 'especialidad_id', 'plazas', 'fecha_inicio', 'fecha_fin', 'turno', 'modalidad', 'ubicacion', 'requisitos', 'tecnologias'];
+        $fields = ['titulo', 'descripcion', 'especialidad_id', 'plazas', 'fecha_inicio', 'fecha_fin', 'turno', 'jornada', 'modalidad', 'ubicacion', 'requisitos', 'tecnologias'];
         $values = [];
         foreach ($fields as $field) {
             $values[$field] = isset($request[$field]) && is_string($request[$field])
                 ? $request[$field]
                 : '';
+        }
+        if (array_key_exists('horarios', $request)) {
+            $submittedSchedules = is_array($request['horarios']) ? $request['horarios'] : [];
+            $values['horarios'] = [];
+            foreach (range(1, 7) as $day) {
+                $submitted = $submittedSchedules[$day] ?? [];
+                if (!is_array($submitted)) {
+                    $submitted = [];
+                }
+                $values['horarios'][$day] = [
+                    'activo' => in_array($submitted['activo'] ?? null, ['1', 1, true], true),
+                ];
+                foreach (['hora_inicio', 'hora_fin', 'hora_inicio_2', 'hora_fin_2'] as $field) {
+                    $values['horarios'][$day][$field] = isset($submitted[$field]) && is_string($submitted[$field])
+                        ? $submitted[$field]
+                        : '';
+                }
+            }
         }
 
         return $values;

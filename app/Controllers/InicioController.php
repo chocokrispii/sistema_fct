@@ -16,23 +16,74 @@ class InicioController
 
         $db = getPDOConnection();
         $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+        $asignaciones = (new Asignacion($db))->listarActivasPorUsuario($usuarioId);
+        $asignacionesActivas = count($asignaciones);
+        $hoy = date('Y-m-d');
+        $disponibilidades = (new Disponibilidad($db))->obtenerVigentesPorUsuario($usuarioId, $hoy);
 
-        $ofertaModel = new Oferta($db);
-        $ofertaResumen = $ofertaModel->obtenerResumenVigentes();
-        $ofertasRecientes = $ofertaModel->obtenerRecientesVigentes();
-        $asignacionModel = new Asignacion($db);
-        $eventos = $asignacionModel->obtenerProximosEventos($usuarioId);
+        $ofertas = [];
+        if ($asignacionesActivas === 0 && $disponibilidades !== []) {
+            $ofertaModel = new Oferta($db);
+            $ofertas = array_values(array_filter(
+                array_map(static function (array $oferta): array {
+                    $oferta['plazas_disponibles'] = max(
+                        0,
+                        (int)$oferta['plazas_cuantas'] - (int)$oferta['asignadas']
+                    );
+                    return $oferta;
+                }, $ofertaModel->obtenerVigentesConAsignaciones()),
+                static fn(array $oferta): bool => $oferta['plazas_disponibles'] > 0
+            ));
+            $ofertasCompatibles = $ofertas === []
+                ? []
+                : array_fill_keys(
+                    $ofertaModel->obtenerIdsOfertasVigentesCompatibles(
+                        $usuarioId,
+                        array_map(static fn(array $oferta): int => (int)$oferta['id'], $ofertas)
+                    ),
+                    true
+                );
+            $ofertas = array_values(array_filter(
+                $ofertas,
+                static fn(array $oferta): bool => isset($ofertasCompatibles[(int)$oferta['id']])
+            ));
+        }
         $notaMedia = (new Calificacion($db))->obtenerNotaMediaPorUsuario($usuarioId);
-        $disponibilidadModel = new Disponibilidad($db);
+
+        $eventos = [];
+        foreach ($asignaciones as $a) {
+            if ($a['fecha_inicio'] >= $hoy) {
+                $eventos[] = ['fecha' => $a['fecha_inicio'], 'titulo' => 'Inicio de prácticas', 'detalle' => $a['nombre_empresa']];
+            }
+            if ($a['fecha_fin'] >= $hoy) {
+                $eventos[] = ['fecha' => $a['fecha_fin'], 'titulo' => 'Fin de prácticas', 'detalle' => $a['nombre_empresa']];
+            }
+        }
+        foreach ($disponibilidades as $d) {
+            if ($d['fecha_inicio'] >= $hoy) {
+                $eventos[] = ['fecha' => $d['fecha_inicio'], 'titulo' => 'Inicio de disponibilidad', 'detalle' => 'Periodo registrado'];
+            }
+            if ($d['fecha_fin'] >= $hoy) {
+                $eventos[] = ['fecha' => $d['fecha_fin'], 'titulo' => 'Fin de disponibilidad', 'detalle' => 'Periodo registrado'];
+            }
+        }
+        usort($eventos, static function (array $x, array $y): int {
+            return strcmp($x['fecha'], $y['fecha'])
+                ?: ((str_starts_with($x['titulo'], 'Fin de') ? 1 : 0)
+                    <=> (str_starts_with($y['titulo'], 'Fin de') ? 1 : 0))
+                ?: strcmp($x['titulo'], $y['titulo'])
+                ?: strcmp($x['detalle'], $y['detalle']);
+        });
 
         View::render('home/dashboard_alumno', [
-            'totalOfertas' => (int)$ofertaResumen['total_ofertas'],
-            'totalEmpresas' => (int)$ofertaResumen['total_empresas'],
-            'asignacionesActivas' => $asignacionModel->contarActivasPorUsuario($usuarioId),
+            'totalOfertas' => count($ofertas),
+            'totalEmpresas' => count(array_unique(array_column($ofertas, 'empresa_id'))),
+            'asignacionesActivas' => $asignacionesActivas,
             'notaMedia' => $notaMedia,
-            'ofertasRecientes' => $ofertasRecientes,
-            'eventos' => $eventos,
-            'tieneDisponibilidad' => $disponibilidadModel->tienePorUsuario($usuarioId),
+            'ofertasVigentes' => array_slice($ofertas, 0, 4),
+            'eventos' => array_slice($eventos, 0, 5),
+            'tieneAsignacionActiva' => $asignacionesActivas > 0,
+            'tieneDisponibilidad' => $disponibilidades !== [],
         ]);
     }
 }

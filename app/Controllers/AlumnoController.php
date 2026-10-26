@@ -139,7 +139,7 @@ class AlumnoController
                 $fieldErrors['apellidos'] = 'Introduce apellidos válidos de hasta 100 caracteres.';
             }
             if (!$dni) {
-                $fieldErrors['dni'] = 'Introduce un DNI/NIE con una letra de control válida.';
+                $fieldErrors['dni'] = 'Introduce un DNI/NIE con letra de control válida.';
             }
             if (!$nss) {
                 $fieldErrors['nss'] = 'Introduce entre 5 y 20 caracteres alfanuméricos, espacios, puntos o guiones.';

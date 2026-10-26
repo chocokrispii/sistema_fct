@@ -102,8 +102,8 @@ class AsignacionController
         foreach ($ofertas as &$oferta) {
             $ofertaId = (int)$oferta['id'];
             if (isset($candidatosPorOferta[$ofertaId])) {
-                $oferta['candidatos'] = $candidatosPorOferta[$ofertaId]['candidatos'];
-                $oferta['paginacionCandidatos'] = $candidatosPorOferta[$ofertaId];
+            $oferta['candidatos'] = $candidatosPorOferta[$ofertaId]['candidatos'];
+            $oferta['paginacionCandidatos'] = $candidatosPorOferta[$ofertaId];
             }
         }
         unset($oferta);

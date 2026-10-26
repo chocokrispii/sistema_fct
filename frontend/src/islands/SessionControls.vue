@@ -9,7 +9,8 @@ const submitting = ref(false);
 const error = ref('');
 onMounted(() => {
     session.setCsrfToken(props.csrfToken);
-    const fallback = root.value?.closest('nav')?.querySelector<HTMLFormElement>('.session-fallback');
+    const fallback = root.value?.closest('.app-menu__panel')?.querySelector<HTMLFormElement>('.session-fallback')
+        ?? root.value?.closest('nav')?.querySelector<HTMLFormElement>('.session-fallback');
     if (fallback) {
         fallback.hidden = true;
     }
@@ -33,7 +34,7 @@ async function logout(): Promise<void> {
 </script>
 
 <template>
-    <span ref="root">
+    <span ref="root" class="session-controls">
         <button type="button" :disabled="submitting" @click="logout">Cerrar sesión</button>
         <span v-if="error" class="message message-error" role="alert">{{ error }}</span>
     </span>

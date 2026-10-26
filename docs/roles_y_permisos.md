@@ -5,6 +5,8 @@ Las acciones y sus métodos MVC se declaran en `routes/web.php`.
 controlador; `CsrfMiddleware` protege las mutaciones POST de esa capa. La API
 tokenizada usa autenticación Bearer propia, descrita más abajo. El rol se
 vuelve a comprobar en el servidor para las decisiones de ofertas y convenios.
+Las cuentas de Empresa sólo acceden a módulos privados cuando su perfil tiene
+estado `Aprobada`.
 
 ## Alcance de Observador
 
@@ -29,12 +31,38 @@ El único POST disponible es `logout`, para invalidar la propia sesión; es una 
 
 | Perfil | Alcance principal |
 |---|---|
-| Invitado | Inicio, registro, login y recuperación. El catálogo de ofertas requiere sesión y responde 403 a visitantes sin autenticar. |
+| Invitado | Inicio, registro, login y solicitud de recuperación. La aprobación de recuperación es exclusiva de Administrador. El catálogo de ofertas requiere sesión y responde 403 a visitantes sin autenticar. |
 | Alumno | Expediente propio, edición de perfil, disponibilidad, asignaciones propias, calificaciones propias y datos de interés de su empresa asignada. No ve el catálogo general de ofertas ni expedientes de terceros. |
 | Empresa | Sus ofertas, convenios y sedes; puede consultar ofertas aprobadas. No decide sus revisiones. |
 | Coordinador | Consulta y seguimiento de ofertas/convenios, asignación y cierre de prácticas, calificaciones y consultas. No puede aprobar o rechazar ofertas ni convenios. |
-| Administrador | Gestión de usuarios y decisiones sobre ofertas/convenios; comparte la gestión de asignaciones y calificaciones. Es el único rol con acceso a la administración de integraciones: `api-tokens` (emisión y revocación de tokens), `pruebas-integracion` y la consulta de webhooks (`webhook-inbox`, `webhooks-recibidos`, `webhooks-enviados`, `webhooks-empresa`). |
+| Administrador | Gestión de usuarios, aprobaciones de empresas y solicitudes de recuperación de contraseña; comparte la gestión de asignaciones y calificaciones. Es el único rol con acceso a la administración de integraciones: `api-tokens` (emisión y revocación de tokens), `pruebas-integracion` y la consulta de webhooks (`webhook-inbox`, `webhooks-recibidos`, `webhooks-enviados`, `webhooks-empresa`). |
 | Observador | Solo lectura, con anonimización y sin acceso a documentos privados, según el alcance anterior. |
+
+## Alta y aprobación de empresas
+
+El registro público crea la cuenta con estado `Pendiente_Aprobacion`. El login, la sesión y las rutas privadas MVC y de API deniegan el acceso con
+HTTP 403 hasta que un Administrador aprueba la solicitud. En navegación HTML,
+las cuentas pendientes o rechazadas llegan a `solicitud-pendiente`; las
+respuestas JSON conservan el sobre de error 403. Las empresas existentes al
+aplicar la migración se conservan como aprobadas.
+
+Sólo Administrador puede consultar `solicitudes-empresa` (también
+`/admin/convenios`) y aprobar mediante `aprobar-empresa` o el endpoint de
+sesión `POST /api/admin/empresas/{id}/aprobar-convenio` (el alias `/aprobar`
+sigue disponible). La aprobación requiere un número de Convenio Marco y un PDF
+firmado; el archivo se valida y analiza con ClamAV y se guarda fuera de
+`public/` dentro de `FCT_STORAGE_PATH`.
+
+## Recuperación de contraseña con aprobación
+
+`POST /api/auth/solicitar-reset-password` devuelve la misma confirmación
+independientemente de que el correo exista y conserva una sola solicitud
+pendiente por cuenta. Solo Administrador puede aprobarla o rechazarla desde
+`/admin/solicitudes-password`. La aprobación envía un enlace de un solo uso con
+expiración de 24 horas; en MariaDB se guarda el SHA-256 del token, no el valor
+en claro. El correo requiere `FCT_PUBLIC_BASE_URL`, `FCT_MAIL_FROM` y un MTA
+configurado para PHP `mail()`. Si el envío falla, la aprobación se revierte a
+pendiente y el panel informa del error.
 
 ## Privacidad del alumnado
 

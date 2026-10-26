@@ -31,6 +31,20 @@ class Asignacion
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function listarActivasPorUsuario(int $usuarioId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT p.fecha_inicio, p.fecha_fin, e.nombre_empresa
+             FROM asignaciones_fct af
+             INNER JOIN alumnos a ON a.id = af.alumno_id
+             INNER JOIN empresa_especialidades_plazas p ON p.id = af.oferta_id
+             INNER JOIN empresas e ON e.id = p.empresa_id
+             WHERE a.usuario_id = :usuario_id AND af.estado = 'Asignada'"
+        );
+        $stmt->execute(['usuario_id' => $usuarioId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     private function consultaListado(bool $soloPropias, int $usuarioId, bool $anonimizarAlumnado): array
     {
         $studentFields = $anonimizarAlumnado
@@ -131,16 +145,26 @@ class Asignacion
                  INNER JOIN alumnos a ON a.id = d.alumno_id
                  WHERE a.usuario_id = :usuario_disponibilidad
                    AND d.fecha_inicio >= CURDATE()
+                 UNION ALL
+                 SELECT d.fecha_fin AS fecha, 'Fin de disponibilidad' AS titulo,
+                        'Periodo registrado' AS detalle
+                 FROM alumno_disponibilidad d
+                 INNER JOIN alumnos a ON a.id = d.alumno_id
+                 WHERE a.usuario_id = :usuario_fin_disponibilidad
+                   AND d.fecha_fin >= CURDATE()
              ) eventos
-             ORDER BY eventos.fecha
-             LIMIT 3"
+             ORDER BY eventos.fecha,
+                      CASE WHEN eventos.titulo LIKE 'Fin de%' THEN 1 ELSE 0 END,
+                      eventos.titulo,
+                      eventos.detalle
+             LIMIT 5"
         );
         $stmt->execute([
             'usuario_inicio' => $usuarioId,
             'usuario_fin' => $usuarioId,
             'usuario_disponibilidad' => $usuarioId,
+            'usuario_fin_disponibilidad' => $usuarioId,
         ]);
-
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -149,13 +173,14 @@ class Asignacion
         $this->db->beginTransaction();
         try {
             $offer = $this->db->prepare(
-                "SELECT p.id, p.plazas_cuantas, p.estado
+                "SELECT p.id, p.plazas_cuantas, p.estado,
+                        p.fecha_fin >= CURDATE() AS vigente
                  FROM empresa_especialidades_plazas p WHERE p.id = :id FOR UPDATE"
             );
             $offer->execute(['id' => $ofertaId]);
             $row = $offer->fetch(PDO::FETCH_ASSOC);
-            if (!$row || $row['estado'] !== 'Aprobada') {
-                throw new RuntimeException('La oferta no existe o no está aprobada.');
+            if (!$row || $row['estado'] !== 'Aprobada' || (int)$row['vigente'] !== 1) {
+                throw new RuntimeException('La oferta no existe, no está aprobada o ya no está vigente.');
             }
 
             $capacity = $this->db->prepare(
@@ -200,12 +225,24 @@ class Asignacion
                                     OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
                                         <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
                                 )
-                                AND NOT EXISTS (
-                                    SELECT 1 FROM alumno_disponibilidad_semanal ds
-                                    WHERE ds.disponibilidad_id = d.id
-                                        AND ds.dia_semana = oh.dia_semana
-                                        AND ds.hora_inicio <= oh.hora_inicio
-                                        AND ds.hora_fin >= oh.hora_fin
+                                AND (
+                                    NOT EXISTS (
+                                        SELECT 1 FROM alumno_disponibilidad_semanal ds
+                                        WHERE ds.disponibilidad_id = d.id
+                                            AND ds.dia_semana = oh.dia_semana
+                                            AND ds.hora_inicio <= oh.hora_inicio
+                                            AND ds.hora_fin >= oh.hora_fin
+                                    )
+                                    OR (
+                                        oh.hora_inicio_2 IS NOT NULL
+                                        AND NOT EXISTS (
+                                            SELECT 1 FROM alumno_disponibilidad_semanal ds
+                                            WHERE ds.disponibilidad_id = d.id
+                                                AND ds.dia_semana = oh.dia_semana
+                                                AND ds.hora_inicio <= oh.hora_inicio_2
+                                                AND ds.hora_fin >= oh.hora_fin_2
+                                        )
+                                    )
                                 )
                         )
                     )

@@ -39,6 +39,10 @@ if (
     && ctype_digit($contentLength)
     && (int)$contentLength > PhpIni::sizeToBytes((string)ini_get('post_max_size'))
 ) {
+    if (JsonResponse::wantsJson()) {
+        JsonResponse::failure('La solicitud supera el límite configurado.', 413);
+        exit;
+    }
     http_response_code(413);
     header('Content-Type: text/plain; charset=UTF-8');
     exit('La solicitud supera el límite configurado.');
@@ -66,6 +70,7 @@ header('Content-Security-Policy: ' . $contentSecurityPolicy);
 
 $action = $_GET['action'] ?? 'inicio';
 $routes = require __DIR__ . '/../routes/web.php';
+$outputBufferLevel = ob_get_level();
 ob_start();
 
 try {
@@ -97,7 +102,23 @@ try {
             }
         }
     }
+} catch (CompanyApprovalRequiredException $e) {
+    while (ob_get_level() > $outputBufferLevel + 1) {
+        ob_end_clean();
+    }
+    ob_clean();
+    http_response_code(403);
+    if (JsonResponse::wantsJson()) {
+        JsonResponse::failure($e->getMessage(), 403);
+    } else {
+        View::render('errors/empresa-pendiente');
+    }
 } catch (Throwable $e) {
+    while (ob_get_level() > $outputBufferLevel + 1) {
+        ob_end_clean();
+    }
+    ob_clean();
+
     error_log('Error no controlado en "' . (is_string($action) ? $action : 'invalid') . '": ' . $e->getMessage());
     if (http_response_code() < 400) {
         http_response_code(500);
@@ -105,10 +126,18 @@ try {
     if (JsonResponse::wantsJson()) {
         JsonResponse::failure('No se pudo completar la solicitud.', http_response_code());
     } else {
-        View::render('errors/generic', ['status' => http_response_code()]);
+        $dbUnavailable = $e instanceof PDOException
+            && in_array((int)($e->errorInfo[1] ?? 0), [2002, 2006, 2013], true);
+        if ($dbUnavailable) {
+            http_response_code(503);
+        }
+        View::render('errors/generic', ['status' => http_response_code(), 'dbUnavailable' => $dbUnavailable]);
     }
 }
 
+while (ob_get_level() > $outputBufferLevel + 1) {
+    ob_end_flush();
+}
 $contenido = ob_get_clean();
 if (JsonResponse::hasSent()) {
     echo $contenido;

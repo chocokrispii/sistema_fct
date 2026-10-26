@@ -20,6 +20,19 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: no-referrer');
 
+$requestMethod = strtoupper($_SERVER['REQUEST_METHOD'] ?? '');
+if ($requestMethod === 'POST') {
+    if (($_SERVER['HTTP_ORIGIN'] ?? '') !== 'http://127.0.0.1:8003') {
+        http_response_code(403);
+        exit;
+    }
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+    if (!is_string($contentType) || strtolower(trim(explode(';', $contentType, 2)[0])) !== 'application/json') {
+        http_response_code(415);
+        exit;
+    }
+}
+
 $respondJson = static function (int $status, array $body): never {
     header('Content-Type: application/json; charset=UTF-8');
     http_response_code($status);

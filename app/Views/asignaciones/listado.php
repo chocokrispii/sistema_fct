@@ -21,7 +21,7 @@
             <p><?= $soloPropias ? 'Cuando el centro te asigne a una oferta, los detalles aparecerán aquí.' : 'Las asignaciones creadas mediante el emparejamiento aparecerán aquí.' ?></p>
         </div>
     <?php else: ?>
-        <div class="assignments-table-wrap">
+        <div class="assignments-table-wrap" role="region" aria-label="Listado de asignaciones" tabindex="0">
             <table class="assignments-table">
                 <thead><tr><?php if (!$soloPropias): ?><th>Alumno</th><?php endif; ?><th>Empresa</th><th>Ciclo</th><th>Periodo</th><?php if (!$anonimizarAlumnado): ?><th>Tutor de empresa</th><?php endif; ?><th>Estado</th><?php if ($puedeGestionar): ?><th>Acciones</th><?php endif; ?></tr></thead>
                 <tbody><?php foreach ($asignaciones as $item): ?>

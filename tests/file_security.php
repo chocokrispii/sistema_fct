@@ -67,6 +67,22 @@ assertFileSecurity(
         && $routes['guardar-calificacion']['roles'] === ['Administrador', 'Coordinador'],
     'La matriz de acceso a calificaciones no coincide con los permisos previstos.'
 );
+$originalRequestUri = $_SERVER['REQUEST_URI'] ?? null;
+$originalHttpStatus = http_response_code();
+$_SERVER['REQUEST_URI'] = '/assets%5c..%5c.htaccess';
+$routerResponse = require __DIR__ . '/../public/dev-router.php';
+assertFileSecurity(
+    $routerResponse === true && http_response_code() === 404,
+    'El router de desarrollo debe bloquear archivos ocultos también con separadores Windows codificados.'
+);
+if ($originalRequestUri === null) {
+    unset($_SERVER['REQUEST_URI']);
+} else {
+    $_SERVER['REQUEST_URI'] = $originalRequestUri;
+}
+if ($originalHttpStatus !== false) {
+    http_response_code($originalHttpStatus);
+}
 assertFileSecurity(
     $routes['ofertas']['roles'] === ['Administrador', 'Coordinador', 'Observador', 'Empresa']
         && !in_array('Alumno', $routes['ofertas']['roles'], true)
@@ -231,6 +247,10 @@ try {
 assertFileSecurity(PhpIni::sizeToBytes('12M') === 12 * 1024 * 1024, 'No se interpretó el límite PHP de 12 MiB.');
 assertFileSecurity(PhpIni::sizeToBytes('512K') === 512 * 1024, 'No se interpretó un límite PHP en KiB.');
 assertFileSecurity(PhpIni::sizeToBytes('0') === PHP_INT_MAX, 'El límite PHP 0 debe representar tamaño ilimitado.');
+assertFileSecurity(
+    PhpIni::sizeToBytes('999999999999999999999G') === PHP_INT_MAX,
+    'Un límite PHP demasiado grande no se saturó al máximo entero.'
+);
 assertFileSecurity(PhpIni::sizeToBytes('invalid') === 0, 'Un límite PHP inválido no se rechazó de forma segura.');
 assertFileSecurity(SpanishDataValidator::isDniNie('12345678Z'), 'Se rechazó un DNI válido.');
 assertFileSecurity(SpanishDataValidator::isDniNie('00000009D'), 'Se rechazó un DNI válido cuya letra de control es D.');
@@ -241,6 +261,11 @@ assertFileSecurity(SpanishDataValidator::isDniNieFormat('12345678A'), 'El login 
 assertFileSecurity(SpanishDataValidator::isCifFormat('B12345678'), 'Se rechazó un CIF con formato válido.');
 assertFileSecurity(!SpanishDataValidator::isCifFormat('B1234'), 'Se aceptó un CIF mal formado.');
 assertFileSecurity(SpanishDataValidator::isSpanishPhone('+34 612 345 678'), 'Se rechazó un teléfono válido con prefijo +34.');
+assertFileSecurity(SpanishDataValidator::isSpanishPhone('0034 (612) 345-678'), 'Se rechazó un teléfono válido con prefijo 0034.');
+assertFileSecurity(
+    SpanishDataValidator::normalizePhone('0034 (612) 345-678') === '612345678',
+    'No se normalizó el prefijo internacional y formato del teléfono.'
+);
 assertFileSecurity(!SpanishDataValidator::isSpanishPhone('512345678'), 'Se aceptó un teléfono con prefijo nacional no permitido.');
 assertFileSecurity(SpanishDataValidator::isSpanishPostcode('28013'), 'Se rechazó un código postal válido.');
 assertFileSecurity(!SpanishDataValidator::isSpanishPostcode('53000'), 'Se aceptó un código postal fuera del rango provincial español.');
@@ -410,4 +435,6 @@ try {
     }
 }
 
-echo "OK: validadores españoles, matriz de rutas, almacenamiento privado y política antivirus fail-closed.\n";
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__)) {
+    echo "OK: validadores españoles, matriz de rutas, almacenamiento privado y política antivirus fail-closed.\n";
+}

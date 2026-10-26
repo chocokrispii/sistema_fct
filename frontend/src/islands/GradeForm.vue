@@ -1,15 +1,47 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { requestApi } from '../api/client';
 
 const props = defineProps<{ csrf: string }>();
 const root = ref<HTMLElement | null>(null);
 const error = ref('');
 const submitting = ref(false);
+const errorId = ref('grade-form-error');
 let form: HTMLFormElement | null = null;
 let gradeInput: HTMLInputElement | null = null;
 let submitButton: HTMLButtonElement | null = null;
 let lastValidValue = '';
+
+function setValidationError(message: string): void {
+    error.value = message;
+    if (!gradeInput) {
+        return;
+    }
+
+    gradeInput.setAttribute('aria-invalid', 'true');
+    const describedBy = new Set((gradeInput.getAttribute('aria-describedby') ?? '')
+        .split(/\s+/)
+        .filter(Boolean));
+    describedBy.add(errorId.value);
+    gradeInput.setAttribute('aria-describedby', [...describedBy].join(' '));
+}
+
+function clearValidationError(): void {
+    error.value = '';
+    if (!gradeInput) {
+        return;
+    }
+
+    gradeInput.removeAttribute('aria-invalid');
+    const describedBy = (gradeInput.getAttribute('aria-describedby') ?? '')
+        .split(/\s+/)
+        .filter((id) => id && id !== errorId.value);
+    if (describedBy.length > 0) {
+        gradeInput.setAttribute('aria-describedby', describedBy.join(' '));
+    } else {
+        gradeInput.removeAttribute('aria-describedby');
+    }
+}
 
 function isValidEdit(value: string): boolean {
     if (value === '') {
@@ -49,12 +81,12 @@ function onInput(): void {
     const normalized = gradeInput.value.replace(',', '.');
     if (!isValidEdit(normalized)) {
         gradeInput.value = lastValidValue;
-        error.value = 'La nota debe estar entre 0 y 10, con un máximo de dos decimales.';
+        setValidationError('La nota debe estar entre 0 y 10, con un máximo de dos decimales.');
         return;
     }
     gradeInput.value = normalized;
     lastValidValue = normalized;
-    error.value = '';
+    clearValidationError();
 }
 
 function onPaste(event: ClipboardEvent): void {
@@ -68,7 +100,7 @@ function onPaste(event: ClipboardEvent): void {
     const end = input.selectionEnd ?? input.value.length;
     const next = (input.value.slice(0, start) + pasted.replace(',', '.') + input.value.slice(end));
     if (!isValidEdit(next)) {
-        error.value = 'El texto pegado no es una nota válida entre 0 y 10.';
+        setValidationError('El texto pegado no es una nota válida entre 0 y 10.');
         return;
     }
     input.value = next;
@@ -80,9 +112,15 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
     if (!form || submitting.value) {
         return;
     }
+    if (!gradeInput || gradeInput.value.trim() === '' || !isValidEdit(gradeInput.value)) {
+        setValidationError('La nota debe estar entre 0 y 10, con un máximo de dos decimales.');
+        await nextTick();
+        gradeInput?.focus();
+        return;
+    }
     const data = new FormData(form);
     submitting.value = true;
-    error.value = '';
+    clearValidationError();
     if (submitButton) {
         submitButton.disabled = true;
     }
@@ -98,7 +136,9 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
         });
         window.location.assign('index.php?action=calificaciones&guardada=1');
     } catch (cause) {
-        error.value = cause instanceof Error ? cause.message : 'No se pudo guardar la calificación.';
+        setValidationError(cause instanceof Error ? cause.message : 'No se pudo guardar la calificación.');
+        await nextTick();
+        gradeInput?.focus();
     } finally {
         submitting.value = false;
         if (submitButton) {
@@ -114,6 +154,9 @@ onMounted(() => {
     if (!form || !gradeInput) {
         throw new Error('No se encontró el formulario de calificación.');
     }
+    const assignmentId = form.querySelector<HTMLInputElement>('input[name="asignacion_id"]')?.value;
+    const stableKey = assignmentId && /^\d+$/.test(assignmentId) ? assignmentId : gradeInput.id || 'grade';
+    errorId.value = `grade-error-${stableKey}`;
     lastValidValue = gradeInput.value;
     gradeInput.addEventListener('keydown', onKeydown);
     gradeInput.addEventListener('input', onInput);
@@ -131,6 +174,6 @@ onBeforeUnmount(() => {
 
 <template>
     <div ref="root">
-        <p v-if="error" class="message message-error" role="alert">{{ error }}</p>
+        <p v-if="error" :id="errorId" class="message message-error" role="alert" tabindex="-1">{{ error }}</p>
     </div>
 </template>

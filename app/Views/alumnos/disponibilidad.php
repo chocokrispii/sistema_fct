@@ -1,5 +1,5 @@
 <section class="availability-page" aria-labelledby="availability-title">
-    <?php if ($error !== ''): ?><p class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+    <?php if ($error !== ''): ?><p id="availability-error" class="message message-error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
     <?php if (isset($_GET['guardada'])): ?><p class="message message-success" role="status">Disponibilidad guardada.</p><?php endif; ?>
     <div class="availability-page__intro">
         <span class="student-registration__eyebrow">Área de alumnado</span>
@@ -41,7 +41,7 @@
         ),
     ];
     ?>
-    <form class="page-form page-form--narrow" method="POST" action="index.php?action=disponibilidad">
+    <form class="page-form page-form--narrow" method="POST" action="index.php?action=disponibilidad"<?= $error !== '' ? ' aria-describedby="availability-error"' : '' ?>>
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars($scheduleState['csrf'], ENT_QUOTES, 'UTF-8') ?>">
     <input type="hidden" name="turno" value="M">
         <div
@@ -68,12 +68,13 @@
         </fieldset>
         <fieldset class="availability-schedule">
             <legend>Disponibilidad semanal</legend>
+            <p>Selecciona los días y el horario en el que puedes realizar las prácticas cada semana.</p>
             <p>Define franjas exactas por día. Para aplicar un horario a varios días, usa el selector de horario general cuando JavaScript esté disponible.</p>
             <p class="availability-schedule__selection" role="status" aria-live="polite">
                 <?php if ($scheduleState['esIndiferente']): ?>Aplicable a cualquier horario.
                 <?php else: ?><?= $selectedScheduleDays === 1 ? '1 día seleccionado' : $selectedScheduleDays . ' días seleccionados' ?><?php endif; ?>
             </p>
-            <div class="availability-schedule__table-wrap">
+            <div class="availability-schedule__table-wrap" role="region" aria-label="Horario semanal de disponibilidad" tabindex="0">
                 <table class="availability-schedule__table">
                     <thead><tr><th>Día</th><th>Disponible</th><th>Desde</th><th>Hasta</th></tr></thead>
                     <tbody><?php foreach ($scheduleState['days'] as $day): ?>

@@ -1,4 +1,4 @@
-import type { Turno } from './domain';
+import type { TurnoDisponibilidad } from './domain';
 
 export interface AvailabilityDayState {
     day: number;
@@ -37,7 +37,7 @@ export interface AvailabilityDayPayload {
 export interface AvailabilityUpdatePayload {
     fecha_inicio: string;
     fecha_fin: string;
-    turno: Turno;
+    turno: TurnoDisponibilidad;
     es_indiferente: boolean;
     horarios: Record<number, AvailabilityDayPayload>;
 }

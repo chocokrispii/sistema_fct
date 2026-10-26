@@ -23,8 +23,6 @@ Copy-Item .env.example .env
 docker compose up -d --build
 ```
 
-Después, opcionalmente, crea cuentas demo (ver [sección 5](#5-base-de-datos-cuentas-de-desarrollo-y-phpmyadmin)) y consulta el [estado de los servicios](#4-iniciar-y-detener-la-infraestructura) con `docker compose ps`.
-
 ## Índice
 
 1. [Tecnologías](#1-tecnologías)
@@ -38,6 +36,229 @@ Después, opcionalmente, crea cuentas demo (ver [sección 5](#5-base-de-datos-cu
 9. [Portal de documentación VitePress](#9-portal-de-documentación-vitepress)
 10. [Verificaciones y pruebas](#10-verificaciones-y-pruebas)
 11. [Solución de problemas frecuentes](#11-solución-de-problemas-frecuentes)
+- [Instalación local con XAMPP](#instalación-local-con-xampp)
+
+Docker Compose ejecuta PHP 8.2 con Apache, MariaDB 10.4.32 y el servicio oficial
+ClamAV. El código del proyecto se monta desde la carpeta local, por lo que los
+cambios en archivos PHP, vistas y recursos se reflejan en Docker sin reconstruir
+la imagen. Por defecto, la base de datos Docker es independiente de la de XAMPP;
+se puede configurar `FCT_DB_HOST` en `.env` para que la aplicación use una base
+compartida. La versión de MariaDB coincide con la instalación XAMPP local observada;
+10.4 ya no recibe soporte, por lo que esta composición es exclusivamente para
+desarrollo local y no debe desplegarse en producción. El Dockerfile instala
+`pdo_mysql` y `mbstring`; `fileinfo` viene con la imagen PHP. Composer está
+disponible en el contenedor, aunque esta aplicación no tiene dependencias
+Composer. Los datos de MariaDB, las firmas de ClamAV y los archivos privados se
+guardan en volúmenes Docker.
+
+1. Copia la plantilla de entorno:
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+2. Construye y arranca los servicios:
+
+   ```powershell
+   docker compose up -d --build
+   ```
+
+3. Al iniciar, el contenedor de la aplicación aplica las migraciones pendientes
+   y registra sus archivos y checksums en `schema_migrations`. El comando es
+   idempotente: las ya registradas se omiten y un cambio posterior de un archivo
+   aplicado se informa como error. Para consultar el estado:
+
+   ```powershell
+   docker compose exec app php scripts/migrate.php --status
+   ```
+
+   Para generar cuentas de demostración, ejecuta el seed explícitamente y
+   guarda las contraseñas aleatorias que imprima:
+
+   ```powershell
+   docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/crear_cuentas_demo.php
+   docker compose exec -e FCT_ENABLE_DEMO_SEED=1 -e FCT_DEMO_SEED_ALLOW_DOCKER=1 app php scripts/seed_datos_sinteticos.php
+   docker compose ps
+   docker compose exec app php -v
+   ```
+
+   Espera a que `db` y `clamav` estén saludables; en el primer arranque, ClamAV
+   puede tardar en descargar sus firmas. MariaDB importa el esquema base solo
+   al inicializar un volumen vacío; la aplicación gestiona las migraciones tanto
+   en instalaciones nuevas como en volúmenes existentes.
+   El seed crea cuentas ausentes con contraseñas aleatorias. Para establecer
+   contraseñas elegidas explícitamente, pásalas mediante las variables
+   `FCT_DEMO_PASSWORD_ADMINISTRADOR`, `FCT_DEMO_PASSWORD_COORDINADOR`,
+   `FCT_DEMO_PASSWORD_OBSERVADOR`, `FCT_DEMO_PASSWORD_EMPRESA` y
+   `FCT_DEMO_PASSWORD_ALUMNO`; para reemplazar contraseñas de cuentas demo ya
+   existentes, habilita además `FCT_DEMO_SEED_RESET_PASSWORDS=1`. Las
+   contraseñas proporcionadas por entorno nunca se imprimen. No guardes estos
+   valores en archivos versionados.
+   Abre `http://localhost:8080` (o el puerto definido por `APP_PORT` en `.env`).
+   Las contraseñas de desarrollo son configurables en `.env`; no reutilices
+   esos valores fuera del entorno local.
+
+Para que Docker y XAMPP muestren y modifiquen los mismos datos, configura la
+aplicación Docker contra MariaDB de XAMPP mediante `FCT_DB_HOST=host.docker.internal`
+en `.env`, y usa en `FCT_DB_USER` y `FCT_DB_PASS` una cuenta de MariaDB con
+permisos limitados a la base `sistema_fct`. Crea esa cuenta en MariaDB de XAMPP;
+no uses `root` para la conexión desde Docker. El servidor de MariaDB de XAMPP
+debe estar iniciado y aceptar la conexión local de Docker. La base Docker
+existente no se borra, pero la aplicación deja de usarla mientras esté activa
+esta configuración compartida. `http://127.0.0.1:8002/index.php` también usa
+MariaDB de XAMPP mediante `.env.local`.
+
+## Instalación local con XAMPP
+
+La API REST versionada está documentada en [docs/api-rest.md](docs/api-rest.md).
+Antes de usarla en una base existente, ejecuta la migración
+`database/migrations/008_api_access_tokens.sql` y crea/revoca tokens desde
+**Tokens API** en el panel de administración.
+
+### 1. Configurar Apache
+
+La opción requerida para un despliegue es configurar un VirtualHost cuyo
+`DocumentRoot` sea exclusivamente la carpeta `public/` del proyecto. Así
+`app/`, `config/`, `database/` y `storage/` quedan fuera del acceso web directo.
+La carpeta `storage/` también deniega el acceso mediante `.htaccess` como
+defensa adicional; no uses esa regla como sustituto de servir solo `public/`.
+La raíz del proyecto deniega el acceso directo a todo; solo `public/` lo
+rehabilita.
+
+Para una prueba local rápida con la configuración habitual de XAMPP, también
+se puede abrir:
+
+```text
+http://localhost/proyecto-practicas/public/
+```
+
+Este modo es solo para desarrollo local. No expongas la raíz del repositorio en
+Internet ni uses esta configuración como despliegue productivo. Apache debe
+permitir `AllowOverride AuthConfig Options` en la raíz del proyecto y
+`AllowOverride AuthConfig FileInfo Limit Options` en `public/` para procesar las
+denegaciones, la concesión exclusiva de `public/`, el límite de cuerpo de
+petición y la desactivación del listado de directorios.
+`storage/.htaccess` deniega además el acceso directo cuando el proyecto se
+sirve desde un directorio superior.
+
+Para el VirtualHost, concede acceso únicamente a `public/` y establece
+`LimitRequestBody 12582912` en su bloque `<Directory>` (12 MiB, compatible con
+el máximo de carga PHP de 10 MiB). No crees un alias web para `storage/`.
+Configura en Apache `FCT_STORAGE_PATH`, `FCT_CLAMSCAN` y
+`FCT_CLAMAV_DATABASE`, por ejemplo:
+
+```apache
+DocumentRoot "C:/xampp/htdocs/proyecto-practicas/public"
+<Directory "C:/xampp/htdocs/proyecto-practicas">
+    Require all denied
+    AllowOverride AuthConfig Options
+    Options -Indexes
+</Directory>
+<Directory "C:/xampp/htdocs/proyecto-practicas/public">
+    Require all granted
+    AllowOverride AuthConfig FileInfo Limit Options
+    Options -Indexes
+    LimitRequestBody 12582912
+</Directory>
+SetEnv FCT_STORAGE_PATH "C:/xampp/private/sistema-fct"
+SetEnv FCT_CLAMSCAN "C:/Program Files/ClamAV/clamscan.exe"
+SetEnv FCT_CLAMAV_DATABASE "C:/ProgramData/ClamAV/db"
+```
+
+Para el lanzador de desarrollo de XAMPP, Docker publica ClamAV solo en
+`127.0.0.1:3310`; no hace falta instalar un segundo antivirus en Windows.
+Mantén Docker y su servicio `clamav` iniciados mientras se cargan convenios.
+El lanzador configura automáticamente `FCT_CLAMD_HOST=127.0.0.1` y
+`FCT_CLAMD_PORT=3310`, salvo que `.env.local` especifique `FCT_CLAMD_HOST` o
+un ejecutable local `FCT_CLAMSCAN`. El puerto no queda expuesto a otros equipos
+de la red.
+
+En una instalación Apache/XAMPP distinta del lanzador local, crea previamente el directorio de almacenamiento fuera del
+`DocumentRoot` y configura `FCT_STORAGE_PATH`; no existe una ruta
+predeterminada. La aplicación
+resuelve ambas rutas y rechaza directorios inexistentes, rutas relativas,
+almacenamientos dentro del `DocumentRoot` o directorios que lo contengan. Mantén
+el almacenamiento fuera del árbol del proyecto y de `htdocs`. En XAMPP local,
+`public/.htaccess` configura los límites PHP por directorio y el límite de
+Apache, siempre que esté habilitado `mod_php` y las opciones `AllowOverride`
+indicadas. Define las variables de entorno en Apache o en el VirtualHost, no en
+`.htaccess`. La configuración comprobada para Apache queda limitada a esta
+aplicación.
+
+Si no se usa Docker como analizador en una instalación Apache/XAMPP, se puede
+instalar la distribución oficial de Cisco Talos desde WinGet:
+
+```powershell
+winget install --id Cisco.ClamAV --exact --source winget
+New-Item -ItemType Directory -Force -Path "C:\ProgramData\ClamAV\db"
+Copy-Item config\clamav\freshclam.conf.example "C:\ProgramData\ClamAV\freshclam.conf"
+& "C:\Program Files\ClamAV\freshclam.exe" --config-file="C:\ProgramData\ClamAV\freshclam.conf"
+```
+
+Configura las variables anteriores en Apache para este método nativo. Mantén el
+almacenamiento privado con permisos de modificación solo para la identidad que
+ejecuta Apache y lectura restringida; no concedas escritura a
+`Usuarios autentificados`. Programa `freshclam` para actualizar las firmas al
+menos cada dos horas. En la instalación local se usa una tarea del usuario que
+ejecuta Apache, con actualización disponible al iniciar sesión:
+
+```powershell
+$action = New-ScheduledTaskAction -Execute "C:\Program Files\ClamAV\freshclam.exe" -Argument '--config-file="C:\ProgramData\ClamAV\freshclam.conf"' -WorkingDirectory "C:\ProgramData\ClamAV"
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddHours(2) -RepetitionInterval (New-TimeSpan -Hours 2) -RepetitionDuration (New-TimeSpan -Days 3650)
+$principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 20)
+Register-ScheduledTask -TaskName "FCT-ClamAV-Freshclam" -Action $action -Trigger $trigger -Principal $principal -Settings $settings
+```
+
+`FileScanner` rechaza cargas si el análisis falla o las firmas tienen más de
+tres días; no desactives esta protección para resolver problemas de instalación.
+
+### Límites y permisos de archivos
+
+Combina los valores de `config/php-upload.ini` con el `php.ini` que carga Apache
+(en XAMPP suele ser `C:\xampp\php\php.ini`) y reinicia Apache:
+
+```ini
+upload_max_filesize = 10M
+post_max_size = 12M
+max_file_uploads = 1
+max_input_time = 60
+```
+
+La aplicación vuelve a comprobar los límites PHP antes de aceptar una carga,
+limita cada PDF a 10 MiB y rechaza cargas truncadas por PHP. Apache aplica
+además `LimitRequestBody 12582912` mediante `public/.htaccess` o el VirtualHost.
+No aumentes uno de estos límites sin revisar los otros. Verifica los valores
+efectivos con `phpinfo()` solo en un entorno local y elimina esa página al
+terminar; en XAMPP, el PHP de consola puede cargar un `php.ini` diferente al de
+Apache.
+
+En Windows, concede lectura/escritura solo a la identidad real del servicio
+Apache y control total a Administradores/SYSTEM; retira herencia y no concedas
+permisos a `Everyone` o `Users`. En Linux, usa un propietario del servicio web,
+directorios `0700` y archivos `0600`. La aplicación establece esos modos para
+los directorios y PDFs nuevos; las ACL NTFS deben prepararse y revisarse en el
+servidor, ya que no se sustituyen con `chmod()`.
+
+Ejemplo de ACL NTFS (sustituye `EQUIPO\ApacheSvc` por la cuenta que ejecuta
+Apache; conserva solo los principales realmente necesarios):
+
+```powershell
+New-Item -ItemType Directory -Path "C:\xampp\private\sistema-fct" -Force
+icacls "C:\xampp\private\sistema-fct" /inheritance:r
+icacls "C:\xampp\private\sistema-fct" /grant:r "BUILTIN\Administrators:(OI)(CI)F" "NT AUTHORITY\SYSTEM:(OI)(CI)F" "EQUIPO\ApacheSvc:(OI)(CI)M"
+```
+
+Los PDFs pasan por validación de extensión, MIME y tamaño y, antes de persistir,
+por ClamAV. En el lanzador local de XAMPP se usa el servicio Docker ClamAV en
+`127.0.0.1:3310`; para otra instalación XAMPP, `FCT_CLAMSCAN` debe señalar al
+ejecutable confiable con ruta absoluta. En Docker se usa `FCT_CLAMD_HOST` y el
+protocolo TCP de ClamD. Si el antivirus no está configurado, no se puede
+contactar, tiene firmas con más de tres días o no puede completar el análisis,
+la carga falla cerrada. Mantén ClamAV instalado y sus firmas actualizadas,
+supervisa los fallos del análisis y examina el almacenamiento existente antes
+de habilitar este flujo. Si se detecta malware, no publiques el documento:
+aíslalo, registra el incidente y elimínalo según la política del centro.
 
 ## 1. Tecnologías
 
@@ -79,11 +300,49 @@ Crea `.env` con los valores locales de referencia; Compose lo carga automáticam
 Copy-Item .env.example .env
 ```
 
-Abre `.env` para cambiar puertos, seleccionar la base de datos y ajustar las credenciales locales:
+### Crear la base de datos en XAMPP
+
+1. Inicia Apache y MySQL desde el panel de XAMPP.
+2. En phpMyAdmin, crea una base de datos vacía llamada `sistema_fct` con
+   codificación `utf8mb4` (por ejemplo, collation
+   `utf8mb4_unicode_ci`).
+3. Selecciona esa base e importa `database/sistema_fct.sql`. El volcado crea
+   las tablas base y contiene registros de demostración; no crea la base de
+   datos por sí solo.
+4. En PowerShell, apunta la configuración a la base que acabas de importar y
+   ejecuta el gestor. Usa la ruta de PHP CLI de tu instalación:
+
+   ```powershell
+   $env:FCT_DB_NAME = "sistema_fct"
+   & "C:\xampp\php\php.exe" scripts\migrate.php
+   & "C:\xampp\php\php.exe" scripts\migrate.php --status
+   ```
+
+   El gestor aplica en orden las migraciones pendientes, incluidas las de
+   convenios, disponibilidad, webhooks y tokens de API; no ejecutes esos SQL
+   manualmente además del gestor. Los convenios existentes que no tengan ciclo
+   asignado quedan sin clasificar y deben revisarse antes de volver a usarlos.
+
+Para configurar los puertos, seleccionar la base de datos de Compose o ajustar
+las credenciales locales, abre `.env`:
 
 ```powershell
 notepad .env
 ```
+
+El gestor aplica en orden todas las migraciones pendientes, registra el nombre
+y el SHA-256 normalizado de cada archivo en `schema_migrations` y omite las ya
+aplicadas. Si una instalación existente ya tiene el nombre actual de la columna
+de especialidades pero no tiene registro, reconoce la migración 001 como
+adoptada y completa su índice único si falta. Haz una copia de seguridad antes
+de ejecutarlo sobre una base con datos existentes. Si una migración falla, el
+proceso se detiene sin registrarla como aplicada; corrige el problema y vuelve
+a ejecutar el mismo comando.
+
+El volcado y el gestor no seleccionan la base por sí mismos: configura
+`FCT_DB_NAME` y comprueba la salida antes de aplicar cambios. El dump actual
+contiene dos expedientes de alumno y direcciones que apuntan a registros
+existentes. No es necesario aplicar el seed para completar la instalación.
 
 Variables incluidas en la plantilla:
 
@@ -230,6 +489,8 @@ docker compose cp (Resolve-Path .\database\migrations\010_detalles_ofertas.sql).
 
 La migración es idempotente. Los datos de ofertas históricas reciben valores predeterminados compatibles; una descripción/ubicación no se inventa para esos registros. Después de aplicarla, comprueba con una consulta de solo lectura que `modalidad` conserva `Híbrido` (la columna debe mostrar `enum('Presencial','Remoto','Híbrido')`):
 
+`012_jornada_ofertas.sql` agrega la jornada (`normal` o `partida`) y las columnas opcionales para la segunda franja horaria. Compose la ejecuta al crear una base nueva; en una base existente debe aplicarse una vez después de `010_detalles_ofertas.sql`.
+
 ```powershell
 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e "SHOW COLUMNS FROM empresa_especialidades_plazas LIKE ''modalidad''" #' | docker compose exec -T db sh -s
 ```
@@ -292,7 +553,7 @@ El sistema compara ofertas y expedientes del mismo ciclo formativo, por ejemplo 
 
 Los ciclos soportados incluyen **DAW** (Desarrollo de Aplicaciones Web) y **DAM** (Desarrollo de Aplicaciones Multiplataforma). La especialidad se relaciona por ID en la base de datos, y `009_desarrollo_aplicaciones_multiplataforma.sql` incorpora DAM sin duplicarlo. Una oferta guarda un único ciclo para preservar el matching actual.
 
-La publicación recoge título, descripción, plazas, fechas, turno, franjas semanales de cinco minutos, modalidad, ubicación, requisitos y tecnologías. La modalidad presencial e híbrida requiere ubicación. La revisión y los listados muestran los detalles persistidos; el matching sigue usando la misma relación por ciclo, fechas y horarios.
+La publicación recoge título, descripción, plazas, fechas, jornada normal o partida y franjas semanales de cinco minutos, modalidad, ubicación, requisitos y tecnologías. La jornada partida admite dos intervalos no solapados por día; la modalidad presencial e híbrida requiere ubicación. La revisión y los listados muestran los detalles persistidos; el matching usa los intervalos exactos junto con ciclo y fechas.
 
 En el portal del alumno, la disponibilidad tiene tres pasos de configuración:
 
@@ -348,8 +609,8 @@ Consulta la [guía de acceso para usuarios](docs/guia-acceso.pdf) o su [fuente e
 |---|---|
 | Aplicación PHP | <http://localhost:8080> (o `APP_PORT`) |
 | phpMyAdmin | <http://localhost:8082> (o `PMA_PORT`) |
-| Vista previa de disponibilidad (sólo desarrollo) | <http://localhost:8080/index.php?action=preview-disponibilidad> |
-| Vista previa de publicar oferta (sólo desarrollo) | `http://localhost:8080/dev/preview-publicar-oferta` |
+| Vista previa de disponibilidad (entornos `development` o `local`) | <http://localhost:8080/index.php?action=preview-disponibilidad> |
+| Vista previa de publicar oferta (entornos `development` o `local`) | `http://localhost:8080/dev/preview-publicar-oferta` |
 | Vite HMR | <http://localhost:5173> cuando se inicia el frontend |
 | Portal VitePress | <http://localhost:5174> con el comando de desarrollo de documentación |
 
@@ -478,7 +739,31 @@ $tests = (Resolve-Path .\tests).Path -replace '\\', '/'
 docker compose run --rm --no-deps -v "${tests}:/var/www/html/tests:ro" app php tests/file_security.php
 ```
 
+Ejecuta la suite local completa con:
+
+```powershell
+npm ci
+npm run test
+```
+
+El comando valida lint y tipos frontend, compila el bundle y la documentación, crea un proyecto Docker temporal con una base `fct_test_*`, ejecuta el lint PHP, las pruebas de seguridad y las suites de integración, y elimina únicamente los volúmenes de ese proyecto temporal al terminar.
+
 `tests/run.php` es una prueba de integración y debe apuntar exclusivamente a una base de datos desechable cuyo nombre empiece por `fct_test_`; configura `FCT_TEST_DB_NAME` y `FCT_DB_NAME` con el mismo nombre antes de ejecutarla. No la ejecutes contra `sistema_fct` ni una base que quieras conservar.
+
+Para ejecutar la integración desde XAMPP, crea `fct_test_local` en phpMyAdmin e
+importa en ella el dump base seleccionando explícitamente esa base. El gestor
+aplica las migraciones pendientes; la suite necesita el esquema actualizado,
+incluidas las bandejas de webhooks y las columnas de respuesta HTTP. Después,
+ejecuta desde PowerShell:
+
+```powershell
+$env:FCT_TEST_DB_NAME = "fct_test_local"
+$env:FCT_DB_NAME = $env:FCT_TEST_DB_NAME
+$env:FCT_DB_USER = "root"
+$env:FCT_DB_PASS = ""
+& "C:\xampp\php\php.exe" scripts\migrate.php
+& "C:\xampp\php\php.exe" tests\run.php
+```
 
 ## Restablecimiento de Base de Datos por Cambios de Esquema o Migraciones
 

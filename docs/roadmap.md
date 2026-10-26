@@ -45,8 +45,8 @@ Cada acordeón contiene un diagrama pequeño de arriba hacia abajo. Los diagrama
 ```mermaid
 flowchart TB
     session["login · session · logout<br/>COMPLETED"]:::completed
-    recovery["recuperar · restablecer<br/>PENDING"]:::pending
-    adminReview["recuperaciones · verificar-recuperacion<br/>PENDING"]:::pending
+    recovery["recuperar · restablecer<br/>COMPLETED"]:::completed
+    adminReview["solicitudes-reset · aprobar/rechazar<br/>COMPLETED"]:::completed
     session --> recovery --> adminReview
     classDef completed fill:#e8f7ee,stroke:#29804b,color:#174b2b,stroke-width:2px
     classDef inprogress fill:#fff9df,stroke:#9b7b00,color:#493b00,stroke-width:2px
@@ -151,6 +151,11 @@ flowchart TB
 | Auth y sesión | `GET, POST login` | COMPLETED | Formulario PHP fallback + `AuthLoginEnhancement`, `AuthController` JSON y store `session` | Conservar fallback; endurecer estados del formulario si se amplía | CSRF en POST, regeneración de sesión | P3 |
 | Auth y sesión | `GET session` | COMPLETED | `AuthController::session` devuelve sobre JSON consumido por Pinia | Mantener contrato `ApiResponse` | Cookie de sesión y validación de usuario activo | P3 |
 | Auth y sesión | `POST logout` | COMPLETED | `RoleDashboard`/Pinia usa `AuthController` JSON; fallback formulario | Mantener invalidación de sesión en servidor | CSRF y expiración de cookie | P3 |
+| Recuperación | `POST /api/auth/solicitar-reset-password` | COMPLETED | Formulario PHP con isla `OlvidePassword` | Envío JSON progresivo y fallback HTML | Respuesta genérica, deduplicación de solicitudes pendientes | P2 |
+| Recuperación | `POST /api/auth/confirmar-reset-password` | COMPLETED | Formulario PHP con isla `RestablecerPassword` | Confirmación JSON y fallback HTML | Hash de token, caducidad 24 h, un solo uso y contraseña 12-72 bytes | P2 |
+| Administración | `GET /admin/solicitudes-password` | COMPLETED | Listado PHP protegido | Acciones accesibles de aprobar/rechazar | Sólo Administrador | P3 |
+| Administración | `POST /api/admin/solicitudes-password/{id}/aprobar` o `/rechazar` | COMPLETED | Acciones MVC multipart/JSON | Respuesta JSON con estados explícitos | Sólo Administrador, CSRF, token oculto y entrega por correo | P2 |
+| Portal del alumno | `GET, POST registro-alumno` | PENDING | Registro PHP síncrono | Isla con JSON/Pinia y fallback | Validadores de identidad y transacción Usuario/Alumno/Tutor | P2 |
 | Recuperación | `GET, POST recuperar` | PENDING | Formulario PHP síncrono | Isla progresiva con respuesta JSON y estado de envío | Respuesta genérica para no filtrar existencia de cuentas; límites de intentos | P2 |
 | Recuperación | `GET, POST restablecer` | PENDING | Formulario PHP síncrono | Isla progresiva con validación y JSON | Token hash, expiración, uso único y política de contraseña | P2 |
 | Administración | `GET recuperaciones` | PENDING | Listado PHP protegido | Mantener lectura PHP; mejorar acciones sólo cuando haya necesidad | Administrador/Coordinador | P3 |
@@ -158,7 +163,8 @@ flowchart TB
 | Administración | `GET, POST alumnos-centro` | COMPLETED | Formulario PHP para altas por Administrador/Coordinador; contraseña temporal aleatoria de un solo vistazo | Mantener flujo de mejora progresiva | CSRF, validación NIF/DNI/NIE, ciclo activo, curso 1.º/2.º, transacción y auditoría | P2 |
 | Portal del alumno | `GET portal-alumno` | PENDING | Vista PHP de expediente | Mantener render inicial PHP; añadir isla sólo para widgets interactivos | Rol Alumno y datos del propio expediente | P3 |
 | Portal del alumno | `GET, POST perfil-alumno` | COMPLETED | Isla `StudentProfile`, DTO JSON, store `student-profile`, fallback PHP | Mantener contrato y ampliar sólo ante nuevos campos | Validación de expediente y transacción del modelo | P3 |
-| Empresa y ofertas | `GET, POST registro-empresa` | PENDING | Registro PHP síncrono | Isla con contrato JSON y estado Pinia manteniendo fallback | Creación atómica Usuario/Empresa y unicidad de correo/CIF | P2 |
+| Empresa y ofertas | `GET, POST registro-empresa` | COMPLETED | Formulario PHP fallback + isla `AltaEmpresa` y endpoint JSON de sesión | Mantener fallback, validación de CIF/NIF y errores accesibles | Alta atómica pendiente de aprobación; login y módulos privados bloqueados hasta validar | P2 |
+| Administración | `GET solicitudes-empresa`, `POST aprobar-empresa` | COMPLETED | Listado PHP con modal `CompanyApproval`; fallback PHP y endpoint multipart de sesión | Mantener la aprobación sólo en Administrador | Número de convenio, PDF analizado con ClamAV y almacenamiento fuera de `public/` | P1 |
 | Empresa y ofertas | `GET ofertas` | PENDING | Catálogo HTML renderizado por PHP | Mantener render PHP; añadir filtros Vue sólo si se necesita interacción rica | Público; no cargar ofertas privadas | P3 |
 | Empresa y ofertas | `GET, POST publicar-oferta` | PENDING | Formulario PHP; comprobación de convenio en servidor | Isla con validación JSON manteniendo fallback | Requiere convenio aprobado y fechas cubiertas; plazas/ciclo válidos | P1 |
 | Empresa y ofertas | `GET, POST sedes` | PENDING | Gestión PHP síncrona | Isla JSON/Pinia manteniendo fallback | Empresa autenticada; pertenencia de la sede | P2 |
@@ -166,7 +172,7 @@ flowchart TB
 | Empresa y ofertas | `POST revisar-oferta` | IN_PROGRESS | Isla Vue + JSON, sin store Pinia dedicado | Tipar payload y estado en Pinia; conservar fallback | Decisión puede exigir convenio vigente; transacción/auditoría | P2 |
 | Portal del alumno | `GET, POST disponibilidad` | IN_PROGRESS | Isla `AvailabilitySchedule` y JSON, estado de isla no centralizado en Pinia | Store Pinia, reset al desmontar y conservar HTML fallback | Fechas, franjas y turno deben seguir validados por servidor | P2 |
 | Asignaciones | `GET asignaciones` | PENDING | Listado HTML PHP | Mantener lectura PHP; Vue sólo para mutaciones interactivas | Roles Administrador/Coordinador/Observador | P2 |
-| Asignaciones | `GET emparejar` | PENDING | Matching PHP calcula capacidad y candidatos compatibles | Mantener matching PHP; mejoras Vue desacopladas del cálculo autoritativo | Requiere oferta aprobada, disponibilidad/ciclo/turno y plazas | P1 |
+| Asignaciones | `GET emparejar` | PENDING | Matching PHP calcula capacidad y candidatos compatibles | Mantener matching PHP; mejoras Vue desacopladas del cálculo autoritativo | Requiere oferta aprobada, disponibilidad/ciclo/intervalos horarios y plazas | P1 |
 | Portal del alumno | `GET mis-asignaciones` | PENDING | Vista de sólo lectura PHP | Mantener render PHP; enriquecer progresivamente si aporta valor | Filtrado por usuario de sesión | P3 |
 | Portal del alumno | `GET empresa-asignada` | IN_PROGRESS | Isla `AssignedCompany` (montada en `portal.php` si hay una asignación `Asignada`) consume `AsignacionController::empresaAsignada` por JSON con `requestApi`; sin store Pinia | Centralizar estado y tipos en un store Pinia; mantener el listado PHP de asignaciones como render inicial | Sólo rol Alumno; identidad de sesión sin ID de cliente; 404 si no hay práctica activa; sin datos de contacto privados | P3 |
 | Calificaciones | `GET calificaciones` | PENDING | Listado PHP | Mantener render PHP; mejora interactiva aislada | Roles de lectura definidos en la ruta | P2 |

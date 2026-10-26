@@ -20,6 +20,8 @@ require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
 require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
 require_once __DIR__ . '/../app/Controllers/CalificacionController.php';
 require_once __DIR__ . '/../app/Controllers/DisponibilidadController.php';
+require_once __DIR__ . '/../app/Controllers/InicioController.php';
+require_once __DIR__ . '/../app/Controllers/OfertaController.php';
 require_once __DIR__ . '/../app/Controllers/UsuarioAdminController.php';
 require_once __DIR__ . '/../app/Controllers/ActivacionController.php';
 require_once __DIR__ . '/../app/Models/SolicitudReenvioActivacion.php';
@@ -29,11 +31,13 @@ require_once __DIR__ . '/../app/Models/Alumno.php';
 require_once __DIR__ . '/../app/Models/Disponibilidad.php';
 require_once __DIR__ . '/../app/Models/Calificacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
-require_once __DIR__ . '/../app/Models/Empresa.php';
+require_once __DIR__ . '/../app/Models/SolicitudResetPassword.php';
 require_once __DIR__ . '/../app/Models/Usuario.php';
 require_once __DIR__ . '/../app/Models/Especialidad.php';
 require_once __DIR__ . '/../app/Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../app/Controllers/ConvenioController.php';
+require_once __DIR__ . '/../app/Controllers/ConsultaController.php';
+require_once __DIR__ . '/../app/Models/Empresa.php';
 require_once __DIR__ . '/../app/Controllers/WebhookCompanyActivityController.php';
 
 function assertTrue(bool $condition, string $message): void
@@ -48,6 +52,57 @@ require_once __DIR__ . '/file_security.php';
 $db = getPDOConnection();
 $actualDatabase = $db->query('SELECT DATABASE()')->fetchColumn();
 assertTrue($actualDatabase === $testDatabase, 'La conexión no apunta a la base de prueba.');
+require_once __DIR__ . '/../scripts/migrate.php';
+$parsedSql = splitSqlStatements(
+    "INSERT INTO sample (value) VALUES ('one;two');\nSELECT `semi;colon` FROM sample;"
+);
+assertTrue(
+    count($parsedSql) === 2
+        && str_contains($parsedSql[0], 'one;two')
+        && str_contains($parsedSql[1], '`semi;colon`'),
+    'El gestor debe separar sentencias sin dividir los puntos y coma dentro de literales o identificadores.'
+);
+$migrationFiles = glob(__DIR__ . '/../database/migrations/[0-9][0-9][0-9]_*.sql');
+assertTrue(is_array($migrationFiles), 'No se pudieron enumerar las migraciones.');
+foreach ($migrationFiles as $migrationFile) {
+    $parsedMigration = splitSqlStatements((string)file_get_contents($migrationFile));
+    assertTrue($parsedMigration !== [], 'No se pudo analizar la migración ' . basename($migrationFile) . '.');
+}
+$appliedMigrations = $db->query('SELECT version, checksum FROM schema_migrations')->fetchAll(PDO::FETCH_KEY_PAIR);
+foreach ($migrationFiles as $migrationFile) {
+    $migrationVersion = basename($migrationFile);
+    $migrationChecksum = migrationChecksum($migrationFile);
+    assertTrue(
+        is_string($migrationChecksum)
+            && isset($appliedMigrations[$migrationVersion])
+            && hash_equals($appliedMigrations[$migrationVersion], $migrationChecksum),
+        "La migración $migrationVersion no está registrada o su checksum no coincide."
+    );
+}
+$baseTableCollations = $db->query(
+    "SELECT COUNT(*) FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME IN (
+           'alumnos', 'coordinadores', 'direcciones_telefonos', 'empresas',
+           'empresa_especialidades_plazas', 'especialidades', 'tutores_legales', 'usuarios'
+       )
+       AND TABLE_COLLATION <> 'utf8mb4_unicode_ci'"
+)->fetchColumn();
+assertTrue(
+    (int)$baseTableCollations === 0,
+    'Las tablas base deben usar utf8mb4_unicode_ci; ejecuta la migración 009.'
+);
+$offerConstraints = $db->query(
+    "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'empresa_especialidades_plazas'
+       AND CONSTRAINT_TYPE = 'CHECK'
+       AND CONSTRAINT_NAME IN ('chk_oferta_plazas_positivas', 'chk_oferta_fechas')"
+)->fetchColumn();
+assertTrue(
+    (int)$offerConstraints === 2,
+    'Faltan restricciones CHECK de las ofertas; ejecuta la migración 010.'
+);
 $cycles = (new Especialidad($db))->obtenerTodas();
 $dam = array_values(array_filter(
     $cycles,
@@ -74,6 +129,16 @@ foreach ($demoUsers as $demoUser) {
         'La contraseña de demostración no valida para ' . $demoUser['email'] . '.'
     );
 }
+$demoDnis = $db->query(
+    "SELECT dni FROM alumnos WHERE correo IN ('lucas@correo.com', 'sofia@correo.com')"
+)->fetchAll(PDO::FETCH_COLUMN);
+assertTrue(count($demoDnis) === 2, 'Faltan expedientes de alumno de demostración.');
+foreach ($demoDnis as $demoDni) {
+    assertTrue(
+        is_string($demoDni) && SpanishDataValidator::isDniNie($demoDni),
+        'El DNI/NIE de un alumno de demostración no tiene una letra de control válida.'
+    );
+}
 
 $required = [
     'identificador_fiscal_personal' => ['table' => 'usuarios', 'column' => 'identificador_fiscal'],
@@ -91,12 +156,20 @@ $required = [
     'nota' => ['table' => 'calificaciones_fct', 'column' => 'nota'],
     'codigo_postal' => ['table' => 'alumnos', 'column' => 'codigo_postal'],
     'horario_oferta' => ['table' => 'empresa_oferta_horarios_semanales', 'column' => 'hora_inicio'],
+    'jornada_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'jornada'],
+    'fecha_firma_convenio_empresa' => ['table' => 'empresas', 'column' => 'fecha_firma_convenio'],
+    'segunda_hora_inicio_oferta' => ['table' => 'empresa_oferta_horarios_semanales', 'column' => 'hora_inicio_2'],
+    'segunda_hora_fin_oferta' => ['table' => 'empresa_oferta_horarios_semanales', 'column' => 'hora_fin_2'],
     'titulo_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'titulo'],
     'descripcion_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'descripcion'],
     'modalidad_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'modalidad'],
     'ubicacion_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'ubicacion'],
     'requisitos_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'requisitos'],
     'tecnologias_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'tecnologias'],
+    'reset_request_status' => ['table' => 'solicitudes_reset_password', 'column' => 'estado'],
+    'reset_request_token' => ['table' => 'solicitudes_reset_password', 'column' => 'token'],
+    'reset_request_expiry' => ['table' => 'solicitudes_reset_password', 'column' => 'expira_en'],
+    'reset_request_approver' => ['table' => 'solicitudes_reset_password', 'column' => 'aprobado_por'],
 ];
 foreach ($required as $name => $definition) {
     $stmt = $db->prepare(
@@ -110,6 +183,24 @@ foreach ($required as $name => $definition) {
     ]);
     assertTrue((int)$stmt->fetchColumn() === 1, "Falta columna requerida para las migraciones: $name.");
 }
+$jornadaDefault = $db->query(
+    "SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'empresa_especialidades_plazas'
+       AND COLUMN_NAME = 'jornada'"
+)->fetchColumn();
+$nullableSecondIntervalColumns = $db->query(
+    "SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'empresa_oferta_horarios_semanales'
+       AND COLUMN_NAME IN ('hora_inicio_2', 'hora_fin_2')
+       AND IS_NULLABLE = 'YES'"
+)->fetchColumn();
+assertTrue(
+    in_array($jornadaDefault, ['normal', "'normal'"], true)
+        && (int)$nullableSecondIntervalColumns === 2,
+    'La migración debe asignar jornada normal a ofertas existentes y mantener nullable el segundo intervalo.'
+);
 $activationTable = $db->prepare(
     'SELECT COUNT(*) FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table'
@@ -131,6 +222,13 @@ $auditColumns = $db->query(
        )"
 )->fetchColumn();
 assertTrue((int)$auditColumns === 7, 'La tabla audit_logs debe incluir todos los datos de trazabilidad requeridos.');
+$auditRecordNullable = $db->query(
+    "SELECT IS_NULLABLE FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'audit_logs'
+       AND COLUMN_NAME = 'id_registro_modificado'"
+)->fetchColumn();
+assertTrue($auditRecordNullable === 'YES', 'La auditoría debe permitir eventos sin un registro afectado.');
 $webhookTables = $db->query(
     "SELECT COUNT(*) FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('webhook_inbox', 'webhook_outbox')"
@@ -145,6 +243,25 @@ $webhookResponseColumns = $db->query(
 assertTrue((int)$webhookResponseColumns === 3, 'Faltan columnas para conservar las respuestas webhook; ejecuta la migración 009.');
 
 $fixture = bin2hex(random_bytes(5));
+$testYear = (int)(new DateTimeImmutable())->format('Y') + 1;
+$availabilityStart = sprintf('%04d-03-01', $testYear);
+$availabilityEditStart = sprintf('%04d-04-01', $testYear);
+$availabilityEnd = sprintf('%04d-06-30', $testYear);
+$agreementSigned = sprintf('%04d-01-01', $testYear - 1);
+$agreementStart = sprintf('%04d-01-01', $testYear);
+$agreementEnd = sprintf('%04d-12-31', $testYear);
+$offerDateObject = new DateTimeImmutable($availabilityStart);
+while ($offerDateObject->format('N') !== '1') {
+    $offerDateObject = $offerDateObject->modify('+1 day');
+}
+$offerDate = $offerDateObject->modify('+14 days')->format('Y-m-d');
+$minorBirthDate = (new DateTimeImmutable('today'))->modify('-17 years')->format('Y-m-d');
+$underageBirthDate = (new DateTimeImmutable('today'))->modify('-15 years')->format('Y-m-d');
+$dniLetters = 'TRWAGMYFPDXBNJZSQVHLCKE';
+$firstDniNumber = 10000000 + hexdec(substr($fixture, 0, 6));
+$firstStudentDni = sprintf('%08d%s', $firstDniNumber, $dniLetters[$firstDniNumber % 23]);
+$secondDniNumber = $firstDniNumber + 1;
+$secondStudentDni = sprintf('%08d%s', $secondDniNumber, $dniLetters[$secondDniNumber % 23]);
 $emails = [
     "company-$fixture@example.test",
     "student-a-$fixture@example.test",
@@ -161,6 +278,9 @@ $createdStaffUsers = [];
 $createdCompany = null;
 $createdStudents = [];
 $createdOffer = null;
+$createdWebhookOffer = null;
+$createdExpiredOffer = null;
+$createdPaginationOffers = [];
 $createdAgreementId = null;
 $createdAssignmentId = null;
 $createdCycleId = null;
@@ -319,6 +439,123 @@ try {
     $createdUsers[] = (int)$db->lastInsertId();
     $addUser->execute(['email' => $emails[6], 'hash' => $roleHash, 'role' => 'Observador']);
     $createdUsers[] = (int)$db->lastInsertId();
+
+    $recoveryIndex = $db->prepare(
+        "SELECT COUNT(*) FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = 'solicitudes_reset_password'
+           AND INDEX_NAME = 'uq_reset_token' AND NON_UNIQUE = 0"
+    );
+    $recoveryIndex->execute(['schema' => $testDatabase]);
+    assertTrue((int)$recoveryIndex->fetchColumn() === 1, 'Falta el índice único para tokens de recuperación.');
+
+    $recoveryNow = new DateTimeImmutable();
+    $oldRecovery = $db->prepare(
+        "INSERT INTO solicitudes_reset_password
+            (usuario_id, email, estado, solicitado_en)
+         VALUES (:usuario, :email, 'Expirada', :solicitado)"
+    );
+    $oldRecovery->execute([
+        'usuario' => $createdUsers[1],
+        'email' => $emails[1],
+        'solicitado' => $recoveryNow->modify('-' . (SolicitudResetPassword::RETENCION_DIAS + 1) . ' days')->format('Y-m-d H:i:s'),
+    ]);
+    $recoveryModel = new SolicitudResetPassword($db);
+    $recoveryModel->solicitar($emails[1], $recoveryNow);
+    $recoveryModel->solicitar($emails[0], $recoveryNow);
+    $recoveryModel->solicitar($emails[0], $recoveryNow);
+    $recoveryCount = $db->prepare(
+        "SELECT COUNT(*) FROM solicitudes_reset_password
+         WHERE usuario_id = :usuario AND estado = 'Pendiente_Aprobacion'"
+    );
+    $recoveryCount->execute(['usuario' => $createdUsers[1]]);
+    assertTrue(
+        (int)$recoveryCount->fetchColumn() === 1,
+        'La limpieza debe eliminar solicitudes antiguas sin bloquear una nueva solicitud.'
+    );
+    $recoveryCount->execute(['usuario' => $createdUsers[0]]);
+    assertTrue(
+        (int)$recoveryCount->fetchColumn() === 1,
+        'Las solicitudes repetidas de recuperación deben conservar una sola petición pendiente.'
+    );
+    $recoveryId = (int)$db->query(
+        "SELECT id FROM solicitudes_reset_password
+         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente_Aprobacion'"
+    )->fetchColumn();
+    $approvedReset = $recoveryModel->aprobar($recoveryId, $createdUsers[4]);
+    $recoveryToken = is_array($approvedReset) ? $approvedReset['token'] : null;
+    $approvedResetState = $db->prepare(
+        'SELECT estado, token, expira_en, aprobado_en, aprobado_por,
+                TIMESTAMPDIFF(SECOND, aprobado_en, expira_en) AS validez_segundos
+         FROM solicitudes_reset_password WHERE id = :id'
+    );
+    $approvedResetState->execute(['id' => $recoveryId]);
+    $approvedResetRow = $approvedResetState->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_string($recoveryToken) && strlen($recoveryToken) === 64
+            && is_array($approvedResetRow)
+            && $approvedResetRow['estado'] === 'Aprobada'
+            && $approvedResetRow['token'] === hash('sha256', $recoveryToken)
+            && (int)$approvedResetRow['aprobado_por'] === $createdUsers[4]
+            && (int)$approvedResetRow['validez_segundos'] === 86400
+            && $recoveryModel->vigente($recoveryToken, new DateTimeImmutable()),
+        'La aprobación debe guardar solo el hash del token, el administrador y una validez exacta de 24 horas.'
+    );
+    assertTrue(
+        $recoveryModel->consumir($recoveryToken, 'ResetPassword123!', new DateTimeImmutable()) === $emails[0]
+            && password_verify(
+                'ResetPassword123!',
+                (string)$db->query(
+                    'SELECT password_hash FROM usuarios WHERE id = ' . $createdUsers[0]
+                )->fetchColumn()
+            ),
+        'Restablecer una cuenta debe cambiar la contraseña y consumir el enlace de un solo uso.'
+    );
+    $usedResetState = $db->prepare('SELECT estado, token FROM solicitudes_reset_password WHERE id = :id');
+    $usedResetState->execute(['id' => $recoveryId]);
+    $usedResetRow = $usedResetState->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_array($usedResetRow)
+            && $usedResetRow['estado'] === 'Usada'
+            && $usedResetRow['token'] === null
+            && $recoveryModel->consumir($recoveryToken, 'ResetPassword123!', new DateTimeImmutable()) === null,
+        'Un token consumido debe invalidarse inmediatamente.'
+    );
+
+    $recoveryModel->solicitar($emails[0], new DateTimeImmutable());
+    $expiryRequestId = (int)$db->query(
+        "SELECT id FROM solicitudes_reset_password
+         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente_Aprobacion'
+         ORDER BY solicitado_en DESC LIMIT 1"
+    )->fetchColumn();
+    $expiryRequest = $recoveryModel->aprobar($expiryRequestId, $createdUsers[4]);
+    $forceExpired = $db->prepare(
+        'UPDATE solicitudes_reset_password
+         SET expira_en = DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 SECOND) WHERE id = :id'
+    );
+    $forceExpired->execute(['id' => $expiryRequestId]);
+    assertTrue(
+        is_array($expiryRequest)
+            && !$recoveryModel->vigente($expiryRequest['token'], new DateTimeImmutable())
+            && $db->query(
+                'SELECT estado FROM solicitudes_reset_password WHERE id = ' . $expiryRequestId
+            )->fetchColumn() === 'Expirada',
+        'Un enlace vencido debe marcarse Expirada y dejar de ser válido.'
+    );
+
+    $recoveryModel->solicitar($emails[0], new DateTimeImmutable());
+    $rejectRequestId = (int)$db->query(
+        "SELECT id FROM solicitudes_reset_password
+         WHERE usuario_id = " . $createdUsers[0] . " AND estado = 'Pendiente_Aprobacion'
+         ORDER BY solicitado_en DESC LIMIT 1"
+    )->fetchColumn();
+    assertTrue(
+        $recoveryModel->rechazar($rejectRequestId, $createdUsers[4])
+            && $db->query(
+                'SELECT estado FROM solicitudes_reset_password WHERE id = ' . $rejectRequestId
+            )->fetchColumn() === 'Rechazada',
+        'El Administrador debe poder rechazar la solicitud pendiente.'
+    );
+
     $coordinatorProfile = $db->prepare(
         'INSERT INTO coordinadores (usuario_id, nombre, apellidos) VALUES (:usuario, :nombre, :apellidos)'
     );
@@ -413,8 +650,8 @@ try {
     assertTrue($specialtyModel->existe($cycleId), 'Un ciclo reactivado debe volver a estar disponible.');
 
     $companyInsert = $db->prepare(
-        'INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto)
-         VALUES (:usuario, :nombre, :cif, :contacto)'
+        "INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto, estado)
+         VALUES (:usuario, :nombre, :cif, :contacto, 'Aprobada')"
     );
     $companyInsert->execute([
         'usuario' => $createdUsers[0],
@@ -435,6 +672,34 @@ try {
             && $listedTestCompany['email'] === $emails[0]
             && (int)$listedTestCompany['activo'] === 1,
         'El directorio del centro debe listar los perfiles de empresa con su cuenta y estado.'
+    );
+
+    $invalidOfferInsert = $db->prepare(
+        "INSERT INTO empresa_especialidades_plazas
+            (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno, estado)
+         VALUES (:empresa, :ciclo, :plazas, :inicio, :fin, 'M', 'Pendiente')"
+    );
+    $invalidOfferRejected = [];
+    foreach ([
+        ['plazas' => 0, 'inicio' => '2027-03-15', 'fin' => '2027-03-15'],
+        ['plazas' => 1, 'inicio' => '2027-03-16', 'fin' => '2027-03-15'],
+    ] as $invalidOffer) {
+        try {
+            $invalidOfferInsert->execute([
+                'empresa' => $createdCompany,
+                'ciclo' => $cycleId,
+                'plazas' => $invalidOffer['plazas'],
+                'inicio' => $invalidOffer['inicio'],
+                'fin' => $invalidOffer['fin'],
+            ]);
+            $invalidOfferRejected[] = false;
+        } catch (PDOException) {
+            $invalidOfferRejected[] = true;
+        }
+    }
+    assertTrue(
+        $invalidOfferRejected === [true, true],
+        'La base debe rechazar ofertas sin plazas o con fechas incoherentes.'
     );
 
     $studentInsert = $db->prepare(
@@ -554,7 +819,7 @@ try {
         'Ángela',
         "O'Connor",
         '2005-01-01',
-        '12345678Z',
+        $firstStudentDni,
         '12345-67890',
         '612345678',
         'Calle O’Donnell, 1',
@@ -565,7 +830,7 @@ try {
         $updatedProfile !== null
             && $updatedProfile['nombre'] === 'Ángela'
             && $updatedProfile['apellidos'] === "O'Connor"
-            && $updatedProfile['dni'] === '12345678Z'
+            && $updatedProfile['dni'] === $firstStudentDni
             && $updatedProfile['codigo_postal'] === '28013'
             && $updatedProfile['telefono'] === '612345678',
         'La edición del perfil debe guardar los datos personales, postales y de contacto.'
@@ -578,7 +843,7 @@ try {
             'Cambio parcial',
             "O'Connor",
             '2005-01-01',
-            '12345678Z',
+            $firstStudentDni,
             '12345-67890',
             '612345678',
             'Calle O’Donnell, 1',
@@ -601,7 +866,11 @@ try {
     assertTrue(
         is_string($profileHtml)
             && str_contains($profileHtml, 'Ángela')
-            && str_contains($profileHtml, '28013')
+            && str_contains($profileHtml, 'value="28013"')
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="profile-dni")(?=[^>]*\bmaxlength="20")[^>]*>/',
+                $profileHtml
+            ) === 1
             && str_contains($profileHtml, 'data-vue-island="StudentProfile"'),
         'El formulario de perfil debe cargar los datos que se pueden editar.'
     );
@@ -623,15 +892,71 @@ try {
     assertTrue(
         is_string($invalidProfileHtml)
             && str_contains($invalidProfileHtml, 'aria-invalid="true"')
-            && str_contains($invalidProfileHtml, 'letra de control válida'),
+            && str_contains($invalidProfileHtml, 'con letra de control'),
         'Los datos inválidos deben marcar el campo y mostrar feedback específico sin guardar.'
     );
     assertTrue(
-        $studentModel->obtenerPorUsuario($createdUsers[1])['dni'] === '12345678Z',
+        $studentModel->obtenerPorUsuario($createdUsers[1])['dni'] === $firstStudentDni,
         'Un DNI/NIE inválido no debe modificar el expediente.'
     );
+    $_POST = [
+        'email' => $emails[1],
+        'nombre' => 'Ángela',
+        'apellidos' => "O'Connor",
+        'fecha_nacimiento' => '2005-01-01',
+        'dni' => $firstStudentDni,
+        'nss' => '12345-67890',
+        'telefono' => '------------612345678',
+        'direccion' => 'Calle O’Donnell, 1',
+        'codigo_postal' => '28013',
+    ];
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $longStudentPhoneHtml = (string)ob_get_clean();
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="profile-phone")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $longStudentPhoneHtml
+        ) === 1
+            && str_contains($longStudentPhoneHtml, 'Introduce un teléfono español válido de hasta 20 caracteres.')
+            && $studentModel->obtenerPorUsuario($createdUsers[1])['telefono'] === '612345678',
+        'El perfil debe rechazar teléfonos normalizados válidos que superen su maxlength y no guardarlos.'
+    );
+    $_POST['telefono'] = '612345678';
+    $_POST['dni'] = implode('--', str_split($firstStudentDni));
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $longStudentDniHtml = (string)ob_get_clean();
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="profile-dni")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $longStudentDniHtml
+        ) === 1
+            && str_contains($longStudentDniHtml, 'DNI/NIE válido de hasta 20 caracteres')
+            && $studentModel->obtenerPorUsuario($createdUsers[1])['dni'] === $firstStudentDni,
+        'El perfil debe rechazar DNI/NIE largos aunque la normalización produzca un documento válido.'
+    );
+    $_POST = [
+        'email' => $emails[1],
+        'nombre' => 'Ángela',
+        'apellidos' => "O'Connor",
+        'fecha_nacimiento' => '2005-01-01',
+        'dni' => $firstStudentDni,
+        'nss' => "NSS-$fixture-2",
+        'telefono' => '612345678',
+        'direccion' => 'Calle O’Donnell, 1',
+        'codigo_postal' => '28013',
+    ];
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $duplicateNssHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($duplicateNssHtml, 'correo, DNI/NIE o número de Seguridad Social')
+            && $studentModel->obtenerPorUsuario($createdUsers[1])['numero_seguridad_social'] === '12345-67890',
+        'Una colisión de NSS debe explicar el motivo y dejar intacto el perfil.'
+    );
     $db->prepare('UPDATE alumnos SET fecha_nacimiento = :nacimiento WHERE id = :id')
-        ->execute(['nacimiento' => '2010-01-01', 'id' => $createdStudents[1]]);
+        ->execute(['nacimiento' => $minorBirthDate, 'id' => $createdStudents[1]]);
     $legacyGuardian = $db->prepare(
         'INSERT INTO tutores_legales
             (alumno_id, nombre_completo, direccion, telefono, dni, numero_seguridad_social, correo)
@@ -660,8 +985,8 @@ try {
         'email' => $emails[2],
         'nombre' => 'Alumno',
         'apellidos' => 'Apellidos Legado',
-        'fecha_nacimiento' => '2010-01-01',
-        'dni' => '87654321X',
+        'fecha_nacimiento' => $minorBirthDate,
+        'dni' => $secondStudentDni,
         'nss' => "NSS-$fixture-2",
         'telefono' => '612345679',
         'direccion' => 'Calle Nueva 2',
@@ -679,13 +1004,55 @@ try {
         str_contains($incompleteGuardianHtml, 'name="tutor_dni"'),
         'El formulario debe conservar acceso a la corrección de los datos del tutor legal.'
     );
+    $_POST['tutor_nombre'] = 'Tutor legado';
+    $_POST['tutor_dni'] = '12345678A';
+    $_POST['tutor_nss'] = '12345-67890';
+    $_POST['tutor_direccion'] = 'Calle Tutor 2';
+    $_POST['tutor_telefono'] = '612345670';
+    $_POST['tutor_correo'] = 'tutor@example.test';
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $invalidGuardianHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($invalidGuardianHtml, 'id="profile-guardian-dni"')
+            && str_contains($invalidGuardianHtml, 'aria-invalid="true"')
+            && str_contains($invalidGuardianHtml, 'DNI/NIE válido de hasta 20 caracteres')
+            && str_contains($invalidGuardianHtml, 'value="12345678A"'),
+        'Un DNI/NIE de tutor inválido debe señalar el campo y conservar el valor para corregirlo.'
+    );
+    $_POST['tutor_dni'] = implode('--', str_split('12345678Z'));
+    $_POST['tutor_telefono'] = '612345670';
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $longGuardianDniHtml = (string)ob_get_clean();
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="profile-guardian-dni")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $longGuardianDniHtml
+        ) === 1
+            && str_contains($longGuardianDniHtml, 'DNI/NIE válido de hasta 20 caracteres'),
+        'El perfil del menor debe limitar la longitud original del DNI/NIE de tutor.'
+    );
+    $_POST['tutor_dni'] = '12345678Z';
+    $_POST['tutor_telefono'] = '------------612345670';
+    ob_start();
+    (new AlumnoController($db))->editarPerfil();
+    $longGuardianPhoneHtml = (string)ob_get_clean();
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="profile-guardian-phone")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $longGuardianPhoneHtml
+        ) === 1
+            && str_contains($longGuardianPhoneHtml, 'Introduce un teléfono español válido de hasta 20 caracteres.'),
+        'El perfil del menor debe rechazar los teléfonos largos de tutor tras normalización.'
+    );
     $studentModel->actualizarPerfil(
         $createdUsers[2],
         $emails[2],
         'Alumno',
         'Apellidos Legado',
-        '2010-01-01',
-        '87654321X',
+        $minorBirthDate,
+        $secondStudentDni,
         "NSS-$fixture-2",
         '612345679',
         'Calle Nueva 2',
@@ -713,6 +1080,236 @@ try {
         'Guardar el perfil del menor debe completar el tutor legado dentro de la misma operación.'
     );
     $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_SESSION = [];
+    $_POST = [];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $registrationHtml = (string)ob_get_clean();
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="student-dni")(?=[^>]*\bmaxlength="20")[^>]*>/',
+            $registrationHtml
+        ) === 1
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-guardian-dni")(?=[^>]*\bmaxlength="20")[^>]*>/',
+                $registrationHtml
+            ) === 1,
+        'El registro debe permitir los separadores admitidos en DNI/NIE del alumno y del tutor.'
+    );
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_GET = [];
+    $_POST = [
+        'email' => "new-student-$fixture@example.test",
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Nuevo Alumno',
+        'apellidos' => 'Prueba de Registro',
+        'dni' => sprintf(
+            '%08d%s',
+            $secondDniNumber + 1,
+            $dniLetters[($secondDniNumber + 1) % 23]
+        ),
+        'nss' => "REG-$fixture-1",
+        'telefono' => '612345671',
+        'direccion' => 'Calle de prueba 1',
+        'codigo_postal' => '28013',
+        'fecha_nacimiento' => $minorBirthDate,
+        'especialidad_id' => (string)$cycleId,
+        'tutor_nombre' => 'Tutor de Prueba',
+        'tutor_dni' => '12345678A',
+        'tutor_nss' => 'NSS!',
+        'tutor_correo' => 'tutor-registro@example.test',
+        'tutor_direccion' => 'Calle Tutor 1',
+        'tutor_telefono' => '612345672',
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $invalidGuardianRegistrationHtml = (string)ob_get_clean();
+    $invalidGuardianAccountCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $invalidGuardianAccountCount->execute(['email' => $_POST['email']]);
+    assertTrue(
+        str_contains($invalidGuardianRegistrationHtml, 'Comprueba los datos del tutor indicados.')
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-guardian-nss")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $invalidGuardianRegistrationHtml
+            ) === 1
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-guardian-dni")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $invalidGuardianRegistrationHtml
+            ) === 1
+            && str_contains($invalidGuardianRegistrationHtml, 'Introduce un número de Seguridad Social válido')
+            && str_contains($invalidGuardianRegistrationHtml, 'Introduce un DNI/NIE con una letra de control válida.')
+            && !str_contains($invalidGuardianRegistrationHtml, 'value="NSS!"')
+            && !str_contains($invalidGuardianRegistrationHtml, 'value="12345678A"')
+            && !str_contains($invalidGuardianRegistrationHtml, 'value="ValidStudentPassword123"')
+            && (int)$invalidGuardianAccountCount->fetchColumn() === 0,
+        'Los errores de DNI/NIE y NSS del tutor deben señalar ambos campos e impedir crear la cuenta.'
+    );
+    $_POST = [
+        'email' => "invalid-student-$fixture@example.test",
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Nuevo Alumno',
+        'apellidos' => 'Prueba de Validación',
+        'dni' => sprintf(
+            '%08d%s',
+            $secondDniNumber + 3,
+            $dniLetters[($secondDniNumber + 3) % 23]
+        ),
+        'nss' => "REG-$fixture-3",
+        'telefono' => '------------612345678',
+        'direccion' => 'Calle de prueba 3',
+        'codigo_postal' => '99999',
+        'fecha_nacimiento' => '2099-01-01',
+        'especialidad_id' => (string)$cycleId,
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $invalidStudentRegistrationHtml = (string)ob_get_clean();
+    $invalidStudentAccountCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $invalidStudentAccountCount->execute(['email' => $_POST['email']]);
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="student-phone")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $invalidStudentRegistrationHtml
+        ) === 1
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-postcode")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $invalidStudentRegistrationHtml
+            ) === 1
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-birth-date")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $invalidStudentRegistrationHtml
+            ) === 1
+            && str_contains($invalidStudentRegistrationHtml, 'Introduce un teléfono español válido de hasta 20 caracteres.')
+            && str_contains($invalidStudentRegistrationHtml, 'código postal español válido')
+            && str_contains($invalidStudentRegistrationHtml, 'La fecha de nacimiento no puede ser futura.')
+            && (int)$invalidStudentAccountCount->fetchColumn() === 0,
+        'El registro debe señalar todos los campos inválidos y no crear la cuenta.'
+    );
+    $malformedEmail = "malformed-email-$fixture@example.test";
+    $_POST = [
+        'email' => ['malformed'],
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Nuevo Alumno',
+        'apellidos' => 'Entrada no válida',
+        'dni' => sprintf(
+            '%08d%s',
+            $secondDniNumber + 4,
+            $dniLetters[($secondDniNumber + 4) % 23]
+        ),
+        'nss' => "REG-$fixture-5",
+        'telefono' => '612345675',
+        'direccion' => 'Calle de prueba 5',
+        'codigo_postal' => '28013',
+        'fecha_nacimiento' => '2000-01-01',
+        'especialidad_id' => (string)$cycleId,
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $malformedEmailHtml = (string)ob_get_clean();
+    $malformedEmailCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $malformedEmailCount->execute(['email' => $malformedEmail]);
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="student-email")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $malformedEmailHtml
+        ) === 1
+            && str_contains($malformedEmailHtml, 'Este campo debe contener un único valor de texto.')
+            && (int)$malformedEmailCount->fetchColumn() === 0,
+        'Un campo enviado con tipo incorrecto debe señalarse y detener el registro.'
+    );
+    $underageEmail = "underage-student-$fixture@example.test";
+    $_POST = [
+        'email' => $underageEmail,
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Alumno Menor',
+        'apellidos' => 'Edad Insuficiente',
+        'dni' => sprintf(
+            '%08d%s',
+            $secondDniNumber + 5,
+            $dniLetters[($secondDniNumber + 5) % 23]
+        ),
+        'nss' => "REG-$fixture-6",
+        'telefono' => '612345676',
+        'direccion' => 'Calle de prueba 6',
+        'codigo_postal' => '28013',
+        'fecha_nacimiento' => $underageBirthDate,
+        'especialidad_id' => (string)$cycleId,
+        'tutor_nss' => 'NSS!',
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $underageRegistrationHtml = (string)ob_get_clean();
+    $underageAccountCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $underageAccountCount->execute(['email' => $underageEmail]);
+    assertTrue(
+        str_contains($underageRegistrationHtml, 'El alumno debe tener al menos 16 años.')
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-birth-date")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $underageRegistrationHtml
+            ) === 1
+            && (int)$underageAccountCount->fetchColumn() === 0,
+        'La edad mínima debe mostrarse junto a la fecha antes de validar los datos del tutor.'
+    );
+    $_POST = [
+        'email' => $emails[1],
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Nuevo Alumno',
+        'apellidos' => 'Prueba de Registro',
+        'dni' => sprintf(
+            '%08d%s',
+            $secondDniNumber + 2,
+            $dniLetters[($secondDniNumber + 2) % 23]
+        ),
+        'nss' => "REG-$fixture-2",
+        'telefono' => '612345673',
+        'direccion' => 'Calle de prueba 2',
+        'codigo_postal' => '28013',
+        'fecha_nacimiento' => '2000-01-01',
+        'especialidad_id' => (string)$cycleId,
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $duplicateRegistrationHtml = (string)ob_get_clean();
+    $duplicateRegistrationCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $duplicateRegistrationCount->execute(['email' => $emails[1]]);
+    assertTrue(
+        str_contains($duplicateRegistrationHtml, 'El correo indicado ya está asociado')
+            && preg_match(
+                '/<input\b(?=[^>]*\bid="student-email")(?=[^>]*\baria-invalid="true")[^>]*>/',
+                $duplicateRegistrationHtml
+            ) === 1
+            && str_contains($duplicateRegistrationHtml, 'Este correo electrónico ya está registrado.')
+            && (int)$duplicateRegistrationCount->fetchColumn() === 1,
+        'Un correo duplicado debe señalar el campo, informar del conflicto y evitar crear otra cuenta.'
+    );
+    $_POST = [
+        'email' => "duplicate-dni-$fixture@example.test",
+        'password' => 'ValidStudentPassword123',
+        'nombre' => 'Nuevo Alumno',
+        'apellidos' => 'DNI Duplicado',
+        'dni' => $firstStudentDni,
+        'nss' => "REG-$fixture-4",
+        'telefono' => '612345674',
+        'direccion' => 'Calle de prueba 4',
+        'codigo_postal' => '28013',
+        'fecha_nacimiento' => '2000-01-01',
+        'especialidad_id' => (string)$cycleId,
+    ];
+    ob_start();
+    (new AlumnoController($db))->registrar();
+    $duplicateDniRegistrationHtml = (string)ob_get_clean();
+    $duplicateDniAccountCount = $db->prepare('SELECT COUNT(*) FROM usuarios WHERE email = :email');
+    $duplicateDniAccountCount->execute(['email' => $_POST['email']]);
+    assertTrue(
+        preg_match(
+            '/<input\b(?=[^>]*\bid="student-dni")(?=[^>]*\baria-invalid="true")[^>]*>/',
+            $duplicateDniRegistrationHtml
+        ) === 1
+            && str_contains($duplicateDniRegistrationHtml, 'Este DNI/NIE ya está asociado a otro expediente.')
+            && (int)$duplicateDniAccountCount->fetchColumn() === 0,
+        'Un DNI/NIE duplicado debe señalar el campo y revertir el alta completa.'
+    );
+    $_SERVER['REQUEST_METHOD'] = 'GET';
     $_POST = [];
     $_GET = [];
     $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno'];
@@ -730,7 +1327,7 @@ try {
     $availability = $db->prepare(
         "INSERT INTO alumno_disponibilidad
             (alumno_id, fecha_inicio, fecha_fin, turno, es_indiferente)
-         VALUES (:alumno, '2027-03-01', '2027-06-30', 'M', FALSE)"
+         VALUES (:alumno, :inicio, :fin, 'M', FALSE)"
     );
     $weeklySchedule = $db->prepare(
         "INSERT INTO alumno_disponibilidad_semanal
@@ -738,7 +1335,11 @@ try {
          VALUES (:periodo, :dia_semana, :hora_inicio, :hora_fin)"
     );
     foreach ($createdStudents as $index => $studentId) {
-        $availability->execute(['alumno' => $studentId]);
+        $availability->execute([
+            'alumno' => $studentId,
+            'inicio' => $availabilityStart,
+            'fin' => $availabilityEnd,
+        ]);
         $weeklySchedule->execute([
             'periodo' => (int)$db->lastInsertId(),
             'dia_semana' => 1,
@@ -802,7 +1403,11 @@ try {
             && !str_contains($newStudentAvailabilityHtml, 'name="horarios[1][activo]" value="1" aria-label="Lunes" disabled'),
         'Un alumno sin disponibilidad debe recibir horarios editables y no indiferentes por defecto.'
     );
-    $availability->execute(['alumno' => $createdStudents[1]]);
+    $availability->execute([
+        'alumno' => $createdStudents[1],
+        'inicio' => $availabilityStart,
+        'fin' => $availabilityEnd,
+    ]);
     $weeklySchedule->execute([
         'periodo' => (int)$db->lastInsertId(),
         'dia_semana' => 1,
@@ -874,8 +1479,8 @@ try {
     $_SERVER['REQUEST_METHOD'] = 'POST';
     $_SERVER['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
     $_POST = [
-        'fecha_inicio' => '2027-04-01',
-        'fecha_fin' => '2027-06-30',
+        'fecha_inicio' => $availabilityEditStart,
+        'fecha_fin' => $availabilityEnd,
         'turno' => 'Indiferente',
         'es_indiferente' => '0',
         'horarios' => [
@@ -893,17 +1498,42 @@ try {
         count($availabilityModel->obtenerPorUsuario($createdUsers[1])) === 1,
         'Una franja horaria inválida no debe sobrescribir la disponibilidad persistida.'
     );
+    $futureStart = (new DateTimeImmutable('tomorrow'))->format('Y-m-d');
+    $futureEnd = (new DateTimeImmutable('tomorrow + 30 days'))->format('Y-m-d');
+    $_POST = [
+        'fecha_inicio' => $futureStart,
+        'fecha_fin' => $futureEnd,
+        'turno' => 'Indiferente',
+        'horarios' => [
+            '1' => ['activo' => '1', 'hora_inicio' => '08:00', 'hora_fin' => '12:00'],
+            '+1' => ['activo' => '1', 'hora_inicio' => '13:00', 'hora_fin' => '17:00'],
+        ],
+    ];
+    ob_start();
+    (new DisponibilidadController($db))->gestionar();
+    $duplicateDayHtml = ob_get_clean();
+    assertTrue(
+        is_string($duplicateDayHtml) && str_contains($duplicateDayHtml, 'cada día de la semana una sola vez'),
+        'El servidor debe rechazar claves distintas que representan el mismo día de la semana.'
+    );
+    assertTrue(
+        count($availabilityModel->obtenerHorarioSemanalPorUsuario($createdUsers[1])) === 1,
+        'Un día semanal duplicado no debe sobrescribir la disponibilidad persistida.'
+    );
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_POST = [];
 
     $agreement = $db->prepare(
         "INSERT INTO convenios (empresa_id, especialidad_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path, estado)
-         VALUES (:empresa, :especialidad, :numero, '2026-01-01', '2027-01-01', '2027-12-31', 'test-placeholder.pdf', 'Pendiente')"
+         VALUES (:empresa, :especialidad, :numero, :firma, :inicio, :fin, 'test-placeholder.pdf', 'Pendiente')"
     );
     $agreement->execute([
         'empresa' => $createdCompany,
         'especialidad' => $cycleId,
         'numero' => "AG-$fixture",
+        'firma' => $agreementSigned,
+        'inicio' => $agreementStart,
+        'fin' => $agreementEnd,
     ]);
     $agreementId = (int)$db->lastInsertId();
     $createdAgreementId = $agreementId;
@@ -939,7 +1569,12 @@ try {
     );
     $companyModel = new Empresa($db);
     assertTrue(
-        $companyModel->tieneConvenioParaFechas($createdCompany, $cycleId, '2027-03-15', '2027-06-15'),
+        $companyModel->tieneConvenioParaFechas(
+            $createdCompany,
+            $cycleId,
+            $offerDate,
+            (new DateTimeImmutable($offerDate))->modify('+3 months')->format('Y-m-d')
+        ),
         'Un convenio aprobado del mismo ciclo y periodo debe cubrir la oferta.'
     );
     $duplicateAgreementRejected = false;
@@ -947,12 +1582,15 @@ try {
         $duplicate = $db->prepare(
             "INSERT INTO convenios
                 (empresa_id, especialidad_id, numero_convenio, fecha_firma, fecha_inicio, fecha_fin, archivo_path)
-             VALUES (:empresa, :especialidad, :numero, '2026-01-01', '2027-01-01', '2027-12-31', 'duplicate-placeholder.pdf')"
+             VALUES (:empresa, :especialidad, :numero, :firma, :inicio, :fin, 'duplicate-placeholder.pdf')"
         );
         $duplicate->execute([
             'empresa' => $createdCompany,
             'especialidad' => $cycleId,
             'numero' => "AG-DUP-$fixture",
+            'firma' => $agreementSigned,
+            'inicio' => $agreementStart,
+            'fin' => $agreementEnd,
         ]);
     } catch (PDOException $e) {
         $duplicateAgreementRejected = $e->getCode() === '23000';
@@ -966,7 +1604,12 @@ try {
     )->fetchColumn();
     if ($otherCycleId > 0) {
         assertTrue(
-            !$companyModel->tieneConvenioParaFechas($createdCompany, $otherCycleId, '2027-03-15', '2027-06-15'),
+            !$companyModel->tieneConvenioParaFechas(
+                $createdCompany,
+                $otherCycleId,
+                $offerDate,
+                (new DateTimeImmutable($offerDate))->modify('+3 months')->format('Y-m-d')
+            ),
             'Un convenio de otro ciclo no debe cubrir la oferta.'
         );
     }
@@ -980,6 +1623,47 @@ try {
         'direccion' => 'Dirección de prueba',
     ]);
 
+    $offer = $db->prepare(
+        "INSERT INTO empresa_especialidades_plazas
+            (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno, estado)
+         VALUES (:empresa, :ciclo, 1, :inicio, :fin, 'M', 'Pendiente')"
+    );
+    $offer->execute([
+        'empresa' => $createdCompany,
+        'ciclo' => $cycleId,
+        'inicio' => $offerDate,
+        'fin' => $offerDate,
+    ]);
+    $createdWebhookOffer = (int)$db->lastInsertId();
+
+    $previousWebhookDestination = getenv('FCT_WEBHOOK_OUTBOUND_URL');
+    putenv('FCT_WEBHOOK_OUTBOUND_URL=https://receiver.example.test/webhooks');
+    $db->beginTransaction();
+    try {
+        Webhook::enqueue($db, 'oferta.revisada', [
+            'oferta_id' => $createdWebhookOffer,
+            'estado' => 'Aprobada',
+        ]);
+        $companyTaggedEvent = $db->query(
+            "SELECT payload FROM webhook_outbox
+             WHERE event_type = 'oferta.revisada'
+               AND CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.data.oferta_id')) AS UNSIGNED) = $createdWebhookOffer
+             ORDER BY created_at DESC, event_id DESC
+             LIMIT 1"
+        )->fetchColumn();
+        assertTrue(
+            is_string($companyTaggedEvent)
+                && (int)json_decode($companyTaggedEvent, true, 16, JSON_THROW_ON_ERROR)['data']['empresa_id'] === $createdCompany,
+            'Los eventos de oferta revisada deben incluir el ID de su empresa para agruparlos.'
+        );
+    } finally {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        putenv($previousWebhookDestination === false
+            ? 'FCT_WEBHOOK_OUTBOUND_URL'
+            : 'FCT_WEBHOOK_OUTBOUND_URL=' . $previousWebhookDestination);
+    }
     $matching = new Oferta($db);
     $createdOffer = $matching->crearOferta(
         $createdCompany,
@@ -989,12 +1673,19 @@ try {
         '2027-03-15',
         "Oferta de prueba $fixture",
         'Descripción de prueba de la oferta.',
-        'P',
+        'Indiferente',
         'Híbrido',
         'Madrid',
         'Trabajo en equipo.',
         'PHP, Vue',
-        [['dia_semana' => 1, 'hora_inicio' => '09:00:00', 'hora_fin' => '13:00:00']]
+        [[
+            'dia_semana' => 1,
+            'hora_inicio' => '09:00:00',
+            'hora_fin' => '11:00:00',
+            'hora_inicio_2' => '12:00:00',
+            'hora_fin_2' => '13:00:00',
+        ]],
+        'partida'
     );
     $savedOffer = array_values(array_filter(
         $matching->obtenerPorEmpresa($createdCompany),
@@ -1004,12 +1695,97 @@ try {
         $savedOffer !== null
             && $savedOffer['titulo'] === "Oferta de prueba $fixture"
             && $savedOffer['descripcion'] === 'Descripción de prueba de la oferta.'
-            && $savedOffer['turno'] === 'P'
             && $savedOffer['modalidad'] === 'Híbrido'
             && $savedOffer['ubicacion'] === 'Madrid'
             && $savedOffer['requisitos'] === 'Trabajo en equipo.'
-            && $savedOffer['tecnologias'] === 'PHP, Vue',
+            && $savedOffer['tecnologias'] === 'PHP, Vue'
+            && $savedOffer['jornada'] === 'partida',
         'La oferta debe persistir sus detalles completos.'
+    );
+    $savedSchedule = $matching->obtenerHorarioSemanal($createdOffer);
+    assertTrue(
+        count($savedSchedule) === 1
+            && $savedSchedule[0]['hora_inicio_2'] === '12:00:00'
+            && $savedSchedule[0]['hora_fin_2'] === '13:00:00',
+        'La jornada partida debe persistir su segunda franja semanal.'
+    );
+    $_SESSION = ['usuario_id' => $createdUsers[3]];
+    $publishOffer = new ReflectionMethod(OfertaController::class, 'procesarPublicacion');
+    $publishOffer->setAccessible(true);
+    $offerDate = '2027-03-15';
+    $splitOfferRequest = [
+        'especialidad_id' => (string)$cycleId,
+        'plazas' => '1',
+        'fecha_inicio' => $offerDate,
+        'fecha_fin' => (new DateTimeImmutable($offerDate))->modify('+1 day')->format('Y-m-d'),
+        'titulo' => "Oferta partida del formulario $fixture",
+        'descripcion' => 'Prueba del guardado del formulario PHP.',
+        'jornada' => 'partida',
+        'modalidad' => 'Presencial',
+        'ubicacion' => 'Madrid',
+        'horarios' => [
+            1 => [
+                'activo' => '1',
+                'hora_inicio' => '09:00',
+                'hora_fin' => '11:00',
+                'hora_inicio_2' => '12:00',
+                'hora_fin_2' => '13:00',
+            ],
+        ],
+    ];
+    $publishError = $publishOffer->invoke(new OfertaController($db), $createdCompany, $splitOfferRequest);
+    $overlappingSplitRequest = $splitOfferRequest;
+    $overlappingSplitRequest['horarios'][1]['hora_inicio_2'] = '10:55';
+    assertTrue(
+        $publishOffer->invoke(new OfertaController($db), $createdCompany, $overlappingSplitRequest)
+            === 'Cada día seleccionado necesita dos franjas válidas, no solapadas y en orden horario.',
+        'La validación debe rechazar franjas partidas solapadas.'
+    );
+    $missingSplitTimeRequest = $splitOfferRequest;
+    unset($missingSplitTimeRequest['horarios'][1]['hora_fin_2']);
+    assertTrue(
+        $publishOffer->invoke(new OfertaController($db), $createdCompany, $missingSplitTimeRequest)
+            === 'Cada día seleccionado necesita dos franjas válidas, no solapadas y en orden horario.',
+        'La validación debe exigir las cuatro horas de cada día activo en jornada partida.'
+    );
+    $formPublishedOffer = $db->prepare(
+        'SELECT id, jornada, turno FROM empresa_especialidades_plazas WHERE titulo = :titulo'
+    );
+    $formPublishedOffer->execute(['titulo' => "Oferta partida del formulario $fixture"]);
+    $formOffer = $formPublishedOffer->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        $publishError === null
+            && is_array($formOffer)
+            && $formOffer['jornada'] === 'partida'
+            && $formOffer['turno'] === 'Indiferente'
+            && count((new Oferta($db))->obtenerHorarioSemanal((int)$formOffer['id'])) === 1,
+        'El formulario PHP debe aceptar jornada y franjas partidas sin requerir la etiqueta de turno antigua.'
+    );
+    $normalOfferRequest = $splitOfferRequest;
+    $normalOfferRequest['fecha_inicio'] = (new DateTimeImmutable($offerDate))->modify('+2 days')->format('Y-m-d');
+    $normalOfferRequest['fecha_fin'] = (new DateTimeImmutable($offerDate))->modify('+3 days')->format('Y-m-d');
+    $normalOfferRequest['titulo'] = "Oferta normal del formulario $fixture";
+    $normalOfferRequest['jornada'] = 'normal';
+    $normalOfferRequest['horarios'][1]['hora_inicio_2'] = ['ignored'];
+    $normalOfferRequest['horarios'][1]['hora_fin_2'] = ['ignored'];
+    assertTrue(
+        $publishOffer->invoke(new OfertaController($db), $createdCompany, $normalOfferRequest) === null,
+        'La jornada normal debe ignorar con seguridad los campos de segunda franja.'
+    );
+    $normalOffer = $db->prepare(
+        'SELECT p.jornada, oh.hora_inicio_2, oh.hora_fin_2
+         FROM empresa_especialidades_plazas p
+         INNER JOIN empresa_oferta_horarios_semanales oh ON oh.oferta_id = p.id
+         WHERE p.titulo = :titulo'
+    );
+    $normalOffer->execute(['titulo' => "Oferta normal del formulario $fixture"]);
+    $normalOfferSchedule = $normalOffer->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_array($normalOfferSchedule)
+            && $normalOfferSchedule['jornada'] === 'normal'
+            && $normalOfferSchedule['hora_inicio_2'] === null
+            && $normalOfferSchedule['hora_fin_2'] === null,
+        'La jornada normal debe guardarse sin segunda franja incluso si recibe valores ignorables.'
     );
     assertTrue(
         $matching->resolver($createdOffer, 'Aprobada', '', $createdUsers[3]),
@@ -1018,7 +1794,73 @@ try {
     $candidates = $matching->obtenerCandidatos($createdOffer);
     assertTrue(
         count($candidates) === 1 && (int)$candidates[0]['alumno_id'] === $createdStudents[0],
-        'El motor de compatibilidad debe exigir que la disponibilidad cubra las horas exactas de la oferta.'
+        'El matching debe basarse en los intervalos (aunque las etiquetas de turno difieran) y exigir cobertura de ambas franjas.'
+    );
+    $shortSecondInterval = $db->prepare(
+        'UPDATE alumno_disponibilidad_semanal ds
+         INNER JOIN alumno_disponibilidad d ON d.id = ds.disponibilidad_id
+         SET ds.hora_fin = \'12:30:00\'
+         WHERE d.alumno_id = :alumno AND ds.dia_semana = 1'
+    );
+    $shortSecondInterval->execute(['alumno' => $createdStudents[0]]);
+    assertTrue(
+        $matching->obtenerCandidatos($createdOffer) === [],
+        'El matching debe rechazar al candidato si su horario cubre la primera franja, pero no la segunda.'
+    );
+    $assignments = new Asignacion($db);
+    $splitAssignmentRejected = false;
+    try {
+        $assignments->crear($createdOffer, $createdStudents[0], $createdUsers[3], 'Tutor de empresa');
+    } catch (DomainException $exception) {
+        $splitAssignmentRejected = str_contains($exception->getMessage(), 'cobertura horaria');
+    }
+    assertTrue(
+        $splitAssignmentRejected,
+        'La validación transaccional de asignación también debe exigir cobertura de la segunda franja.'
+    );
+    $restoreSecondInterval = $db->prepare(
+        'UPDATE alumno_disponibilidad_semanal ds
+         INNER JOIN alumno_disponibilidad d ON d.id = ds.disponibilidad_id
+         SET ds.hora_fin = \'14:00:00\'
+         WHERE d.alumno_id = :alumno AND ds.dia_semana = 1'
+    );
+    $restoreSecondInterval->execute(['alumno' => $createdStudents[0]]);
+    $offersWithCounts = $matching->obtenerVigentesConAsignaciones();
+    assertTrue(
+        count($offersWithCounts) === 1
+            && (int)$offersWithCounts[0]['asignadas'] === 0,
+        'La lista de ofertas debe cargar el número de plazas cubiertas en una consulta agrupada.'
+    );
+    $bulkCandidates = $matching->obtenerCandidatosVigentes();
+    assertTrue(
+        count($bulkCandidates[$createdOffer] ?? []) === 1
+            && (int)$bulkCandidates[$createdOffer][0]['alumno_id'] === $createdStudents[0],
+        'La consulta agrupada debe devolver los candidatos indexados por oferta.'
+    );
+    $studentCandidates = $matching->obtenerCandidatosVigentes($createdUsers[1]);
+    assertTrue(
+        count($studentCandidates[$createdOffer] ?? []) === 1
+            && (int)$studentCandidates[$createdOffer][0]['alumno_id'] === $createdStudents[0],
+        'La consulta agrupada debe poder limitar los candidatos compatibles a un alumno.'
+    );
+    assertTrue(
+        $matching->obtenerIdsOfertasVigentesCompatibles($createdUsers[1]) === [$createdOffer],
+        'El dashboard debe poder obtener solo los IDs de ofertas compatibles con el alumno.'
+    );
+    $paginatedCandidates = $matching->obtenerCandidatosPaginados(
+        [$createdOffer],
+        [$createdOffer => 1],
+        1
+    );
+    assertTrue(
+        count($paginatedCandidates[$createdOffer]['candidatos'] ?? []) === 1
+            && (int)$paginatedCandidates[$createdOffer]['candidatos'][0]['alumno_id'] === $createdStudents[0]
+            && !$paginatedCandidates[$createdOffer]['haySiguiente'],
+        'El matching paginado debe conservar el candidato compatible y el estado de navegación.'
+    );
+    assertTrue(
+        ($matching->contarAsignacionesPorOferta([$createdOffer])[$createdOffer] ?? null) === 0,
+        'El conteo agrupado debe informar cero plazas ocupadas antes de asignar.'
     );
 
     assertTrue($specialtyModel->retirar($cycleId), 'El ciclo de la oferta debe poder retirarse.');
@@ -1043,6 +1885,46 @@ try {
         'Al reactivar un ciclo, sus ofertas deben volver a participar en el emparejamiento.'
     );
 
+    $expiredOffer = $db->prepare(
+        "INSERT INTO empresa_especialidades_plazas
+            (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno, estado)
+         VALUES (:empresa, :ciclo, 1,
+            DATE_SUB(CURDATE(), INTERVAL 2 DAY),
+            DATE_SUB(CURDATE(), INTERVAL 1 DAY),
+            'Indiferente', 'Aprobada')"
+    );
+    $expiredOffer->execute(['empresa' => $createdCompany, 'ciclo' => $cycleId]);
+    $createdExpiredOffer = (int)$db->lastInsertId();
+    $expiredAvailability = $db->prepare(
+        "INSERT INTO alumno_disponibilidad (alumno_id, fecha_inicio, fecha_fin, turno)
+         VALUES (:alumno_id, DATE_SUB(CURDATE(), INTERVAL 2 DAY),
+            DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'Indiferente')"
+    );
+    $expiredAvailability->execute(['alumno_id' => $createdStudents[1]]);
+    $expiredAvailabilityId = (int)$db->lastInsertId();
+    $expiredWeeklyAvailability = $db->prepare(
+        "INSERT INTO alumno_disponibilidad_semanal
+            (disponibilidad_id, dia_semana, hora_inicio, hora_fin)
+         VALUES (:disponibilidad_id,
+            WEEKDAY(DATE_SUB(CURDATE(), INTERVAL 2 DAY)) + 1, '08:00:00', '14:00:00')"
+    );
+    $expiredWeeklyAvailability->execute(['disponibilidad_id' => $expiredAvailabilityId]);
+    $expiredAssignmentRejected = false;
+    try {
+        $assignments->crear(
+            $createdExpiredOffer,
+            $createdStudents[1],
+            $createdUsers[3],
+            'Tutor de empresa'
+        );
+    } catch (RuntimeException $e) {
+        $expiredAssignmentRejected = $e->getMessage()
+            === 'La oferta no existe, no está aprobada o ya no está vigente.';
+    }
+    assertTrue(
+        $expiredAssignmentRejected,
+        'Una oferta vencida debe rechazarse aunque el alumno conserve disponibilidad compatible.'
+    );
     $partialCoverageRejected = false;
     try {
         $assignments->crear($createdOffer, $createdStudents[1], $createdUsers[3], 'Tutor de empresa');
@@ -1087,11 +1969,117 @@ try {
         'SELECT id FROM asignaciones_fct WHERE oferta_id = ' . $createdOffer . ' AND alumno_id = ' . $createdStudents[0]
     )->fetchColumn();
     $createdAssignmentId = $assignmentId;
-    assertTrue(count($matching->obtenerCandidatos($createdOffer)) === 0, 'Un alumno asignado no debe seguir siendo candidato.');
+    $assignmentPage = $assignments->obtenerPagina(false, 0, 1);
+    assertTrue(
+        $assignmentPage['total'] === 1
+            && count($assignmentPage['items']) === 1
+            && (int)$assignmentPage['items'][0]['id'] === $assignmentId,
+        'El listado paginado de asignaciones debe devolver el total y la fila correspondiente.'
+    );
+    $availabilityModel->reemplazar(
+        $createdUsers[2],
+        $availabilityStart,
+        $availabilityEnd,
+        'M',
+        false,
+        [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
+    );
+    $remainingCandidates = $matching->obtenerCandidatos($createdOffer);
+    assertTrue(
+        count($remainingCandidates) === 1
+            && (int)$remainingCandidates[0]['alumno_id'] === $createdStudents[1],
+        'El motor individual debe excluir al alumno asignado y conservar al candidato compatible.'
+    );
+    assertTrue(
+        (int)$matching->obtenerVigentesConAsignaciones()[0]['asignadas'] === 1
+            && !isset($matching->obtenerCandidatosVigentes()[$createdOffer])
+            && !isset($matching->obtenerCandidatosVigentes($createdUsers[1])[$createdOffer]),
+        'El matching agrupado debe reflejar plazas ocupadas y excluir ofertas sin capacidad.'
+    );
+    assertTrue(
+        ($matching->obtenerCandidatosPaginados(
+            [$createdOffer],
+            [$createdOffer => 1]
+        )[$createdOffer]['candidatos'] ?? []) === [],
+        'La consulta paginada debe ocultar candidatos cuando la oferta ya no tiene plazas.'
+    );
+    $paginationOffer = $db->prepare(
+        "INSERT INTO empresa_especialidades_plazas
+            (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, turno, estado)
+         VALUES (:empresa, :ciclo, 1, :inicio, :fin, 'M', 'Aprobada')"
+    );
+    for ($index = 0; $index < 51; $index++) {
+        $paginationOffer->execute([
+            'empresa' => $createdCompany,
+            'ciclo' => $cycleId,
+            'inicio' => $offerDate,
+            'fin' => $offerDate,
+        ]);
+        $createdPaginationOffers[] = (int)$db->lastInsertId();
+    }
+    $listedOfferIds = array_map(
+        'intval',
+        array_column($matching->obtenerTodas(true), 'id')
+    );
+    $fixtureOfferIds = array_merge([$createdOffer], $createdPaginationOffers);
+    $listedFixtureOfferPositions = array_map(
+        static fn(int $offerId): int|false => array_search($offerId, $listedOfferIds, true),
+        $fixtureOfferIds
+    );
+    $sortedFixtureOfferPositions = $listedFixtureOfferPositions;
+    sort($sortedFixtureOfferPositions);
+    assertTrue(
+        !in_array(false, $listedFixtureOfferPositions, true)
+            && $listedFixtureOfferPositions === $sortedFixtureOfferPositions,
+        'Las ofertas con la misma fecha de inicio deben conservar un orden predecible.'
+    );
+    $offerPage = $matching->obtenerPaginaTodas(true, 1, 10);
+    assertTrue(
+        count($offerPage['items']) === 10
+            && $offerPage['total'] === count($listedOfferIds)
+            && $offerPage['totalPaginas'] === (int)ceil(count($listedOfferIds) / 10),
+        'La paginación de ofertas debe limitar filas y calcular el total desde la base de datos.'
+    );
+    $_GET = [
+        'especialidad_id' => (string)$cycleId,
+        'estado' => 'Aprobada',
+        'desde' => $offerDate,
+        'hasta' => $offerDate,
+        'pagina' => '1',
+    ];
+    ob_start();
+    (new ConsultaController($db))->buscar();
+    $consultationPageOne = (string)ob_get_clean();
+    assertTrue(
+        str_contains($consultationPageOne, 'Mostrando 1-50 de')
+            && substr_count($consultationPageOne, '<tr>') === 51
+            && str_contains($consultationPageOne, 'estado=Aprobada'),
+        'La primera página debe limitar resultados y conservar los filtros en la navegación.'
+    );
+    $_GET['pagina'] = '2';
+    ob_start();
+    (new ConsultaController($db))->buscar();
+    $consultationPageTwo = (string)ob_get_clean();
+    assertTrue(
+        str_contains($consultationPageTwo, 'Mostrando 51-')
+            && str_contains($consultationPageTwo, 'Página 2 de')
+            && str_contains($consultationPageTwo, 'name="desde" value="' . $offerDate . '"'),
+        'La segunda página debe mostrar resultados restantes y mantener filtros seleccionados.'
+    );
+    $_GET['pagina'] = '0';
+    ob_start();
+    (new ConsultaController($db))->buscar();
+    $invalidConsultationPage = (string)ob_get_clean();
+    assertTrue(
+        str_contains($invalidConsultationPage, 'Selecciona una página válida.')
+            && str_contains($invalidConsultationPage, 'No se encontraron resultados.'),
+        'La consulta debe rechazar números de página fuera del rango.'
+    );
+    $_GET = [];
     $availabilityModel->reemplazar(
         $createdUsers[1],
-        '2027-04-01',
-        '2027-06-30',
+        $availabilityEditStart,
+        $availabilityEnd,
         'T',
         false,
         [['dia_semana' => 2, 'hora_inicio' => '15:15:00', 'hora_fin' => '19:00:00']]
@@ -1100,7 +2088,7 @@ try {
     $updatedWeekly = $availabilityModel->obtenerHorarioSemanalPorUsuario($createdUsers[1]);
     assertTrue(
         count($updatedAvailability) === 1
-            && $updatedAvailability[0]['fecha_inicio'] === '2027-04-01'
+            && $updatedAvailability[0]['fecha_inicio'] === $availabilityEditStart
             && $updatedAvailability[0]['turno'] === 'T'
             && (int)$updatedAvailability[0]['es_indiferente'] === 0
             && count($updatedWeekly) === 1
@@ -1118,6 +2106,10 @@ try {
     assertTrue($capacityRejected, 'El sistema debe impedir superar el cupo de plazas.');
 
     $gradeModel = new Calificacion($db);
+    assertTrue(
+        $gradeModel->obtenerNotaMediaPorUsuario($createdUsers[1]) === null,
+        'El promedio del alumno debe permanecer vacío mientras no tenga calificaciones.'
+    );
     $gradeBeforeCloseRejected = false;
     try {
         $gradeModel->guardar((int)$createdAssignmentId, $createdUsers[3], 8.5, 'Prueba');
@@ -1128,6 +2120,10 @@ try {
 
     assertTrue($assignments->cerrar($assignmentId, $createdUsers[3]), 'Una asignación activa debe poder cerrarse.');
     assertTrue(!$assignments->cerrar($assignmentId, $createdUsers[3]), 'Una asignación cerrada no debe cerrarse dos veces.');
+    assertTrue(
+        $assignments->listarActivasPorUsuario($createdUsers[1]) === [],
+        'El dashboard no debe recuperar del historial las asignaciones ya cerradas.'
+    );
     $precisionRejected = false;
     try {
         $gradeModel->guardar($assignmentId, $createdUsers[3], 8.501, 'Precisión excesiva');
@@ -1136,6 +2132,10 @@ try {
     }
     assertTrue($precisionRejected, 'El modelo debe rechazar notas con más de dos decimales.');
     $gradeModel->guardar($assignmentId, $createdUsers[3], 8.5, 'Buen desempeño.');
+    assertTrue(
+        $gradeModel->obtenerNotaMediaPorUsuario($createdUsers[1]) === 8.5,
+        'El promedio del dashboard debe incluir la calificación final del alumno.'
+    );
     $ownGrades = $gradeModel->listar(true, $createdUsers[1]);
     assertTrue(
         count($ownGrades) === 1
@@ -1146,7 +2146,8 @@ try {
     $gradeModel->guardar($assignmentId, $createdUsers[3], 9.25, 'Nota revisada.');
     assertTrue(
         count($gradeModel->listar()) === 1
-            && (float)$gradeModel->listar()[0]['nota'] === 9.25,
+            && (float)$gradeModel->listar()[0]['nota'] === 9.25
+            && $gradeModel->obtenerNotaMediaPorUsuario($createdUsers[1]) === 9.25,
         'La edición de una nota debe actualizar la misma calificación, sin duplicarla.'
     );
     $observerGrades = $gradeModel->listar(false, 0, true);
@@ -1217,9 +2218,99 @@ try {
                         && str_contains($adminViewHtml, 'No, volver.')
                         && str_contains($adminViewHtml, 'Sí, eliminar')
                         && str_contains($adminViewHtml, 'assets/js/admin-users.js')
+            )
+            && (
+                FrontendAssets::isEnabled()
+                    || (
+                        str_contains($adminViewHtml, 'Buscar por correo o nombre')
+                        && str_contains($adminViewHtml, 'Filtrar cuentas')
+                        && str_contains($adminViewHtml, 'Cuenta actual')
+                    )
+            )
+            && !str_contains(
+                $adminViewHtml,
+                'aria-label="Desactivar cuenta de ' . htmlspecialchars($emails[4], ENT_QUOTES, 'UTF-8') . '"'
             ),
         'La administración debe mostrar los usuarios y habilitar el diálogo Vue o su fallback PHP.'
     );
+    $_GET = ['cuenta_creada' => '1'];
+    ob_start();
+    (new UsuarioAdminController($db))->gestionar();
+    $createdAccountHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($createdAccountHtml, 'Cuenta creada correctamente.')
+            && str_contains($createdAccountHtml, 'role="status"'),
+        'La administración debe confirmar de forma accesible la creación correcta de una cuenta.'
+    );
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_POST = [
+        'email' => 'correo-invalido',
+        'password' => 'NeverEchoThisPassword123',
+        'nombre' => "Nombre O'Connor",
+        'apellidos' => 'Apellidos de prueba',
+        'rol' => 'Observador',
+    ];
+    ob_start();
+    (new UsuarioAdminController($db))->gestionar();
+    $accountFormHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($accountFormHtml, 'value="correo-invalido"')
+            && str_contains($accountFormHtml, 'value="Nombre O&#039;Connor"')
+            && str_contains($accountFormHtml, 'value="Apellidos de prueba"')
+            && str_contains($accountFormHtml, 'value="Observador" selected')
+            && !str_contains($accountFormHtml, 'NeverEchoThisPassword123'),
+        'Un error al crear una cuenta debe conservar los campos no sensibles y limpiar la contraseña.'
+    );
+    $_POST = [
+        'email' => 'coordinador-valido@example.test',
+        'password' => 'ValidInitialPassword123',
+        'nombre' => '<script>alert(1)</script>',
+        'apellidos' => 'Apellidos válidos',
+        'rol' => 'Coordinador',
+    ];
+    ob_start();
+    (new UsuarioAdminController($db))->gestionar();
+    $missingCoordinatorNameHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($missingCoordinatorNameHtml, 'Los coordinadores necesitan nombres y apellidos válidos')
+            && !str_contains($missingCoordinatorNameHtml, '<script>alert(1)</script>')
+            && str_contains($missingCoordinatorNameHtml, '&lt;script&gt;alert(1)&lt;/script&gt;')
+            && !str_contains($missingCoordinatorNameHtml, 'Comprueba si el correo ya está registrado'),
+        'El nombre del coordinador debe validarse y mostrarse escapado antes de intentar crear la cuenta.'
+    );
+    $_POST = [];
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_GET = ['estado_actualizado' => '1'];
+    ob_start();
+    (new UsuarioAdminController($db))->gestionar();
+    $updatedAccountStatusHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($updatedAccountStatusHtml, 'Estado de la cuenta actualizado.')
+            && str_contains($updatedAccountStatusHtml, 'role="status"'),
+        'La administración debe confirmar de forma accesible la actualización del estado de una cuenta.'
+    );
+    $filteredStaff = (new Usuario($db))->obtenerTodos($emails[3], 'Coordinador', true);
+    assertTrue(
+        count($filteredStaff) === 1
+            && $filteredStaff[0]['email'] === $emails[3]
+            && $filteredStaff[0]['rol'] === 'Coordinador',
+        'Los filtros de texto, rol y estado deben combinarse sin devolver cuentas ajenas.'
+    );
+    $_GET = ['buscar' => $emails[3], 'rol' => 'Coordinador', 'activo' => '1'];
+    ob_start();
+    (new UsuarioAdminController($db))->gestionar();
+    $filteredAdminView = (string)ob_get_clean();
+    assertTrue(
+        str_contains($filteredAdminView, htmlspecialchars($emails[3], ENT_QUOTES, 'UTF-8'))
+            && !str_contains($filteredAdminView, htmlspecialchars($emails[4], ENT_QUOTES, 'UTF-8'))
+            && str_contains($filteredAdminView, 'value="Coordinador" selected')
+            && str_contains($filteredAdminView, 'value="1" selected')
+            && str_contains($filteredAdminView, 'name="buscar" value="' . htmlspecialchars($emails[3], ENT_QUOTES, 'UTF-8') . '"')
+            && str_contains($filteredAdminView, 'name="rol" value="Coordinador"')
+            && str_contains($filteredAdminView, 'name="activo_filtro" value="1"'),
+        'La página administrativa debe aplicar filtros y conservarlos en los formularios de acción.'
+    );
+    $_GET = [];
 
     $staffRoles = ['Administrador', 'Coordinador', 'Observador'];
     $staffIdentifierBase = (hexdec(substr($fixture, 0, 7)) + 1000) % 100000000;
@@ -1607,6 +2698,229 @@ try {
         'El borrado debe dejar un registro completo aunque la cuenta modificada ya no exista.'
     );
 
+    $eventStart = (new DateTimeImmutable('today'))->modify('+3 days');
+    $eventEnd = $eventStart->modify('+7 days');
+    $updateOfferDates = $db->prepare(
+        'UPDATE empresa_especialidades_plazas SET fecha_inicio = :inicio, fecha_fin = :fin WHERE id = :id'
+    );
+    $updateOfferDates->execute([
+        'inicio' => $eventStart->format('Y-m-d'),
+        'fin' => $eventEnd->format('Y-m-d'),
+        'id' => $createdOffer,
+    ]);
+    $db->prepare('UPDATE empresa_especialidades_plazas SET plazas_cuantas = 2 WHERE id = :id')
+        ->execute(['id' => $createdOffer]);
+    $updateAvailabilityDates = $db->prepare(
+        'UPDATE alumno_disponibilidad SET fecha_inicio = :inicio, fecha_fin = :fin WHERE alumno_id = :alumno'
+    );
+    $updateAvailabilityDates->execute([
+        'inicio' => $eventStart->format('Y-m-d'),
+        'fin' => $eventEnd->format('Y-m-d'),
+        'alumno' => $createdStudents[0],
+    ]);
+    $addAvailabilityPeriod = $db->prepare(
+        'INSERT INTO alumno_disponibilidad (alumno_id, fecha_inicio, fecha_fin, turno)
+         VALUES (:alumno, :inicio, :fin, :turno)'
+    );
+    $addAvailabilityPeriod->execute([
+        'alumno' => $createdStudents[0],
+        'inicio' => $eventEnd->format('Y-m-d'),
+        'fin' => $eventEnd->modify('+5 days')->format('Y-m-d'),
+        'turno' => 'M',
+    ]);
+    $activateAssignment = $db->prepare("UPDATE asignaciones_fct SET estado = 'Asignada' WHERE id = :id");
+    $activateAssignment->execute(['id' => $createdAssignmentId]);
+    $activeAssignmentsForDashboard = $assignments->listarActivasPorUsuario($createdUsers[1]);
+    assertTrue(
+        count($activeAssignmentsForDashboard) === 1
+            && array_keys($activeAssignmentsForDashboard[0]) === ['fecha_inicio', 'fecha_fin', 'nombre_empresa'],
+        'El dashboard debe recuperar solo las asignaciones activas y los campos que muestra.'
+    );
+    $databaseEvents = $assignments->obtenerProximosEventos($createdUsers[1]);
+    assertTrue(
+        count($databaseEvents) === 5
+            && $databaseEvents[0]['fecha'] <= $databaseEvents[1]['fecha']
+            && !str_starts_with($databaseEvents[0]['titulo'], 'Fin de'),
+        'La consulta de próximos eventos debe incluir cinco elementos en orden cronológico estable.'
+    );
+    $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno', 'nombre' => 'Alumno de prueba'];
+    ob_start();
+    (new InicioController())->mostrar();
+    $dashboardHtml = (string)ob_get_clean();
+    preg_match(
+        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Ofertas compatibles</span>~',
+        $dashboardHtml,
+        $assignedStudentOfferMetric
+    );
+    preg_match(
+        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Empresas compatibles</span>~',
+        $dashboardHtml,
+        $assignedStudentCompanyMetric
+    );
+    assertTrue(
+        isset($assignedStudentOfferMetric[1], $assignedStudentCompanyMetric[1])
+            && (int)$assignedStudentOfferMetric[1] === 0
+            && (int)$assignedStudentCompanyMetric[1] === 0
+            && str_contains($dashboardHtml, 'Ya tienes una práctica asignada. Cuando finalice, podrás consultar nuevas ofertas compatibles.'),
+        'El dashboard no debe ofrecer nuevas prácticas a un alumno que ya tiene una asignación activa.'
+    );
+    $_SESSION = ['usuario_id' => $createdUsers[1], 'rol' => 'Alumno'];
+    ob_start();
+    (new OfertaController($db))->listar();
+    $assignedStudentOfferListingHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($assignedStudentOfferListingHtml, 'Ya tienes una práctica asignada')
+            && str_contains($assignedStudentOfferListingHtml, 'Cuando finalice, podrás consultar nuevas ofertas compatibles.'),
+        'El listado debe explicar que las nuevas ofertas no están disponibles mientras haya una práctica activa.'
+    );
+
+    $availabilityModel->reemplazar(
+        $createdUsers[2],
+        $eventStart->modify('-2 days')->format('Y-m-d'),
+        $eventEnd->modify('+5 days')->format('Y-m-d'),
+        'M',
+        false,
+        [['dia_semana' => 1, 'hora_inicio' => '08:00:00', 'hora_fin' => '14:00:00']]
+    );
+    $upcomingAvailability = $availabilityModel->obtenerVigentesPorUsuario(
+        $createdUsers[2],
+        (new DateTimeImmutable('today'))->format('Y-m-d')
+    );
+    assertTrue(
+        count($upcomingAvailability) === 1
+            && array_keys($upcomingAvailability[0]) === ['fecha_inicio', 'fecha_fin'],
+        'El dashboard debe recuperar solo fechas de disponibilidad vigente o futura.'
+    );
+    $compatibleCandidates = (new Oferta($db))->obtenerCandidatosVigentes($createdUsers[2]);
+    assertTrue(
+        isset($compatibleCandidates[$createdOffer]),
+        'El alumno compatible debe aparecer para la oferta con plazas libres.'
+    );
+    $compatibleOfferIds = array_fill_keys(array_map('intval', array_keys($compatibleCandidates)), true);
+    $compatibleOffers = array_values(array_filter(
+        (new Oferta($db))->obtenerVigentesConAsignaciones(),
+        static fn(array $offer): bool => isset($compatibleOfferIds[(int)$offer['id']])
+    ));
+    $dashboardOfferCount = count($compatibleOffers);
+    $dashboardCompanyCount = count(array_unique(array_column($compatibleOffers, 'empresa_id')));
+    $_SESSION = ['usuario_id' => $createdUsers[2], 'rol' => 'Alumno', 'nombre' => 'Segundo alumno'];
+    ob_start();
+    (new InicioController())->mostrar();
+    $compatibleDashboardHtml = (string)ob_get_clean();
+    ob_start();
+    (new OfertaController($db))->listar();
+    $compatibleOfferListingHtml = (string)ob_get_clean();
+    preg_match(
+        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Ofertas compatibles</span>~',
+        $compatibleDashboardHtml,
+        $dashboardOfferMetric
+    );
+    preg_match(
+        '~<strong>(\d+)</strong>\s*<span class="fct-stat__label">Empresas compatibles</span>~',
+        $compatibleDashboardHtml,
+        $dashboardCompanyMetric
+    );
+    assertTrue(
+        str_contains(
+            $compatibleDashboardHtml,
+            'Del ' . $eventStart->format('d/m/Y') . ' al ' . $eventEnd->format('d/m/Y') . ' - Jornada partida'
+        ),
+        'La tarjeta debe mostrar las fechas y la jornada partida de la oferta.'
+    );
+    $compatibleListingChecks = [
+        'heading' => str_contains($compatibleOfferListingHtml, 'Ofertas compatibles con tu perfil'),
+        'accessible wrapper' => str_contains($compatibleOfferListingHtml, '<div class="assignments-table-wrap" role="region" aria-label="Listado de ofertas" tabindex="0">'),
+        'caption' => str_contains($compatibleOfferListingHtml, '<caption>Ofertas compatibles con tu perfil</caption>'),
+        'company header' => str_contains($compatibleOfferListingHtml, '<th scope="col">Empresa</th>'),
+        'vacancies header' => str_contains($compatibleOfferListingHtml, '<th scope="col">Vacantes disponibles</th>'),
+        'one available vacancy' => str_contains($compatibleOfferListingHtml, '<td>1</td>'),
+        'split jornada' => str_contains($compatibleOfferListingHtml, '<td>Jornada partida</td>'),
+        'start date' => str_contains($compatibleOfferListingHtml, '<td>' . $eventStart->format('Y-m-d') . ' –'),
+        'end date' => str_contains($compatibleOfferListingHtml, $eventEnd->format('Y-m-d') . '</td>'),
+        'company name' => str_contains($compatibleOfferListingHtml, "Test Company $fixture"),
+        'no legacy turn label' => !str_contains($compatibleOfferListingHtml, '<td>M</td>'),
+    ];
+    assertTrue(
+        !in_array(false, $compatibleListingChecks, true),
+        'El listado abierto desde el dashboard debe mantener el filtro de compatibilidad y mostrar el cupo libre. Fallos: '
+            . implode(', ', array_keys(array_filter($compatibleListingChecks, static fn(bool $passed): bool => !$passed)))
+            . ' Contenido: ' . trim(preg_replace('/\s+/', ' ', strip_tags($compatibleOfferListingHtml)))
+    );
+    $_SESSION = [];
+    ob_start();
+    (new OfertaController($db))->listar();
+    $publicOfferListingHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($publicOfferListingHtml, 'Ofertas de prácticas')
+            && !str_contains($publicOfferListingHtml, 'Ofertas compatibles con tu perfil'),
+        'El listado público debe conservar la visualización general de ofertas aprobadas.'
+    );
+    $availabilityStartPosition = strpos($dashboardHtml, 'Inicio de disponibilidad');
+    $practiceStartPosition = strpos($dashboardHtml, 'Inicio de prácticas');
+    $availabilityEndPosition = strpos($dashboardHtml, 'Fin de disponibilidad');
+    $practiceEndPosition = strpos($dashboardHtml, 'Fin de prácticas');
+    $eventListStart = strpos($dashboardHtml, '<ol class="fct-events__list">');
+    $eventListEnd = $eventListStart === false ? false : strpos($dashboardHtml, '</ol>', $eventListStart);
+    $eventsHtml = $eventListStart === false || $eventListEnd === false
+        ? ''
+        : substr($dashboardHtml, $eventListStart, $eventListEnd - $eventListStart);
+    $lastAvailabilityStartPosition = strrpos($eventsHtml, 'Inicio de disponibilidad');
+    $sameDayPracticeEndPosition = strpos($eventsHtml, 'Fin de prácticas');
+    assertTrue(
+        isset($dashboardOfferMetric[1], $dashboardCompanyMetric[1])
+            && (int)$dashboardOfferMetric[1] === (int)$dashboardOfferCount
+            && (int)$dashboardCompanyMetric[1] === (int)$dashboardCompanyCount
+            && str_contains($compatibleDashboardHtml, '<small class="fct-offer__capacity">1 plaza disponible</small>')
+            && str_contains($dashboardHtml, 'href="index.php?action=mis-asignaciones">Ver asignaciones')
+            && str_contains($dashboardHtml, 'href="index.php?action=disponibilidad">Gestionar disponibilidad')
+            && $availabilityStartPosition !== false
+            && $practiceStartPosition !== false
+            && $availabilityEndPosition !== false
+            && $practiceEndPosition !== false
+            && $availabilityStartPosition < $practiceStartPosition
+            && $availabilityEndPosition < $practiceEndPosition
+            && substr_count($eventsHtml, '<li>') === 5
+            && $lastAvailabilityStartPosition !== false
+            && $sameDayPracticeEndPosition !== false
+            && $lastAvailabilityStartPosition < $sameDayPracticeEndPosition
+            && str_contains($dashboardHtml, $eventStart->format('Y'))
+            && str_contains($dashboardHtml, $eventEnd->format('Y')),
+        'El dashboard debe contar solo plazas vacantes y ordenar inicios antes que finales en fechas iguales.'
+    );
+
+    $pastAvailability = $db->prepare(
+        'UPDATE alumno_disponibilidad
+         SET fecha_inicio = :inicio, fecha_fin = :fin
+         WHERE alumno_id = :alumno'
+    );
+    $pastAvailability->execute([
+        'inicio' => (new DateTimeImmutable('today'))->modify('-30 days')->format('Y-m-d'),
+        'fin' => (new DateTimeImmutable('today'))->modify('-1 day')->format('Y-m-d'),
+        'alumno' => $createdStudents[1],
+    ]);
+    $_SESSION = ['usuario_id' => $createdUsers[2], 'rol' => 'Alumno', 'nombre' => 'Segundo alumno'];
+    ob_start();
+    (new InicioController())->mostrar();
+    $expiredAvailabilityDashboard = (string)ob_get_clean();
+    assertTrue(
+        str_contains($expiredAvailabilityDashboard, '<p class="fct-empty" role="status">Registra una disponibilidad vigente')
+            && str_contains($expiredAvailabilityDashboard, 'href="index.php?action=disponibilidad">Registrar disponibilidad')
+            && str_contains($expiredAvailabilityDashboard, 'Gestionar disponibilidad')
+            && str_contains($expiredAvailabilityDashboard, 'No tienes eventos próximos.'),
+        'Un periodo vencido debe ofrecer registrar disponibilidad y no aparecer como evento próximo.'
+    );
+    ob_start();
+    (new OfertaController($db))->listar();
+    $expiredAvailabilityOfferListingHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($expiredAvailabilityOfferListingHtml, '<p role="status">Necesitas una disponibilidad vigente')
+            && str_contains(
+                $expiredAvailabilityOfferListingHtml,
+                'href="index.php?action=disponibilidad">Registrar disponibilidad'
+            ),
+        'El listado de ofertas debe permitir actualizar disponibilidad cuando todos los periodos vencieron.'
+    );
+
     $_SESSION = [];
     $token = CsrfMiddleware::token();
     $_POST['_csrf'] = $token;
@@ -1654,8 +2968,12 @@ try {
         'Las solicitudes de reenvío deben ser públicas con respuesta genérica y aprobarse solo por Administrador mediante POST.'
     );
 
-    echo "OK: migraciones, perfiles, validación española, convenios, ofertas, matching, disponibilidad, calificaciones, usuarios y CSRF.\n";
+    echo "OK: migraciones, perfiles, recuperación, validación española, convenios, ofertas, matching, paginación, disponibilidad, dashboard, calificaciones, usuarios, webhooks, estado de sesión y CSRF.\n";
 } finally {
+    foreach ($createdPaginationOffers as $paginationOfferId) {
+        $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
+        $stmt->execute(['offer' => $paginationOfferId]);
+    }
     putenv('FCT_WEBHOOK_OUTBOUND_URL');
     if ($createdAgreementId !== null) {
         $stmt = $db->prepare('DELETE FROM auditoria WHERE entidad = :entidad AND entidad_id = :id');
@@ -1669,6 +2987,10 @@ try {
         $stmt = $db->prepare('DELETE FROM webhook_outbox WHERE event_id = :event_id');
         $stmt->execute(['event_id' => $availabilityWebhookEventId]);
     }
+    if ($createdWebhookOffer !== null) {
+        $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
+        $stmt->execute(['offer' => $createdWebhookOffer]);
+    }
     if ($createdOffer !== null) {
         $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');
         $stmt->execute(['offer' => $createdOffer]);
@@ -1680,6 +3002,12 @@ try {
         $stmt->execute(['company' => $createdCompany]);
         $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
         $stmt->execute(['offer' => $createdOffer]);
+    }
+    if ($createdExpiredOffer !== null) {
+        $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');
+        $stmt->execute(['offer' => $createdExpiredOffer]);
+        $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
+        $stmt->execute(['offer' => $createdExpiredOffer]);
     }
     if ($createdAdminStudentProfileId !== null) {
         $stmt = $db->prepare('DELETE FROM auditoria WHERE entidad = :entidad AND entidad_id = :id');

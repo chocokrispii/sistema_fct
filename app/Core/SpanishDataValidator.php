@@ -21,6 +21,41 @@ final class SpanishDataValidator
         return $letter === 'TRWAGMYFPDXBNJZSQVHLCKE'[$number % 23];
     }
 
+    public static function isSpanishTaxId(string $value): bool
+    {
+        $taxId = strtoupper((string)preg_replace('/[\s-]+/u', '', trim($value)));
+        if (self::isDniNie($taxId)) {
+            return true;
+        }
+        if (preg_match('/\A[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]\z/', $taxId) !== 1) {
+            return false;
+        }
+
+        $sum = 0;
+        $digits = substr($taxId, 1, 7);
+        for ($index = 0; $index < 7; $index++) {
+            $digit = (int)$digits[$index];
+            if ($index % 2 === 0) {
+                $doubled = $digit * 2;
+                $sum += intdiv($doubled, 10) + ($doubled % 10);
+            } else {
+                $sum += $digit;
+            }
+        }
+
+        $controlDigit = (10 - ($sum % 10)) % 10;
+        $controlLetter = 'JABCDEFGHI'[$controlDigit];
+        $control = $taxId[8];
+        if (str_contains('ABEH', $taxId[0])) {
+            return $control === (string)$controlDigit;
+        }
+        if (str_contains('PQS', $taxId[0])) {
+            return $control === $controlLetter;
+        }
+
+        return $control === (string)$controlDigit || $control === $controlLetter;
+    }
+
     public static function isDniNieFormat(string $value): bool
     {
         return preg_match('/\A(?:\d{8}[A-Z]|[XYZ]\d{7}[A-Z])\z/', self::normalizeDniNie($value)) === 1;
@@ -39,12 +74,7 @@ final class SpanishDataValidator
 
     public static function isSpanishPhone(string $value): bool
     {
-        $phone = trim($value);
-        if (preg_match('/\A(?:\+34|0034)\s*/', $phone) === 1) {
-            $phone = preg_replace('/\A(?:\+34|0034)\s*/', '', $phone) ?? '';
-        }
-        $digits = preg_replace('/[\s().-]+/', '', $phone);
-        return is_string($digits) && preg_match('/\A[6789]\d{8}\z/', $digits) === 1;
+        return preg_match('/\A[6789]\d{8}\z/', self::normalizePhone($value)) === 1;
     }
 
     public static function isSpanishPostcode(string $value): bool
