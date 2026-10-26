@@ -20,8 +20,8 @@ class Empresa {
     ): int {
         try {
             $stmt = $this->db->prepare(
-                'INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto)
-                 VALUES (:usuario_id, :nombre, :cif, :contacto)'
+                "INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto, estado_solicitud)
+                 VALUES (:usuario_id, :nombre, :cif, :contacto, 'Pendiente_Aprobacion')"
             );
             $stmt->execute([
                 'usuario_id' => $usuarioId,

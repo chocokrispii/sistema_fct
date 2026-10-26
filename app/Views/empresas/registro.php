@@ -1,7 +1,7 @@
 <section class="company-registration" aria-labelledby="company-registration-title">
     <div class="company-registration__intro">
         <span class="company-registration__eyebrow">Área de empresas</span>
-        <h2 id="company-registration-title">Registra tu empresa</h2>
+        <h2 id="company-registration-title">Contacte con Nosotros / Alta de Empresa</h2>
         <p>Crea tu cuenta para gestionar ofertas de prácticas y conectar con estudiantes.</p>
     </div>
 
@@ -11,7 +11,7 @@
     <?php if (isset($_GET['registrada'])): ?>
         <section class="message message-success" role="status">
             <h3>Solicitud registrada</h3>
-            <p>Revisa tu correo para activar la cuenta y elegir una contraseña. El enlace caduca en 24 horas.</p>
+            <p>La solicitud queda en estado <strong>Pendiente_Aprobacion</strong>. No podrás acceder hasta que un administrador la valide.</p>
         </section>
     <?php endif; ?>
 
@@ -42,19 +42,19 @@
                 </div>
 
                 <div class="company-registration__field">
-                    <label for="company-nif">NIF (Persona Jurídica) <span aria-hidden="true">*</span></label>
+                    <label for="company-nif">NIF o pasaporte <span aria-hidden="true">*</span></label>
                     <input id="company-nif" type="text" name="nif_persona_juridica" maxlength="20" autocomplete="off" placeholder="Ej. B12345674" aria-describedby="company-nif-help" required>
-                    <small id="company-nif-help">Introduce el NIF de persona jurídica con su carácter de control válido.</small>
+                    <small id="company-nif-help">Introduce un NIF o pasaporte válido.</small>
                 </div>
 
                 <div class="company-registration__field">
-                    <label for="company-contact">Persona de contacto <span class="company-registration__optional">Opcional</span></label>
-                    <input id="company-contact" type="text" name="persona_contacto" maxlength="150" autocomplete="name" placeholder="Nombre y apellidos">
+                    <label for="company-contact">Persona de contacto <span aria-hidden="true">*</span></label>
+                    <input id="company-contact" type="text" name="persona_contacto" maxlength="150" autocomplete="name" placeholder="Nombre y apellidos" required>
                 </div>
 
                 <div class="company-registration__field">
-                    <label for="company-phone">Teléfono <span class="company-registration__optional">Opcional</span></label>
-                    <input id="company-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" placeholder="Ej. 600 123 456">
+                    <label for="company-phone">Teléfono <span aria-hidden="true">*</span></label>
+                    <input id="company-phone" type="tel" name="telefono" maxlength="20" autocomplete="tel" placeholder="Ej. 600 123 456" required>
                 </div>
 
                 <div class="company-registration__field company-registration__field--full">

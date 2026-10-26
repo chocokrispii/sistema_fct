@@ -9,7 +9,7 @@ require_once __DIR__ . '/Auditoria.php';
  */
 class RecuperacionCuenta
 {
-    public const VALIDEZ_MINUTOS = 30;
+    public const VALIDEZ_MINUTOS = 1440;
 
     private PDO $db;
 
@@ -51,6 +51,20 @@ class RecuperacionCuenta
              WHERE r.estado = \'Solicitada\'
              ORDER BY r.creada'
         )->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function destinatario(int $id): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT u.email, COALESCE(NULLIF(e.nombre_empresa, ''), u.nombre, u.email) AS nombre
+             FROM recuperaciones_cuenta r
+             INNER JOIN usuarios u ON u.id = r.usuario_id
+             LEFT JOIN empresas e ON e.usuario_id = u.id
+             WHERE r.id = :id AND r.estado = 'EnlaceEmitido' LIMIT 1"
+        );
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 
     public function emitirEnlace(int $id, DateTimeImmutable $ahora, int $actorId): ?string

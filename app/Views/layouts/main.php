@@ -71,6 +71,7 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                             <span class="status-badge status-badge--pending"><?= $pendientesReenvioActivacion ?> pendientes</span>
                         <?php endif; ?>
                     </a>
+                    <a href="index.php?action=solicitudes-empresa">Altas de empresas</a>
                     <a href="index.php?action=ciclos">Ciclos formativos</a>
                     <a href="index.php?action=archivo-convenios">Archivo de convenios</a>
                     <a href="index.php?action=integraciones">Integraciones</a>

@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../Models/RecuperacionCuenta.php';
 require_once __DIR__ . '/../Models/IntentoLogin.php';
+require_once __DIR__ . '/../Core/PasswordResetMailer.php';
 
 class RecuperacionController
 {
@@ -55,7 +56,18 @@ class RecuperacionController
             header('Location: index.php?action=recuperaciones&error=1');
             exit;
         }
-        header('Location: index.php?action=recuperaciones&token=' . $token);
+        $destinatario = $this->recuperaciones->destinatario((int)$id);
+        if ($destinatario === null) {
+            header('Location: index.php?action=recuperaciones&error=1');
+            exit;
+        }
+        $appUrl = rtrim(getenv('FCT_APP_URL') ?: '', '/');
+        (new PasswordResetMailer())->send(
+            $destinatario['email'],
+            $destinatario['nombre'],
+            $appUrl . '/index.php?action=restablecer&token=' . rawurlencode($token)
+        );
+        header('Location: index.php?action=recuperaciones&enviado=1');
         exit;
     }
 
