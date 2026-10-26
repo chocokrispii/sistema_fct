@@ -51,6 +51,9 @@ async function submitAsJson(event: SubmitEvent): Promise<void> {
     if (new TextEncoder().encode(password).length > 72) {
         validationError.value = 'La contraseña no puede superar 72 bytes.';
         setPasswordInvalid(true);
+        if (passwordInput) {
+            passwordInput.value = '';
+        }
         await nextTick();
         passwordInput?.focus();
         return;
@@ -69,6 +72,9 @@ async function submitAsJson(event: SubmitEvent): Promise<void> {
         const user = await session.login({ email, password });
         window.location.assign(`index.php?action=${session.dashboardAction(user.rol)}`);
     } catch {
+        if (passwordInput) {
+            passwordInput.value = '';
+        }
         // El store conserva el error para mostrarlo junto al formulario.
         await nextTick();
         root.value?.querySelector<HTMLElement>('#login-request-error')?.focus();

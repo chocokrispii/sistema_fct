@@ -40,16 +40,27 @@ class EmpresaController {
         ];
         $input = [];
         $values = [];
+        $inputErrors = [];
         foreach ($fields as $field) {
             $value = $_POST[$field] ?? '';
             if (!is_string($value)) {
-                $this->fallarRegistro('Los datos del registro deben ser valores de texto válidos.', $values, 422);
-                return;
+                $input[$field] = '';
+                $inputErrors[$field] = 'Introduce un valor de texto válido.';
+                continue;
             }
             $input[$field] = $field === 'password' ? $value : trim($value);
             if ($field !== 'password' && $field !== 'dni_representante') {
                 $values[$field] = $input[$field];
             }
+        }
+        if ($inputErrors !== []) {
+            $this->fallarRegistro(
+                'Los datos del registro deben ser valores de texto válidos.',
+                $values,
+                422,
+                $inputErrors
+            );
+            return;
         }
         $email = $input['email'];
         $password = $input['password'];
@@ -62,32 +73,54 @@ class EmpresaController {
         $dniRepresentante = SpanishDataValidator::normalizeDniNie($input['dni_representante']);
         $cifNormalizado = strtoupper((string)preg_replace('/[\s-]+/u', '', $cif));
 
-        if (
-            !SpanishDataValidator::isEmail($email)
-            || strlen($password) < 12
-            || strlen($password) > 72
-            || trim($password) === ''
-            || !SpanishDataValidator::isSpanishTaxId($cifNormalizado)
-            || mb_strlen($cifNormalizado) > 20
-            || $razonSocial === ''
-            || mb_strlen($razonSocial) > 150
-            || mb_strlen($nombreComercial) > 150
-            || !SpanishDataValidator::isPersonName($representante, 150)
-            || ($dniRepresentante !== '' && !SpanishDataValidator::isDniNie($dniRepresentante))
-            || mb_strlen($telefono) > 20
-            || $direccion === ''
-            || mb_strlen($direccion) > 255
-        ) {
+        $fieldErrors = [];
+        if (!SpanishDataValidator::isEmail($email)) {
+            $fieldErrors['email'] = 'Introduce un correo electrónico válido.';
+        }
+        if (strlen($password) < 12 || strlen($password) > 72 || trim($password) === '') {
+            $fieldErrors['password'] = 'La contraseña debe tener entre 12 y 72 bytes y no estar vacía.';
+        }
+        if (!SpanishDataValidator::isSpanishTaxId($cifNormalizado) || mb_strlen($cifNormalizado) > 20) {
+            $fieldErrors['cif'] = 'Introduce un CIF/NIF válido de hasta 20 caracteres.';
+        }
+        if ($razonSocial === '' || mb_strlen($razonSocial) > 150) {
+            $fieldErrors['razon_social'] = 'La razón social es obligatoria y no puede superar 150 caracteres.';
+        }
+        if ($input['nombre_comercial'] !== '' && mb_strlen($nombreComercial) > 150) {
+            $fieldErrors['nombre_comercial'] = 'El nombre comercial no puede superar 150 caracteres.';
+        }
+        if (!SpanishDataValidator::isPersonName($representante, 150)) {
+            $fieldErrors['representante_legal'] = 'Introduce un nombre válido para el representante legal.';
+        }
+        if ($dniRepresentante !== '' && !SpanishDataValidator::isDniNie($dniRepresentante)) {
+            $fieldErrors['dni_representante'] = 'Introduce un DNI/NIE válido.';
+        }
+        if (mb_strlen($telefono) > 20) {
+            $fieldErrors['telefono'] = 'El teléfono no puede superar 20 caracteres.';
+        }
+        if ($direccion === '' || mb_strlen($direccion) > 255) {
+            $fieldErrors['direccion'] = 'La dirección es obligatoria y no puede superar 255 caracteres.';
+        }
+        if ($fieldErrors !== []) {
             $this->fallarRegistro(
                 'Revisa el correo, el CIF/NIF, la razón social y los datos del representante legal.',
                 $values,
-                422
+                422,
+                $fieldErrors
             );
             return;
         }
 
         if ($this->registroDuplicado($email, $cifNormalizado)) {
-            $this->fallarRegistro('El correo o el CIF/NIF ya está registrado.', $values, 409);
+            $this->fallarRegistro(
+                'El correo o el CIF/NIF ya está registrado.',
+                $values,
+                409,
+                [
+                    'email' => 'El correo o el CIF/NIF ya está registrado.',
+                    'cif' => 'El correo o el CIF/NIF ya está registrado.',
+                ]
+            );
             return;
         }
 
@@ -131,7 +164,15 @@ class EmpresaController {
                 $this->db->rollBack();
             }
             if ($this->registroDuplicado($email, $cifNormalizado)) {
-                $this->fallarRegistro('El correo o el CIF/NIF ya está registrado.', $values, 409);
+                $this->fallarRegistro(
+                    'El correo o el CIF/NIF ya está registrado.',
+                    $values,
+                    409,
+                    [
+                        'email' => 'El correo o el CIF/NIF ya está registrado.',
+                        'cif' => 'El correo o el CIF/NIF ya está registrado.',
+                    ]
+                );
                 return;
             }
             error_log('Error al registrar empresa: ' . $e->getMessage());
@@ -314,26 +355,28 @@ class EmpresaController {
         return (bool)$statement->fetchColumn();
     }
 
-    private function fallarRegistro(string $error, array $values, int $status): void
+    private function fallarRegistro(string $error, array $values, int $status, array $fieldErrors = []): void
     {
         if (JsonResponse::wantsJson()) {
             JsonResponse::failure($error, $status);
             return;
         }
-        $this->mostrarFormulario($error, $values, false, $status);
+        $this->mostrarFormulario($error, $values, false, $status, $fieldErrors);
     }
 
     private function mostrarFormulario(
         string $error = '',
         array $values = [],
         bool $success = false,
-        int $status = 200
+        int $status = 200,
+        array $fieldErrors = []
     ): void {
         http_response_code($status);
         View::render('empresas/registro', [
             'error' => $error,
             'success' => $success,
             'values' => $values,
+            'fieldErrors' => $fieldErrors,
             'csrf' => CsrfMiddleware::token(),
         ]);
     }

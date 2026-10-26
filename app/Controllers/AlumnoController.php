@@ -601,9 +601,9 @@ class AlumnoController
         $especialidades = $this->especialidadModel->obtenerTodas();
         $values = [];
         foreach ([
-            'email', 'nombre', 'apellidos', 'dni', 'nss', 'telefono', 'direccion', 'codigo_postal',
-            'fecha_nacimiento', 'especialidad_id', 'tutor_nombre', 'tutor_dni', 'tutor_nss',
-            'tutor_correo', 'tutor_direccion', 'tutor_telefono',
+            'email', 'nombre', 'apellidos', 'telefono', 'direccion', 'codigo_postal',
+            'fecha_nacimiento', 'especialidad_id', 'tutor_nombre', 'tutor_correo',
+            'tutor_direccion', 'tutor_telefono',
         ] as $field) {
             if (isset($_POST[$field]) && is_string($_POST[$field])) {
                 $values[$field] = $_POST[$field];

@@ -912,7 +912,9 @@ try {
             ) === 1
             && str_contains($invalidGuardianRegistrationHtml, 'Introduce un número de Seguridad Social válido')
             && str_contains($invalidGuardianRegistrationHtml, 'Introduce un DNI/NIE con una letra de control válida.')
-            && str_contains($invalidGuardianRegistrationHtml, 'value="NSS!"')
+            && !str_contains($invalidGuardianRegistrationHtml, 'value="NSS!"')
+            && !str_contains($invalidGuardianRegistrationHtml, 'value="12345678A"')
+            && !str_contains($invalidGuardianRegistrationHtml, 'value="ValidStudentPassword123"')
             && (int)$invalidGuardianAccountCount->fetchColumn() === 0,
         'Los errores de DNI/NIE y NSS del tutor deben señalar ambos campos e impedir crear la cuenta.'
     );

@@ -91,8 +91,8 @@ documentacion/       Guías funcionales y de pruebas.
 Los archivos `.gitkeep` mantienen en Git carpetas que aún están vacías. No
 contienen lógica de aplicación. Las páginas activas se renderizan mediante
 `app/Views/layouts/main.php`. Los archivos HTML antiguos no implementan rutas
-ni operaciones de escritura: `app/Views/layouts/index.html` y
-`app/Views/alumnos/alumnos.html` redirigen al front controller; la página
+ni operaciones de escritura: `app/Views/layouts/index.html` redirige al front
+controller; la antigua maqueta de registro de alumnos se eliminó. La página
 heredada de asignaciones es informativa y enlaza a las rutas oficiales, que
 aplican autenticación y permisos. Apache debe exponer únicamente `public/` como
 raíz web y mantener `app/`, `config/`, `database/` y `storage/` fuera del acceso

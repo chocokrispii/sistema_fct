@@ -112,6 +112,12 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
     if (!form || submitting.value) {
         return;
     }
+    if (!gradeInput || gradeInput.value.trim() === '' || !isValidEdit(gradeInput.value)) {
+        setValidationError('La nota debe estar entre 0 y 10, con un máximo de dos decimales.');
+        await nextTick();
+        gradeInput?.focus();
+        return;
+    }
     const data = new FormData(form);
     submitting.value = true;
     clearValidationError();
@@ -130,9 +136,9 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
         });
         window.location.assign('index.php?action=calificaciones&guardada=1');
     } catch (cause) {
-        error.value = cause instanceof Error ? cause.message : 'No se pudo guardar la calificación.';
+        setValidationError(cause instanceof Error ? cause.message : 'No se pudo guardar la calificación.');
         await nextTick();
-        root.value?.querySelector<HTMLElement>('[role="alert"]')?.focus();
+        gradeInput?.focus();
     } finally {
         submitting.value = false;
         if (submitButton) {
@@ -149,9 +155,8 @@ onMounted(() => {
         throw new Error('No se encontró el formulario de calificación.');
     }
     const assignmentId = form.querySelector<HTMLInputElement>('input[name="asignacion_id"]')?.value;
-    if (assignmentId && /^\d+$/.test(assignmentId)) {
-        errorId.value = `grade-error-${assignmentId}`;
-    }
+    const stableKey = assignmentId && /^\d+$/.test(assignmentId) ? assignmentId : gradeInput.id || 'grade';
+    errorId.value = `grade-error-${stableKey}`;
     lastValidValue = gradeInput.value;
     gradeInput.addEventListener('keydown', onKeydown);
     gradeInput.addEventListener('input', onInput);

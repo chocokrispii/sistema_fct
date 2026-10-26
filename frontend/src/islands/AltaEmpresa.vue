@@ -30,6 +30,12 @@ function isDniNie(value: string): boolean {
     return letter === 'TRWAGMYFPDXBNJZSQVHLCKE'[number % 23];
 }
 
+function isPersonName(value: string, maxLength: number): boolean {
+    const name = value.trim();
+    return Array.from(name).length <= maxLength
+        && /^[\p{L}\p{M}][\p{L}\p{M} \t.'’\-]*$/u.test(name);
+}
+
 function isSpanishTaxId(value: string): boolean {
     const taxId = normalizedDocument(value);
     if (isDniNie(taxId)) {
@@ -63,9 +69,52 @@ function isSpanishTaxId(value: string): boolean {
     return control === String(controlDigit) || control === controlLetter;
 }
 
+function fieldErrorId(field: string): string {
+    return `company-${field}-error`;
+}
+
+function setFieldError(field: string, error: string): void {
+    const input = form?.querySelector<HTMLInputElement>(`[name="${field}"]`);
+    const errorElement = form?.querySelector<HTMLElement>(`#${fieldErrorId(field)}`);
+    if (!input || !errorElement) {
+        return;
+    }
+
+    errorElement.textContent = error;
+    errorElement.setAttribute('role', 'alert');
+    input.setAttribute('aria-invalid', 'true');
+    const describedBy = new Set((input.getAttribute('aria-describedby') ?? '')
+        .split(/\s+/)
+        .filter(Boolean));
+    describedBy.add(fieldErrorId(field));
+    input.setAttribute('aria-describedby', [...describedBy].join(' '));
+}
+
+function clearFieldError(field: string): void {
+    const input = form?.querySelector<HTMLInputElement>(`[name="${field}"]`);
+    const errorElement = form?.querySelector<HTMLElement>(`#${fieldErrorId(field)}`);
+    if (!input) {
+        return;
+    }
+
+    input.removeAttribute('aria-invalid');
+    const describedBy = (input.getAttribute('aria-describedby') ?? '')
+        .split(/\s+/)
+        .filter((id) => id && id !== fieldErrorId(field));
+    if (describedBy.length > 0) {
+        input.setAttribute('aria-describedby', describedBy.join(' '));
+    } else {
+        input.removeAttribute('aria-describedby');
+    }
+    if (errorElement) {
+        errorElement.textContent = '';
+        errorElement.removeAttribute('role');
+    }
+}
+
 function clearInputError(event: Event): void {
     if (event.target instanceof HTMLInputElement) {
-        event.target.removeAttribute('aria-invalid');
+        clearFieldError(event.target.name);
         if (status.value === 'error') {
             status.value = 'idle';
             message.value = '';
@@ -81,34 +130,40 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
 
     const password = form.querySelector<HTMLInputElement>('input[name="password"]');
     const taxId = form.querySelector<HTMLInputElement>('input[name="cif"]');
+    const representative = form.querySelector<HTMLInputElement>('input[name="representante_legal"]');
     const representativeDni = form.querySelector<HTMLInputElement>('input[name="dni_representante"]');
     if (password && new TextEncoder().encode(password.value).length > 72) {
         status.value = 'error';
         message.value = 'La contraseña no puede superar 72 bytes.';
-        password.setAttribute('aria-invalid', 'true');
+        setFieldError('password', message.value);
         await nextTick();
         password.focus();
         return;
     }
-    password?.removeAttribute('aria-invalid');
     if (taxId && !isSpanishTaxId(taxId.value)) {
         status.value = 'error';
         message.value = 'El CIF/NIF no tiene un formato válido.';
-        taxId.setAttribute('aria-invalid', 'true');
+        setFieldError('cif', message.value);
         await nextTick();
         taxId.focus();
         return;
     }
-    taxId?.removeAttribute('aria-invalid');
+    if (representative && !isPersonName(representative.value, 150)) {
+        status.value = 'error';
+        message.value = 'Introduce un nombre válido para el representante legal.';
+        setFieldError('representante_legal', message.value);
+        await nextTick();
+        representative.focus();
+        return;
+    }
     if (representativeDni?.value.trim() && !isDniNie(representativeDni.value)) {
         status.value = 'error';
         message.value = 'El DNI/NIE del representante no tiene un formato válido.';
-        representativeDni.setAttribute('aria-invalid', 'true');
+        setFieldError('dni_representante', message.value);
         await nextTick();
         representativeDni.focus();
         return;
     }
-    representativeDni?.removeAttribute('aria-invalid');
 
     status.value = 'submitting';
     message.value = '';
@@ -129,6 +184,9 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
         if (password) {
             password.value = '';
         }
+        if (representativeDni) {
+            representativeDni.value = '';
+        }
         form.hidden = true;
         await nextTick();
         root.value?.querySelector<HTMLElement>('[role="status"]')?.focus();
@@ -139,10 +197,21 @@ async function onSubmit(event: SubmitEvent): Promise<void> {
             : 'No se pudo enviar la solicitud. Inténtalo de nuevo.';
         if (password) {
             password.value = '';
-            password.removeAttribute('aria-invalid');
         }
+        if (representativeDni) {
+            representativeDni.value = '';
+        }
+        clearFieldError('password');
+        clearFieldError('dni_representante');
         await nextTick();
-        root.value?.querySelector<HTMLElement>('[role="alert"]')?.focus();
+        if (message.value === 'El correo o el CIF/NIF ya está registrado.') {
+            setFieldError('email', message.value);
+            setFieldError('cif', message.value);
+            await nextTick();
+            form.querySelector<HTMLInputElement>('input[name="email"]')?.focus();
+        } else {
+            root.value?.querySelector<HTMLElement>('[role="alert"]')?.focus();
+        }
     } finally {
         form?.removeAttribute('aria-busy');
         if (submit && status.value !== 'success') {
