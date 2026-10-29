@@ -11,6 +11,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
     "check": "npm run build",
     "docs:dev": "vitepress dev docs_md",
     "docs:build": "vitepress build docs_md",
@@ -30,6 +31,7 @@
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "vitepress": "^1.6.4",
+    "vitest": "^3.2.4",
     "vue-tsc": "^2.2.0"
   },
   "overrides": {

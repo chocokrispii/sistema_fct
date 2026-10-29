@@ -43,7 +43,7 @@ class EmpresaController {
         $direccion = $input['direccion'];
         $contacto = $input['persona_contacto'];
 
-        if (!SpanishDataValidator::isNifPersonaJuridica($nif) && !SpanishDataValidator::isPassport($input['nif_persona_juridica'])) {
+        if (!SpanishDataValidator::isNifPersonaJuridica($nif)) {
             $this->mostrarFormulario('Introduce un NIF (Persona Jurídica) con un carácter de control válido.');
             return;
         }
