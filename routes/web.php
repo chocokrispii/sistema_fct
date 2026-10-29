@@ -24,6 +24,7 @@ $routes = [
     'solicitudes-empresa' => ['method' => 'GET', 'roles' => ['Administrador'], 'controller' => EmpresaController::class, 'action' => 'solicitudes'],
     'gestion-empresas' => ['method' => 'GET', 'roles' => ['Administrador'], 'controller' => EmpresaController::class, 'action' => 'hubAdmin'],
     'aprobar-empresa' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => EmpresaController::class, 'action' => 'aprobarSolicitud'],
+    'importar-empresas' => ['method' => ['GET', 'POST'], 'roles' => ['Administrador', 'Coordinador'], 'controller' => EmpresaController::class, 'action' => 'importar'],
     'mi-empresa' => ['method' => 'GET', 'roles' => ['Empresa'], 'controller' => EmpresaController::class, 'action' => 'hub'],
     'onboarding-empresa' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => EmpresaController::class, 'action' => 'onboarding'],
     'ofertas' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador', 'Empresa'], 'controller' => OfertaController::class, 'action' => 'listar'],
