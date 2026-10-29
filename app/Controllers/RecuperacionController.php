@@ -42,6 +42,15 @@ class RecuperacionController
         ]);
     }
 
+    public function hubAdmin(): void
+    {
+        $pendientesReenvio = (int)getPDOConnection()->query(
+            "SELECT COUNT(*) FROM activation_resend_requests WHERE estado = 'Pendiente de Reenvío'"
+        )->fetchColumn();
+
+        View::render('admin/gestion-cuentas', ['pendientesReenvio' => $pendientesReenvio]);
+    }
+
     public function verificar(): void
     {
         $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);

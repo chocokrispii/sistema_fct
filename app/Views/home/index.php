@@ -67,20 +67,12 @@
         </div>
     <?php elseif ($rolActual === 'Empresa'): ?>
         <div class="site-home__features">
-            <article class="site-home__feature">
-                <h3>Ofertas de prácticas</h3>
-                <p>Publica plazas y consulta su estado de revisión.</p>
-                <a href="index.php?action=publicar-oferta">Gestionar ofertas</a>
-            </article>
-            <article class="site-home__feature">
-                <h3>Convenios</h3>
-                <p>Registra documentos vinculados a ciclos formativos y revisa su estado.</p>
-                <a href="index.php?action=convenios">Gestionar convenios</a>
-            </article>
-            <article class="site-home__feature">
-                <h3>Sedes</h3>
-                <p>Administra las sedes asociadas a tu empresa.</p>
-                <a href="index.php?action=sedes">Gestionar sedes</a>
+            <article class="site-home__feature site-home__feature--company-hub">
+                <h3>Mi empresa</h3>
+                <p>Gestiona en un mismo espacio tus datos fiscales, sedes, convenios y ofertas de prácticas.</p>
+                <div class="site-home__feature-links">
+                    <a href="index.php?action=mi-empresa">Abrir gestión de empresa</a>
+                </div>
             </article>
         </div>
     <?php elseif (in_array($rolActual, ['Administrador', 'Coordinador'], true)): ?>

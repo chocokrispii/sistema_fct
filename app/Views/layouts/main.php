@@ -45,35 +45,37 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                 </svg>
             </summary>
             <nav class="site-navigation" aria-label="Navegación principal">
-                <div class="site-navigation__links">
+                <?php if ($usuarioAutenticado): ?>
+                    <div data-vue-island="TabNavigation" data-prop-role="<?= htmlspecialchars((string)$rolActual, ENT_QUOTES, 'UTF-8') ?>"></div>
+                <?php endif; ?>
+                <div class="site-navigation__links site-navigation__links--fallback">
             <a href="index.php">Inicio</a>
-            <?php if (in_array($rolActual, ['Administrador', 'Coordinador', 'Observador', 'Empresa'], true)): ?>
+            <?php if (in_array($rolActual, ['Administrador', 'Coordinador', 'Observador'], true)): ?>
                 <a href="index.php?action=ofertas">Ofertas</a>
             <?php endif; ?>
             <?php if ($rolActual === 'Empresa'): ?>
-                <a href="index.php?action=publicar-oferta">Publicar oferta</a>
-                <a href="index.php?action=sedes">Sedes</a>
-                <a href="index.php?action=convenios">Convenios</a>
+                <a class="site-navigation__company-link" href="index.php?action=mi-empresa">Mi empresa</a>
             <?php elseif (in_array($rolActual, ['Administrador', 'Coordinador'], true)): ?>
                 <a href="index.php?action=alumnos-centro">Alumnado</a>
-                <a href="index.php?action=revisar-convenios">Revisar convenios</a>
+                <?php if ($rolActual === 'Coordinador'): ?>
+                    <a href="index.php?action=revisar-convenios">Revisar convenios</a>
+                <?php endif; ?>
                 <a href="index.php?action=revisar-ofertas">Revisar ofertas</a>
                 <a href="index.php?action=emparejar">Emparejar alumnos</a>
                 <a href="index.php?action=asignaciones">Asignaciones</a>
-                <a href="index.php?action=consultas">Consultas</a>
+                <?php if ($rolActual === 'Coordinador'): ?>
+                    <a href="index.php?action=consultas">Consultas</a>
+                <?php endif; ?>
                 <a href="index.php?action=calificaciones">Calificaciones</a>
-                <a href="index.php?action=recuperaciones">Recuperaciones</a>
                 <?php if ($rolActual === 'Administrador'): ?>
-                    <a href="index.php?action=usuarios">Usuarios</a>
-                    <a href="index.php?action=solicitudes-activacion">
-                        Reenvíos de activación
+                    <a href="index.php?action=gestion-empresas">Gestión de empresas</a>
+                    <a href="index.php?action=gestion-cuentas">
+                        Cuentas y recuperación
                         <?php if ($pendientesReenvioActivacion > 0): ?>
                             <span class="status-badge status-badge--pending"><?= $pendientesReenvioActivacion ?> pendientes</span>
                         <?php endif; ?>
                     </a>
-                    <a href="index.php?action=solicitudes-empresa">Altas de empresas</a>
                     <a href="index.php?action=ciclos">Ciclos formativos</a>
-                    <a href="index.php?action=archivo-convenios">Archivo de convenios</a>
                     <a href="index.php?action=integraciones">Integraciones</a>
                 <?php endif; ?>
             <?php elseif ($rolActual === 'Observador'): ?>
@@ -86,6 +88,8 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                 <a href="index.php?action=perfil-alumno">Editar perfil</a>
                 <a href="index.php?action=disponibilidad">Mi disponibilidad</a>
                 <a href="index.php?action=mis-asignaciones">Mis prácticas</a>
+                <a href="index.php?action=documentacion-inicio">Documentación de inicio</a>
+                <a href="index.php?action=documentacion-cierre">Documentación de cierre</a>
                 <a href="index.php?action=mis-calificaciones">Mis calificaciones</a>
             <?php endif; ?>
             <?php if (!$usuarioAutenticado): ?>
