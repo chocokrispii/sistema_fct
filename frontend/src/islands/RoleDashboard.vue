@@ -13,6 +13,7 @@ const roleCards = {
     ],
     Empresa: [
         { title: 'Mi empresa', description: 'Gestiona datos fiscales, sedes, convenios y ofertas desde un único espacio.', action: 'mi-empresa', label: 'Gestionar mi empresa' },
+        { title: 'Evaluación final', description: 'Consulta la documentación recibida y entrega el informe final del alumnado asignado.', action: 'evaluaciones-empresa', label: 'Gestionar evaluaciones' },
     ],
     Coordinador: [
         { title: 'Revisiones', description: 'Consulta las ofertas y convenios pendientes; las decisiones corresponden a administración.', action: 'revisar-ofertas', label: 'Revisar ofertas' },
@@ -42,7 +43,7 @@ onMounted(() => {
         <p v-if="session.status === 'loading'" role="status">Cargando tu panel…</p>
         <div v-else-if="session.status === 'error'" class="message message-error" role="alert">
             <p>{{ session.error }}</p>
-            <button type="button" @click="session.initialize()">Reintentar</button>
+            <button type="button" @click="session.initialize(session.csrfToken)">Reintentar</button>
         </div>
         <div v-else-if="session.user" class="site-home__hero">
             <p v-if="session.error" class="message message-error" role="alert">

@@ -40,6 +40,13 @@ $sedesCount = count($sedes);
                 <small>Publica plazas y consulta el estado de tus ofertas.</small>
             </span>
         </a>
+        <a class="company-hub__card company-hub__card--evaluation" href="index.php?action=evaluaciones-empresa">
+            <span class="company-hub__step">5</span>
+            <span>
+                <strong>Evaluaciones finales</strong>
+                <small>Consulta el alumnado asignado y entrega el informe Apto o No Apto.</small>
+            </span>
+        </a>
     </div>
 
     <p class="company-hub__help">¿Es tu primera vez? Empieza por <a href="index.php?action=onboarding-empresa">Datos de empresa</a> y sigue los pasos numerados.</p>

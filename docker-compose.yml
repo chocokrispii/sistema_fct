@@ -104,6 +104,7 @@ services:
       - ./database/migrations/020_alta_empresa_y_recuperacion_admin.sql:/docker-entrypoint-initdb.d/024-alta-empresa-recuperacion-admin.sql:ro
       - ./database/migrations/021_documentacion_cierre_alumno.sql:/docker-entrypoint-initdb.d/025-documentacion-cierre-alumno.sql:ro
       - ./database/migrations/022_documentacion_inicio_asignacion.sql:/docker-entrypoint-initdb.d/026-documentacion-inicio-asignacion.sql:ro
+      - ./database/migrations/023_evaluacion_empresa.sql:/docker-entrypoint-initdb.d/027-evaluacion-empresa.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -138,8 +139,10 @@ services:
           AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alumnos'
           AND COLUMN_NAME = 'tipo_documento')
-          AND EXISTS (SELECT 1 FROM information_schema.TABLES
-          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documentacion_cierre_fct'), 1, 0)")" = "1"
+            AND EXISTS (SELECT 1 FROM information_schema.TABLES
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documentacion_cierre_fct')
+            AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asignaciones_fct' AND COLUMN_NAME = 'evaluacion_dictamen'), 1, 0)")" = "1"
       interval: 10s
       timeout: 5s
       retries: 10

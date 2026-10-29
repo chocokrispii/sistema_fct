@@ -30,9 +30,9 @@ const tabsByRole: Record<string, NavigationTab[]> = {
         { id: 'gestion', label: 'Gestión', items: [{ label: 'Emparejar alumnos', action: 'emparejar' }, { label: 'Asignaciones', action: 'asignaciones' }, { label: 'Consultas', action: 'consultas' }] },
         { id: 'ofertas', label: 'Ofertas y convenios', items: [{ label: 'Ofertas', action: 'ofertas' }, { label: 'Revisar ofertas', action: 'revisar-ofertas' }, { label: 'Revisar convenios', action: 'revisar-convenios' }] },
     ],
-    Empresa: [
-        { id: 'empresa', label: 'Mi empresa', items: [{ label: 'Panel de empresa', action: 'mi-empresa' }] },
-    ],
+      Empresa: [
+        { id: 'empresa', label: 'Mi empresa', items: [{ label: 'Panel de empresa', action: 'mi-empresa' }, { label: 'Evaluaciones finales', action: 'evaluaciones-empresa' }] },
+      ],
     Alumno: [
         { id: 'expediente', label: 'Mi expediente', items: [{ label: 'Resumen', action: 'portal-alumno' }, { label: 'Editar perfil', action: 'perfil-alumno' }] },
         { id: 'practicas', label: 'Mis prácticas', items: [{ label: 'Disponibilidad', action: 'disponibilidad' }, { label: 'Asignaciones', action: 'mis-asignaciones' }, { label: 'Documentación de inicio', action: 'documentacion-inicio' }, { label: 'Documentación de cierre', action: 'documentacion-cierre' }, { label: 'Calificaciones', action: 'mis-calificaciones' }] },
