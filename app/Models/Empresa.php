@@ -48,6 +48,27 @@ class Empresa {
         }
     }
 
+    public function crearImportada(int $usuarioId, string $cif, string $nombreEmpresa, string $personaContacto, int $adminId): int
+    {
+        $stmt = $this->db->prepare(
+            "INSERT INTO empresas (usuario_id, nombre_empresa, cif_empresa, persona_contacto, estado_solicitud, aprobada_por, aprobada_en)
+             VALUES (:usuario_id, :nombre, :cif, :contacto, 'Aprobada', :admin, CURRENT_TIMESTAMP)"
+        );
+        $stmt->execute([
+            'usuario_id' => $usuarioId,
+            'nombre' => $nombreEmpresa,
+            'cif' => $cif,
+            'contacto' => $personaContacto,
+            'admin' => $adminId,
+        ]);
+        $empresaId = (int)$this->db->lastInsertId();
+        $direccion = $this->db->prepare(
+            'INSERT INTO direcciones_telefonos (empresa_id, direccion_completa) VALUES (:empresa_id, :direccion)'
+        );
+        $direccion->execute(['empresa_id' => $empresaId, 'direccion' => 'Pendiente de completar por la empresa']);
+        return $empresaId;
+    }
+
     public function obtenerPorUsuarioId(int $usuarioId): ?array {
         $stmt = $this->db->prepare('SELECT * FROM empresas WHERE usuario_id = :usuario_id LIMIT 1');
         $stmt->execute(['usuario_id' => $usuarioId]);

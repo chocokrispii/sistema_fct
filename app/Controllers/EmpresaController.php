@@ -7,6 +7,8 @@ require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../Core/AccountActivationMailer.php';
 require_once __DIR__ . '/../Core/ActivationUrl.php';
 require_once __DIR__ . '/../Core/FileScanner.php';
+require_once __DIR__ . '/../Core/CompanyImportParser.php';
+require_once __DIR__ . '/../Core/CompanyImporter.php';
 require_once __DIR__ . '/../../config/storage.php';
 
 class EmpresaController {
@@ -198,6 +200,63 @@ class EmpresaController {
     {
         header('Location: index.php?action=solicitudes-empresa&error=' . rawurlencode($message));
         exit;
+    }
+
+    public function importar(): void
+    {
+        $json = JsonResponse::wantsJson();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            View::render('admin/importar-empresas', ['error' => '', 'resultado' => null]);
+            return;
+        }
+
+        $archivo = $_FILES['archivo_empresas'] ?? null;
+        $error = '';
+        $status = 422;
+        $resultado = null;
+        try {
+            if (!is_array($archivo) || ($archivo['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
+                || !is_string($archivo['tmp_name'] ?? null) || !is_string($archivo['name'] ?? null)
+                || !is_int($archivo['size'] ?? null) || $archivo['size'] < 1 || $archivo['size'] > 5 * 1024 * 1024
+                || !is_uploaded_file($archivo['tmp_name'])) {
+                throw new CompanyImportException('Adjunta un archivo .xlsx o .pdf de hasta 5 MB.');
+            }
+            $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+            $mime = (new finfo(FILEINFO_MIME_TYPE))->file($archivo['tmp_name']);
+            $validMime = match ($extension) {
+                'pdf' => $mime === 'application/pdf',
+                'xlsx' => in_array($mime, ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip'], true),
+                default => false,
+            };
+            if (!$validMime) {
+                throw new CompanyImportException('El archivo debe ser un Excel (.xlsx) o un PDF válido.');
+            }
+
+            // Fail-closed: cualquier fallo o detección del antivirus aborta antes de leer el contenido.
+            try {
+                FileScanner::scan($archivo['tmp_name']);
+            } catch (Throwable $e) {
+                error_log('SECURITY importación de empresas bloqueada por el antivirus: ' . $e->getMessage());
+                $status = 503;
+                throw new CompanyImportException('El archivo no superó el análisis antivirus o el análisis no está disponible.');
+            }
+
+            $hash = hash_file('sha256', $archivo['tmp_name']) ?: '';
+            $filas = CompanyImportParser::parse($archivo['tmp_name'], $extension);
+            $resultado = (new CompanyImporter($this->db))->import($filas, (int)$_SESSION['usuario_id'], $archivo['name'], $hash);
+        } catch (CompanyImportException $e) {
+            $error = $e->getMessage();
+        } catch (Throwable $e) {
+            error_log('Error en la importación de empresas: ' . $e->getMessage());
+            $status = 500;
+            $error = 'No se pudo completar la importación. Contacta con el administrador del sistema.';
+        }
+
+        if ($json) {
+            $resultado !== null ? JsonResponse::success($resultado) : JsonResponse::failure($error, $status);
+            return;
+        }
+        View::render('admin/importar-empresas', ['error' => $error, 'resultado' => $resultado]);
     }
 
     public function listarParaCentro(): void
