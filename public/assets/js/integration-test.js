@@ -1,3 +1,5 @@
+import { isApiResponse } from './api-response.js';
+
 (() => {
     const panel = document.querySelector('[data-api-test-form]');
     if (!(panel instanceof HTMLElement)) {
@@ -79,6 +81,7 @@
         const options = {
             method,
             headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
+            credentials: 'omit',
             cache: 'no-store',
         };
         if (requestBody !== undefined) {
@@ -91,17 +94,31 @@
             const result = await fetch(url, options);
             const responseText = await result.text();
             let formatted;
+            let payload;
+            let validEnvelope = false;
             try {
-                formatted = JSON.stringify(JSON.parse(responseText), null, 2);
+                payload = JSON.parse(responseText);
+                validEnvelope = isApiResponse(payload);
+                formatted = JSON.stringify(payload, null, 2);
             } catch {
                 formatted = responseText || '(respuesta vacía)';
             }
             const errorCode = result.headers.get('X-API-Error-Code');
-            const statusDetail = result.ok
-                ? ' · solicitud completada'
-                : errorCode
-                    ? ' · ' + errorCode
-                    : ' · revisa el error devuelto';
+            let statusDetail;
+            if (!validEnvelope) {
+                statusDetail = ' · sobre ApiResponse no válido';
+            } else if (payload.success === false) {
+                statusDetail = ' · error API: ' + payload.error;
+                if (errorCode) {
+                    statusDetail += ' · ' + errorCode;
+                }
+            } else {
+                statusDetail = result.ok
+                    ? ' · respuesta ApiResponse válida'
+                    : errorCode
+                        ? ' · ' + errorCode
+                        : ' · revisa el error devuelto';
+            }
             status.textContent = 'HTTP ' + result.status + statusDetail;
             response.textContent = formatted;
         } catch (error) {

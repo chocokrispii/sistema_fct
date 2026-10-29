@@ -142,6 +142,8 @@ Cada bloque representa un recorrido independiente; las reglas compartidas de ses
 
 ### Convenciones de seguridad y respuesta
 
+- La comunicación de las islas, el cliente `requestApi` y la separación respecto
+  de la API REST tokenizada se detallan en [Comunicación frontend-backend](/arquitectura/comunicacion-frontend).
 - `public/index.php` inicia una sesión PHP con `HttpOnly`, `SameSite=Lax` y `Secure` cuando la petición usa HTTPS; además establece CSP y cabeceras de protección.
 - Las rutas con roles consultan usuario y estado activo en MariaDB antes de despachar. Las rutas POST verifican CSRF: campo `_csrf` en formularios o cabecera `X-CSRF-Token` en JSON.
 - El transporte JSON está implementado en `JsonResponse`. Login, sesión, logout, disponibilidad, asignaciones, calificaciones y revisiones progresivas lo usan con `{ success, data }` o `{ success, error }`; las vistas tradicionales conservan sus formularios y redirecciones.

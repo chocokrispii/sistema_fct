@@ -149,20 +149,33 @@ try {
             && !str_contains($companyHtml, 'CIF'),
         'El alta de empresa debe etiquetar su NIF de persona jurídica y no solicitar contraseña antes de activar.'
     );
-    foreach (['B12345678', 'P1234567E', '12345678Z', 'AB1234', '', ['B12345674']] as $invalidNif) {
+    foreach ([
+        ['B12345674', true],
+        ['B12345678', false],
+        ['P1234567E', false],
+        ['12345678Z', false],
+        ['AB1234', false],
+        ['', false],
+        [['B12345674'], false],
+    ] as [$identifier, $isValidIdentifier]) {
         $_POST = [
-            'nif_persona_juridica' => $invalidNif, 'email' => 'empresa@example.test',
+            'nif_persona_juridica' => $identifier, 'email' => 'empresa@example.test',
             'password' => 'PasswordDePrueba123!', 'nombre_comercial' => 'Empresa de prueba',
             'direccion' => 'Calle de prueba 1', 'telefono' => '', 'persona_contacto' => '',
         ];
         $html = captureIdentityOutput(fn() => $company->registrar());
-        assertIdentity(str_contains($html, 'role="alert"'), 'El NIF de empresa inválido debe mostrar un error.');
-        if (is_string($invalidNif)) {
-            assertIdentity(
-                str_contains($html, 'Introduce un NIF (Persona Jurídica) con un carácter de control válido.'),
-                'El mensaje debe explicar el error del NIF de empresa.'
-            );
-        }
+        assertIdentity(str_contains($html, 'role="alert"'), 'El registro de empresa debe mostrar errores de validación.');
+        $expectedMessage = $isValidIdentifier
+            ? 'Completa correctamente todos los campos obligatorios.'
+            : (is_string($identifier)
+                ? 'Introduce un NIF (Persona Jurídica) con un carácter de control válido.'
+                : 'Los datos del registro deben ser valores de texto válidos.');
+        assertIdentity(
+            str_contains($html, $expectedMessage),
+            $isValidIdentifier
+                ? 'El NIF de persona jurídica válido debe superar la validación del identificador.'
+                : 'El identificador de empresa inválido debe mostrar el error correspondiente.'
+        );
         assertIdentity(preg_match('/\bCIF\b/i', $html) === 0, 'El registro de empresa no debe contener CIF.');
         assertIdentity(str_contains($html, 'name="nif_persona_juridica"'), 'El formulario debe usar el campo NIF de empresa.');
     }

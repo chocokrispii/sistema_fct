@@ -28,6 +28,7 @@ export default defineConfig({
       { text: 'Visión General', link: '/' },
       { text: 'Arquitectura y Flujo de Datos', link: '/flujo-de-datos' },
       { text: 'Diagrama completo', link: '/diagrama-completo' },
+      { text: 'Comunicación frontend-backend', link: '/arquitectura/comunicacion-frontend' },
       { text: 'Hoja de ruta de migración', link: '/roadmap' },
       { text: 'Roles y permisos', link: '/roles_y_permisos' },
       { text: 'Paginación y consultas', link: '/optimizacion_consultas' },

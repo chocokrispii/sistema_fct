@@ -46,4 +46,4 @@
     <p class="integration-test__status" data-api-status role="status" aria-live="polite"></p>
     <pre class="integration-test__response" data-api-response>No se ha enviado ninguna solicitud.</pre>
 </section>
-<script src="assets/js/integration-test.js" defer></script>
+<script type="module" src="assets/js/integration-test.js"></script>
