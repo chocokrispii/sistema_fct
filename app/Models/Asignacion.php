@@ -21,6 +21,11 @@ class Asignacion
     {
     }
 
+    public function getDb(): PDO
+    {
+        return $this->db;
+    }
+
     public function listar(bool $soloPropias = false, int $usuarioId = 0, bool $anonimizarAlumnado = false): array
     {
         [$sql, $params] = $this->consultaListado($soloPropias, $usuarioId, $anonimizarAlumnado);

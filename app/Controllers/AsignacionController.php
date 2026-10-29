@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../Models/Asignacion.php';
 require_once __DIR__ . '/../Models/Oferta.php';
 require_once __DIR__ . '/../Core/JsonResponse.php';
+require_once __DIR__ . '/../Services/DocumentacionInicioService.php';
 
 class AsignacionController
 {
@@ -160,12 +161,13 @@ class AsignacionController
         }
 
         try {
-            $this->model->crear(
+            $assignmentId = $this->model->crear(
                 (int)$offerId,
                 (int)$studentId,
                 (int)$_SESSION['usuario_id'],
                 $tutor
             );
+            (new DocumentacionInicioService($this->model->getDb()))->generarYNotificar($assignmentId, (int)$_SESSION['usuario_id']);
         } catch (Throwable $e) {
             error_log('No se pudo asignar alumno: ' . $e->getMessage());
             $safeMessages = [

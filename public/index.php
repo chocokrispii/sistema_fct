@@ -13,6 +13,8 @@ require_once __DIR__ . '/../app/Controllers/InicioController.php';
 require_once __DIR__ . '/../app/Controllers/AuthController.php';
 require_once __DIR__ . '/../app/Controllers/RecuperacionController.php';
 require_once __DIR__ . '/../app/Controllers/AlumnoController.php';
+require_once __DIR__ . '/../app/Controllers/DocumentacionAlumnoController.php';
+require_once __DIR__ . '/../app/Controllers/DocumentacionInicioController.php';
 require_once __DIR__ . '/../app/Controllers/EmpresaController.php';
 require_once __DIR__ . '/../app/Controllers/OfertaController.php';
 require_once __DIR__ . '/../app/Controllers/DisponibilidadController.php';
