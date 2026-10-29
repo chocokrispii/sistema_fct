@@ -44,7 +44,7 @@ class EmpresaController {
         $contacto = $input['persona_contacto'];
 
         if (!SpanishDataValidator::isNifPersonaJuridica($nif) && !SpanishDataValidator::isPassport($input['nif_persona_juridica'])) {
-            $this->mostrarFormulario('Introduce un NIF o pasaporte válido.');
+            $this->mostrarFormulario('Introduce un NIF (Persona Jurídica) con un carácter de control válido.');
             return;
         }
 
@@ -246,5 +246,171 @@ class EmpresaController {
             'sedes' => $this->empresaModel->obtenerSedes((int)$empresa['id']),
             'error' => $error,
         ]);
+    }
+
+    public function onboarding(): void
+    {
+        $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+        $empresa = $this->empresaModel->obtenerPorUsuarioId($usuarioId);
+        if ($empresa === null) {
+            throw new RuntimeException('No se encontró el perfil de empresa.');
+        }
+
+        $contacto = $this->empresaModel->obtenerContactoPrincipal((int)$empresa['id']);
+        $sedes = $this->empresaModel->obtenerSedes((int)$empresa['id']);
+        $error = '';
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $nombre = trim((string)($_POST['nombre_empresa'] ?? ''));
+            $nif = SpanishDataValidator::normalizeFiscalIdentifier((string)($_POST['cif_empresa'] ?? ''));
+            $representante = trim((string)($_POST['persona_contacto'] ?? ''));
+            $telefono = trim((string)($_POST['telefono'] ?? ''));
+            $direccion = trim((string)($_POST['direccion'] ?? ''));
+            $sedesInput = $_POST['sedes'] ?? [];
+
+            if (!is_array($sedesInput)) {
+                $sedesInput = [];
+            }
+            $sedesValidadas = [];
+            foreach ($sedesInput as $sede) {
+                if (!is_array($sede)) {
+                    continue;
+                }
+                $sedeNombre = trim((string)($sede['nombre'] ?? ''));
+                $sedeDireccion = trim((string)($sede['direccion'] ?? ''));
+                $sedeTelefono = trim((string)($sede['telefono'] ?? ''));
+                if ($sedeNombre === '' && $sedeDireccion === '' && $sedeTelefono === '') {
+                    continue;
+                }
+                if ($sedeNombre === '' || mb_strlen($sedeNombre) > 150
+                    || $sedeDireccion === '' || mb_strlen($sedeDireccion) > 255
+                    || mb_strlen($sedeTelefono) > 20) {
+                    $error = 'Completa correctamente el nombre, la dirección y el teléfono opcional de cada sede.';
+                    break;
+                }
+                $sedesValidadas[] = [
+                    'nombre' => $sedeNombre,
+                    'direccion' => $sedeDireccion,
+                    'telefono' => $sedeTelefono,
+                ];
+            }
+
+            if ($error === '' && (
+                $nombre === '' || mb_strlen($nombre) > 150
+                || !SpanishDataValidator::isNifPersonaJuridica($nif)
+                || $representante === '' || mb_strlen($representante) > 150
+                || $telefono === '' || !SpanishDataValidator::isSpanishPhone($telefono)
+                || $direccion === '' || mb_strlen($direccion) > 255
+                || $sedesValidadas === []
+            )) {
+                $error = 'Completa la razón social, un NIF jurídico válido, los datos del representante y al menos una sede.';
+            }
+
+            if ($error === '') {
+                try {
+                    $this->db->beginTransaction();
+                    $updateEmpresa = $this->db->prepare(
+                        'UPDATE empresas
+                         SET nombre_empresa = :nombre, cif_empresa = :cif, persona_contacto = :contacto
+                         WHERE id = :id AND usuario_id = :usuario_id'
+                    );
+                    $updateEmpresa->execute([
+                        'nombre' => $nombre,
+                        'cif' => $nif,
+                        'contacto' => $representante,
+                        'id' => (int)$empresa['id'],
+                        'usuario_id' => $usuarioId,
+                    ]);
+
+                    $contactoExistente = $this->db->prepare(
+                        'SELECT id FROM direcciones_telefonos WHERE empresa_id = :empresa_id ORDER BY es_principal DESC, id LIMIT 1'
+                    );
+                    $contactoExistente->execute(['empresa_id' => (int)$empresa['id']]);
+                    $contactoId = $contactoExistente->fetchColumn();
+                    if ($contactoId !== false) {
+                        $actualizarContacto = $this->db->prepare(
+                            'UPDATE direcciones_telefonos
+                             SET telefono = :telefono, direccion_completa = :direccion, es_principal = 1
+                             WHERE id = :id AND empresa_id = :empresa_id'
+                        );
+                        $actualizarContacto->execute([
+                            'telefono' => SpanishDataValidator::normalizePhone($telefono),
+                            'direccion' => $direccion,
+                            'id' => (int)$contactoId,
+                            'empresa_id' => (int)$empresa['id'],
+                        ]);
+                    } else {
+                        $crearContacto = $this->db->prepare(
+                            'INSERT INTO direcciones_telefonos (empresa_id, telefono, direccion_completa, es_principal)
+                             VALUES (:empresa_id, :telefono, :direccion, 1)'
+                        );
+                        $crearContacto->execute([
+                            'empresa_id' => (int)$empresa['id'],
+                            'telefono' => SpanishDataValidator::normalizePhone($telefono),
+                            'direccion' => $direccion,
+                        ]);
+                    }
+
+                    $desactivarSedes = $this->db->prepare(
+                        'UPDATE empresa_sedes SET activa = 0 WHERE empresa_id = :empresa_id'
+                    );
+                    $desactivarSedes->execute(['empresa_id' => (int)$empresa['id']]);
+                    $crearSede = $this->db->prepare(
+                        'INSERT INTO empresa_sedes (empresa_id, nombre, direccion, telefono, activa)
+                         VALUES (:empresa_id, :nombre, :direccion, :telefono, 1)'
+                    );
+                    foreach ($sedesValidadas as $sede) {
+                        $crearSede->execute([
+                            'empresa_id' => (int)$empresa['id'],
+                            'nombre' => $sede['nombre'],
+                            'direccion' => $sede['direccion'],
+                            'telefono' => $sede['telefono'] !== '' ? SpanishDataValidator::normalizePhone($sede['telefono']) : null,
+                        ]);
+                    }
+                    $this->db->commit();
+                    header('Location: index.php?onboarding=1');
+                    exit;
+                } catch (Throwable $exception) {
+                    if ($this->db->inTransaction()) {
+                        $this->db->rollBack();
+                    }
+                    error_log('Error al completar onboarding de empresa: ' . $exception->getMessage());
+                    $error = $exception instanceof PDOException
+                        ? 'No se pudieron guardar los datos. Comprueba que el NIF jurídico no esté ya registrado.'
+                        : 'No se pudieron guardar todos los datos. Inténtalo de nuevo.';
+                }
+            }
+
+            $empresa['nombre_empresa'] = $nombre;
+            $empresa['cif_empresa'] = $nif;
+            $empresa['persona_contacto'] = $representante;
+            $contacto = ['telefono' => $telefono, 'direccion_completa' => $direccion];
+            $sedes = $sedesValidadas;
+        }
+
+        View::render('empresas/onboarding', [
+            'empresa' => $empresa,
+            'contacto' => $contacto,
+            'sedes' => $sedes,
+            'error' => $error,
+        ]);
+    }
+
+    public function hub(): void
+    {
+        $empresa = $this->empresaModel->obtenerPorUsuarioId((int)($_SESSION['usuario_id'] ?? 0));
+        if ($empresa === null) {
+            throw new RuntimeException('No se encontró el perfil de empresa.');
+        }
+
+        View::render('empresas/hub', [
+            'empresa' => $empresa,
+            'sedes' => $this->empresaModel->obtenerSedes((int)$empresa['id']),
+        ]);
+    }
+
+    public function hubAdmin(): void
+    {
+        View::render('admin/gestion-empresas');
     }
 }

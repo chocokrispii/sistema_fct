@@ -101,7 +101,7 @@ class AuthController {
         }
 
         $destino = match ($usuario['rol']) {
-            'Empresa' => 'publicar-oferta',
+            'Empresa' => 'inicio',
             'Alumno' => 'portal-alumno',
             'Observador' => 'asignaciones',
             default => 'inicio',

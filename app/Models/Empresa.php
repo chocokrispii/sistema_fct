@@ -94,6 +94,21 @@ class Empresa {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function obtenerContactoPrincipal(int $empresaId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT telefono, direccion_completa
+             FROM direcciones_telefonos
+             WHERE empresa_id = :empresa_id
+             ORDER BY es_principal DESC, id
+             LIMIT 1'
+        );
+        $stmt->execute(['empresa_id' => $empresaId]);
+        $contacto = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($contacto) ? $contacto : ['telefono' => '', 'direccion_completa' => ''];
+    }
+
     public function crearSede(int $empresaId, string $nombre, string $direccion, string $telefono): int
     {
         $stmt = $this->db->prepare(

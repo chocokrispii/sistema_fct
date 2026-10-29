@@ -42,7 +42,7 @@
                 </div>
 
                 <div class="company-registration__field">
-                    <label for="company-nif">NIF o pasaporte <span aria-hidden="true">*</span></label>
+                    <label for="company-nif">NIF (Persona Jurídica) <span aria-hidden="true">*</span></label>
                     <input id="company-nif" type="text" name="nif_persona_juridica" maxlength="20" autocomplete="off" placeholder="Ej. B12345674" aria-describedby="company-nif-help" required>
                     <small id="company-nif-help">Introduce un NIF o pasaporte válido.</small>
                 </div>

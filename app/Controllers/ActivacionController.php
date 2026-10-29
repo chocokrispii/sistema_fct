@@ -74,6 +74,22 @@ class ActivacionController
                 );
                 $markUsed->execute(['token_hash' => hash('sha256', $token)]);
                 $db->commit();
+                if ($companyActivation) {
+                    $account = $db->prepare('SELECT id, email, rol FROM usuarios WHERE id = :id AND activo = 1');
+                    $account->execute(['id' => (int)$activation['usuario_id']]);
+                    $row = $account->fetch(PDO::FETCH_ASSOC);
+                    if (is_array($row)) {
+                        session_regenerate_id(true);
+                        unset($_SESSION['csrf_token']);
+                        $_SESSION['usuario_id'] = (int)$row['id'];
+                        $_SESSION['email'] = (string)$row['email'];
+                        $_SESSION['rol'] = (string)$row['rol'];
+                    }
+                    if (PHP_SAPI !== 'cli') {
+                        header('Location: index.php?action=onboarding-empresa');
+                        exit;
+                    }
+                }
                 View::render('auth/activation', [
                     'error' => '',
                     'token' => '',
