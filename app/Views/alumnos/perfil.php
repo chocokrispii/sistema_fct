@@ -43,9 +43,9 @@ $vueProfileState = [
                         <option value="PASAPORTE" <?= $values['tipo_documento'] === 'PASAPORTE' ? 'selected' : '' ?>>Pasaporte</option>
                     </select>
                     <label for="profile-dni">Número de documento</label>
-                    <input id="profile-dni" name="dni" maxlength="20" autocomplete="off" value="<?= htmlspecialchars($values['dni'], ENT_QUOTES, 'UTF-8') ?>" data-spanish-id aria-invalid="<?= isset($fieldErrors['dni']) ? 'true' : 'false' ?>" required>
+                    <input id="profile-dni" name="dni" maxlength="<?= $values['tipo_documento'] === 'PASAPORTE' ? 15 : 20 ?>" autocomplete="off" value="<?= htmlspecialchars($values['dni'], ENT_QUOTES, 'UTF-8') ?>" data-spanish-id aria-invalid="<?= isset($fieldErrors['dni']) ? 'true' : 'false' ?>" required>
                     <small id="profile-document-help">Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional.</small>
-                    <small>Para NIF / NIE / DNI se valida el dígito o letra de control.</small>
+                    <small>Para NIF / NIE / DNI se valida el dígito o letra de control. El pasaporte debe tener entre 6 y 15 caracteres alfanuméricos.</small>
                     <small data-field-error><?= htmlspecialchars($fieldErrors['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                 </div>
                 <div class="student-registration__field">

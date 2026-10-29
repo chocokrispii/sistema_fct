@@ -18,6 +18,7 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
 
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=alumnos-centro">
     <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">
+    <div data-vue-island="StudentEnrollmentValidation"></div>
 
     <label for="student-document-type">Tipo de documento</label>
     <select id="student-document-type" name="tipo_documento" aria-describedby="student-document-help" required>
@@ -25,8 +26,8 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
         <option value="PASAPORTE" <?= ($values['tipo_documento'] ?? '') === 'PASAPORTE' ? 'selected' : '' ?>>Pasaporte</option>
     </select>
     <label for="student-dni">Número de documento</label>
-    <input id="student-dni" type="text" name="dni" maxlength="20" autocomplete="off" required value="<?= $escape($values['dni'] ?? '') ?>">
-    <small id="student-document-help">Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional.</small>
+    <input id="student-dni" type="text" name="dni" maxlength="<?= ($values['tipo_documento'] ?? 'NIF_NIE_DNI') === 'PASAPORTE' ? 15 : 20 ?>" autocomplete="off" required value="<?= $escape($values['dni'] ?? '') ?>">
+    <small id="student-document-help">Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional. El pasaporte debe tener entre 6 y 15 caracteres alfanuméricos; el NIF/NIE/DNI se valida con su letra de control.</small>
 
     <label for="student-name">Nombre</label>
     <input id="student-name" type="text" name="nombre" maxlength="50" autocomplete="given-name" required value="<?= $escape($values['nombre'] ?? '') ?>">
