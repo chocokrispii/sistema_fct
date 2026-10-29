@@ -25,7 +25,7 @@
 <?php foreach ($convenios as $item): ?><tr>
     <td><?= htmlspecialchars($item['numero_convenio'], ENT_QUOTES, 'UTF-8') ?></td>
     <td><?= htmlspecialchars($item['nombre_especialidad'] ?? 'Sin clasificar (anterior)', ENT_QUOTES, 'UTF-8') ?></td>
-    <td><?= htmlspecialchars($item['fecha_inicio'] . ' – ' . $item['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
+    <td><?= EuropeanDate::periodBlock($item['fecha_inicio'], $item['fecha_fin']) ?></td>
     <td><?= htmlspecialchars($item['estado'], ENT_QUOTES, 'UTF-8') ?></td>
     <td><?= htmlspecialchars($item['motivo_revision'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
     <td><a href="index.php?action=descargar-convenio&id=<?= (int)$item['id'] ?>">Descargar PDF</a></td>

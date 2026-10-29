@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import type { SavedAvailabilitySchedule } from '../types/availability';
+import { formatEuropeanDate } from '../utils/date';
 
 const props = defineProps<{ state: string }>();
 const savedSchedule = ref(JSON.parse(props.state) as SavedAvailabilitySchedule);
@@ -41,9 +42,10 @@ onBeforeUnmount(() => {
 <template>
     <section class="availability-page__current" aria-labelledby="availability-current-title">
         <h3 id="availability-current-title">Horario semanal guardado</h3>
-        <p v-if="savedSchedule.fecha_inicio && savedSchedule.fecha_fin">
-            Registrado de {{ savedSchedule.fecha_inicio }} a {{ savedSchedule.fecha_fin }}
-        </p>
+        <span v-if="savedSchedule.fecha_inicio && savedSchedule.fecha_fin" class="period-range" :aria-label="`Periodo del ${formatEuropeanDate(savedSchedule.fecha_inicio)} al ${formatEuropeanDate(savedSchedule.fecha_fin)}`">
+            <span class="period-range__row"><span class="period-range__label">Inicio</span><time :datetime="savedSchedule.fecha_inicio">{{ formatEuropeanDate(savedSchedule.fecha_inicio) }}</time></span>
+            <span class="period-range__row"><span class="period-range__label">Fin</span><time :datetime="savedSchedule.fecha_fin">{{ formatEuropeanDate(savedSchedule.fecha_fin) }}</time></span>
+        </span>
         <p v-else>Aún no has registrado disponibilidad.</p>
         <p v-if="savedSchedule.es_indiferente">Disponible para cualquier horario.</p>
         <ul v-else-if="savedSchedule.dias.length > 0" class="student-portal__list">

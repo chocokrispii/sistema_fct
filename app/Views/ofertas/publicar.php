@@ -222,7 +222,7 @@
                             <td><strong><?= htmlspecialchars($oferta['titulo'] ?? 'Oferta FCT', ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars((string)($oferta['descripcion'] ?? ''), ENT_QUOTES, 'UTF-8') ?></small><?php if (!empty($oferta['tecnologias'])): ?><small>Tecnologías: <?= htmlspecialchars($oferta['tecnologias'], ENT_QUOTES, 'UTF-8') ?></small><?php endif; ?></td>
                             <td><?= htmlspecialchars($oferta['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></td>
                             <td><?= (int)$oferta['plazas_cuantas'] ?></td>
-                            <td><?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= EuropeanDate::periodBlock($oferta['fecha_inicio'], $oferta['fecha_fin']) ?></td>
                             <td>
                                 <?php if ($oferta['horarios'] === []): ?>
                                     Pendiente de actualizar

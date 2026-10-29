@@ -1364,6 +1364,115 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
     min-height: 40px;
 }
 
+.grades-table-wrap {
+    overflow-x: visible;
+}
+
+.grades-page .assignments-page__intro {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+}
+
+.grades-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.grades-table th,
+.grades-table td {
+    padding: 9px 8px;
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+    font-size: clamp(.72rem, 1.05vw, .88rem);
+}
+
+.grades-table--manager th:nth-child(1) { width: 10%; }
+.grades-table--manager th:nth-child(2) { width: 9%; }
+.grades-table--manager th:nth-child(3) { width: 18%; }
+.grades-table--manager th:nth-child(4) { width: 17%; }
+.grades-table--manager th:nth-child(5) { width: 8%; }
+.grades-table--manager th:nth-child(6) { width: 7%; }
+.grades-table--manager th:nth-child(7) { width: 11%; }
+.grades-table--manager th:nth-child(8) { width: 20%; }
+
+.grades-table--manager th:nth-child(7) {
+    white-space: nowrap;
+}
+
+.grades-table .period-range__row {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 4px;
+    padding: 5px 6px;
+}
+
+.grades-table .period-range time {
+    font-size: clamp(.68rem, .9vw, .78rem);
+}
+
+.grades-table .grade-form {
+    min-width: 0;
+}
+
+.grades-table .grade-form input,
+.grades-table .grade-form textarea,
+.grades-table .grade-form button {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.agreements-archive-page .assignments-page__intro {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+}
+
+.agreements-archive-page .assignments-page__intro p {
+    max-width: 760px;
+}
+
+.agreements-archive-table-wrap {
+    overflow-x: visible;
+}
+
+.agreements-archive-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.agreements-archive-table th:nth-child(1) { width: 12%; }
+.agreements-archive-table th:nth-child(2) { width: 27%; }
+.agreements-archive-table th:nth-child(3) { width: 17%; }
+.agreements-archive-table th:nth-child(4) { width: 22%; }
+.agreements-archive-table th:nth-child(5) { width: 10%; }
+.agreements-archive-table th:nth-child(6) { width: 12%; }
+
+.agreements-archive-table th,
+.agreements-archive-table td {
+    padding: 9px 8px;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+    font-size: clamp(.72rem, 1.05vw, .88rem);
+}
+
+.agreements-archive-table .period-range__row {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 4px;
+    padding: 5px 6px;
+}
+
+.agreements-archive-table .period-range time {
+    font-size: clamp(.67rem, .88vw, .78rem);
+}
+
+.agreements-archive-table details ul {
+    margin: 8px 0 0;
+    padding-left: 16px;
+}
+
 .student-portal__profile-actions,
 .user-actions,
 .user-delete-dialog__actions {
@@ -2688,9 +2797,21 @@ html[data-theme="dark"] .btn-submit {
 .offer-list-section__heading {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
+    flex-direction: column;
     gap: 16px;
     margin: 0 0 18px;
+    text-align: center;
+}
+
+.offer-list-section__heading > div {
+    display: grid;
+    justify-items: center;
+}
+
+.offer-list-section__heading > p {
+    margin: 0;
+    color: var(--color-text-muted);
 }
 
 .offer-list-section__heading h2,
@@ -2708,6 +2829,127 @@ html[data-theme="dark"] .btn-submit {
     color: var(--color-text-muted);
     line-height: 1.5;
     text-align: center;
+}
+
+.offer-list-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.offer-list-table th:nth-child(1) { width: 19%; }
+.offer-list-table th:nth-child(2) { width: 9%; }
+.offer-list-table th:nth-child(3) { width: 13%; }
+.offer-list-table th:nth-child(4) { width: 5%; }
+.offer-list-table th:nth-child(5) { width: 17%; }
+.offer-list-table th:nth-child(6) { width: 16%; }
+.offer-list-table th:nth-child(7) { width: 9%; }
+.offer-list-table th:nth-child(8) { width: 12%; }
+
+.offer-list-table-wrap {
+    overflow-x: visible;
+}
+
+.offer-list-table th,
+.offer-list-table td {
+    vertical-align: top;
+    padding: 9px 8px;
+    overflow-wrap: anywhere;
+    font-size: clamp(.72rem, 1.05vw, .88rem);
+}
+
+.offer-list-table__schedule {
+    padding: 10px 12px;
+}
+
+.offer-list-table td:nth-child(7) .status-badge {
+    max-width: 100%;
+    padding: 4px 6px;
+    font-size: .68rem;
+}
+
+.weekly-schedule {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.weekly-schedule li {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 5px 7px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
+    line-height: 1.2;
+}
+
+.weekly-schedule__day {
+    color: var(--color-primary);
+    font-size: .78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.weekly-schedule__time {
+    color: var(--color-text-main);
+    font-size: clamp(.7rem, .95vw, .82rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.period-range {
+    display: inline-grid;
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+    max-width: 180px;
+    vertical-align: top;
+}
+
+.period-range__row {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    align-items: center;
+    gap: 7px;
+    padding: 5px 7px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
+    line-height: 1.2;
+}
+
+.period-range__label {
+    color: var(--color-primary);
+    font-size: .62rem;
+    font-weight: 800;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+}
+
+.period-range time {
+    color: var(--color-text-main);
+    font-size: clamp(.68rem, .9vw, .8rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+    .offer-list-table {
+        min-width: 0;
+    }
+
+    .weekly-schedule {
+        min-width: 0;
+    }
 }
 
 @media (max-width: 600px) {
@@ -2728,9 +2970,9 @@ html[data-theme="dark"] .btn-submit {
     }
 
     .offer-list-section__heading {
-        align-items: flex-start;
-        flex-direction: column;
+        align-items: center;
     }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2798,6 +3040,7 @@ html[data-theme="dark"] .btn-submit {
    ========================= */
 
 .site-header {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2875,6 +3118,7 @@ html[data-theme="dark"] .btn-submit {
 
 .site-navigation__links {
     flex: 1 1 auto;
+    justify-content: center;
 }
 
 .site-navigation__account {
@@ -2912,6 +3156,7 @@ html[data-theme="dark"] .btn-submit {
 .tab-navigation__tabs {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: .35rem;
     border-bottom: 1px solid var(--color-border);
 }
@@ -2937,6 +3182,7 @@ html[data-theme="dark"] .btn-submit {
 .tab-navigation__items {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: .35rem;
     padding: .65rem 0;
 }
@@ -2956,6 +3202,31 @@ html[data-theme="dark"] .btn-submit {
 
 html.vue-tabs-ready .site-navigation__links--fallback {
     display: none;
+}
+
+@media (min-width: 761px) {
+    .site-navigation__links,
+    .site-navigation > [data-vue-island="TabNavigation"] {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: max-content;
+        max-width: calc(100% - 430px);
+        flex-wrap: nowrap;
+        transform: translate(-50%, -50%);
+    }
+
+    .site-navigation > [data-vue-island="TabNavigation"] .tab-navigation {
+        width: max-content;
+        max-width: 100%;
+        margin: 0;
+    }
+
+    .site-navigation > [data-vue-island="TabNavigation"] .tab-navigation__tabs,
+    .site-navigation > [data-vue-island="TabNavigation"] .tab-navigation__items {
+        flex-wrap: nowrap;
+        justify-content: center;
+    }
 }
 
 .company-hub {
@@ -3297,6 +3568,7 @@ html.vue-tabs-ready .site-navigation__links--fallback {
         gap: 4px;
         padding: 0;
         border: 0;
+        justify-content: flex-start;
     }
 
     .site-navigation__links > a,
@@ -3313,6 +3585,7 @@ html.vue-tabs-ready .site-navigation__links--fallback {
     .tab-navigation__tabs,
     .tab-navigation__items {
         flex-direction: column;
+        justify-content: flex-start;
     }
 
     .tab-navigation__tab {

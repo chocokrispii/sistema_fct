@@ -25,7 +25,7 @@
                         <span class="matching-card__capacity"><?= (int)$oferta['plazas_disponibles'] ?> plazas disponibles</span>
                     </div>
                     <dl class="matching-card__details">
-                        <div><dt>Periodo</dt><dd><?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></dd></div>
+                        <div><dt>Periodo</dt><dd><?= EuropeanDate::periodBlock($oferta['fecha_inicio'], $oferta['fecha_fin']) ?></dd></div>
                         <div><dt>Horario semanal</dt><dd><?php if ($oferta['horarios'] === []): ?>No hay horarios exactos registrados<?php else: ?><?php foreach ($oferta['horarios'] as $shift): ?><?= htmlspecialchars(['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][(int)$shift['dia_semana']] . ' ' . substr($shift['hora_inicio'], 0, 5) . '–' . substr($shift['hora_fin'], 0, 5), ENT_QUOTES, 'UTF-8') ?><br><?php endforeach; ?><?php endif; ?></dd></div>
                         <div><dt>Plazas cubiertas</dt><dd><?= (int)$oferta['asignadas'] ?> de <?= (int)$oferta['plazas_cuantas'] ?></dd></div>
                     </dl>

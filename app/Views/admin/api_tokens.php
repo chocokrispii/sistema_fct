@@ -25,8 +25,8 @@
             <td><?= htmlspecialchars($token['name'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= htmlspecialchars($token['email'], ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= htmlspecialchars($token['rol'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($token['created_at'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($token['last_used_at'] ?? 'Nunca', ENT_QUOTES, 'UTF-8') ?></td>
+            <td><?= htmlspecialchars(EuropeanDate::dateTime($token['created_at']), ENT_QUOTES, 'UTF-8') ?></td>
+            <td><?= htmlspecialchars(EuropeanDate::dateTime($token['last_used_at'] ?? null, 'Nunca'), ENT_QUOTES, 'UTF-8') ?></td>
             <td><?= $token['revoked_at'] === null ? 'Activo' : 'Revocado' ?></td>
             <td><?php if ($token['revoked_at'] === null): ?>
                 <form method="POST" action="index.php?action=api-tokens">

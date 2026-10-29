@@ -1,4 +1,4 @@
-<section class="assignments-page" aria-labelledby="grades-title">
+<section class="assignments-page grades-page" aria-labelledby="grades-title">
     <div class="assignments-page__intro">
         <span class="student-registration__eyebrow"><?= $soloPropias ? 'Área de alumnado' : 'Seguimiento académico' ?></span>
         <h2 id="grades-title"><?= $soloPropias ? 'Mis calificaciones de FCT' : 'Calificaciones de prácticas' ?></h2>
@@ -20,8 +20,8 @@
             <p><?= $soloPropias ? 'Cuando el centro cierre y califique una práctica, aparecerá aquí.' : 'Las prácticas y sus calificaciones aparecerán aquí.' ?></p>
         </div>
     <?php else: ?>
-        <div class="assignments-table-wrap">
-            <table class="assignments-table">
+        <div class="assignments-table-wrap grades-table-wrap">
+            <table class="assignments-table grades-table<?= !$soloPropias && $puedeGestionar ? ' grades-table--manager' : '' ?>">
                 <thead><tr>
                     <?php if (!$soloPropias): ?><th>Alumno</th><?php endif; ?>
                     <th>Empresa</th><th>Ciclo</th><th>Periodo</th><th>Estado</th><th>Nota final</th><th>Observaciones</th>
@@ -32,7 +32,7 @@
                         <?php if (!$soloPropias): ?><td><?= htmlspecialchars($item['alumno_nombre'] . ' ' . $item['apellidos'], ENT_QUOTES, 'UTF-8') ?><small><?= htmlspecialchars($item['alumno_correo'], ENT_QUOTES, 'UTF-8') ?></small></td><?php endif; ?>
                         <td><?= htmlspecialchars($item['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
                         <td><?= htmlspecialchars($item['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($item['fecha_inicio'] . ' – ' . $item['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
+                        <td><?= EuropeanDate::periodBlock($item['fecha_inicio'], $item['fecha_fin']) ?></td>
                         <td><?= htmlspecialchars($item['estado_asignacion'], ENT_QUOTES, 'UTF-8') ?></td>
                         <td><?= $item['nota'] !== null ? htmlspecialchars(number_format((float)$item['nota'], 2, ',', '') . ' / 10', ENT_QUOTES, 'UTF-8') : 'Pendiente' ?></td>
                         <td><?= $item['observaciones'] !== null && $item['observaciones'] !== '' ? nl2br(htmlspecialchars($item['observaciones'], ENT_QUOTES, 'UTF-8')) : '—' ?></td>

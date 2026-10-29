@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/Core/PhpIni.php';
 require_once __DIR__ . '/../app/Core/View.php';
+require_once __DIR__ . '/../app/Core/EuropeanDate.php';
 require_once __DIR__ . '/../app/Core/FrontendAssets.php';
 require_once __DIR__ . '/../app/Core/JsonResponse.php';
 require_once __DIR__ . '/../app/Middleware/AuthMiddleware.php';
