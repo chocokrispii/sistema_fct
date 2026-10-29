@@ -12,9 +12,7 @@ const roleCards = {
         { title: 'Disponibilidad', description: 'Actualiza el periodo y horario disponibles para realizar prácticas.', action: 'disponibilidad', label: 'Gestionar disponibilidad' },
     ],
     Empresa: [
-        { title: 'Ofertas de prácticas', description: 'Publica plazas y consulta su estado de revisión.', action: 'publicar-oferta', label: 'Gestionar ofertas' },
-        { title: 'Convenios', description: 'Registra documentos y consulta su estado.', action: 'convenios', label: 'Gestionar convenios' },
-        { title: 'Sedes', description: 'Administra las sedes asociadas a tu empresa.', action: 'sedes', label: 'Gestionar sedes' },
+        { title: 'Mi empresa', description: 'Gestiona datos fiscales, sedes, convenios y ofertas desde un único espacio.', action: 'mi-empresa', label: 'Gestionar mi empresa' },
     ],
     Coordinador: [
         { title: 'Revisiones', description: 'Consulta las ofertas y convenios pendientes; las decisiones corresponden a administración.', action: 'revisar-ofertas', label: 'Revisar ofertas' },

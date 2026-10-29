@@ -515,6 +515,54 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
     font-weight: 700;
 }
 
+.company-onboarding {
+    max-width: 960px;
+    margin: 2rem auto;
+}
+
+.company-onboarding__intro {
+    margin-bottom: 1.5rem;
+}
+
+.company-onboarding__eyebrow {
+    color: var(--color-secondary);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.company-onboarding__form {
+    max-width: none;
+}
+
+.company-onboarding__form fieldset {
+    display: grid;
+    gap: 1rem;
+    margin: 0 0 1.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-bg-card);
+}
+
+.company-onboarding__site {
+    display: grid;
+    gap: .75rem;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background: var(--color-bg-subtle);
+}
+
+.company-onboarding__site h3 {
+    margin: 0;
+}
+
+.company-onboarding__add,
+.company-onboarding__remove {
+    width: fit-content;
+}
+
 .site-home {
     width: min(100%, 1040px);
     margin: 0 auto;
@@ -2840,6 +2888,203 @@ html[data-theme="dark"] .btn-submit {
     color: var(--color-text-main);
 }
 
+.site-home__feature--company-hub {
+    grid-column: 1 / -1;
+}
+
+.site-home__feature-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.site-navigation__company-link {
+    font-weight: 700;
+}
+
+.tab-navigation {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    margin-bottom: .75rem;
+}
+
+.tab-navigation__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.tab-navigation__tab {
+    padding: .55rem .8rem;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+}
+
+.tab-navigation__tab:hover,
+.tab-navigation__tab:focus-visible,
+.tab-navigation__tab--active {
+    border-bottom-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.tab-navigation__items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    padding: .65rem 0;
+}
+
+.tab-navigation__items a {
+    padding: .45rem .7rem;
+    border-radius: 8px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.tab-navigation__items a:hover,
+.tab-navigation__items a:focus-visible {
+    background: var(--color-bg-subtle);
+    color: var(--color-primary);
+}
+
+html.vue-tabs-ready .site-navigation__links--fallback {
+    display: none;
+}
+
+.company-hub {
+    max-width: 980px;
+    margin: 2rem auto;
+}
+
+.company-hub__header {
+    margin-bottom: 1.5rem;
+}
+
+.company-hub__eyebrow {
+    color: var(--color-secondary);
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.company-hub__summary {
+    color: var(--color-text-muted);
+}
+
+.company-hub__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.company-hub__card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    min-height: 130px;
+    padding: 1.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-bg-card);
+    box-shadow: var(--shadow-card);
+    color: var(--color-text-main);
+    text-decoration: none;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.company-hub__card:hover,
+.company-hub__card:focus-visible {
+    border-color: var(--color-secondary);
+    box-shadow: 0 10px 28px rgb(0 64 133 / 12%);
+    transform: translateY(-2px);
+}
+
+.company-hub__card--primary {
+    border-color: var(--color-primary);
+}
+
+.company-hub__step {
+    display: inline-flex;
+    flex: 0 0 34px;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: var(--color-primary-contrast);
+    font-weight: 800;
+}
+
+.company-hub__card strong,
+.company-hub__card small {
+    display: block;
+}
+
+.company-hub__card strong {
+    margin-bottom: .45rem;
+    font-size: 1.05rem;
+}
+
+.company-hub__card small {
+    color: var(--color-text-muted);
+    line-height: 1.45;
+}
+
+.company-hub__help {
+    margin-top: 1.5rem;
+    color: var(--color-text-muted);
+}
+
+.company-hub__help a {
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+.admin-hub {
+    max-width: 980px;
+    margin: 2rem auto;
+}
+
+.admin-hub__header { margin-bottom: 1.5rem; }
+.admin-hub__eyebrow { color: var(--color-secondary); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.admin-hub__summary { color: var(--color-text-muted); max-width: 720px; }
+.admin-hub__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.admin-hub__card { display: flex; align-items: flex-start; gap: 1rem; min-height: 112px; padding: 1.25rem; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); color: inherit; text-decoration: none; transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.admin-hub__card:hover, .admin-hub__card:focus-visible { border-color: var(--color-secondary); box-shadow: 0 10px 28px rgb(0 64 133 / 12%); transform: translateY(-2px); }
+.admin-hub__card--primary { border-color: var(--color-primary); }
+.admin-hub__step { display: inline-flex; flex: 0 0 34px; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary); color: #fff; font-weight: 700; }
+.admin-hub__card strong, .admin-hub__card small { display: block; }
+.admin-hub__card strong { margin-bottom: .45rem; font-size: 1.05rem; }
+.admin-hub__card small { color: var(--color-text-muted); line-height: 1.45; }
+
+.student-documents-page { max-width: 980px; margin: 2rem auto; }
+.student-documents-page__header { margin-bottom: 1.5rem; }
+.student-documents-page__eyebrow { color: var(--color-secondary); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.document-scanner { display: grid; gap: 1rem; max-width: 760px; }
+.document-scanner__selection { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.document-scanner__selection label, .document-scanner__file { display: grid; gap: .4rem; font-weight: 700; }
+.document-scanner select, .document-scanner input[type="file"] { width: 100%; padding: .7rem; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-bg-input); color: var(--color-text-main); font: inherit; }
+.document-scanner__existing, .document-scanner__pdf, .document-scanner__empty { padding: 1rem; border-radius: 10px; background: var(--color-bg-subtle); color: var(--color-text-muted); }
+.document-scanner__preview { position: relative; overflow: hidden; max-width: 720px; border: 1px solid var(--color-border); border-radius: 12px; background: #1f2933; cursor: crosshair; touch-action: none; }
+.document-scanner__preview img, .document-scanner__preview canvas { display: block; width: 100%; height: auto; }
+.document-scanner__preview canvas { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.document-scanner__crop { position: absolute; border: 3px solid var(--color-secondary); background: rgb(0 168 232 / 12%); pointer-events: none; }
+.document-scanner__preview small { display: block; position: absolute; right: .75rem; bottom: .75rem; padding: .35rem .5rem; border-radius: 6px; background: rgb(0 0 0 / 65%); color: #fff; }
+.document-scanner button { justify-self: start; }
+.student-documents-page__list { display: grid; gap: .8rem; max-width: 760px; }
+.student-documents-page__document { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.2rem; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-card); }
+.student-documents-page__document strong, .student-documents-page__document small { display: block; }
+.student-documents-page__document small { margin-top: .3rem; color: var(--color-text-muted); }
+.student-documents-page__download { color: var(--color-primary); font-weight: 700; white-space: nowrap; }
+
 .site-navigation__theme {
     display: inline-flex;
     flex: 0 0 auto;
@@ -2962,6 +3207,46 @@ html[data-theme="dark"] .btn-submit {
     .site-navigation__account > a {
         display: block;
         padding: 11px 12px;
+    }
+
+    .site-navigation__company-link {
+        display: block;
+        padding: 11px 12px;
+    }
+
+    .tab-navigation__tabs,
+    .tab-navigation__items {
+        flex-direction: column;
+    }
+
+    .tab-navigation__tab {
+        width: 100%;
+        text-align: left;
+    }
+
+    .company-hub {
+        margin: 1.25rem auto;
+    }
+
+    .company-hub__grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .admin-hub {
+        margin: 1.25rem auto;
+    }
+
+    .admin-hub__grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .document-scanner__selection {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .student-documents-page__document {
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .site-navigation__account {

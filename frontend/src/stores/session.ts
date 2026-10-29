@@ -90,7 +90,7 @@ export const useSessionStore = defineStore('session', () => {
             case 'Alumno':
                 return 'portal-alumno';
             case 'Empresa':
-                return 'publicar-oferta';
+                return 'inicio';
             case 'Observador':
                 return 'asignaciones';
             case 'Administrador':
