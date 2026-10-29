@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/Auditoria.php';
 require_once __DIR__ . '/../Core/Paginacion.php';
+require_once __DIR__ . '/Oferta.php';
 
 class Asignacion
 {
@@ -177,53 +178,8 @@ class Asignacion
                 throw new RuntimeException('No se encontró el expediente del alumno.');
             }
 
-            $candidate = $this->db->prepare(
-                "SELECT 1
-                 FROM alumnos a
-                 INNER JOIN empresa_especialidades_plazas p ON p.especialidad_id = a.especialidad_id
-                 INNER JOIN especialidades es ON es.id = p.especialidad_id AND es.activo = 1
-                 INNER JOIN alumno_disponibilidad d
-                    ON d.alumno_id = a.id
-                    AND d.fecha_inicio <= p.fecha_inicio AND d.fecha_fin >= p.fecha_fin
-                    AND EXISTS (
-                        SELECT 1 FROM empresa_oferta_horarios_semanales oh
-                        WHERE oh.oferta_id = p.id
-                            AND (
-                                DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                                OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
-                                    <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
-                            )
-                    )
-                    AND (
-                        d.es_indiferente = TRUE
-                        OR NOT EXISTS (
-                            SELECT 1 FROM empresa_oferta_horarios_semanales oh
-                            WHERE oh.oferta_id = p.id
-                                AND (
-                                    DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                                    OR MOD(oh.dia_semana - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
-                                        <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
-                                )
-                                AND NOT EXISTS (
-                                    SELECT 1 FROM alumno_disponibilidad_semanal ds
-                                    WHERE ds.disponibilidad_id = d.id
-                                        AND ds.dia_semana = oh.dia_semana
-                                        AND ds.hora_inicio <= oh.hora_inicio
-                                        AND ds.hora_fin >= oh.hora_fin
-                                )
-                        )
-                    )
-                 WHERE a.id = :alumno_id AND p.id = :oferta_id
-                    AND p.estado = 'Aprobada'
-                    AND NOT EXISTS (
-                        SELECT 1 FROM asignaciones_fct af
-                        WHERE af.alumno_id = a.id AND af.estado = 'Asignada'
-                    )
-                 LIMIT 1 FOR UPDATE"
-            );
-            $candidate->execute(['alumno_id' => $alumnoId, 'oferta_id' => $ofertaId]);
-            if (!$candidate->fetchColumn()) {
-                throw new DomainException('El alumno no cumple el ciclo, disponibilidad o cobertura horaria de la oferta.');
+            if ((new Oferta($this->db))->obtenerCandidato($ofertaId, $alumnoId) === null) {
+                throw new DomainException('El alumno no cumple el ciclo, la tolerancia de fechas o la cobertura horaria mÃ­nima de la oferta.');
             }
 
             $insert = $this->db->prepare(

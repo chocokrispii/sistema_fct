@@ -892,6 +892,27 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
     min-width: 0;
 }
 
+.matching-card__student-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.matching-card__compatibility {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: var(--color-success-bg);
+    color: var(--color-success-text) !important;
+    font-size: 0.78rem !important;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .matching-card__student span {
     color: var(--color-text-muted);
     font-size: 0.86rem;
