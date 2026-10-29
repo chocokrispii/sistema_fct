@@ -45,7 +45,7 @@ foreach ($requiredTables as $table) {
 }
 
 $definitions = [
-    ['role' => 'Administrador', 'email' => 'demo.admin@fct.local'],
+    ['role' => 'Administrador', 'email' => 'carmen.demo@fct.local'],
     ['role' => 'Coordinador', 'email' => 'demo.coordinador@fct.local'],
     ['role' => 'Observador', 'email' => 'demo.observador@fct.local'],
     ['role' => 'Empresa', 'email' => 'demo.empresa@fct.local'],
@@ -91,8 +91,8 @@ try {
 
     $find = $db->prepare('SELECT id, rol FROM usuarios WHERE email = :email LIMIT 1');
     $insertUser = $db->prepare(
-        'INSERT INTO usuarios (email, identificador_fiscal, password_hash, rol)
-         VALUES (:email, :identifier_fiscal, :hash, :rol)'
+        'INSERT INTO usuarios (email, identificador_fiscal, password_hash, rol, nombre, apellidos)
+         VALUES (:email, :identifier_fiscal, :hash, :rol, :nombre, :apellidos)'
     );
     $updatePassword = $db->prepare(
         'UPDATE usuarios
@@ -134,6 +134,9 @@ try {
             'identifier_fiscal' => $definition['identifier_fiscal'],
             'hash' => password_hash($account['password'], PASSWORD_DEFAULT),
             'rol' => $definition['role'],
+            // El esquema exige nombre y apellidos (y un correo nominativo) para los Administradores.
+            'nombre' => $definition['role'] === 'Administrador' ? 'Carmen' : null,
+            'apellidos' => $definition['role'] === 'Administrador' ? 'Demo Administración' : null,
         ]);
         $userId = (int)$db->lastInsertId();
 
