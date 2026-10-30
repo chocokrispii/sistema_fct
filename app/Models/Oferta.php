@@ -84,6 +84,43 @@ class Oferta {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function reemplazarHorarioPendiente(int $ofertaId, array $horarios): array
+    {
+        if (!$this->db->inTransaction()) {
+            throw new LogicException('La actualización del horario debe ejecutarse dentro de una transacción.');
+        }
+
+        $offer = $this->db->prepare(
+            "SELECT estado FROM empresa_especialidades_plazas WHERE id = :id FOR UPDATE"
+        );
+        $offer->execute(['id' => $ofertaId]);
+        if ($offer->fetchColumn() !== 'Pendiente') {
+            throw new DomainException('Solo se puede actualizar el horario de una oferta pendiente.');
+        }
+
+        $previous = $this->obtenerHorarioSemanal($ofertaId);
+        $delete = $this->db->prepare(
+            'DELETE FROM empresa_oferta_horarios_semanales WHERE oferta_id = :oferta_id'
+        );
+        $delete->execute(['oferta_id' => $ofertaId]);
+
+        $insert = $this->db->prepare(
+            'INSERT INTO empresa_oferta_horarios_semanales
+                (oferta_id, dia_semana, hora_inicio, hora_fin)
+             VALUES (:oferta_id, :dia_semana, :hora_inicio, :hora_fin)'
+        );
+        foreach ($horarios as $horario) {
+            $insert->execute([
+                'oferta_id' => $ofertaId,
+                'dia_semana' => $horario['dia_semana'],
+                'hora_inicio' => $horario['hora_inicio'],
+                'hora_fin' => $horario['hora_fin'],
+            ]);
+        }
+
+        return $previous;
+    }
+
     public function obtenerPorEmpresa(int $empresaId): array {
         $stmt = $this->db->prepare(self::SELECT_BASE . ' WHERE p.empresa_id = :empresa_id ORDER BY p.fecha_inicio DESC');
         $stmt->execute(['empresa_id' => $empresaId]);

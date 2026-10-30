@@ -187,7 +187,8 @@ class OfertaController {
                 'oferta.revisada',
                 'ofertas',
                 (int)$id,
-                'estado=' . $decision
+                'estado_anterior=Pendiente;estado_nuevo=' . $decision,
+                $decision === 'Aprobada' ? 'aprobación' : 'rechazo'
             );
             $this->db->commit();
         } catch (DomainException $e) {
@@ -215,6 +216,152 @@ class OfertaController {
         }
         header('Location: index.php?action=revisar-ofertas');
         exit;
+    }
+
+    public function actualizarHorarioRevision(): void
+    {
+        if (($_SESSION['rol'] ?? null) !== 'Administrador') {
+            http_response_code(403);
+            if (JsonResponse::wantsJson()) {
+                JsonResponse::failure('Solo un administrador puede actualizar horarios de ofertas.', 403);
+                return;
+            }
+            throw new RuntimeException('Solo un administrador puede actualizar horarios de ofertas.');
+        }
+
+        $jsonRequest = JsonResponse::wantsJson();
+        $requestValues = $_POST;
+        $contentType = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+        if (str_contains($contentType, 'application/json')) {
+            try {
+                $decoded = json_decode((string)file_get_contents('php://input'), false, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException) {
+                JsonResponse::failure('El cuerpo JSON no es válido.', 400);
+                return;
+            }
+            if (!$decoded instanceof stdClass) {
+                JsonResponse::failure('El cuerpo JSON debe ser un objeto de datos.', 400);
+                return;
+            }
+            $requestValues = get_object_vars($decoded);
+        }
+
+        $offerId = $requestValues['oferta_id'] ?? null;
+        $id = is_int($offerId) || is_string($offerId)
+            ? filter_var($offerId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+            : false;
+        $rawSchedule = $requestValues['horarios'] ?? null;
+        if ($id === false || !is_array($rawSchedule)) {
+            $this->responderErrorHorario('Indica una oferta y franjas horarias válidas.', $jsonRequest, 422, $id);
+            return;
+        }
+
+        try {
+            $schedule = $this->parsearHorarioRevision($rawSchedule);
+        } catch (InvalidArgumentException $exception) {
+            $this->responderErrorHorario($exception->getMessage(), $jsonRequest, 422, (int)$id);
+            return;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $previous = $this->ofertaModel->reemplazarHorarioPendiente((int)$id, $schedule);
+            (new Auditoria($this->db))->registrar(
+                (int)$_SESSION['usuario_id'],
+                'oferta.horario_actualizado',
+                'ofertas',
+                (int)$id,
+                'horario_anterior=' . $this->formatearHorarioAuditoria($previous)
+                    . ';horario_nuevo=' . $this->formatearHorarioAuditoria($schedule),
+                'actualización de horario'
+            );
+            $this->db->commit();
+        } catch (DomainException $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            $this->responderErrorHorario($exception->getMessage(), $jsonRequest, 409, (int)$id);
+            return;
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $exception;
+        }
+
+        if ($jsonRequest) {
+            JsonResponse::success(['message' => 'El horario semanal se ha actualizado.']);
+            return;
+        }
+        header('Location: index.php?action=revisar-ofertas');
+        exit;
+    }
+
+    private function parsearHorarioRevision(array $rawSchedule): array
+    {
+        $schedule = [];
+        foreach ($rawSchedule as $day => $values) {
+            $dayNumber = filter_var($day, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 7]]);
+            if ($dayNumber === false || !is_array($values)) {
+                throw new InvalidArgumentException('Las franjas semanales no tienen un formato válido.');
+            }
+            $active = $values['activo'] ?? '';
+            if (!in_array($active, ['', '1'], true)) {
+                throw new InvalidArgumentException('Las franjas semanales no tienen un formato válido.');
+            }
+            if ($active !== '1') {
+                continue;
+            }
+            $start = $values['hora_inicio'] ?? null;
+            $end = $values['hora_fin'] ?? null;
+            if (
+                !is_string($start)
+                || !is_string($end)
+                || preg_match('/^(?:[01]\d|2[0-3]):(?:[0-5][05])$/', $start) !== 1
+                || preg_match('/^(?:[01]\d|2[0-3]):(?:[0-5][05])$/', $end) !== 1
+                || $end <= $start
+            ) {
+                throw new InvalidArgumentException('Cada día seleccionado necesita horas válidas en intervalos de cinco minutos.');
+            }
+            $schedule[] = [
+                'dia_semana' => (int)$dayNumber,
+                'hora_inicio' => $start . ':00',
+                'hora_fin' => $end . ':00',
+            ];
+        }
+        if ($schedule === []) {
+            throw new InvalidArgumentException('Selecciona al menos un día y una franja horaria semanal.');
+        }
+        usort($schedule, static fn(array $left, array $right): int => $left['dia_semana'] <=> $right['dia_semana']);
+        return $schedule;
+    }
+
+    private function formatearHorarioAuditoria(array $schedule): string
+    {
+        if ($schedule === []) {
+            return 'sin_horario';
+        }
+        $dayNames = ['', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+        $entries = array_map(
+            static fn(array $item): string => $dayNames[(int)$item['dia_semana']]
+                . ':' . substr((string)$item['hora_inicio'], 0, 5)
+                . '-' . substr((string)$item['hora_fin'], 0, 5),
+            $schedule
+        );
+        return implode(',', $entries);
+    }
+
+    private function responderErrorHorario(string $message, bool $jsonRequest, int $status, int|false|null $offerId): void
+    {
+        if ($jsonRequest) {
+            JsonResponse::failure($message, $status);
+            return;
+        }
+        $query = ['error' => $message];
+        if (is_int($offerId) && $offerId > 0) {
+            $query['oferta_id'] = $offerId;
+        }
+        header('Location: index.php?action=revisar-ofertas&' . http_build_query($query));
     }
 
     /** Devuelve el mensaje de error o null si la oferta se ha creado. */

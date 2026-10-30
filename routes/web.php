@@ -35,6 +35,7 @@ $routes = [
     'publicar-oferta' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => OfertaController::class, 'action' => 'publicar'],
     'sedes' => ['method' => ['GET', 'POST'], 'roles' => ['Empresa'], 'controller' => EmpresaController::class, 'action' => 'sedes'],
     'revisar-ofertas' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador'], 'controller' => OfertaController::class, 'action' => 'revisar'],
+    'actualizar-horario-oferta' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => OfertaController::class, 'action' => 'actualizarHorarioRevision'],
     'revisar-oferta' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => OfertaController::class, 'action' => 'resolverRevision'],
     'disponibilidad' => ['method' => ['GET', 'POST'], 'roles' => ['Alumno'], 'controller' => DisponibilidadController::class, 'action' => 'gestionar'],
     'asignaciones' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador'], 'controller' => AsignacionController::class, 'action' => 'listar'],
