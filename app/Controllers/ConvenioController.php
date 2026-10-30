@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 require_once __DIR__ . '/../Models/Convenio.php';
 require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
@@ -212,29 +214,18 @@ class ConvenioController
 
     public function revisar(): void
     {
-        View::render('convenios/revisar', [
-            'convenios' => $this->convenioModel->listar(null, 'Pendiente'),
-            'puedeResolver' => ($_SESSION['rol'] ?? null) === 'Administrador',
-        ]);
+        $this->renderListado('pendiente_revision');
     }
 
     public function archivo(): void
     {
-        if (($_SESSION['rol'] ?? null) !== 'Administrador') {
-            http_response_code(403);
-            throw new RuntimeException('El archivo de convenios está reservado a administración.');
-        }
+        $this->requireAdministrador('El archivo de convenios está reservado a administración.');
+        $this->renderListado('todos');
+    }
 
-        $eventosPorConvenio = [];
-        foreach ($this->convenioModel->listarEventosArchivo() as $evento) {
-            $convenioId = (int)$evento['convenio_id'];
-            $eventosPorConvenio[$convenioId][] = $evento;
-        }
-
-        View::render('convenios/archivo', [
-            'convenios' => $this->convenioModel->listarArchivo(),
-            'eventosPorConvenio' => $eventosPorConvenio,
-        ]);
+    public function index(): void
+    {
+        $this->renderListado('todos');
     }
 
     public function auditar(): void
@@ -246,13 +237,33 @@ class ConvenioController
 
     public function resolver(): void
     {
-        if (($_SESSION['rol'] ?? null) !== 'Administrador') {
+        $this->ejecutarTransicion(['Aprobado', 'Rechazado']);
+    }
+
+    public function aprobar(): void
+    {
+        $this->ejecutarTransicion(['Aprobado']);
+    }
+
+    public function rechazar(): void
+    {
+        $this->ejecutarTransicion(['Rechazado']);
+    }
+
+    public function archivar(): void
+    {
+        $this->ejecutarTransicion(['Archivado']);
+    }
+
+    private function ejecutarTransicion(array $estadosPermitidos): void
+    {
+        if (!$this->esAdministrador()) {
             http_response_code(403);
             if (JsonResponse::wantsJson()) {
-                JsonResponse::failure('Solo un administrador puede resolver convenios.', 403);
+                JsonResponse::failure('Solo un administrador puede cambiar el estado de los convenios.', 403);
                 return;
             }
-            throw new RuntimeException('Solo un administrador puede resolver convenios.');
+            throw new RuntimeException('Solo un administrador puede cambiar el estado de los convenios.');
         }
         $jsonRequest = JsonResponse::wantsJson();
         $requestValues = $_POST;
@@ -271,11 +282,11 @@ class ConvenioController
             $requestValues = get_object_vars($decoded);
         }
 
-        $convenioId = $requestValues['convenio_id'] ?? null;
+        $convenioId = $requestValues['convenio_id'] ?? $requestValues['id'] ?? null;
         $id = is_int($convenioId) || is_string($convenioId)
             ? filter_var($convenioId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
             : false;
-        $decisionValue = $requestValues['decision'] ?? '';
+        $decisionValue = $requestValues['decision'] ?? $estadosPermitidos[0];
         $decision = is_string($decisionValue) ? $decisionValue : '';
         $motivoRaw = $requestValues['motivo'] ?? '';
         if (!is_string($motivoRaw)) {
@@ -286,12 +297,12 @@ class ConvenioController
             throw new InvalidArgumentException('El motivo de revisión no es válido.');
         }
         $motivo = trim($motivoRaw);
-        if ($id === false || !in_array($decision, ['Aprobado', 'Rechazado'], true)) {
+        if ($id === false || !in_array($decision, $estadosPermitidos, true)) {
             if ($jsonRequest) {
-                JsonResponse::failure('La decisión de revisión no es válida.', 422);
+                JsonResponse::failure('La acción sobre el convenio no es válida.', 422);
                 return;
             }
-            throw new InvalidArgumentException('La decisión de revisión no es válida.');
+            throw new InvalidArgumentException('La acción sobre el convenio no es válida.');
         }
         if ($decision === 'Rechazado' && $motivo === '') {
             if ($jsonRequest) {
@@ -309,15 +320,18 @@ class ConvenioController
         }
         $this->db->beginTransaction();
         try {
-            if (!$this->convenioModel->resolver((int)$id, $decision, $motivo, (int)$_SESSION['usuario_id'])) {
-                throw new DomainException('El convenio ya fue revisado o no existe.');
-            }
+            $estadoAnterior = $this->convenioModel->transicionar(
+                (int)$id,
+                $decision,
+                $motivo,
+                (int)$_SESSION['usuario_id']
+            );
             (new Auditoria($this->db))->registrar(
                 (int)$_SESSION['usuario_id'],
-                'convenio.revisado',
+                $decision === 'Archivado' ? 'convenio.archivado' : 'convenio.revisado',
                 'convenios',
                 (int)$id,
-                'estado=' . $decision
+                'estado_anterior=' . $estadoAnterior . ';estado_nuevo=' . $decision
             );
             $this->db->commit();
         } catch (DomainException $e) {
@@ -336,59 +350,64 @@ class ConvenioController
             throw $e;
         }
         if ($jsonRequest) {
+            $verb = match ($decision) {
+                'Aprobado' => 'aprobado',
+                'Rechazado' => 'rechazado',
+                default => 'archivado',
+            };
             JsonResponse::success([
-                'message' => 'El convenio se ha ' . ($decision === 'Aprobado' ? 'aprobado.' : 'rechazado.'),
-                'decision' => $decision,
+                'message' => 'El convenio se ha ' . $verb . '.',
+                'estado' => $decision,
+                'estado_anterior' => $estadoAnterior,
             ]);
             return;
         }
-        header('Location: index.php?action=revisar-convenios');
+        header('Location: index.php?action=revisar-convenios&estado=' . rawurlencode(
+            $decision === 'Archivado' ? 'archivado' : 'pendiente_revision'
+        ));
         exit;
     }
 
     public function descargar(): void
     {
-        if (!in_array($_SESSION['rol'] ?? null, ['Administrador', 'Coordinador', 'Empresa'], true)) {
+        $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if (!$this->esAdministrador()) {
+            $this->descargarPdf($id === false ? 0 : (int)$id);
+        }
+        if ($id === false) {
+            http_response_code(400);
+            throw new InvalidArgumentException('El identificador del convenio no es válido.');
+        }
+        $this->descargarPdf((int)$id);
+    }
+
+    public function descargarPdf(int $id): void
+    {
+        if (!$this->esAdministrador()) {
             $userId = filter_var($_SESSION['usuario_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             (new Auditoria($this->db))->registrar(
                 $userId === false ? null : (int)$userId,
                 'convenio.descarga.denegada',
                 'convenios',
-                null,
+                $id > 0 ? $id : null,
                 'motivo=rol_no_autorizado'
             );
             http_response_code(403);
-            throw new RuntimeException('No tienes permiso para descargar convenios.');
+            throw new RuntimeException('Solo un administrador puede descargar documentos de convenios.');
         }
 
-        $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $convenio = $id === false ? null : $this->convenioModel->obtener((int)$id);
+        $convenio = $id > 0 ? $this->convenioModel->obtener($id) : null;
         if ($convenio === null) {
             (new Auditoria($this->db))->registrar(
                 (int)$_SESSION['usuario_id'],
                 'convenio.descarga.denegada',
                 'convenios',
-                $id === false ? null : (int)$id,
+                $id > 0 ? $id : null,
                 'motivo=no_encontrado'
             );
             http_response_code(404);
             throw new RuntimeException('El documento solicitado no existe.');
         }
-        if ($_SESSION['rol'] === 'Empresa') {
-            $empresa = $this->empresaModel->obtenerPorUsuarioId((int)$_SESSION['usuario_id']);
-            if ($empresa === null || (int)$empresa['id'] !== (int)$convenio['empresa_id']) {
-                (new Auditoria($this->db))->registrar(
-                    (int)$_SESSION['usuario_id'],
-                    'convenio.descarga.denegada',
-                    'convenios',
-                    (int)$id,
-                    'motivo=empresa_sin_titularidad'
-                );
-                http_response_code(403);
-                throw new RuntimeException('No tienes permiso para descargar este documento.');
-            }
-        }
-
         $storedName = $convenio['archivo_path'];
         $base = realpath(fctStoragePath() . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'convenios');
         $candidate = is_string($storedName) && preg_match('/\A[a-f0-9]{48}\.pdf\z/', $storedName) === 1
@@ -407,9 +426,10 @@ class ConvenioController
                 (int)$_SESSION['usuario_id'],
                 'convenio.descarga.denegada',
                 'convenios',
-                (int)$id,
+                $id,
                 'motivo=archivo_no_disponible'
             );
+            http_response_code(404);
             throw new RuntimeException('No se encontró el archivo del convenio.');
         }
 
@@ -423,7 +443,7 @@ class ConvenioController
                 (int)$_SESSION['usuario_id'],
                 'convenio.descarga.denegada',
                 'convenios',
-                (int)$id,
+                $id,
                 'motivo=archivo_no_legible'
             );
             throw new RuntimeException('No se pudo abrir el archivo del convenio.');
@@ -432,7 +452,7 @@ class ConvenioController
             (int)$_SESSION['usuario_id'],
             'convenio.descarga',
             'convenios',
-            (int)$id,
+            $id,
             'resultado=autorizada'
         );
 
@@ -442,9 +462,91 @@ class ConvenioController
         header('Content-Type: application/pdf');
         header('Content-Length: ' . $size);
         header('Content-Disposition: attachment; filename="convenio-' . (int)$convenio['id'] . '.pdf"');
+        header('X-Content-Type-Options: nosniff');
         fpassthru($handle);
         fclose($handle);
         exit;
+    }
+
+    private function renderListado(string $estadoPredeterminado): void
+    {
+        $rol = $_SESSION['rol'] ?? null;
+        if (!in_array($rol, ['Administrador', 'Coordinador'], true)) {
+            http_response_code(403);
+            throw new RuntimeException('No tienes permiso para consultar la gestión de convenios.');
+        }
+        $filtros = [
+            'estado' => $estadoPredeterminado,
+            'nif' => '',
+            'fecha_desde' => '',
+            'fecha_hasta' => '',
+            'page' => 1,
+            'limit' => 20,
+        ];
+        $error = '';
+        try {
+            $filtros['estado'] = $rol === 'Coordinador'
+                ? 'pendiente_revision'
+                : $this->leerFiltro('estado', $estadoPredeterminado);
+            $filtros['nif'] = $this->leerFiltro('nif', '');
+            $filtros['fecha_desde'] = $this->leerFiltro('fecha_desde', '');
+            $filtros['fecha_hasta'] = $this->leerFiltro('fecha_hasta', '');
+            $filtros['page'] = $this->leerFiltroPaginacion('page', 1);
+            $filtros['limit'] = $this->leerFiltroPaginacion('limit', 20);
+            $resultado = $this->convenioModel->buscarPaginado($filtros);
+        } catch (InvalidArgumentException $exception) {
+            http_response_code(422);
+            $error = $exception->getMessage();
+            $resultado = [
+                'items' => [],
+                'total' => 0,
+                'page' => 1,
+                'limit' => 20,
+                'pages' => 1,
+            ];
+        }
+        $eventosPorConvenio = [];
+        $ids = array_map(static fn(array $item): int => (int)$item['id'], $resultado['items']);
+        foreach ($this->convenioModel->listarEventos($ids) as $evento) {
+            $eventosPorConvenio[(int)$evento['convenio_id']][] = $evento;
+        }
+        View::render('convenios/listado', [
+            'convenios' => $resultado['items'],
+            'eventosPorConvenio' => $eventosPorConvenio,
+            'filtros' => $filtros,
+            'paginacion' => $resultado,
+            'error' => $error,
+            'puedeResolver' => $rol === 'Administrador',
+            'esAdministrador' => $rol === 'Administrador',
+        ]);
+    }
+
+    private function leerFiltro(string $nombre, string $predeterminado): string
+    {
+        $value = $_GET[$nombre] ?? $predeterminado;
+        if (!is_string($value)) {
+            throw new InvalidArgumentException('Los filtros de convenios no tienen un formato válido.');
+        }
+        return trim($value);
+    }
+
+    private function leerFiltroPaginacion(string $nombre, int $predeterminado): int|string
+    {
+        $value = $_GET[$nombre] ?? $predeterminado;
+        return is_int($value) || is_string($value) ? $value : '';
+    }
+
+    private function esAdministrador(): bool
+    {
+        return ($_SESSION['rol'] ?? null) === 'Administrador';
+    }
+
+    private function requireAdministrador(string $mensaje): void
+    {
+        if (!$this->esAdministrador()) {
+            http_response_code(403);
+            throw new RuntimeException($mensaje);
+        }
     }
 
     private function validarLimitesCarga(): void

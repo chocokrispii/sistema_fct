@@ -28,5 +28,5 @@
     <td><?= EuropeanDate::periodBlock($item['fecha_inicio'], $item['fecha_fin']) ?></td>
     <td><?= htmlspecialchars($item['estado'], ENT_QUOTES, 'UTF-8') ?></td>
     <td><?= htmlspecialchars($item['motivo_revision'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-    <td><a href="index.php?action=descargar-convenio&id=<?= (int)$item['id'] ?>">Descargar PDF</a></td>
+    <td><span>Descarga reservada a administración</span></td>
 </tr><?php endforeach; ?></tbody></table><?php endif; ?>

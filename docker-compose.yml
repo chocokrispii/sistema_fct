@@ -108,6 +108,7 @@ services:
       - ./database/migrations/021_documentacion_cierre_alumno.sql:/docker-entrypoint-initdb.d/025-documentacion-cierre-alumno.sql:ro
       - ./database/migrations/022_documentacion_inicio_asignacion.sql:/docker-entrypoint-initdb.d/026-documentacion-inicio-asignacion.sql:ro
       - ./database/migrations/023_evaluacion_empresa.sql:/docker-entrypoint-initdb.d/027-evaluacion-empresa.sql:ro
+      - ./database/migrations/024_convenios_estado_archivado.sql:/docker-entrypoint-initdb.d/028-convenios-estado-archivado.sql:ro
     healthcheck:
       test:
         - CMD-SHELL

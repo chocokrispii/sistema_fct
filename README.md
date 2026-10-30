@@ -325,11 +325,13 @@ Administrador y Coordinador registran calificaciones de prácticas cerradas; se 
 | Empresa | Sus convenios, sedes y ofertas; no decide sus revisiones. |
 | Invitado | Inicio, registro, autenticación y recuperación; las áreas protegidas requieren sesión. |
 
-Los convenios aprobados permanecen en la tabla `convenios`, con sus datos de
-revisión; los PDF se conservan en almacenamiento privado. El administrador
-puede consultar todos los estados y el registro de actividad desde **Archivo
-de convenios** (`index.php?action=archivo-convenios`). La lista de **Revisar
-convenios** sigue destinada a la cola de pendientes.
+La revisión y el histórico de convenios se consultan desde una vista unificada
+(`index.php?action=gestionar-convenios`) con pestañas para pendientes,
+aprobados, rechazados y archivados, filtros por NIF y fecha de registro, y
+paginación. `revisar-convenios` y `archivo-convenios` siguen disponibles como
+accesos compatibles a esa vista. Solo Administrador puede aprobar, rechazar,
+archivar o descargar PDFs; cada transición queda auditada con estado anterior
+y nuevo. Los PDFs se conservan en almacenamiento privado fuera de `public/`.
 
 El botón de tema claro/oscuro sigue la preferencia del sistema si todavía no hay una elección guardada; al cambiarlo manualmente, la elección queda en el almacenamiento local del navegador.
 

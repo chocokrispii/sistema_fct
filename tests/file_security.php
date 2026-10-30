@@ -23,7 +23,7 @@ function assertFileSecurity(bool $condition, string $message): void
 
 $routes = require __DIR__ . '/../routes/web.php';
 assertFileSecurity(
-    $routes['descargar-convenio']['roles'] === ['Administrador', 'Coordinador', 'Empresa'],
+    $routes['descargar-convenio']['roles'] === ['Administrador'],
     'La matriz de acceso a convenios concede acceso a un rol no autorizado.'
 );
 assertFileSecurity(
