@@ -3378,3 +3378,195 @@ html.vue-tabs-ready .site-navigation__links--fallback {
         transition: none;
     }
 }
+
+.agreement-management {
+    display: grid;
+    gap: 18px;
+    width: min(100% - 32px, 1440px);
+    margin: 24px auto;
+}
+
+.agreement-management__intro h1 {
+    margin: 4px 0 8px;
+    color: var(--color-primary);
+}
+
+.agreement-management__intro p,
+.agreement-results,
+.agreement-empty {
+    color: var(--color-text-muted);
+}
+
+.agreement-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.agreement-tabs a {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    border-radius: 8px 8px 0 0;
+    color: var(--color-text-main);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.agreement-tabs a[aria-current="page"] {
+    border-color: var(--color-border);
+    border-bottom-color: var(--color-bg-card);
+    margin-bottom: -1px;
+    background: var(--color-bg-card);
+    color: var(--color-primary);
+}
+
+.agreement-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-card);
+}
+
+.agreement-filters label,
+.agreement-actions label {
+    display: grid;
+    gap: 5px;
+    color: var(--color-text-main);
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.agreement-filters input,
+.agreement-filters select,
+.agreement-actions input {
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background: var(--color-bg-input);
+    color: var(--color-text-main);
+    font: inherit;
+}
+
+.agreement-filters button,
+.agreement-actions button {
+    min-height: 40px;
+}
+
+.agreement-filters__reset {
+    padding: 10px 4px;
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+.agreement-table {
+    min-width: 1050px;
+}
+
+.agreement-table td {
+    vertical-align: top;
+}
+
+.agreement-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.agreement-status--pending {
+    background: var(--color-warning-bg);
+    color: var(--color-warning-text);
+}
+
+.agreement-status--approved {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+}
+
+.agreement-status--rejected {
+    background: var(--color-danger-bg);
+    color: var(--color-danger-text);
+}
+
+.agreement-status--archived,
+.agreement-status--unknown {
+    background: var(--color-neutral-bg);
+    color: var(--color-neutral-text);
+}
+
+.agreement-actions {
+    min-width: 220px;
+}
+
+.agreement-actions > a,
+.agreement-actions > span {
+    display: inline-block;
+    margin-bottom: 8px;
+    font-weight: 700;
+}
+
+.agreement-actions form {
+    display: grid;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.agreement-actions details ul {
+    min-width: 180px;
+    padding-left: 18px;
+}
+
+.agreement-actions details li + li {
+    margin-top: 8px;
+}
+
+.agreement-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+}
+
+.agreement-pagination a {
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+@media (max-width: 640px) {
+    .agreement-management {
+        width: min(100% - 20px, 1440px);
+        margin: 14px auto;
+    }
+
+    .agreement-filters {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .agreement-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .agreement-tabs a {
+        justify-content: center;
+        border-radius: 7px;
+    }
+
+    .agreement-tabs a[aria-current="page"] {
+        margin-bottom: 0;
+        border-color: var(--color-primary);
+    }
+}

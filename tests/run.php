@@ -1631,6 +1631,11 @@ try {
     if ($createdAgreementId !== null) {
         $stmt = $db->prepare('DELETE FROM auditoria WHERE entidad = :entidad AND entidad_id = :id');
         $stmt->execute(['entidad' => 'convenios', 'id' => $createdAgreementId]);
+        $stmt = $db->prepare(
+            'DELETE FROM audit_logs
+             WHERE entidad_afectada = :entidad AND id_registro_modificado = :id'
+        );
+        $stmt->execute(['entidad' => 'convenios', 'id' => $createdAgreementId]);
     }
     if ($createdOffer !== null) {
         $stmt = $db->prepare('DELETE FROM asignaciones_fct WHERE oferta_id = :offer');
