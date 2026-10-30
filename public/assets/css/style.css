@@ -3570,3 +3570,65 @@ html.vue-tabs-ready .site-navigation__links--fallback {
         border-color: var(--color-primary);
     }
 }
+
+.offer-schedule-repair fieldset {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+}
+
+.offer-schedule-repair legend {
+    padding: 0 6px;
+    color: var(--color-primary);
+    font-weight: 800;
+}
+
+.offer-schedule-repair fieldset > p {
+    margin: 0;
+    color: var(--color-text-muted);
+}
+
+.offer-schedule-repair__day {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) repeat(2, minmax(115px, 180px));
+    align-items: end;
+    gap: 12px;
+}
+
+.offer-schedule-repair__day label {
+    display: grid;
+    gap: 5px;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.offer-schedule-repair__day input[type="time"] {
+    min-height: 40px;
+    padding: 7px 9px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background: var(--color-bg-input);
+    color: var(--color-text-main);
+    font: inherit;
+}
+
+.offer-schedule-repair__day .offer-schedule-repair__active {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+}
+
+@media (max-width: 560px) {
+    .offer-schedule-repair__day {
+        grid-template-columns: minmax(90px, 0.8fr) repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .offer-schedule-repair__day label {
+        font-size: 0.8rem;
+    }
+}

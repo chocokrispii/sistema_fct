@@ -75,9 +75,11 @@ assertFileSecurity(
 );
 assertFileSecurity(
     $routes['revisar-oferta']['roles'] === ['Administrador']
+        && $routes['actualizar-horario-oferta']['method'] === 'POST'
+        && $routes['actualizar-horario-oferta']['roles'] === ['Administrador']
         && $routes['resolver-convenio']['roles'] === ['Administrador']
         && $routes['auditar-convenios']['roles'] === ['Observador'],
-    'La resolución de ofertas/convenios y la consulta de auditoría deben tener roles separados.'
+    'La actualización de horarios, resolución de ofertas/convenios y consulta de auditoría deben tener roles separados.'
 );
 assertFileSecurity(
     $routes['logout']['method'] === 'POST'
