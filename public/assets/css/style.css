@@ -2311,11 +2311,6 @@ html[data-theme="dark"] .theme-toggle {
     border-color: var(--color-border-strong);
 }
 
-html[data-theme="dark"] button,
-html[data-theme="dark"] .btn-submit {
-    color: var(--color-primary-contrast);
-}
-
 /* =========================
    OFFER CREATION FORM
    ========================= */
@@ -3196,6 +3191,7 @@ html[data-theme="dark"] .btn-submit {
 .tab-navigation__tab:hover,
 .tab-navigation__tab:focus-visible,
 .tab-navigation__tab--active {
+    background: transparent;
     border-bottom-color: var(--color-primary);
     color: var(--color-primary);
 }
@@ -3226,26 +3222,28 @@ html.vue-tabs-ready .site-navigation__links--fallback {
 }
 
 @media (min-width: 761px) {
+    .site-navigation {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+
     .site-navigation__links,
     .site-navigation > [data-vue-island="TabNavigation"] {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: max-content;
-        max-width: calc(100% - 430px);
-        flex-wrap: nowrap;
-        transform: translate(-50%, -50%);
+        position: static;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
     }
 
     .site-navigation > [data-vue-island="TabNavigation"] .tab-navigation {
-        width: max-content;
+        width: 100%;
         max-width: 100%;
         margin: 0;
     }
 
     .site-navigation > [data-vue-island="TabNavigation"] .tab-navigation__tabs,
     .site-navigation > [data-vue-island="TabNavigation"] .tab-navigation__items {
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         justify-content: center;
     }
 }
