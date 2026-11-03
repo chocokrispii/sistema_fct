@@ -111,9 +111,7 @@ final class CompanyImportParser
                 $parts = [trim($m['razon']), $m['nif'], $m['email'], trim($m['rep'])];
             }
             if (count($parts) < 4) {
-                if (str_contains($line, '@')) {
-                    $rows[] = ['linea' => $index + 1, 'razon_social' => $line, 'nif' => '', 'email' => '', 'representante' => ''];
-                }
+                $rows[] = ['linea' => $index + 1, 'razon_social' => $line, 'nif' => '', 'email' => '', 'representante' => ''];
                 continue;
             }
             $rows[] = [
