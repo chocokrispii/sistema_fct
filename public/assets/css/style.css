@@ -3178,6 +3178,7 @@ html[data-theme="dark"] .theme-toggle {
 }
 
 .tab-navigation__tab {
+    display: block;
     padding: .55rem .8rem;
     border: 0;
     border-bottom: 3px solid transparent;
@@ -3186,6 +3187,7 @@ html[data-theme="dark"] .theme-toggle {
     cursor: pointer;
     font: inherit;
     font-weight: 700;
+    text-decoration: none;
 }
 
 .tab-navigation__tab:hover,
@@ -3212,7 +3214,8 @@ html[data-theme="dark"] .theme-toggle {
 }
 
 .tab-navigation__items a:hover,
-.tab-navigation__items a:focus-visible {
+.tab-navigation__items a:focus-visible,
+.tab-navigation__items a[aria-current="page"] {
     background: var(--color-bg-subtle);
     color: var(--color-primary);
 }
