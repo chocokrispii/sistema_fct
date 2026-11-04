@@ -8,6 +8,9 @@ export default defineConfig({
     css: {
         postcss: './postcss.config.cjs',
     },
+    server: {
+        host: '127.0.0.1',
+    },
     build: {
         manifest: true,
         emptyOutDir: true,
