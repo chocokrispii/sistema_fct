@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../app/Core/IntegrationFeature.php';
+
 $routes = [
     'inicio' => ['method' => 'GET', 'roles' => [], 'controller' => null, 'action' => null],
     'login' => ['method' => ['GET', 'POST'], 'roles' => [], 'controller' => AuthController::class, 'action' => 'login'],
@@ -66,11 +68,15 @@ $routes = [
     'retirar-ciclo' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => EspecialidadAdminController::class, 'action' => 'retirar'],
     'reactivar-ciclo' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => EspecialidadAdminController::class, 'action' => 'reactivar'],
     'api-tokens' => ['method' => ['GET', 'POST'], 'roles' => ['Administrador'], 'controller' => ApiTokenAdminController::class, 'action' => 'gestionar'],
-    'integraciones' => ['method' => 'GET', 'roles' => ['Administrador'], 'controller' => IntegrationHubController::class, 'action' => 'mostrar'],
+    'integraciones' => ['method' => ['GET', 'POST'], 'roles' => ['Administrador'], 'controller' => IntegrationHubController::class, 'action' => 'gestionar'],
     'estado-usuario' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'cambiarEstado'],
     'eliminar-usuario' => ['method' => 'POST', 'roles' => ['Administrador'], 'controller' => UsuarioAdminController::class, 'action' => 'eliminar'],
     'consultas' => ['method' => 'GET', 'roles' => ['Administrador', 'Coordinador', 'Observador'], 'controller' => ConsultaController::class, 'action' => 'buscar'],
 ];
+
+if (!IntegrationFeature::isEnabled()) {
+    unset($routes['integraciones'], $routes['api-tokens']);
+}
 
 if (DevelopmentPreviewController::isEnabled()) {
     $routes['preview-disponibilidad'] = [
