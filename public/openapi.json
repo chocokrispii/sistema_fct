@@ -166,6 +166,7 @@
       "get": {
         "tags": ["Ofertas"],
         "summary": "Consultar ofertas",
+        "description": "Las respuestas incluyen sede_id, sede_nombre, sede_direccion y sede_telefono de la sede de trabajo.",
         "parameters": [
           {"$ref": "#/components/parameters/Page"},
           {"$ref": "#/components/parameters/PerPage"}
@@ -180,7 +181,7 @@
       "post": {
         "tags": ["Ofertas"],
         "summary": "Crear una oferta",
-        "description": "Disponible para Empresa y requiere un convenio aprobado.",
+        "description": "Disponible para Empresa. Requiere un convenio aprobado e incluir sede_id de una sede activa asociada a la empresa; si falta o no es válida, responde 422.",
         "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
         "responses": {
           "201": {"$ref": "#/components/responses/Success"},

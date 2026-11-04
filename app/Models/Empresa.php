@@ -115,6 +115,18 @@ class Empresa {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function obtenerSedeActiva(int $empresaId, int $sedeId): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id, nombre, direccion, telefono FROM empresa_sedes
+             WHERE id = :id AND empresa_id = :empresa_id AND activa = 1'
+        );
+        $stmt->execute(['id' => $sedeId, 'empresa_id' => $empresaId]);
+        $sede = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($sede) ? $sede : null;
+    }
+
     public function obtenerContactoPrincipal(int $empresaId): array
     {
         $stmt = $this->db->prepare(

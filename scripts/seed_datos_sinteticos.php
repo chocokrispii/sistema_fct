@@ -303,42 +303,9 @@ try {
     foreach ($offers as $offer) {
         $companyId = $companyIds[$offer['company']['key']];
         $specialtyId = $specialties[$offer['specialty']];
-        $findOffer = $db->prepare(
-            'SELECT id FROM empresa_especialidades_plazas
-             WHERE empresa_id = :empresa AND especialidad_id = :especialidad
-               AND fecha_inicio = :inicio AND fecha_fin = :fin
-             LIMIT 1'
-        );
-        $findOffer->execute([
-            'empresa' => $companyId,
-            'especialidad' => $specialtyId,
-            'inicio' => $offer['start'],
-            'fin' => $offer['end'],
-        ]);
-        if ($findOffer->fetchColumn() === false) {
-            $reviewedAt = $offer['state'] === 'Aprobada' ? date('Y-m-d H:i:s') : null;
-            $insertOffer = $db->prepare(
-                'INSERT INTO empresa_especialidades_plazas
-                    (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, estado, turno,
-                     revisado_por, revisado_en)
-                 VALUES (:empresa, :especialidad, 2, :inicio, :fin, :estado, :turno, :revisor, :revisado_en)'
-            );
-            $insertOffer->execute([
-                'empresa' => $companyId,
-                'especialidad' => $specialtyId,
-                'inicio' => $offer['start'],
-                'fin' => $offer['end'],
-                'estado' => $offer['state'],
-                'turno' => $offer['shift'],
-                'revisor' => $offer['state'] === 'Aprobada' ? $reviewerId : null,
-                'revisado_en' => $reviewedAt,
-            ]);
-            $createdCounts['ofertas']++;
-        }
-
         $findSite = $db->prepare(
             'SELECT id FROM empresa_sedes
-             WHERE empresa_id = :empresa AND nombre = :nombre LIMIT 1'
+             WHERE empresa_id = :empresa AND nombre = :nombre AND activa = 1 LIMIT 1'
         );
         $findSite->execute([
             'empresa' => $companyId,
@@ -356,6 +323,40 @@ try {
                 'direccion' => 'Direccion sintetica de pruebas, Madrid',
             ]);
             $siteId = $db->lastInsertId();
+        }
+
+        $findOffer = $db->prepare(
+            'SELECT id FROM empresa_especialidades_plazas
+             WHERE empresa_id = :empresa AND especialidad_id = :especialidad
+               AND fecha_inicio = :inicio AND fecha_fin = :fin
+             LIMIT 1'
+        );
+        $findOffer->execute([
+            'empresa' => $companyId,
+            'especialidad' => $specialtyId,
+            'inicio' => $offer['start'],
+            'fin' => $offer['end'],
+        ]);
+        if ($findOffer->fetchColumn() === false) {
+            $reviewedAt = $offer['state'] === 'Aprobada' ? date('Y-m-d H:i:s') : null;
+            $insertOffer = $db->prepare(
+                'INSERT INTO empresa_especialidades_plazas
+                    (empresa_id, sede_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, estado, turno,
+                     revisado_por, revisado_en)
+                 VALUES (:empresa, :sede, :especialidad, 2, :inicio, :fin, :estado, :turno, :revisor, :revisado_en)'
+            );
+            $insertOffer->execute([
+                'empresa' => $companyId,
+                'sede' => (int)$siteId,
+                'especialidad' => $specialtyId,
+                'inicio' => $offer['start'],
+                'fin' => $offer['end'],
+                'estado' => $offer['state'],
+                'turno' => $offer['shift'],
+                'revisor' => $offer['state'] === 'Aprobada' ? $reviewerId : null,
+                'revisado_en' => $reviewedAt,
+            ]);
+            $createdCounts['ofertas']++;
         }
 
         $agreementExists = $db->prepare(
