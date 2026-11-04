@@ -14,8 +14,8 @@
                     <tr>
                         <td><?= htmlspecialchars($item['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
                         <td><?= htmlspecialchars($item['nombre_especialidad'] ?? 'Sin clasificar', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($item['fecha_firma'], ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($item['fecha_inicio'] . ' – ' . $item['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
+                        <td><?= htmlspecialchars(EuropeanDate::format($item['fecha_firma']), ENT_QUOTES, 'UTF-8') ?></td>
+                        <td><?= EuropeanDate::periodBlock($item['fecha_inicio'], $item['fecha_fin']) ?></td>
                         <td><?= htmlspecialchars($item['estado'], ENT_QUOTES, 'UTF-8') ?></td>
                     </tr>
                 <?php endforeach; ?></tbody>

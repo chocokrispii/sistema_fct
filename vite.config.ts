@@ -6,7 +6,7 @@ export default defineConfig({
     plugins: [vue()],
     publicDir: false,
     css: {
-        postcss: './postcss.config.js',
+        postcss: './postcss.config.cjs',
     },
     build: {
         manifest: true,

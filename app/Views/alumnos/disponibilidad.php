@@ -109,7 +109,7 @@
         <section class="availability-page__current" aria-labelledby="availability-current-title">
             <h3 id="availability-current-title">Horario semanal guardado</h3>
             <?php if ($values['fecha_inicio'] !== '' && $values['fecha_fin'] !== ''): ?>
-                <p>Registrado de <?= htmlspecialchars($values['fecha_inicio'], ENT_QUOTES, 'UTF-8') ?> a <?= htmlspecialchars($values['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></p>
+                <?= EuropeanDate::periodBlock($values['fecha_inicio'], $values['fecha_fin']) ?>
             <?php else: ?>
                 <p>Aún no has registrado disponibilidad.</p>
             <?php endif; ?>

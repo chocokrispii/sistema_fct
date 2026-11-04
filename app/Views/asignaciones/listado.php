@@ -30,7 +30,7 @@
                         <?php if (!$soloPropias): ?><td><?= htmlspecialchars($item['alumno_nombre'] . ' ' . $item['apellidos'], ENT_QUOTES, 'UTF-8') ?><?php if (!$anonimizarAlumnado): ?><small><?= htmlspecialchars($item['alumno_correo'], ENT_QUOTES, 'UTF-8') ?></small><?php endif; ?></td><?php endif; ?>
                         <td><?= htmlspecialchars($item['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?></td>
                         <td><?= htmlspecialchars($item['nombre_especialidad'], ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($item['fecha_inicio'] . ' – ' . $item['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
+                        <td><?= EuropeanDate::periodBlock($item['fecha_inicio'], $item['fecha_fin']) ?></td>
                         <?php if (!$anonimizarAlumnado): ?><td><?= htmlspecialchars($item['tutor_empresa'] ?? '', ENT_QUOTES, 'UTF-8') ?></td><?php endif; ?>
                         <td><span class="status-badge status-badge--<?= $estadoModifier ?>"><?= htmlspecialchars($item['estado'], ENT_QUOTES, 'UTF-8') ?></span></td>
                         <?php if ($puedeGestionar): ?><td>

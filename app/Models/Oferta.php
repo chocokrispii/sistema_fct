@@ -3,6 +3,7 @@
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../Core/Paginacion.php';
+require_once __DIR__ . '/../Services/MatchingService.php';
 
 class Oferta {
     private PDO $db;
@@ -15,50 +16,6 @@ class Oferta {
          FROM empresa_especialidades_plazas p
          INNER JOIN empresas e ON e.id = p.empresa_id
          INNER JOIN especialidades es ON es.id = p.especialidad_id';
-
-    private const FROM_CANDIDATOS =
-        'FROM empresa_especialidades_plazas p
-         INNER JOIN especialidades es ON es.id = p.especialidad_id AND es.activo = 1
-         INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
-         INNER JOIN alumno_disponibilidad d
-            ON d.alumno_id = a.id
-            AND d.fecha_inicio <= p.fecha_inicio
-            AND d.fecha_fin >= p.fecha_fin
-            AND EXISTS (
-                SELECT 1
-                FROM empresa_oferta_horarios_semanales oh
-                WHERE oh.oferta_id = p.id
-                    AND (
-                        DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                        OR MOD(CAST(oh.dia_semana AS SIGNED) - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
-                            <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
-                    )
-            )
-            AND (
-                d.es_indiferente = TRUE
-                OR NOT EXISTS (
-                    SELECT 1 FROM empresa_oferta_horarios_semanales oh
-                    WHERE oh.oferta_id = p.id
-                        AND (
-                            DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                            OR MOD(CAST(oh.dia_semana AS SIGNED) - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
-                                <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
-                        )
-                        AND NOT EXISTS (
-                            SELECT 1 FROM alumno_disponibilidad_semanal ds
-                            WHERE ds.disponibilidad_id = d.id
-                                AND ds.dia_semana = oh.dia_semana
-                                AND ds.hora_inicio <= oh.hora_inicio
-                                AND ds.hora_fin >= oh.hora_fin
-                        )
-                )
-            )
-         WHERE p.id = :oferta_id
-            AND p.estado = \'Aprobada\'
-            AND NOT EXISTS (
-                SELECT 1 FROM asignaciones_fct af
-                WHERE af.alumno_id = a.id AND af.estado = \'Asignada\'
-            )';
 
     public function __construct(?PDO $db = null) {
         $this->db = $db ?? getPDOConnection();
@@ -125,6 +82,43 @@ class Oferta {
         );
         $stmt->execute(['oferta_id' => $ofertaId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function reemplazarHorarioPendiente(int $ofertaId, array $horarios): array
+    {
+        if (!$this->db->inTransaction()) {
+            throw new LogicException('La actualización del horario debe ejecutarse dentro de una transacción.');
+        }
+
+        $offer = $this->db->prepare(
+            "SELECT estado FROM empresa_especialidades_plazas WHERE id = :id FOR UPDATE"
+        );
+        $offer->execute(['id' => $ofertaId]);
+        if ($offer->fetchColumn() !== 'Pendiente') {
+            throw new DomainException('Solo se puede actualizar el horario de una oferta pendiente.');
+        }
+
+        $previous = $this->obtenerHorarioSemanal($ofertaId);
+        $delete = $this->db->prepare(
+            'DELETE FROM empresa_oferta_horarios_semanales WHERE oferta_id = :oferta_id'
+        );
+        $delete->execute(['oferta_id' => $ofertaId]);
+
+        $insert = $this->db->prepare(
+            'INSERT INTO empresa_oferta_horarios_semanales
+                (oferta_id, dia_semana, hora_inicio, hora_fin)
+             VALUES (:oferta_id, :dia_semana, :hora_inicio, :hora_fin)'
+        );
+        foreach ($horarios as $horario) {
+            $insert->execute([
+                'oferta_id' => $ofertaId,
+                'dia_semana' => $horario['dia_semana'],
+                'hora_inicio' => $horario['hora_inicio'],
+                'hora_fin' => $horario['hora_fin'],
+            ]);
+        }
+
+        return $previous;
     }
 
     public function obtenerPorEmpresa(int $empresaId): array {
@@ -278,55 +272,93 @@ class Oferta {
 
     public function obtenerCandidatos(int $ofertaId): array
     {
-        $sql = "SELECT a.id AS alumno_id, a.nombre, a.apellidos, a.correo
+        $matching = MatchingService::fromEnvironment();
+        $tolerancia = $matching->toleranceDays();
+        $diasMinimos = $matching->minimumOverlapDays();
+        $sql = "SELECT a.id AS alumno_id, a.nombre, a.apellidos, a.correo,
+                       d.id AS disponibilidad_id, d.fecha_inicio AS disponibilidad_inicio,
+                       d.fecha_fin AS disponibilidad_fin, d.es_indiferente,
+                       p.fecha_inicio AS oferta_inicio, p.fecha_fin AS oferta_fin
                 FROM empresa_especialidades_plazas p
                 INNER JOIN especialidades es ON es.id = p.especialidad_id AND es.activo = 1
                 INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
                 INNER JOIN alumno_disponibilidad d
                     ON d.alumno_id = a.id
-                    AND d.fecha_inicio <= p.fecha_inicio
-                    AND d.fecha_fin >= p.fecha_fin
-                    AND EXISTS (
-                        SELECT 1
-                        FROM empresa_oferta_horarios_semanales oh
-                        WHERE oh.oferta_id = p.id
-                            AND (
-                                DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                                OR MOD(CAST(oh.dia_semana AS SIGNED) - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
-                                    <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
-                            )
-                    )
-                    AND (
-                        d.es_indiferente = TRUE
-                        OR NOT EXISTS (
-                            SELECT 1 FROM empresa_oferta_horarios_semanales oh
-                            WHERE oh.oferta_id = p.id
-                                AND (
-                                    DATEDIFF(p.fecha_fin, p.fecha_inicio) >= 6
-                                    OR MOD(CAST(oh.dia_semana AS SIGNED) - 1 - WEEKDAY(p.fecha_inicio) + 7, 7)
-                                        <= DATEDIFF(p.fecha_fin, p.fecha_inicio)
-                                )
-                                AND NOT EXISTS (
-                                    SELECT 1 FROM alumno_disponibilidad_semanal ds
-                                    WHERE ds.disponibilidad_id = d.id
-                                        AND ds.dia_semana = oh.dia_semana
-                                        AND ds.hora_inicio <= oh.hora_inicio
-                                        AND ds.hora_fin >= oh.hora_fin
-                                )
-                        )
-                    )
+                    AND d.fecha_inicio <= DATE_ADD(p.fecha_inicio, INTERVAL $tolerancia DAY)
+                    AND d.fecha_fin >= DATE_SUB(p.fecha_fin, INTERVAL $tolerancia DAY)
+                    AND GREATEST(d.fecha_inicio, p.fecha_inicio) <= LEAST(d.fecha_fin, p.fecha_fin)
+                    AND DATEDIFF(LEAST(d.fecha_fin, p.fecha_fin), GREATEST(d.fecha_inicio, p.fecha_inicio)) + 1 >= $diasMinimos
                 WHERE p.id = :oferta_id
                     AND p.estado = 'Aprobada'
+                    AND EXISTS (SELECT 1 FROM empresa_oferta_horarios_semanales oh WHERE oh.oferta_id = p.id)
                     AND NOT EXISTS (
                         SELECT 1 FROM asignaciones_fct af
                         WHERE af.alumno_id = a.id AND af.estado = 'Asignada'
                     )
-                GROUP BY a.id, a.nombre, a.apellidos, a.correo
-                ORDER BY a.apellidos, a.nombre";
+                ORDER BY a.apellidos, a.nombre, d.fecha_inicio";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['oferta_id' => $ofertaId]);
+        $filas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($filas === []) {
+            return [];
+        }
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $disponibilidadIds = array_values(array_unique(array_map(
+            static fn(array $fila): int => (int)$fila['disponibilidad_id'],
+            $filas
+        )));
+        $placeholders = implode(',', array_fill(0, count($disponibilidadIds), '?'));
+        $horariosStmt = $this->db->prepare(
+            "SELECT disponibilidad_id, dia_semana, hora_inicio, hora_fin
+             FROM alumno_disponibilidad_semanal
+             WHERE disponibilidad_id IN ($placeholders)
+             ORDER BY dia_semana"
+        );
+        $horariosStmt->execute($disponibilidadIds);
+        $horariosAlumno = [];
+        foreach ($horariosStmt->fetchAll(PDO::FETCH_ASSOC) as $horario) {
+            $horariosAlumno[(int)$horario['disponibilidad_id']][] = $horario;
+        }
+
+        $horariosOferta = $this->obtenerHorarioSemanal($ofertaId);
+        $candidatos = [];
+        foreach ($filas as $fila) {
+            $evaluacion = $matching->evaluate(
+                $fila['oferta_inicio'],
+                $fila['oferta_fin'],
+                $fila['disponibilidad_inicio'],
+                $fila['disponibilidad_fin'],
+                $horariosOferta,
+                $horariosAlumno[(int)$fila['disponibilidad_id']] ?? [],
+                (bool)$fila['es_indiferente']
+            );
+            if ($evaluacion === null) {
+                continue;
+            }
+            $candidato = array_merge($fila, $evaluacion);
+            $alumnoId = (int)$fila['alumno_id'];
+            if (!isset($candidatos[$alumnoId])
+                || $candidato['compatibilidad_porcentaje'] > $candidatos[$alumnoId]['compatibilidad_porcentaje']) {
+                $candidatos[$alumnoId] = $candidato;
+            }
+        }
+
+        $candidatos = array_values($candidatos);
+        usort($candidatos, static function (array $a, array $b): int {
+            return $b['compatibilidad_porcentaje'] <=> $a['compatibilidad_porcentaje']
+                ?: strcasecmp($a['apellidos'] . $a['nombre'], $b['apellidos'] . $b['nombre']);
+        });
+        return $candidatos;
+    }
+
+    public function obtenerCandidato(int $ofertaId, int $alumnoId): ?array
+    {
+        foreach ($this->obtenerCandidatos($ofertaId) as $candidato) {
+            if ((int)$candidato['alumno_id'] === $alumnoId) {
+                return $candidato;
+            }
+        }
+        return null;
     }
 
     public function obtenerCandidatosPaginados(array $ofertaIds, array $paginas, int $porPagina = 10): array
@@ -338,26 +370,13 @@ class Oferta {
                 continue;
             }
 
-            $count = $this->db->prepare('SELECT COUNT(DISTINCT a.id) ' . self::FROM_CANDIDATOS);
-            $count->execute(['oferta_id' => $ofertaId]);
+            $candidatos = $this->obtenerCandidatos($ofertaId);
             $paginacion = Paginacion::calcular(
-                (int)$count->fetchColumn(),
+                count($candidatos),
                 Paginacion::desdeEntrada($paginas[$ofertaId] ?? null),
                 $porPagina
             );
-
-            $stmt = $this->db->prepare(
-                'SELECT a.id AS alumno_id, a.nombre, a.apellidos, a.correo '
-                . self::FROM_CANDIDATOS
-                . ' GROUP BY a.id, a.nombre, a.apellidos, a.correo
-                   ORDER BY a.apellidos, a.nombre
-                   LIMIT :limite OFFSET :offset'
-            );
-            $stmt->bindValue(':oferta_id', $ofertaId, PDO::PARAM_INT);
-            $stmt->bindValue(':limite', $porPagina, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $paginacion['offset'], PDO::PARAM_INT);
-            $stmt->execute();
-            $paginacion['candidatos'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $paginacion['candidatos'] = array_slice($candidatos, $paginacion['offset'], $porPagina);
             $resultados[$ofertaId] = $paginacion;
         }
 

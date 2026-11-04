@@ -1,6 +1,7 @@
 <?php $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8'); ?>
 <h2>Importar empresas desde Excel o PDF</h2>
 <p>Sube un archivo <strong>.xlsx</strong> o <strong>.pdf</strong> (máximo 5 MB y 100 empresas) con las columnas <em>Razón social, NIF, Email, Representante</em>. Cada empresa se crea inactiva y recibe un enlace de activación válido 24 horas.</p>
+<p>En Excel puedes usar las cabeceras indicadas. En PDF utiliza texto seleccionable, una empresa por línea, con este orden y separador: <strong>Razón social; NIF; Email; Representante</strong>. Los PDF escaneados como imagen no se pueden importar.</p>
 <?php if ($error !== ''): ?><p class="message message-error" role="alert"><?= $escape($error) ?></p><?php endif; ?>
 <?php if (is_array($resultado)): ?>
 <p class="message message-success" role="status">Empresas creadas: <?= (int)$resultado['insertados'] ?> de <?= (int)$resultado['total_procesados'] ?>. Filas con errores: <?= (int)$resultado['fallidos'] ?>.</p>

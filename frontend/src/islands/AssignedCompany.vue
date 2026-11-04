@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { requestApi } from '../api/client';
+import { formatEuropeanDate } from '../utils/date';
 
 interface AssignedCompany {
     nombre_empresa: string;
@@ -34,6 +35,6 @@ onMounted(async () => {
         <div><dt>Empresa asignada</dt><dd>{{ company.nombre_empresa }}</dd></div>
         <div><dt>Sector</dt><dd>{{ company.categoria || 'No indicado' }}</dd></div>
         <div><dt>Ciclo</dt><dd>{{ company.nombre_especialidad }}</dd></div>
-        <div><dt>Periodo</dt><dd>{{ company.fecha_inicio }} – {{ company.fecha_fin }}</dd></div>
+        <div><dt>Periodo</dt><dd><span class="period-range" :aria-label="`Periodo del ${formatEuropeanDate(company.fecha_inicio)} al ${formatEuropeanDate(company.fecha_fin)}`"><span class="period-range__row"><span class="period-range__label">Inicio</span><time :datetime="company.fecha_inicio">{{ formatEuropeanDate(company.fecha_inicio) }}</time></span><span class="period-range__row"><span class="period-range__label">Fin</span><time :datetime="company.fecha_fin">{{ formatEuropeanDate(company.fecha_fin) }}</time></span></span></dd></div>
     </dl>
 </template>

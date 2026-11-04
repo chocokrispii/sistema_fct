@@ -29,7 +29,8 @@ $aviso = is_string($_GET['aviso'] ?? null) ? trim((string)$_GET['aviso']) : '';
                 <article class="company-evaluation-card">
                     <div class="company-evaluation-card__summary">
                         <h2><?= $escape($student) ?></h2>
-                        <p><?= $escape((string)$evaluacion['nombre_especialidad']) ?> · <?= $escape((string)$evaluacion['fecha_inicio']) ?> — <?= $escape((string)$evaluacion['fecha_fin']) ?></p>
+                        <p><?= $escape((string)$evaluacion['nombre_especialidad']) ?></p>
+                        <?= EuropeanDate::periodBlock($evaluacion['fecha_inicio'], $evaluacion['fecha_fin']) ?>
                         <p class="company-evaluation-card__status">Estado: <strong><?= $escape((string)$evaluacion['estado']) ?></strong><?php if ($evaluacion['evaluacion_dictamen']): ?> · Dictamen: <strong><?= $escape((string)$evaluacion['evaluacion_dictamen']) ?></strong><?php endif; ?></p>
                         <?php if ($evaluacion['evaluacion_nombre_original']): ?><small>Último archivo: <?= $escape((string)$evaluacion['evaluacion_nombre_original']) ?></small><?php endif; ?>
                     </div>

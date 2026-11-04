@@ -23,7 +23,7 @@ function assertFileSecurity(bool $condition, string $message): void
 
 $routes = require __DIR__ . '/../routes/web.php';
 assertFileSecurity(
-    $routes['descargar-convenio']['roles'] === ['Administrador', 'Coordinador', 'Empresa'],
+    $routes['descargar-convenio']['roles'] === ['Administrador'],
     'La matriz de acceso a convenios concede acceso a un rol no autorizado.'
 );
 assertFileSecurity(
@@ -75,9 +75,11 @@ assertFileSecurity(
 );
 assertFileSecurity(
     $routes['revisar-oferta']['roles'] === ['Administrador']
+        && $routes['actualizar-horario-oferta']['method'] === 'POST'
+        && $routes['actualizar-horario-oferta']['roles'] === ['Administrador']
         && $routes['resolver-convenio']['roles'] === ['Administrador']
         && $routes['auditar-convenios']['roles'] === ['Observador'],
-    'La resolución de ofertas/convenios y la consulta de auditoría deben tener roles separados.'
+    'La actualización de horarios, resolución de ofertas/convenios y consulta de auditoría deben tener roles separados.'
 );
 assertFileSecurity(
     $routes['logout']['method'] === 'POST'

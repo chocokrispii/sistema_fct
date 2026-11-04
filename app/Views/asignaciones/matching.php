@@ -2,7 +2,7 @@
     <div class="matching-page__intro">
         <span class="student-registration__eyebrow">Gestión del centro</span>
         <h2 id="matching-title">Emparejamiento y asignación</h2>
-        <p>El sistema muestra alumnos cuyo ciclo, periodo y horarios exactos cubren todas las franjas semanales de las ofertas aprobadas. La asignación vuelve a validar cada requisito dentro de una transacción.</p>
+        <p>El sistema compara ciclo, solapamiento de fechas y horarios con una tolerancia configurable. Los candidatos se ordenan por compatibilidad y la asignación vuelve a validar cada requisito dentro de una transacción.</p>
         <a class="student-portal__text-action" href="index.php?action=asignaciones">Consultar asignaciones activas</a>
     </div>
 
@@ -25,7 +25,7 @@
                         <span class="matching-card__capacity"><?= (int)$oferta['plazas_disponibles'] ?> plazas disponibles</span>
                     </div>
                     <dl class="matching-card__details">
-                        <div><dt>Periodo</dt><dd><?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></dd></div>
+                        <div><dt>Periodo</dt><dd><?= EuropeanDate::periodBlock($oferta['fecha_inicio'], $oferta['fecha_fin']) ?></dd></div>
                         <div><dt>Horario semanal</dt><dd><?php if ($oferta['horarios'] === []): ?>No hay horarios exactos registrados<?php else: ?><?php foreach ($oferta['horarios'] as $shift): ?><?= htmlspecialchars(['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][(int)$shift['dia_semana']] . ' ' . substr($shift['hora_inicio'], 0, 5) . '–' . substr($shift['hora_fin'], 0, 5), ENT_QUOTES, 'UTF-8') ?><br><?php endforeach; ?><?php endif; ?></dd></div>
                         <div><dt>Plazas cubiertas</dt><dd><?= (int)$oferta['asignadas'] ?> de <?= (int)$oferta['plazas_cuantas'] ?></dd></div>
                     </dl>
@@ -33,7 +33,7 @@
                     <?php if ($oferta['plazas_disponibles'] === 0): ?>
                         <p class="matching-card__empty">La oferta ya no tiene plazas disponibles.</p>
                     <?php elseif ($oferta['candidatos'] === []): ?>
-                        <p class="matching-card__empty">No hay alumnos disponibles que cubran completamente los horarios exactos de esta oferta.</p>
+                        <p class="matching-card__empty">No hay alumnos que cumplan el solapamiento mínimo, la tolerancia de fechas y la cobertura horaria configurados.</p>
                     <?php else: ?>
                         <h4>Candidatos compatibles</h4>
                         <div class="matching-card__candidates">
@@ -47,9 +47,13 @@
                                          data-prop-oferta-id="<?= (int)$oferta['id'] ?>"
                                          data-prop-alumno-id="<?= (int)$candidato['alumno_id'] ?>"></div>
                                     <div class="matching-card__student">
-                                        <strong><?= htmlspecialchars($candidato['nombre'] . ' ' . $candidato['apellidos'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                        <div class="matching-card__student-heading">
+                                            <strong><?= htmlspecialchars($candidato['nombre'] . ' ' . $candidato['apellidos'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                            <span class="matching-card__compatibility"><?= (int)$candidato['compatibilidad_porcentaje'] ?> % compatible</span>
+                                        </div>
                                         <span><?= htmlspecialchars($candidato['correo'], ENT_QUOTES, 'UTF-8') ?></span>
-                                        <span>Horario compatible con todas las franjas de la oferta</span>
+                                        <span>Fechas <?= (int)$candidato['compatibilidad_fechas'] ?> % · Horario <?= (int)$candidato['compatibilidad_horaria'] ?> % · <?= (int)$candidato['dias_solapados'] ?> días coincidentes</span>
+                                        <span>Periodo adaptado: <?= EuropeanDate::format($candidato['fecha_inicio_adaptada']) ?> – <?= EuropeanDate::format($candidato['fecha_fin_adaptada']) ?></span>
                                     </div>
                                     <label>Tutor de empresa
                                         <input type="text" name="tutor_empresa" maxlength="150" autocomplete="name" required>

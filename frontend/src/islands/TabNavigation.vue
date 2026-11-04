@@ -45,12 +45,10 @@ const tabsByRole: Record<string, NavigationTab[]> = {
 const tabs = computed(() => tabsByRole[props.role || ''] || []);
 const selectedTab = computed(() => tabs.value.find((tab) => tab.id === navigation.activeTab) || tabs.value[0]);
 
-function href(action: string): string {
-    return `index.php?action=${encodeURIComponent(action)}&tab=${encodeURIComponent(selectedTab.value?.id || 'principal')}`;
-}
+const currentAction = new URLSearchParams(window.location.search).get('action') || 'inicio';
 
-function select(tab: NavigationTab): void {
-    navigation.selectTab(tab.id);
+function href(action: string, tabId = selectedTab.value?.id || 'principal'): string {
+    return `index.php?action=${encodeURIComponent(action)}&tab=${encodeURIComponent(tabId)}`;
 }
 
 onMounted(() => {
@@ -61,20 +59,18 @@ onMounted(() => {
 
 <template>
     <div v-if="tabs.length" class="tab-navigation" aria-label="Secciones principales">
-        <div class="tab-navigation__tabs" role="tablist" aria-label="Categorías de navegación">
-            <button
+        <div class="tab-navigation__tabs" aria-label="Categorías de navegación">
+            <a
                 v-for="tab in tabs"
                 :key="tab.id"
                 class="tab-navigation__tab"
                 :class="{ 'tab-navigation__tab--active': selectedTab?.id === tab.id }"
-                type="button"
-                role="tab"
-                :aria-selected="selectedTab?.id === tab.id"
-                @click="select(tab)"
-            >{{ tab.label }}</button>
+                :href="href(tab.items[0].action, tab.id)"
+                :aria-current="selectedTab?.id === tab.id ? 'true' : undefined"
+            >{{ tab.label }}</a>
         </div>
-        <div v-if="selectedTab" class="tab-navigation__items" role="tabpanel">
-            <a v-for="item in selectedTab.items" :key="item.action" :href="href(item.action)">{{ item.label }}</a>
+        <div v-if="selectedTab" class="tab-navigation__items">
+            <a v-for="item in selectedTab.items" :key="item.action" :href="href(item.action)" :aria-current="currentAction === item.action ? 'page' : undefined">{{ item.label }}</a>
         </div>
     </div>
 </template>

@@ -12,7 +12,7 @@ $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/in
 $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
 ?>
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-ES">
 
 <head>
     <meta charset="UTF-8">

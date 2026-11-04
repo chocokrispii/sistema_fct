@@ -11,7 +11,7 @@
             <h3><?= htmlspecialchars($oferta['titulo'] ?? 'Oferta FCT', ENT_QUOTES, 'UTF-8') ?></h3>
             <?php if (!empty($oferta['descripcion'])): ?><p><?= nl2br(htmlspecialchars($oferta['descripcion'], ENT_QUOTES, 'UTF-8')) ?></p><?php endif; ?>
             <p><?= (int)$oferta['plazas_cuantas'] ?> plazas ·
-                <?= htmlspecialchars($oferta['fecha_inicio'] . ' – ' . $oferta['fecha_fin'], ENT_QUOTES, 'UTF-8') ?> ·
+                <?= EuropeanDate::periodBlock($oferta['fecha_inicio'], $oferta['fecha_fin']) ?> ·
                 <span class="status-badge status-badge--neutral"><?= htmlspecialchars($turnLabel, ENT_QUOTES, 'UTF-8') ?></span> ·
                 <span class="status-badge status-badge--neutral"><?= htmlspecialchars($oferta['modalidad'], ENT_QUOTES, 'UTF-8') ?></span></p>
             <?php if (!empty($oferta['ubicacion'])): ?><p><strong>Ubicación:</strong> <?= htmlspecialchars($oferta['ubicacion'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
@@ -20,7 +20,35 @@
             <ul><?php foreach ($oferta['horarios'] as $shift): ?>
                 <li><?= htmlspecialchars(['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][(int)$shift['dia_semana']] . ': ' . substr($shift['hora_inicio'], 0, 5) . '–' . substr($shift['hora_fin'], 0, 5), ENT_QUOTES, 'UTF-8') ?></li>
             <?php endforeach; ?></ul>
-            <?php if ($oferta['horarios'] === []): ?><p class="message message-error">Oferta histórica sin horario exacto; no se puede aprobar hasta volver a publicarla con franjas semanales.</p><?php endif; ?>
+            <?php if ($oferta['horarios'] === []): ?>
+                <p class="message message-error">Oferta histórica sin horario exacto. Completa las franjas semanales para habilitar la aprobación.</p>
+                <?php if (($_SESSION['rol'] ?? null) === 'Administrador'): ?>
+                    <form class="review-decision offer-schedule-repair" method="POST" action="index.php?action=actualizar-horario-oferta">
+                        <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="oferta_id" value="<?= (int)$oferta['id'] ?>">
+                        <fieldset>
+                            <legend>Horario semanal</legend>
+                            <p>Selecciona los días y la franja. Verifica que refleje el horario acordado con la empresa.</p>
+                            <?php foreach (['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'] as $dayIndex => $dayName): ?>
+                                <?php $dayNumber = $dayIndex + 1; ?>
+                                <div class="offer-schedule-repair__day">
+                                    <label class="offer-schedule-repair__active">
+                                        <input type="checkbox" name="horarios[<?= $dayNumber ?>][activo]" value="1" <?= $dayNumber <= 5 ? 'checked' : '' ?>>
+                                        <?= htmlspecialchars($dayName, ENT_QUOTES, 'UTF-8') ?>
+                                    </label>
+                                    <label>Desde
+                                        <input type="time" name="horarios[<?= $dayNumber ?>][hora_inicio]" value="08:00" step="300">
+                                    </label>
+                                    <label>Hasta
+                                        <input type="time" name="horarios[<?= $dayNumber ?>][hora_fin]" value="15:00" step="300">
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                        </fieldset>
+                        <button type="submit">Guardar horario semanal</button>
+                    </form>
+                <?php endif; ?>
+            <?php endif; ?>
             <?php if (($_SESSION['rol'] ?? null) === 'Administrador'): ?><form class="review-decision" method="POST" action="index.php?action=revisar-oferta">
                 <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="oferta_id" value="<?= (int)$oferta['id'] ?>">

@@ -44,14 +44,16 @@ El listado general `GET ofertas` está limitado a cuentas autenticadas de empres
 
 ## Revisión y responsabilidades
 
-La lista `GET revisar-ofertas` y la revisión documental de convenios permanecen disponibles para Administración y Coordinación. Las mutaciones `POST revisar-oferta` y `POST resolver-convenio` son exclusivas de Administrador; los controladores vuelven a comprobar el rol para evitar decisiones fuera de la política aunque se invoquen directamente.
+La lista `GET revisar-ofertas` permanece disponible para Administración y Coordinación. La gestión unificada de convenios (`GET gestionar-convenios`, y los accesos compatibles `GET revisar-convenios` / `GET archivo-convenios`) permite a Coordinación consultar solo la cola pendiente; Administración puede filtrar todos los estados. Las mutaciones `POST revisar-oferta`, `POST resolver-convenio` y `POST archivar-convenio` son exclusivas de Administrador; los controladores vuelven a comprobar el rol para evitar decisiones fuera de la política aunque se invoquen directamente.
 
 La política de roles usa los nombres reales del esquema (`Administrador`, `Coordinador`, `Observador`, `Empresa`, `Alumno`). No se inventan roles `Director` ni `Guest` en la base de datos.
 
-El archivo `GET archivo-convenios` está reservado a Administrador. Muestra
-todos los estados, los datos de revisión y los eventos de auditoría asociados.
-Los PDF permanecen en almacenamiento privado y se sirven mediante la ruta
-autorizada `GET descargar-convenio`.
+El acceso `GET archivo-convenios` está reservado a Administrador y conserva
+compatibilidad con la vista unificada de cola e histórico. La vista filtra por
+estado, NIF y fechas de registro, pagina los resultados y muestra los eventos
+de auditoría. La descarga `GET descargar-convenio` también es exclusiva de
+Administrador; los PDF permanecen en almacenamiento privado. Las transiciones
+permitidas son Pendiente → Aprobado/Rechazado y Aprobado/Rechazado → Archivado.
 
 ## API tokenizada
 

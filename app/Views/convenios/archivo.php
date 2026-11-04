@@ -1,4 +1,4 @@
-<section class="assignments-page" aria-labelledby="agreements-archive-title">
+<section class="assignments-page agreements-archive-page" aria-labelledby="agreements-archive-title">
     <div class="assignments-page__intro">
         <span class="student-registration__eyebrow">Solo administración</span>
         <h2 id="agreements-archive-title">Archivo de convenios</h2>
@@ -8,8 +8,8 @@
     <?php if ($convenios === []): ?>
         <p>No hay convenios registrados.</p>
     <?php else: ?>
-        <div class="assignments-table-wrap">
-            <table class="assignments-table">
+        <div class="assignments-table-wrap agreements-archive-table-wrap">
+            <table class="assignments-table agreements-archive-table">
                 <thead>
                     <tr>
                         <th>Convenio</th>
@@ -26,17 +26,17 @@
                         <tr>
                             <td>
                                 <?= htmlspecialchars($item['numero_convenio'], ENT_QUOTES, 'UTF-8') ?>
-                                <small>Firmado <?= htmlspecialchars($item['fecha_firma'], ENT_QUOTES, 'UTF-8') ?></small>
+                                <small>Firmado <?= htmlspecialchars(EuropeanDate::format($item['fecha_firma']), ENT_QUOTES, 'UTF-8') ?></small>
                             </td>
                             <td>
                                 <?= htmlspecialchars($item['nombre_empresa'], ENT_QUOTES, 'UTF-8') ?>
                                 <small><?= htmlspecialchars($item['nombre_especialidad'] ?? 'Sin clasificar', ENT_QUOTES, 'UTF-8') ?><?= $item['nombre_sede'] ? ' · ' . htmlspecialchars($item['nombre_sede'], ENT_QUOTES, 'UTF-8') : '' ?></small>
                             </td>
-                            <td><?= htmlspecialchars($item['fecha_inicio'] . ' – ' . $item['fecha_fin'], ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= EuropeanDate::periodBlock($item['fecha_inicio'], $item['fecha_fin']) ?></td>
                             <td>
                                 <strong><?= htmlspecialchars($item['estado'], ENT_QUOTES, 'UTF-8') ?></strong>
                                 <?php if ($item['revisado_en'] !== null): ?>
-                                    <small>Revisado <?= htmlspecialchars($item['revisado_en'], ENT_QUOTES, 'UTF-8') ?> por <?= htmlspecialchars($item['nombre_revisor'], ENT_QUOTES, 'UTF-8') ?></small>
+                                    <small>Revisado <?= htmlspecialchars(EuropeanDate::dateTime($item['revisado_en']), ENT_QUOTES, 'UTF-8') ?> por <?= htmlspecialchars($item['nombre_revisor'], ENT_QUOTES, 'UTF-8') ?></small>
                                 <?php endif; ?>
                                 <?php if ($item['motivo_revision'] !== null && $item['motivo_revision'] !== ''): ?>
                                     <small><?= htmlspecialchars($item['motivo_revision'], ENT_QUOTES, 'UTF-8') ?></small>
@@ -54,7 +54,7 @@
                                             <?php foreach ($eventos as $evento): ?>
                                                 <li>
                                                     <strong><?= htmlspecialchars($evento['evento'], ENT_QUOTES, 'UTF-8') ?></strong>
-                                                    <small><?= htmlspecialchars($evento['creado_en'], ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars($evento['actor'], ENT_QUOTES, 'UTF-8') ?></small>
+                                                    <small><?= htmlspecialchars(EuropeanDate::dateTime($evento['creado_en']), ENT_QUOTES, 'UTF-8') ?> · <?= htmlspecialchars($evento['actor'], ENT_QUOTES, 'UTF-8') ?></small>
                                                     <?php if ($evento['detalle'] !== null && $evento['detalle'] !== ''): ?>
                                                         <small><?= htmlspecialchars($evento['detalle'], ENT_QUOTES, 'UTF-8') ?></small>
                                                     <?php endif; ?>

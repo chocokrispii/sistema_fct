@@ -892,6 +892,27 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
     min-width: 0;
 }
 
+.matching-card__student-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.matching-card__compatibility {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: var(--color-success-bg);
+    color: var(--color-success-text) !important;
+    font-size: 0.78rem !important;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .matching-card__student span {
     color: var(--color-text-muted);
     font-size: 0.86rem;
@@ -1362,6 +1383,115 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
 
 .grade-form button {
     min-height: 40px;
+}
+
+.grades-table-wrap {
+    overflow-x: visible;
+}
+
+.grades-page .assignments-page__intro {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+}
+
+.grades-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.grades-table th,
+.grades-table td {
+    padding: 9px 8px;
+    overflow-wrap: anywhere;
+    vertical-align: middle;
+    font-size: clamp(.72rem, 1.05vw, .88rem);
+}
+
+.grades-table--manager th:nth-child(1) { width: 10%; }
+.grades-table--manager th:nth-child(2) { width: 9%; }
+.grades-table--manager th:nth-child(3) { width: 18%; }
+.grades-table--manager th:nth-child(4) { width: 17%; }
+.grades-table--manager th:nth-child(5) { width: 8%; }
+.grades-table--manager th:nth-child(6) { width: 7%; }
+.grades-table--manager th:nth-child(7) { width: 11%; }
+.grades-table--manager th:nth-child(8) { width: 20%; }
+
+.grades-table--manager th:nth-child(7) {
+    white-space: nowrap;
+}
+
+.grades-table .period-range__row {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 4px;
+    padding: 5px 6px;
+}
+
+.grades-table .period-range time {
+    font-size: clamp(.68rem, .9vw, .78rem);
+}
+
+.grades-table .grade-form {
+    min-width: 0;
+}
+
+.grades-table .grade-form input,
+.grades-table .grade-form textarea,
+.grades-table .grade-form button {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.agreements-archive-page .assignments-page__intro {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+}
+
+.agreements-archive-page .assignments-page__intro p {
+    max-width: 760px;
+}
+
+.agreements-archive-table-wrap {
+    overflow-x: visible;
+}
+
+.agreements-archive-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.agreements-archive-table th:nth-child(1) { width: 12%; }
+.agreements-archive-table th:nth-child(2) { width: 27%; }
+.agreements-archive-table th:nth-child(3) { width: 17%; }
+.agreements-archive-table th:nth-child(4) { width: 22%; }
+.agreements-archive-table th:nth-child(5) { width: 10%; }
+.agreements-archive-table th:nth-child(6) { width: 12%; }
+
+.agreements-archive-table th,
+.agreements-archive-table td {
+    padding: 9px 8px;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+    font-size: clamp(.72rem, 1.05vw, .88rem);
+}
+
+.agreements-archive-table .period-range__row {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 4px;
+    padding: 5px 6px;
+}
+
+.agreements-archive-table .period-range time {
+    font-size: clamp(.67rem, .88vw, .78rem);
+}
+
+.agreements-archive-table details ul {
+    margin: 8px 0 0;
+    padding-left: 16px;
 }
 
 .student-portal__profile-actions,
@@ -2181,11 +2311,6 @@ html[data-theme="dark"] .theme-toggle {
     border-color: var(--color-border-strong);
 }
 
-html[data-theme="dark"] button,
-html[data-theme="dark"] .btn-submit {
-    color: var(--color-primary-contrast);
-}
-
 /* =========================
    OFFER CREATION FORM
    ========================= */
@@ -2688,9 +2813,21 @@ html[data-theme="dark"] .btn-submit {
 .offer-list-section__heading {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
+    flex-direction: column;
     gap: 16px;
     margin: 0 0 18px;
+    text-align: center;
+}
+
+.offer-list-section__heading > div {
+    display: grid;
+    justify-items: center;
+}
+
+.offer-list-section__heading > p {
+    margin: 0;
+    color: var(--color-text-muted);
 }
 
 .offer-list-section__heading h2,
@@ -2708,6 +2845,127 @@ html[data-theme="dark"] .btn-submit {
     color: var(--color-text-muted);
     line-height: 1.5;
     text-align: center;
+}
+
+.offer-list-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.offer-list-table th:nth-child(1) { width: 19%; }
+.offer-list-table th:nth-child(2) { width: 9%; }
+.offer-list-table th:nth-child(3) { width: 13%; }
+.offer-list-table th:nth-child(4) { width: 5%; }
+.offer-list-table th:nth-child(5) { width: 17%; }
+.offer-list-table th:nth-child(6) { width: 16%; }
+.offer-list-table th:nth-child(7) { width: 9%; }
+.offer-list-table th:nth-child(8) { width: 12%; }
+
+.offer-list-table-wrap {
+    overflow-x: visible;
+}
+
+.offer-list-table th,
+.offer-list-table td {
+    vertical-align: top;
+    padding: 9px 8px;
+    overflow-wrap: anywhere;
+    font-size: clamp(.72rem, 1.05vw, .88rem);
+}
+
+.offer-list-table__schedule {
+    padding: 10px 12px;
+}
+
+.offer-list-table td:nth-child(7) .status-badge {
+    max-width: 100%;
+    padding: 4px 6px;
+    font-size: .68rem;
+}
+
+.weekly-schedule {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.weekly-schedule li {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 5px 7px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
+    line-height: 1.2;
+}
+
+.weekly-schedule__day {
+    color: var(--color-primary);
+    font-size: .78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.weekly-schedule__time {
+    color: var(--color-text-main);
+    font-size: clamp(.7rem, .95vw, .82rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.period-range {
+    display: inline-grid;
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+    max-width: 180px;
+    vertical-align: top;
+}
+
+.period-range__row {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    align-items: center;
+    gap: 7px;
+    padding: 5px 7px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
+    line-height: 1.2;
+}
+
+.period-range__label {
+    color: var(--color-primary);
+    font-size: .62rem;
+    font-weight: 800;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+}
+
+.period-range time {
+    color: var(--color-text-main);
+    font-size: clamp(.68rem, .9vw, .8rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+    .offer-list-table {
+        min-width: 0;
+    }
+
+    .weekly-schedule {
+        min-width: 0;
+    }
 }
 
 @media (max-width: 600px) {
@@ -2728,9 +2986,9 @@ html[data-theme="dark"] .btn-submit {
     }
 
     .offer-list-section__heading {
-        align-items: flex-start;
-        flex-direction: column;
+        align-items: center;
     }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2798,6 +3056,7 @@ html[data-theme="dark"] .btn-submit {
    ========================= */
 
 .site-header {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2875,6 +3134,7 @@ html[data-theme="dark"] .btn-submit {
 
 .site-navigation__links {
     flex: 1 1 auto;
+    justify-content: center;
 }
 
 .site-navigation__account {
@@ -2912,11 +3172,13 @@ html[data-theme="dark"] .btn-submit {
 .tab-navigation__tabs {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: .35rem;
     border-bottom: 1px solid var(--color-border);
 }
 
 .tab-navigation__tab {
+    display: block;
     padding: .55rem .8rem;
     border: 0;
     border-bottom: 3px solid transparent;
@@ -2925,11 +3187,13 @@ html[data-theme="dark"] .btn-submit {
     cursor: pointer;
     font: inherit;
     font-weight: 700;
+    text-decoration: none;
 }
 
 .tab-navigation__tab:hover,
 .tab-navigation__tab:focus-visible,
 .tab-navigation__tab--active {
+    background: transparent;
     border-bottom-color: var(--color-primary);
     color: var(--color-primary);
 }
@@ -2937,6 +3201,7 @@ html[data-theme="dark"] .btn-submit {
 .tab-navigation__items {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: .35rem;
     padding: .65rem 0;
 }
@@ -2949,13 +3214,41 @@ html[data-theme="dark"] .btn-submit {
 }
 
 .tab-navigation__items a:hover,
-.tab-navigation__items a:focus-visible {
+.tab-navigation__items a:focus-visible,
+.tab-navigation__items a[aria-current="page"] {
     background: var(--color-bg-subtle);
     color: var(--color-primary);
 }
 
 html.vue-tabs-ready .site-navigation__links--fallback {
     display: none;
+}
+
+@media (min-width: 761px) {
+    .site-navigation {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+
+    .site-navigation__links,
+    .site-navigation > [data-vue-island="TabNavigation"] {
+        position: static;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .site-navigation > [data-vue-island="TabNavigation"] .tab-navigation {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+    }
+
+    .site-navigation > [data-vue-island="TabNavigation"] .tab-navigation__tabs,
+    .site-navigation > [data-vue-island="TabNavigation"] .tab-navigation__items {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
 }
 
 .company-hub {
@@ -3297,6 +3590,7 @@ html.vue-tabs-ready .site-navigation__links--fallback {
         gap: 4px;
         padding: 0;
         border: 0;
+        justify-content: flex-start;
     }
 
     .site-navigation__links > a,
@@ -3313,6 +3607,7 @@ html.vue-tabs-ready .site-navigation__links--fallback {
     .tab-navigation__tabs,
     .tab-navigation__items {
         flex-direction: column;
+        justify-content: flex-start;
     }
 
     .tab-navigation__tab {
@@ -3376,5 +3671,259 @@ html.vue-tabs-ready .site-navigation__links--fallback {
 @media (prefers-reduced-motion: reduce) {
     .site-navigation__toggle::after {
         transition: none;
+    }
+}
+
+.agreement-management {
+    display: grid;
+    gap: 18px;
+    width: min(100% - 32px, 1440px);
+    margin: 24px auto;
+}
+
+.agreement-management__intro h1 {
+    margin: 4px 0 8px;
+    color: var(--color-primary);
+}
+
+.agreement-management__intro p,
+.agreement-results,
+.agreement-empty {
+    color: var(--color-text-muted);
+}
+
+.agreement-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.agreement-tabs a {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    border-radius: 8px 8px 0 0;
+    color: var(--color-text-main);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.agreement-tabs a[aria-current="page"] {
+    border-color: var(--color-border);
+    border-bottom-color: var(--color-bg-card);
+    margin-bottom: -1px;
+    background: var(--color-bg-card);
+    color: var(--color-primary);
+}
+
+.agreement-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-card);
+}
+
+.agreement-filters label,
+.agreement-actions label {
+    display: grid;
+    gap: 5px;
+    color: var(--color-text-main);
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.agreement-filters input,
+.agreement-filters select,
+.agreement-actions input {
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background: var(--color-bg-input);
+    color: var(--color-text-main);
+    font: inherit;
+}
+
+.agreement-filters button,
+.agreement-actions button {
+    min-height: 40px;
+}
+
+.agreement-filters__reset {
+    padding: 10px 4px;
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+.agreement-table {
+    min-width: 1050px;
+}
+
+.agreement-table td {
+    vertical-align: top;
+}
+
+.agreement-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.agreement-status--pending {
+    background: var(--color-warning-bg);
+    color: var(--color-warning-text);
+}
+
+.agreement-status--approved {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+}
+
+.agreement-status--rejected {
+    background: var(--color-danger-bg);
+    color: var(--color-danger-text);
+}
+
+.agreement-status--archived,
+.agreement-status--unknown {
+    background: var(--color-neutral-bg);
+    color: var(--color-neutral-text);
+}
+
+.agreement-actions {
+    min-width: 220px;
+}
+
+.agreement-actions > a,
+.agreement-actions > span {
+    display: inline-block;
+    margin-bottom: 8px;
+    font-weight: 700;
+}
+
+.agreement-actions form {
+    display: grid;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.agreement-actions details ul {
+    min-width: 180px;
+    padding-left: 18px;
+}
+
+.agreement-actions details li + li {
+    margin-top: 8px;
+}
+
+.agreement-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+}
+
+.agreement-pagination a {
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+@media (max-width: 640px) {
+    .agreement-management {
+        width: min(100% - 20px, 1440px);
+        margin: 14px auto;
+    }
+
+    .agreement-filters {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .agreement-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .agreement-tabs a {
+        justify-content: center;
+        border-radius: 7px;
+    }
+
+    .agreement-tabs a[aria-current="page"] {
+        margin-bottom: 0;
+        border-color: var(--color-primary);
+    }
+}
+
+.offer-schedule-repair fieldset {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+}
+
+.offer-schedule-repair legend {
+    padding: 0 6px;
+    color: var(--color-primary);
+    font-weight: 800;
+}
+
+.offer-schedule-repair fieldset > p {
+    margin: 0;
+    color: var(--color-text-muted);
+}
+
+.offer-schedule-repair__day {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) repeat(2, minmax(115px, 180px));
+    align-items: end;
+    gap: 12px;
+}
+
+.offer-schedule-repair__day label {
+    display: grid;
+    gap: 5px;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+.offer-schedule-repair__day input[type="time"] {
+    min-height: 40px;
+    padding: 7px 9px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+    background: var(--color-bg-input);
+    color: var(--color-text-main);
+    font: inherit;
+}
+
+.offer-schedule-repair__day .offer-schedule-repair__active {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+}
+
+@media (max-width: 560px) {
+    .offer-schedule-repair__day {
+        grid-template-columns: minmax(90px, 0.8fr) repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .offer-schedule-repair__day label {
+        font-size: 0.8rem;
     }
 }

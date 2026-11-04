@@ -296,6 +296,37 @@ Abre phpMyAdmin en <http://localhost:8082>. Inicia sesión con el servidor `db`,
 
 El puerto MariaDB publicado para clientes del host es `127.0.0.1:3307`; dentro de Compose, la aplicación y phpMyAdmin se conectan al nombre de servicio `db:3306`.
 
+### Importación de empresas desde Excel o PDF
+
+Administrador y Coordinador pueden acceder a `index.php?action=importar-empresas`. El Administrador también dispone del acceso **Empresas → Gestión de empresas → Importar empresas**. Se admiten archivos `.xlsx` o `.pdf` de hasta **5 MB y 100 empresas**.
+
+- Excel: columnas **Razón social, NIF, Email y Representante**; las cabeceras permiten identificar las columnas aunque cambien de orden.
+- PDF normalizado: texto seleccionable, una empresa por línea con el formato `Razón social; NIF; Email; Representante`. No se realiza OCR de documentos escaneados como imagen.
+- Cada fila valida el NIF jurídico, correo y campos obligatorios. Los duplicados de NIF o correo se notifican sin impedir el procesamiento de las demás filas. Las filas PDF incompletas también aparecen en el informe de errores.
+- Cada alta crea una cuenta Empresa inactiva y un token aleatorio de 256 bits, de un solo uso y válido 24 horas. Solo se guarda su hash en `company_activation_tokens`, reutilizando el esquema de `019_activacion_cuentas_empresa.sql`. Si el envío del correo falla, se revierte el alta de esa fila.
+- `AuditLogService` registra cada empresa creada y el resumen de la importación en `audit_logs`, incluyendo cantidades procesadas, correctas y fallidas y el hash del archivo.
+
+PHP recibe la carga en su directorio temporal. Antes de extraer datos, la aplicación analiza ese temporal mediante **ClamAV TCP INSTREAM**. No conserva una copia permanente del archivo importado. Con el análisis habilitado, una detección, un fallo del servicio o firmas con más de tres días bloquean el procesamiento.
+
+Si el entorno existente no encuentra las clases de Excel o PDF, instala las dependencias declaradas en el archivo de bloqueo:
+
+```powershell
+docker compose exec -T app composer install --no-interaction --prefer-dist --no-dev
+```
+
+En desarrollo, con el transporte Mailpit configurado, consulta los correos de activación en <http://localhost:8025>. Estos mensajes quedan en el buzón local; no se entregan a los destinatarios externos. La excepción de activación por HTTP requiere `APP_ENV=development`, `FCT_APP_URL=http://localhost:8080`, `FCT_MAIL_TRANSPORT=mailpit`, `FCT_MAIL_HOST=mailpit`, `FCT_MAIL_PORT=1025`, `FCT_MAIL_ENCRYPTION=none` y un `FCT_MAIL_FROM` válido. Tras modificar `.env`, recrea `app` para cargar los valores nuevos.
+
+### Habilitar el archivo de convenios en una base existente
+
+La vista unificada `index.php?action=gestionar-convenios` reúne pendientes, aprobados, rechazados y archivados, con filtros por NIF, estado y fecha de registro, y paginación. Las rutas `revisar-convenios` y `archivo-convenios` acceden a la misma vista. Las descargas siguen pasando por la ruta autorizada y el almacenamiento privado.
+
+En instalaciones existentes aplica `024_convenios_estado_archivado.sql` para añadir `Archivado` sin eliminar los estados ni los datos anteriores. Reiniciar los servicios no aplica migraciones a un volumen ya inicializado:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\024_convenios_estado_archivado.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
 ## 6. Recorrido funcional: disponibilidad, matching y seguimiento
 
 El sistema compara ofertas y expedientes del mismo ciclo formativo, por ejemplo DAW con DAW y DAM con DAM. Para que una asignación sea válida, la oferta debe estar aprobada, tener franjas semanales publicadas y plazas disponibles; el periodo de disponibilidad del alumno debe cubrir el periodo completo de la oferta. El servidor vuelve a validar todos esos criterios al asignar, aunque la pantalla ya haya mostrado candidatos.
@@ -312,7 +343,7 @@ En el portal del alumno, la disponibilidad tiene tres pasos de configuración:
    - **Disponibilidad indiferente:** indica que aceptas cualquier horario de oferta; las franjas por día quedan desactivadas. Fechas y ciclo siguen siendo obligatorios.
 3. Envía el formulario para guardar. La isla Vue muestra de forma reactiva el estado de guardado o el error; no guarda cambios automáticamente. Sin JavaScript, el formulario HTML/PHP mantiene el envío y la validación del servidor.
 
-Con franjas exactas, cada intervalo ofertado `[inicio, fin]` debe quedar contenido en un intervalo de disponibilidad del mismo día (`disponibilidad.inicio <= oferta.inicio` y `disponibilidad.fin >= oferta.fin`). La opción indiferente omite únicamente esa comparación horaria: no omite el ciclo, las fechas, la aprobación, las franjas publicadas ni el control de plazas. Las ofertas históricas sin horarios semanales exactos no participan en el matching hasta volver a publicarse con su horario.
+Con franjas exactas, cada intervalo ofertado `[inicio, fin]` debe quedar contenido en un intervalo de disponibilidad del mismo día (`disponibilidad.inicio <= oferta.inicio` y `disponibilidad.fin >= oferta.fin`). La opción indiferente omite únicamente esa comparación horaria: no omite el ciclo, las fechas, la aprobación, las franjas publicadas ni el control de plazas. Las ofertas históricas sin horarios semanales exactos no participan en el matching ni se pueden aprobar hasta volver a publicarse o hasta que un Administrador registre el horario acordado desde la revisión de ofertas; este cambio queda auditado.
 
 Administrador y Coordinador registran calificaciones de prácticas cerradas; se admiten notas de **0.00 a 10.00**, con hasta dos decimales y sin caracteres alfanuméricos. El alumno consulta sus propias notas. El tema claro/oscuro se administra mediante Pinia, conserva la elección en `localStorage` y ofrece un selector visual SVG. El perfil Observador es de solo lectura y recibe datos anonimizados, sin acceso a documentos privados. La política completa está en [Roles y permisos](docs_md/roles_y_permisos.md).
 
@@ -325,11 +356,13 @@ Administrador y Coordinador registran calificaciones de prácticas cerradas; se 
 | Empresa | Sus convenios, sedes y ofertas; no decide sus revisiones. |
 | Invitado | Inicio, registro, autenticación y recuperación; las áreas protegidas requieren sesión. |
 
-Los convenios aprobados permanecen en la tabla `convenios`, con sus datos de
-revisión; los PDF se conservan en almacenamiento privado. El administrador
-puede consultar todos los estados y el registro de actividad desde **Archivo
-de convenios** (`index.php?action=archivo-convenios`). La lista de **Revisar
-convenios** sigue destinada a la cola de pendientes.
+La revisión y el histórico de convenios se consultan desde una vista unificada
+(`index.php?action=gestionar-convenios`) con pestañas para pendientes,
+aprobados, rechazados y archivados, filtros por NIF y fecha de registro, y
+paginación. `revisar-convenios` y `archivo-convenios` siguen disponibles como
+accesos compatibles a esa vista. Solo Administrador puede aprobar, rechazar,
+archivar o descargar PDFs; cada transición queda auditada con estado anterior
+y nuevo. Los PDFs se conservan en almacenamiento privado fuera de `public/`.
 
 El botón de tema claro/oscuro sigue la preferencia del sistema si todavía no hay una elección guardada; al cambiarlo manualmente, la elección queda en el almacenamiento local del navegador.
 
@@ -478,6 +511,19 @@ Las pruebas de documentos pueden ejecutarse sin base de datos con `docker compos
 
 `tests/run.php` es una prueba de integración y debe apuntar exclusivamente a una base de datos desechable cuyo nombre empiece por `fct_test_`; configura `FCT_TEST_DB_NAME` y `FCT_DB_NAME` con el mismo nombre antes de ejecutarla. No la ejecutes contra `sistema_fct` ni una base que quieras conservar.
 
+Para comprobar la extracción de Excel y PDF normalizado, las filas incompletas y el rechazo de archivos corruptos, ejecuta:
+
+```powershell
+docker compose exec -T app php tests/company_import.php
+```
+
+Las pruebas de importación con base de datos verifican cuentas inactivas, duplicados, errores por fila, caducidad de tokens y auditoría. Las de convenios comprueban filtros, transiciones y permisos. Prepara primero una base aislada `fct_test_revision` con el esquema, todas las migraciones y los datos iniciales necesarios; estos comandos no crean esa base. La prueba de importación envía mensajes de prueba a Mailpit:
+
+```powershell
+docker compose exec -T -e FCT_DB_NAME=fct_test_revision -e FCT_TEST_DB_NAME=fct_test_revision app php tests/company_import_db.php
+docker compose exec -T -e FCT_DB_NAME=fct_test_revision -e FCT_TEST_DB_NAME=fct_test_revision app php tests/convenios_unificado.php
+```
+
 ## Restablecimiento de Base de Datos por Cambios de Esquema o Migraciones
 
 > **⚠️ ADVERTENCIA: restablecimiento destructivo.** `docker compose down -v` elimina todos los volúmenes nombrados de este proyecto Compose, no sólo el de MariaDB. Se perderán la base de datos (`db_data`), los archivos privados subidos (`fct_storage`), las firmas de ClamAV (`clamav_db`) y las dependencias Docker (`node_modules` y `frontend_node_modules`). Es irreversible; usa este procedimiento sólo en un entorno local desechable y después de guardar cualquier dato que quieras conservar.
@@ -552,6 +598,16 @@ docker compose logs --tail=100 db clamav
 El primer arranque de ClamAV puede tardar; espera a que indique `healthy` antes de investigar como fallo.
 
 Para permitir cargas de prueba locales sin escaneo, configura explícitamente ambos valores: `APP_ENV=development` y `FCT_CLAMAV_ENABLED=false`; los registros de PHP indicarán que se omitió ClamAV. El bypass también se acepta en `APP_ENV=test` y `APP_ENV=testing`. Si se requiere análisis real, establece `FCT_CLAMAV_ENABLED=true` y revisa la conectividad interna a `clamav:3310`. Nunca uses el bypass en producción.
+
+Si la aplicación rechaza las cargas por firmas antiguas aunque el contenedor figure como `healthy`, actualiza las firmas y solicita que ClamAV las vuelva a cargar en memoria:
+
+```powershell
+docker compose exec -T clamav freshclam --log=/tmp/fct-freshclam-update.log
+docker compose exec -T clamav clamdscan --reload
+docker compose exec -T clamav clamdscan --version
+```
+
+La recarga puede tardar. Comprueba la fecha mostrada por `clamdscan --version` y los registros antes de repetir la carga. El registro separado de `freshclam` evita el conflicto con el archivo de log que utiliza su proceso automático.
 
 ### La página se ve sin estilos o sin islas Vue
 
