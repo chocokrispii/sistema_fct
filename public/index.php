@@ -8,6 +8,7 @@ require_once __DIR__ . '/../app/Core/View.php';
 require_once __DIR__ . '/../app/Core/EuropeanDate.php';
 require_once __DIR__ . '/../app/Core/FrontendAssets.php';
 require_once __DIR__ . '/../app/Core/JsonResponse.php';
+require_once __DIR__ . '/../app/Core/IntegrationFeature.php';
 require_once __DIR__ . '/../app/Middleware/AuthMiddleware.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
 require_once __DIR__ . '/../app/Controllers/InicioController.php';
@@ -33,6 +34,9 @@ require_once __DIR__ . '/../app/Controllers/ConsultaController.php';
 require_once __DIR__ . '/../app/Controllers/ApiTokenAdminController.php';
 require_once __DIR__ . '/../app/Controllers/IntegrationHubController.php';
 require_once __DIR__ . '/../app/Controllers/BrandingController.php';
+require_once __DIR__ . '/../app/Core/WebhookCrypto.php';
+require_once __DIR__ . '/../app/Core/WebhookEndpoint.php';
+require_once __DIR__ . '/../app/Services/WebhookPublisher.php';
 
 $contentLength = $_SERVER['CONTENT_LENGTH'] ?? null;
 if (

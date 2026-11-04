@@ -1,6 +1,6 @@
-<section class="integration-test__section">
+<section class="integration-test__section" id="integration-api-console">
     <h3>API REST propia</h3>
-    <p>Consulta y gestiona los recursos de la API autenticada. Se requiere un token activo, que puedes crear o revocar desde <a href="index.php?action=api-tokens">Tokens API</a>. Las escrituras mediante POST o PATCH modifican datos de forma permanente.</p>
+    <p>Prueba aquí las solicitudes descritas en la especificación OpenAPI. Se requiere un token activo; las escrituras mediante POST o PATCH modifican datos de forma permanente.</p>
     <div class="page-form integration-test__form" data-api-test-form role="group" aria-label="Solicitud manual a la API">
         <label>Token API
             <?php
@@ -72,7 +72,7 @@
             ?>
             <textarea name="body" rows="10" spellcheck="false" placeholder='{"nombre_comercial":"Empresa de prueba"}'></textarea>
         </label>
-        <label class="integration-test__warning">
+        <label class="integration-test__warning">Confirmar escritura
             <input type="checkbox" name="confirm_write">
             Confirmo que POST y PATCH pueden guardar cambios permanentes en la base de datos actual.
             <?php

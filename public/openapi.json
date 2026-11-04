@@ -3,7 +3,26 @@
   "info": {
     "title": "API REST del Sistema FCT",
     "version": "1.0.0",
-    "description": "API autenticada para consultar y gestionar recursos del Sistema FCT. Usa un token de cuenta en el botón Authorize. Los tokens heredan los permisos de su cuenta y no deben compartirse. Las operaciones POST y PATCH pueden modificar datos permanentemente."
+    "description": "API autenticada para consultar y gestionar recursos del Sistema FCT. Usa un token de cuenta en el botón Authorize. Los tokens heredan los permisos de su cuenta y no deben compartirse. Las operaciones POST y PATCH pueden modificar datos permanentemente. Las integraciones salientes pueden suscribirse a los eventos descritos en x-webhook-events cuando la función esté habilitada."
+  },
+  "x-webhook-events": {
+    "description": "Eventos disponibles para suscripciones webhook. Cada entrega usa POST application/json con event, timestamp, event_id y data.",
+    "events": [
+      "alumno.alta",
+      "convenio.aprobado_firmado",
+      "alumno.evaluacion_apto",
+      "oferta.nueva_publicada"
+    ],
+    "payload": {
+      "type": "object",
+      "required": ["event", "timestamp", "event_id", "data"],
+      "properties": {
+        "event": {"type": "string", "enum": ["alumno.alta", "convenio.aprobado_firmado", "alumno.evaluacion_apto", "oferta.nueva_publicada"]},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "event_id": {"type": "string", "format": "uuid"},
+        "data": {"type": "object"}
+      }
+    }
   },
   "servers": [
     {

@@ -17,9 +17,9 @@ RUN npm run build
 FROM php:8.2-apache
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libonig-dev unzip libzip-dev libpng-dev libjpeg-dev libfreetype6-dev \
+    && apt-get install -y --no-install-recommends libonig-dev libcurl4-openssl-dev unzip libzip-dev libpng-dev libjpeg-dev libfreetype6-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install mbstring pdo_mysql zip gd \
+    && docker-php-ext-install mbstring pdo_mysql zip gd curl \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 

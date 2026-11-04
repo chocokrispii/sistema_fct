@@ -33,7 +33,7 @@ El único POST disponible es `logout`, para invalidar la propia sesión; es una 
 | Alumno | Expediente propio, edición de perfil, disponibilidad, asignaciones propias, calificaciones propias y datos de interés de su empresa asignada. No ve el catálogo general de ofertas ni expedientes de terceros. |
 | Empresa | Sus ofertas, convenios y sedes; puede descargar sus convenios aprobados y sellados desde una ruta autenticada. No decide sus revisiones. |
 | Coordinador | Consulta y seguimiento de ofertas/convenios, asignación y cierre de prácticas, calificaciones y consultas. No puede aprobar o rechazar ofertas ni convenios. |
-| Administrador | Gestión de usuarios y decisiones sobre ofertas/convenios; comparte la gestión de asignaciones y calificaciones. Es el único rol con acceso a la administración de integraciones: `integraciones` (consola API) y `api-tokens` (emisión y revocación de tokens). |
+| Administrador | Gestión de usuarios y decisiones sobre ofertas/convenios; comparte la gestión de asignaciones y calificaciones. Si `FCT_INTEGRATIONS_ENABLED=true`, es el único rol con acceso a `integraciones` y `api-tokens`; por defecto esas rutas y la API están desactivadas. |
 | Observador | Solo lectura, con anonimización y sin acceso a documentos privados, según el alcance anterior. |
 
 ## Privacidad del alumnado

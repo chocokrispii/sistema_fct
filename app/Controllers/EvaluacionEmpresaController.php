@@ -6,6 +6,7 @@ require_once __DIR__ . '/../Models/EvaluacionEmpresa.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/FileScanner.php';
 require_once __DIR__ . '/../Core/EvaluationMailer.php';
+require_once __DIR__ . '/../Services/WebhookPublisher.php';
 require_once __DIR__ . '/../../config/storage.php';
 
 final class EvaluacionEmpresaController
@@ -93,6 +94,13 @@ final class EvaluacionEmpresaController
         try {
             $this->db->beginTransaction();
             $model->guardar((int)$asignacionId, $dictamen, $relativePath, basename($archivo['name']), $mime, (int)$archivo['size']);
+            if ($dictamen === 'Apto' && ($assignment['evaluacion_dictamen'] ?? null) !== 'Apto') {
+                WebhookPublisher::publish($this->db, 'alumno.evaluacion_apto', [
+                    'alumno_id' => (int)$assignment['alumno_id'],
+                    'asignacion_id' => (int)$asignacionId,
+                    'empresa_id' => (int)$assignment['empresa_id'],
+                ]);
+            }
             (new Auditoria($this->db))->registrar((int)$_SESSION['usuario_id'], 'evaluacion_empresa.guardada', 'asignaciones_fct', (int)$asignacionId, 'dictamen=' . $dictamen . ';tipo=' . $extension);
             $this->db->commit();
         } catch (Throwable $exception) {

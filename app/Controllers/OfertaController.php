@@ -6,6 +6,7 @@ require_once __DIR__ . '/../Models/Empresa.php';
 require_once __DIR__ . '/../Models/Especialidad.php';
 require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/JsonResponse.php';
+require_once __DIR__ . '/../Services/WebhookPublisher.php';
 
 class OfertaController {
     private PDO $db;
@@ -181,6 +182,13 @@ class OfertaController {
             }
             if (!$this->ofertaModel->resolver((int)$id, $decision, $motivo, (int)$_SESSION['usuario_id'])) {
                 throw new DomainException('La oferta ya fue revisada o no existe.');
+            }
+            if ($decision === 'Aprobada' && is_array($offer)) {
+                WebhookPublisher::publish($this->db, 'oferta.nueva_publicada', [
+                    'oferta_id' => (int)$id,
+                    'empresa_id' => (int)$offer['empresa_id'],
+                    'especialidad_id' => (int)$offer['especialidad_id'],
+                ]);
             }
             (new Auditoria($this->db))->registrar(
                 (int)$_SESSION['usuario_id'],

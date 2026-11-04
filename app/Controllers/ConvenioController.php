@@ -11,6 +11,7 @@ require_once __DIR__ . '/../Core/JsonResponse.php';
 require_once __DIR__ . '/../Core/PhpIni.php';
 require_once __DIR__ . '/../Core/ConvenioApprovalMailer.php';
 require_once __DIR__ . '/../Services/SimplePdfApprovalStampProvider.php';
+require_once __DIR__ . '/../Services/WebhookPublisher.php';
 require_once __DIR__ . '/../../config/storage.php';
 
 class ConvenioController
@@ -345,6 +346,9 @@ class ConvenioController
                 (int)$id,
                 'estado_anterior=' . $estadoAnterior . ';estado_nuevo=' . $decision
             );
+            if ($decision === 'Aprobado') {
+                WebhookPublisher::publish($this->db, 'convenio.aprobado_firmado', ['convenio_id' => (int)$id]);
+            }
             $this->db->commit();
         } catch (DomainException $e) {
             if ($this->db->inTransaction()) {

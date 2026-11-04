@@ -5,9 +5,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/Core/ApiToken.php';
 require_once __DIR__ . '/../app/Core/JsonResponse.php';
+require_once __DIR__ . '/../app/Core/IntegrationFeature.php';
 require_once __DIR__ . '/../app/Core/ApiResponseAdapter.php';
 require_once __DIR__ . '/../app/Core/ApiRolePolicy.php';
 require_once __DIR__ . '/../app/Core/PhpIni.php';
+require_once __DIR__ . '/../app/Services/WebhookPublisher.php';
 require_once __DIR__ . '/../app/Models/Auditoria.php';
 require_once __DIR__ . '/../app/Models/Oferta.php';
 require_once __DIR__ . '/../app/Models/Asignacion.php';
@@ -30,6 +32,9 @@ $fail = static function (int $status, string $code, string $message): never {
     JsonResponse::failure($message, $status);
     exit;
 };
+if (!IntegrationFeature::isEnabled()) {
+    $fail(404, 'not_found', 'El recurso solicitado no existe.');
+}
 $authorizationHeader = static function (): ?string {
     foreach ([
         $_SERVER['HTTP_AUTHORIZATION'] ?? null,
@@ -657,6 +662,7 @@ function apiCreateStudent(PDO $db, int $actorId, Closure $respond, Closure $fail
             ]);
         }
         (new Auditoria($db))->registrar($actorId, 'alumno.creado_api', 'alumnos', $studentId);
+        WebhookPublisher::publish($db, 'alumno.alta', ['alumno_id' => $studentId]);
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -897,6 +903,13 @@ function apiReviewOffer(PDO $db, int $id, int $userId, Closure $respond, Closure
             $fail(404, 'not_found', 'La oferta no existe o ya fue revisada.');
         }
         (new Auditoria($db))->registrar($userId, 'oferta.revisada', 'ofertas', $id, 'estado=' . $decision);
+        if ($decision === 'Aprobada' && isset($offer) && is_array($offer)) {
+            WebhookPublisher::publish($db, 'oferta.nueva_publicada', [
+                'oferta_id' => $id,
+                'empresa_id' => (int)$offer['empresa_id'],
+                'especialidad_id' => (int)$offer['especialidad_id'],
+            ]);
+        }
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {
@@ -930,6 +943,9 @@ function apiReviewAgreement(PDO $db, int $id, int $userId, Closure $respond, Clo
             $fail(404, 'not_found', 'El convenio no existe o ya fue revisado.');
         }
         (new Auditoria($db))->registrar($userId, 'convenio.revisado', 'convenios', $id, 'estado=' . $decision);
+        if ($decision === 'Aprobado') {
+            WebhookPublisher::publish($db, 'convenio.aprobado_firmado', ['convenio_id' => $id]);
+        }
         $db->commit();
     } catch (Throwable $exception) {
         if ($db->inTransaction()) {

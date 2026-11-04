@@ -21,6 +21,19 @@ function assertFileSecurity(bool $condition, string $message): void
     }
 }
 
+putenv('FCT_INTEGRATIONS_ENABLED=false');
+$routes = require __DIR__ . '/../routes/web.php';
+assertFileSecurity(
+    !isset($routes['integraciones']) && !isset($routes['api-tokens']),
+    'Las rutas de integraciones deben estar ocultas cuando la función está desactivada.'
+);
+putenv('FCT_INTEGRATIONS_ENABLED=true');
+$enabledRoutes = require __DIR__ . '/../routes/web.php';
+putenv('FCT_INTEGRATIONS_ENABLED=false');
+assertFileSecurity(
+    isset($enabledRoutes['integraciones'], $enabledRoutes['api-tokens']),
+    'La bandera técnica debe volver a habilitar las rutas de integración.'
+);
 $routes = require __DIR__ . '/../routes/web.php';
 assertFileSecurity(
     $routes['descargar-convenio']['roles'] === ['Administrador']
@@ -84,6 +97,11 @@ assertFileSecurity(
         && $routes['resolver-convenio']['roles'] === ['Administrador']
         && $routes['auditar-convenios']['roles'] === ['Observador'],
     'La actualización de horarios, resolución de ofertas/convenios y consulta de auditoría deben tener roles separados.'
+);
+assertFileSecurity(
+    $enabledRoutes['integraciones']['method'] === ['GET', 'POST']
+        && $enabledRoutes['integraciones']['roles'] === ['Administrador'],
+    'La configuración de webhooks debe permitir cambios solo mediante POST autenticado para administradores.'
 );
 assertFileSecurity(
     $routes['logout']['method'] === 'POST'

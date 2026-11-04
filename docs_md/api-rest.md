@@ -1,5 +1,7 @@
 # API REST del Sistema FCT
 
+La especificación OpenAPI 3.0 se publica en `public/openapi.json` y puede cargarse en Swagger UI u otras herramientas compatibles. La consola, los tokens API y la API REST están desactivados de forma predeterminada en las entregas para clientes.
+
 ## URL y autenticación
 
 El punto de entrada de la API es `public/api.php`; la ruta del recurso se envía
@@ -44,10 +46,66 @@ del navegador y no se guarda en el servidor. Las operaciones POST y PATCH
 modifican la base de datos actual; usa únicamente registros de prueba y revisa
 el cuerpo antes de confirmar.
 
-La página **Integraciones** reúne la consola para probar esta API. El panel de
-tokens sigue disponible desde la propia consola. En Docker Apache, usa la ruta
+La página **Integraciones** reúne la consola para probar esta API y administrar
+webhooks. El panel de tokens sigue disponible desde la propia consola. En Docker Apache, usa la ruta
 directa `api.php?path=...`; el alias `/api/v1/` requiere configurar el servidor.
 Consulta la [Guía de Integraciones](./integraciones.md).
+
+## Habilitar integraciones (solo personal técnico)
+
+La bandera `FCT_INTEGRATIONS_ENABLED` está en `false` por defecto. Con ella
+desactivada, el menú no muestra Integraciones, las rutas de gestión de
+Integraciones/tokens no están registradas y `public/api.php` responde 404.
+Una persona técnica puede activarla en `.env` con
+`FCT_INTEGRATIONS_ENABLED=true` y recrear la aplicación:
+
+```powershell
+docker compose up -d --force-recreate app
+```
+
+Para usar además el envío de eventos, genera/configura
+`FCT_WEBHOOK_ENCRYPTION_KEY`, aplica la migración de webhooks descrita debajo
+y levanta el worker con `docker compose --profile webhooks up -d webhook-worker`.
+Para volver a ocultar y desactivar la API, cambia la bandera a `false`,
+recrea `app` y detén el worker (`docker compose --profile webhooks stop webhook-worker`).
+
+## Webhooks salientes
+
+Cuando la bandera está habilitada, en **Configuración > Integraciones** un
+administrador puede registrar un endpoint HTTPS público y seleccionar eventos. Los destinos con credenciales,
+redirecciones, direcciones privadas/reservadas o puertos distintos de 443 no
+se aceptan. La clave de cifrado se configura como `FCT_WEBHOOK_ENCRYPTION_KEY`
+(32 bytes hexadecimales); genérala con `php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"`.
+El secreto HMAC se genera al crear cada suscripción, se muestra una sola vez y
+se almacena cifrado con AES-256-GCM.
+Mantén la misma clave de cifrado entre despliegues y respáldala fuera del
+repositorio: cambiarla sin volver a cifrar los secretos existentes los invalida.
+
+Los cambios del dominio y sus entregas se guardan en la misma transacción
+MariaDB. El servicio `webhook-worker` despacha las entregas fuera de la
+petición HTTP. Se envía un POST JSON con `event`, `timestamp`, `event_id` y
+`data`, más las cabeceras `X-FCT-Event`, `X-FCT-Delivery`,
+`X-FCT-Timestamp` y `X-FCT-Signature`. La firma es
+`sha256=` seguido de HMAC-SHA256 sobre `timestamp + "." + cuerpo JSON`,
+usando el secreto de la suscripción.
+
+Los eventos iniciales son `alumno.alta`, `convenio.aprobado_firmado`,
+`alumno.evaluacion_apto` y `oferta.nueva_publicada`. Se realiza un intento
+inicial y hasta tres reintentos, a 1, 5 y 15 minutos. Tras agotarlos, la
+entrega queda `FAILED` y la suscripción `DEGRADED`; en la consola se puede
+reactivar y reencolar las entregas fallidas.
+
+Para una base ya inicializada, aplica una vez la migración pendiente (no borra
+ni reinicializa datos):
+
+```powershell
+docker compose up -d db
+docker compose exec -T db sh -lc 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /docker-entrypoint-initdb.d/030-webhook-outbox.sql'
+docker compose up -d --build app webhook-worker
+```
+
+La integración se prueba con `scripts/run_integration_tests.ps1`; su base
+`fct_test_*` es desechable y no toca el volumen persistente de desarrollo.
 
 Envía el token en cada solicitud mediante `Authorization: Bearer <API_TOKEN>`.
 Sustituye el marcador por el token creado en **Tokens API**; no lo incluyas en

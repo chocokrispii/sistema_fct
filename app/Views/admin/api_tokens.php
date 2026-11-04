@@ -11,7 +11,10 @@ require __DIR__ . '/../components/info_banner.php';
 ?>
 <?php if (is_string($plainTextToken)): ?>
     <p class="message message-success" role="status">Copia y guarda este token ahora. No volverá a mostrarse.</p>
-    <pre><?= htmlspecialchars($plainTextToken, ENT_QUOTES, 'UTF-8') ?></pre>
+    <div class="token-secret">
+        <span class="integration-field-label">Token creado <button type="button" class="field-tooltip" aria-label="Ayuda sobre Token creado" data-tooltip="Copia el valor completo ahora y guárdalo en un gestor seguro. Después de salir de esta página no se puede recuperar; tendrás que emitir otro token.">i</button></span>
+        <pre><?= htmlspecialchars($plainTextToken, ENT_QUOTES, 'UTF-8') ?></pre>
+    </div>
 <?php endif; ?>
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=api-tokens">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
