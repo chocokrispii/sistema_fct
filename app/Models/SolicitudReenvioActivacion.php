@@ -94,6 +94,7 @@ final class SolicitudReenvioActivacion
                         NULLIF(CONCAT_WS(' ', u.nombre, u.apellidos), ''),
                         NULLIF(CONCAT_WS(' ', c.nombre, c.apellidos), ''),
                         NULLIF(CONCAT_WS(' ', a.nombre, a.apellidos), ''),
+                        NULLIF(e.nombre_empresa, ''),
                         '—'
                     ) AS nombre_completo
              FROM activation_resend_requests r
