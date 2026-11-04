@@ -339,6 +339,213 @@ fieldset {
     width: min(100%, 520px);
 }
 
+.consultations-filters > label,
+.consultations-filters__date-range,
+.consultations-filters__date-range label {
+    min-width: 0;
+}
+
+.consultations-filters__date-range {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.consultations-filters__date-range input[type="date"] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding-inline: 8px;
+    font-size: 0.875rem;
+}
+
+.consultations-results {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+    margin-top: 24px;
+}
+
+.consultations-results__count {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    font-weight: 650;
+}
+
+.consultations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+    align-items: stretch;
+    gap: 18px;
+    min-width: 0;
+}
+
+.consultation-card,
+.consultations-empty {
+    min-width: 0;
+    padding: clamp(18px, 3vw, 24px);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-bg-card);
+    box-shadow: var(--shadow-card);
+}
+
+.consultation-card {
+    display: grid;
+    align-content: start;
+    gap: 20px;
+    width: 100%;
+    max-width: 760px;
+}
+
+.consultation-card__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+}
+
+.consultation-card__heading {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.consultation-card__company {
+    margin: 0 0 5px;
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+    font-weight: 750;
+    overflow-wrap: anywhere;
+}
+
+.consultation-card__heading h3 {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.consultation-card__expandable {
+    min-width: 0;
+}
+
+.consultation-card__expandable > summary {
+    display: grid;
+    justify-items: start;
+    gap: 7px;
+    min-width: 0;
+    cursor: pointer;
+    list-style: none;
+}
+
+.consultation-card__expandable > summary::-webkit-details-marker {
+    display: none;
+}
+
+.consultation-card__expandable--title > summary h3,
+.consultation-card__expandable--subtitle > summary > span:first-child {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow-wrap: anywhere;
+}
+
+.consultation-card__expandable--title > summary h3 {
+    width: 100%;
+}
+
+.consultation-card__expandable--subtitle > summary > span:first-child {
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
+.consultation-card__expand-label {
+    color: var(--color-primary);
+    font-size: 0.82rem;
+    font-weight: 750;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.consultation-card__expandable [data-less],
+.consultation-card__expandable[open] [data-more] {
+    display: none;
+}
+
+.consultation-card__expandable[open] [data-less] {
+    display: inline;
+}
+
+.consultation-card__expandable > p {
+    margin: 8px 0 0;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.consultation-card__subtitle {
+    margin: 8px 0 0;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.consultation-card__header > .status-badge {
+    flex: 0 0 auto;
+}
+
+.consultation-card__details {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    min-width: 0;
+    margin: 0;
+}
+
+.consultation-card__details > div {
+    min-width: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
+
+.consultation-card__details dt {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+}
+
+.consultation-card__details dd {
+    min-width: 0;
+    margin: 5px 0 0;
+    font-weight: 700;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.consultation-card__period dd .period-range {
+    max-width: 100%;
+}
+
+.consultation-card__unassigned {
+    color: var(--color-text-muted);
+    font-weight: 500;
+}
+
+.consultations-empty h3 {
+    margin: 0;
+    color: var(--color-primary);
+}
+
+.consultations-empty p {
+    margin: 8px 0 0;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
 .page-form label {
     display: grid;
     gap: 7px;
@@ -4419,6 +4626,11 @@ html.vue-tabs-ready .site-navigation__links--fallback {
     font-weight: 700;
 }
 
+.agreement-filters label {
+    flex: 1 1 180px;
+    min-width: 0;
+}
+
 .agreement-filters input,
 .agreement-filters select,
 .agreement-actions input {
@@ -4429,6 +4641,18 @@ html.vue-tabs-ready .site-navigation__links--fallback {
     background: var(--color-bg-input);
     color: var(--color-text-main);
     font: inherit;
+}
+
+.agreement-filters input,
+.agreement-filters select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.agreement-filters input[type="date"] {
+    padding-inline: 8px;
+    font-size: 0.875rem;
 }
 
 .agreement-filters button,
@@ -4530,6 +4754,10 @@ html.vue-tabs-ready .site-navigation__links--fallback {
         flex-direction: column;
     }
 
+    .agreement-filters label {
+        width: 100%;
+    }
+
     .agreement-tabs {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4543,6 +4771,18 @@ html.vue-tabs-ready .site-navigation__links--fallback {
     .agreement-tabs a[aria-current="page"] {
         margin-bottom: 0;
         border-color: var(--color-primary);
+    }
+}
+
+@media (max-width: 480px) {
+    .consultations-filters__date-range {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .consultation-card__details {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
     }
 }
 
@@ -4606,4 +4846,13 @@ html.vue-tabs-ready .site-navigation__links--fallback {
     .offer-schedule-repair__day label {
         font-size: 0.8rem;
     }
+}
+
+textarea,
+.offer-create__grid textarea,
+.offer-create__section > label textarea,
+.offer-create__field textarea {
+    resize: none;
+    max-height: 240px;
+    overflow-y: hidden;
 }

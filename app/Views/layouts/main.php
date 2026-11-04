@@ -29,6 +29,7 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
         <link rel="stylesheet" href="assets/css/style.css?v=<?= (int)filemtime(__DIR__ . '/../../../public/assets/css/style.css') ?>">
     <?php endif; ?>
     <script src="assets/js/password-toggle.js" defer></script>
+    <script src="assets/js/textarea-autogrow.js" defer></script>
     <?= FrontendAssets::render($contenido . $themeIsland) ?>
     <link id="brand-theme-styles" rel="stylesheet" href="index.php?action=branding-styles">
     <?php if (str_contains($contenido, 'data-brand-design')): ?>
