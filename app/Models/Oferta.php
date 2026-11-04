@@ -273,8 +273,6 @@ class Oferta {
     public function obtenerCandidatos(int $ofertaId): array
     {
         $matching = MatchingService::fromEnvironment();
-        $tolerancia = $matching->toleranceDays();
-        $diasMinimos = $matching->minimumOverlapDays();
         $sql = "SELECT a.id AS alumno_id, a.nombre, a.apellidos, a.correo,
                        d.id AS disponibilidad_id, d.fecha_inicio AS disponibilidad_inicio,
                        d.fecha_fin AS disponibilidad_fin, d.es_indiferente,
@@ -284,12 +282,11 @@ class Oferta {
                 INNER JOIN alumnos a ON a.especialidad_id = p.especialidad_id
                 INNER JOIN alumno_disponibilidad d
                     ON d.alumno_id = a.id
-                    AND d.fecha_inicio <= DATE_ADD(p.fecha_inicio, INTERVAL $tolerancia DAY)
-                    AND d.fecha_fin >= DATE_SUB(p.fecha_fin, INTERVAL $tolerancia DAY)
-                    AND GREATEST(d.fecha_inicio, p.fecha_inicio) <= LEAST(d.fecha_fin, p.fecha_fin)
-                    AND DATEDIFF(LEAST(d.fecha_fin, p.fecha_fin), GREATEST(d.fecha_inicio, p.fecha_inicio)) + 1 >= $diasMinimos
+                    AND d.fecha_inicio <= p.fecha_fin
+                    AND d.fecha_fin >= p.fecha_inicio
                 WHERE p.id = :oferta_id
                     AND p.estado = 'Aprobada'
+                    AND p.fecha_fin >= CURDATE()
                     AND EXISTS (SELECT 1 FROM empresa_oferta_horarios_semanales oh WHERE oh.oferta_id = p.id)
                     AND NOT EXISTS (
                         SELECT 1 FROM asignaciones_fct af

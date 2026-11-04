@@ -179,7 +179,7 @@ class Asignacion
             }
 
             if ((new Oferta($this->db))->obtenerCandidato($ofertaId, $alumnoId) === null) {
-                throw new DomainException('El alumno no cumple el ciclo, la tolerancia de fechas o la cobertura horaria mÃ­nima de la oferta.');
+                throw new DomainException('El alumno no cumple el ciclo, el tiempo mínimo restante o la cobertura horaria de la oferta.');
             }
 
             $insert = $this->db->prepare(

@@ -43,7 +43,6 @@ services:
       FCT_CLAMD_PORT: 3310
       FCT_VITE_DEV_SERVER: ${FCT_VITE_DEV_SERVER:-}
       FCT_APP_URL: ${FCT_APP_URL:-}
-      FCT_MATCH_DATE_TOLERANCE_DAYS: ${FCT_MATCH_DATE_TOLERANCE_DAYS:-5}
       FCT_MATCH_MIN_OVERLAP_DAYS: ${FCT_MATCH_MIN_OVERLAP_DAYS:-1}
       FCT_MATCH_MIN_SCHEDULE_PERCENT: ${FCT_MATCH_MIN_SCHEDULE_PERCENT:-80}
       FCT_MAIL_HOST: ${FCT_MAIL_HOST:-smtp.gmail.com}
@@ -154,6 +153,29 @@ services:
       retries: 10
       start_period: 30s
     restart: unless-stopped
+
+  integration-db:
+    image: mariadb:10.4.32
+    profiles:
+      - integration
+    environment:
+      MARIADB_DATABASE: fct_test_integration
+      MARIADB_USER: fct
+      MARIADB_PASSWORD: fct_test_local
+      MARIADB_ROOT_PASSWORD: fct_test_root_local
+    volumes:
+      - ./database:/fct-database:ro
+      - ./database/init_test_database.sql:/docker-entrypoint-initdb.d/001-test-database.sql:ro
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mariadb-admin ping --host=127.0.0.1 --user="$${MARIADB_USER}" --password="$${MARIADB_PASSWORD}" --silent
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 10s
 
   phpmyadmin:
     image: phpmyadmin:5

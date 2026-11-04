@@ -116,6 +116,7 @@ class AsignacionController
             'criteriosMatching' => [
                 'toleranciaDias' => $criteriosMatching->toleranceDays(),
                 'solapamientoMinimoDias' => $criteriosMatching->minimumOverlapDays(),
+                'diasPracticasMinimos' => $criteriosMatching->minimumPracticeDays(),
                 'compatibilidadHorariaMinima' => $criteriosMatching->minimumSchedulePercent(),
             ],
             'error' => $error,

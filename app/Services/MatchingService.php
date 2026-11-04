@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 final class MatchingService
 {
+    private ?array $offerPeriodCache = null;
+
     public function __construct(
+        private int $minimumPracticeDays = 1,
+        private float $minimumSchedulePercent = 80.0,
         private int $toleranceDays = 5,
-        private int $minimumOverlapDays = 1,
-        private float $minimumSchedulePercent = 80.0
+        private int $minimumOverlapDays = 1
     ) {
-        if ($toleranceDays < 0 || $toleranceDays > 30 || $minimumOverlapDays < 1
-            || $minimumSchedulePercent < 0 || $minimumSchedulePercent > 100) {
+        if ($minimumPracticeDays < 1 || $minimumPracticeDays > 366
+            || $minimumSchedulePercent < 0 || $minimumSchedulePercent > 100
+            || $toleranceDays < 0 || $toleranceDays > 30
+            || $minimumOverlapDays < 1 || $minimumOverlapDays > 366) {
             throw new InvalidArgumentException('La configuración del motor de matching no es válida.');
         }
     }
@@ -18,9 +23,10 @@ final class MatchingService
     public static function fromEnvironment(): self
     {
         return new self(
-            self::environmentInt('FCT_MATCH_DATE_TOLERANCE_DAYS', 5, 0, 30),
-            self::environmentInt('FCT_MATCH_MIN_OVERLAP_DAYS', 1, 1, 366),
-            self::environmentFloat('FCT_MATCH_MIN_SCHEDULE_PERCENT', 80.0, 0, 100)
+            minimumPracticeDays: self::environmentInt('FCT_MATCH_MIN_PRACTICE_DAYS', 1, 1, 366),
+            minimumSchedulePercent: self::environmentFloat('FCT_MATCH_MIN_SCHEDULE_PERCENT', 80.0, 0, 100),
+            toleranceDays: self::environmentInt('FCT_MATCH_DATE_TOLERANCE_DAYS', 5, 0, 30),
+            minimumOverlapDays: self::environmentInt('FCT_MATCH_MIN_OVERLAP_DAYS', 1, 1, 366)
         );
     }
 
@@ -32,6 +38,11 @@ final class MatchingService
     public function minimumOverlapDays(): int
     {
         return $this->minimumOverlapDays;
+    }
+
+    public function minimumPracticeDays(): int
+    {
+        return $this->minimumPracticeDays;
     }
 
     public function minimumSchedulePercent(): float
@@ -72,6 +83,25 @@ final class MatchingService
         if ($overlapDays < $this->minimumOverlapDays) {
             return null;
         }
+        $offerPeriod = $this->offerPeriodStats($offerStart, $offerEnd, $offerSchedule, $offerStartDate, $offerEndDate);
+        $possiblePeriod = $this->scheduledPeriodStats($adaptiveStart, $adaptiveEnd, $offerSchedule);
+        $offerHours = $offerPeriod['hours'];
+        $possibleHours = $possiblePeriod['hours'];
+        $offerPracticeDays = $offerPeriod['days'];
+        $minimumHours = $offerPracticeDays > 0
+            ? ($offerHours / $offerPracticeDays) * $this->minimumPracticeDays
+            : 0.0;
+        $possiblePracticeDays = $possiblePeriod['days'];
+        if ($possiblePracticeDays < $this->minimumPracticeDays || $possibleHours < $minimumHours) {
+            error_log(sprintf(
+                'Matching descartado: tiempo restante insuficiente (días de prácticas %d/%d; horas posibles %.2f/%.2f).',
+                $possiblePracticeDays,
+                $this->minimumPracticeDays,
+                $possibleHours,
+                $minimumHours
+            ));
+            return null;
+        }
 
         $schedulePercent = $indifferentSchedule
             ? 100.0
@@ -79,7 +109,9 @@ final class MatchingService
         if ($schedulePercent < $this->minimumSchedulePercent) {
             return null;
         }
-        $datePercent = min(100.0, ($overlapDays / max(1, $offerDays)) * 100);
+        $datePercent = $offerHours > 0
+            ? min(100.0, ($possibleHours / $offerHours) * 100)
+            : min(100.0, ($overlapDays / max(1, $offerDays)) * 100);
 
         return [
             'compatibilidad_porcentaje' => (int)round(($datePercent * 0.6) + ($schedulePercent * 0.4)),
@@ -88,9 +120,75 @@ final class MatchingService
             'fecha_inicio_adaptada' => $adaptiveStart->format('Y-m-d'),
             'fecha_fin_adaptada' => $adaptiveEnd->format('Y-m-d'),
             'dias_solapados' => $overlapDays,
+            'dias_practica_posibles' => $possiblePracticeDays,
+            'horas_posibles' => round($possibleHours, 2),
+            'horas_minimas_requeridas' => round($minimumHours, 2),
             'desfase_inicio_dias' => $lateStartDays,
             'desfase_fin_dias' => $earlyEndDays,
         ];
+    }
+
+    private function offerPeriodStats(
+        string $offerStart,
+        string $offerEnd,
+        array $offerSchedule,
+        DateTimeImmutable $start,
+        DateTimeImmutable $end
+    ): array {
+        if ($this->offerPeriodCache !== null
+            && $this->offerPeriodCache['start'] === $offerStart
+            && $this->offerPeriodCache['end'] === $offerEnd
+            && $this->offerPeriodCache['schedule'] === $offerSchedule) {
+            return $this->offerPeriodCache['stats'];
+        }
+
+        $stats = $this->scheduledPeriodStats($start, $end, $offerSchedule);
+        $this->offerPeriodCache = [
+            'start' => $offerStart,
+            'end' => $offerEnd,
+            'schedule' => $offerSchedule,
+            'stats' => $stats,
+        ];
+        return $stats;
+    }
+
+    private function scheduledPeriodStats(
+        DateTimeImmutable $start,
+        DateTimeImmutable $end,
+        array $schedule
+    ): array {
+        $hours = 0.0;
+        $hoursByWeekday = [];
+        foreach ($schedule as $shift) {
+            $day = (int)($shift['dia_semana'] ?? 0);
+            $startMinutes = $this->minutes((string)($shift['hora_inicio'] ?? ''));
+            $endMinutes = $this->minutes((string)($shift['hora_fin'] ?? ''));
+            if ($day < 1 || $day > 7 || $startMinutes === null || $endMinutes === null || $endMinutes <= $startMinutes) {
+                continue;
+            }
+            $hoursByWeekday[$day] = ($hoursByWeekday[$day] ?? 0) + $endMinutes - $startMinutes;
+        }
+        $practiceDays = 0;
+        foreach ($hoursByWeekday as $day => $weekdayMinutes) {
+            $occurrences = $this->weekdayOccurrences($start, $end, (int)$day);
+            $practiceDays += $occurrences;
+            $hours += ($occurrences * $weekdayMinutes) / 60;
+        }
+        return ['hours' => $hours, 'days' => $practiceDays];
+    }
+
+    private function weekdayOccurrences(DateTimeImmutable $start, DateTimeImmutable $end, int $weekday): int
+    {
+        $days = (int)$start->diff($end)->days + 1;
+        $count = intdiv($days, 7);
+        $remainder = $days % 7;
+        $startWeekday = (int)$start->format('N');
+        for ($offset = 0; $offset < $remainder; $offset++) {
+            if ((($startWeekday - 1 + $offset) % 7) + 1 === $weekday) {
+                $count++;
+            }
+        }
+        return $count;
     }
 
     private function scheduleCompatibility(array $offerSchedule, array $studentSchedule): float

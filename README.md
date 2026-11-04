@@ -102,6 +102,7 @@ Variables incluidas en la plantilla:
 | `VITE_PORT` | `5173` | Puerto de Vite cuando se ejecuta desde el perfil Docker `frontend-dev`. |
 | `FCT_MATCH_DATE_TOLERANCE_DAYS` | `5` | Retraso máximo del inicio o adelanto máximo del fin de disponibilidad para admitir una coincidencia; entre `0` y `30` días. |
 | `FCT_MATCH_MIN_OVERLAP_DAYS` | `1` | Días calendario coincidentes que debe cubrir como mínimo la disponibilidad; entre `1` y `366`. |
+| `FCT_MATCH_MIN_PRACTICE_DAYS` | `1` | Días con horario de prácticas posibles que debe ofrecer como mínimo el periodo coincidente; entre `1` y `366`. |
 | `FCT_MATCH_MIN_SCHEDULE_PERCENT` | `80` | Compatibilidad horaria mínima requerida; entre `0` y `100`. |
 
 Los valores de `.env.example` son exclusivamente para desarrollo local; sustitúyelos por claves propias y no compartas ni confirmes `.env`.
@@ -343,7 +344,7 @@ docker compose cp (Resolve-Path .\database\migrations\024_convenios_estado_archi
 
 ## 6. Recorrido funcional: disponibilidad, matching y seguimiento
 
-El sistema compara ofertas y expedientes del mismo ciclo formativo, por ejemplo DAW con DAW y DAM con DAM. Para que una asignación sea válida, la oferta debe estar aprobada, tener franjas semanales publicadas y plazas disponibles. El criterio temporal admite por defecto hasta cinco días de retraso en el inicio o de adelanto en el fin, siempre que quede al menos un día coincidente; esos umbrales se configuran con `FCT_MATCH_DATE_TOLERANCE_DAYS` y `FCT_MATCH_MIN_OVERLAP_DAYS`. El periodo asignado se adapta al tramo que realmente coincide. La pantalla de emparejamiento muestra los umbrales activos, y el servidor vuelve a validar todos los criterios al asignar.
+El sistema compara ofertas y expedientes del mismo ciclo formativo, por ejemplo DAW con DAW y DAM con DAM. Para que una asignación sea válida, la oferta debe estar aprobada, tener franjas semanales publicadas y plazas disponibles. El criterio temporal admite por defecto hasta cinco días de retraso en el inicio o de adelanto en el fin, siempre que quede al menos un día calendario coincidente; esos umbrales se configuran con `FCT_MATCH_DATE_TOLERANCE_DAYS` y `FCT_MATCH_MIN_OVERLAP_DAYS`. Además, el periodo coincidente debe ofrecer al menos un día de prácticas con horario (`FCT_MATCH_MIN_PRACTICE_DAYS`) y conservar las horas mínimas necesarias. El periodo asignado se adapta al tramo que realmente coincide. La pantalla de emparejamiento muestra los umbrales activos, y el servidor vuelve a validar todos los criterios al asignar.
 
 Los ciclos soportados incluyen **DAW** (Desarrollo de Aplicaciones Web) y **DAM** (Desarrollo de Aplicaciones Multiplataforma). La especialidad se relaciona por ID en la base de datos, y `009_desarrollo_aplicaciones_multiplataforma.sql` incorpora DAM sin duplicarlo. Una oferta guarda un único ciclo para preservar el matching actual.
 
@@ -523,7 +524,13 @@ docker compose run --rm --no-deps -v "${tests}:/var/www/html/tests:ro" app php t
 
 Las pruebas de documentos pueden ejecutarse sin base de datos con `docker compose exec -T app php tests/identity_documents.php`. Cubren la letra de control de DNI/NIE bajo la etiqueta visible **NIF / NIE / DNI**, el formato de pasaporte (6–15 caracteres alfanuméricos), el cambio de validación según el tipo seleccionado, la nota informativa accesible, el formulario de empresa sin contraseña inicial y el rótulo **NIF (Persona Jurídica)**. También se ejecutan desde `tests/file_security.php`.
 
-`tests/run.php` es una prueba de integración y debe apuntar exclusivamente a una base de datos desechable cuyo nombre empiece por `fct_test_`; configura `FCT_TEST_DB_NAME` y `FCT_DB_NAME` con el mismo nombre antes de ejecutarla. No la ejecutes contra `sistema_fct` ni una base que quieras conservar.
+La suite de integración con base de datos se ejecuta en una instancia MariaDB aislada, con almacenamiento temporal y sin puerto publicado. Inicializa el esquema, todas las migraciones y los datos de ejemplo; al finalizar elimina el contenedor y sus datos. Desde PowerShell puedes repetirla tantas veces como sea necesario:
+
+```powershell
+.\scripts\run_integration_tests.ps1
+```
+
+El servicio aislado usa la base `fct_test_integration`; no modifica `sistema_fct` ni necesita cambiar sus credenciales o permisos. `tests/run.php` y las demás pruebas DB rechazan cualquier base que no use el prefijo `fct_test_`.
 
 Para comprobar la extracción de Excel y PDF normalizado, las filas incompletas y el rechazo de archivos corruptos, ejecuta:
 
@@ -531,12 +538,7 @@ Para comprobar la extracción de Excel y PDF normalizado, las filas incompletas 
 docker compose exec -T app php tests/company_import.php
 ```
 
-Las pruebas de importación con base de datos verifican cuentas inactivas, duplicados, errores por fila, caducidad de tokens y auditoría. Las de convenios comprueban filtros, transiciones y permisos. Prepara primero una base aislada `fct_test_revision` con el esquema, todas las migraciones y los datos iniciales necesarios; estos comandos no crean esa base. La prueba de importación envía mensajes de prueba a Mailpit:
-
-```powershell
-docker compose exec -T -e FCT_DB_NAME=fct_test_revision -e FCT_TEST_DB_NAME=fct_test_revision app php tests/company_import_db.php
-docker compose exec -T -e FCT_DB_NAME=fct_test_revision -e FCT_TEST_DB_NAME=fct_test_revision app php tests/convenios_unificado.php
-```
+Las pruebas de importación con base de datos verifican cuentas inactivas, duplicados, errores por fila, caducidad de tokens y auditoría. Las de convenios comprueban filtros, transiciones y permisos. La suite nueva ejecuta estos escenarios además de la integración principal, el horario histórico de ofertas y el matching temporal. La prueba de importación envía mensajes de prueba a Mailpit si se configura el transporte; el runner aislado usa el entorno de desarrollo y no requiere credenciales SMTP.
 
 ## Restablecimiento de Base de Datos por Cambios de Esquema o Migraciones
 
