@@ -13,6 +13,7 @@ if (getenv('FCT_DB_NAME') !== $testDatabase) {
 }
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../app/Core/EuropeanDate.php';
 require_once __DIR__ . '/../app/Core/ApiToken.php';
 require_once __DIR__ . '/../app/Core/View.php';
 require_once __DIR__ . '/../app/Middleware/CsrfMiddleware.php';
@@ -474,7 +475,7 @@ try {
     (new AlumnoController($db))->editarPerfil();
     $profileHtml = ob_get_clean();
     assertTrue(
-        str_contains($profileHtml, '>NIF</option>')
+        str_contains($profileHtml, '>NIF / NIE / DNI</option>')
             && str_contains($profileHtml, '>Pasaporte</option>')
             && str_contains($profileHtml, 'aria-describedby="profile-document-help"')
             && str_contains($profileHtml, 'Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional'),

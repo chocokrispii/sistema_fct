@@ -72,7 +72,7 @@ La guía para Administradores explica cómo usar la consola de la API propia:
 ## Funciones clave de FCT
 
 - **Disponibilidad del alumno:** elige periodo, define franjas exactas por día o activa la opción indiferente para aceptar cualquier turno. El guardado explícito muestra su estado y errores de forma reactiva; sin JavaScript permanece el formulario PHP.
-- **Matching:** requiere ciclo compatible (por ejemplo, DAW con DAW o DAM con DAM), fechas que cubran toda la oferta, oferta aprobada con franjas semanales y plazas. Con franjas exactas se comprueba la cobertura día a día; el indicador indiferente omite sólo esa comprobación horaria. El servidor revalida antes de crear la asignación.
+- **Matching:** requiere ciclo compatible (por ejemplo, DAW con DAW o DAM con DAM), oferta aprobada vigente con franjas semanales y plazas, además del mínimo configurable de días de prácticas restantes (`FCT_MATCH_MIN_OVERLAP_DAYS`). Las incorporaciones tardías se evalúan según las horas semanales que aún caben hasta el fin de la oferta y reciben una penalización progresiva en la puntuación. Con franjas exactas se comprueba la cobertura día a día; el indicador indiferente omite sólo esa comprobación horaria. El servidor revalida antes de crear la asignación.
 - **Calificaciones:** Administrador y Coordinador pueden registrar una nota de 0 a 10 con hasta dos decimales; el alumno consulta las suyas.
 - **Roles:** las acciones y permisos se declaran en `routes/web.php`. El perfil Observador es de solo lectura, con anonimización y sin documentos privados. Consulta [Roles y permisos](/roles_y_permisos).
 - **Tema:** el selector claro/oscuro respeta la preferencia del sistema hasta que se elige un tema, y guarda la elección manual en el navegador.

@@ -509,7 +509,13 @@ docker compose run --rm --no-deps -v "${tests}:/var/www/html/tests:ro" app php t
 
 Las pruebas de documentos pueden ejecutarse sin base de datos con `docker compose exec -T app php tests/identity_documents.php`. Cubren la letra de control de DNI/NIE bajo la etiqueta visible **NIF / NIE / DNI**, el formato de pasaporte (6–15 caracteres alfanuméricos), el cambio de validación según el tipo seleccionado, la nota informativa accesible, el formulario de empresa sin contraseña inicial y el rótulo **NIF (Persona Jurídica)**. También se ejecutan desde `tests/file_security.php`.
 
-`tests/run.php` es una prueba de integración y debe apuntar exclusivamente a una base de datos desechable cuyo nombre empiece por `fct_test_`; configura `FCT_TEST_DB_NAME` y `FCT_DB_NAME` con el mismo nombre antes de ejecutarla. No la ejecutes contra `sistema_fct` ni una base que quieras conservar.
+La suite de integración con base de datos se ejecuta en una instancia MariaDB aislada, con almacenamiento temporal y sin puerto publicado. Inicializa el esquema, todas las migraciones y los datos de ejemplo; al finalizar elimina el contenedor y sus datos. Desde PowerShell puedes repetirla tantas veces como sea necesario:
+
+```powershell
+.\scripts\run_integration_tests.ps1
+```
+
+El servicio aislado usa la base `fct_test_integration`; no modifica `sistema_fct` ni necesita cambiar sus credenciales o permisos. `tests/run.php` y las demás pruebas DB rechazan cualquier base que no use el prefijo `fct_test_`.
 
 Para comprobar la extracción de Excel y PDF normalizado, las filas incompletas y el rechazo de archivos corruptos, ejecuta:
 
@@ -517,12 +523,7 @@ Para comprobar la extracción de Excel y PDF normalizado, las filas incompletas 
 docker compose exec -T app php tests/company_import.php
 ```
 
-Las pruebas de importación con base de datos verifican cuentas inactivas, duplicados, errores por fila, caducidad de tokens y auditoría. Las de convenios comprueban filtros, transiciones y permisos. Prepara primero una base aislada `fct_test_revision` con el esquema, todas las migraciones y los datos iniciales necesarios; estos comandos no crean esa base. La prueba de importación envía mensajes de prueba a Mailpit:
-
-```powershell
-docker compose exec -T -e FCT_DB_NAME=fct_test_revision -e FCT_TEST_DB_NAME=fct_test_revision app php tests/company_import_db.php
-docker compose exec -T -e FCT_DB_NAME=fct_test_revision -e FCT_TEST_DB_NAME=fct_test_revision app php tests/convenios_unificado.php
-```
+Las pruebas de importación con base de datos verifican cuentas inactivas, duplicados, errores por fila, caducidad de tokens y auditoría. Las de convenios comprueban filtros, transiciones y permisos. La suite nueva ejecuta estos escenarios además de la integración principal, el horario histórico de ofertas y el matching temporal. La prueba de importación envía mensajes de prueba a Mailpit si se configura el transporte; el runner aislado usa el entorno de desarrollo y no requiere credenciales SMTP.
 
 ## Restablecimiento de Base de Datos por Cambios de Esquema o Migraciones
 

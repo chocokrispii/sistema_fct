@@ -2,7 +2,7 @@
     <div class="matching-page__intro">
         <span class="student-registration__eyebrow">Gestión del centro</span>
         <h2 id="matching-title">Emparejamiento y asignación</h2>
-        <p>El sistema compara ciclo, solapamiento de fechas y horarios con una tolerancia configurable. Los candidatos se ordenan por compatibilidad y la asignación vuelve a validar cada requisito dentro de una transacción.</p>
+        <p>El sistema compara ciclo, horas de prácticas restantes y cobertura horaria. Las incorporaciones tardías viables reciben una penalización progresiva y la asignación vuelve a validar cada requisito dentro de una transacción.</p>
         <a class="student-portal__text-action" href="index.php?action=asignaciones">Consultar asignaciones activas</a>
     </div>
 
@@ -10,7 +10,7 @@
     <?php if ($ofertas === []): ?>
         <div class="matching-page__empty">
             <h3>No hay ofertas aprobadas vigentes</h3>
-            <p>Cuando el centro apruebe ofertas con fechas futuras, aparecerán aquí los candidatos compatibles.</p>
+            <p>Cuando el centro apruebe ofertas activas o futuras, aparecerán aquí los candidatos compatibles.</p>
             <a href="index.php?action=revisar-ofertas">Ir a la revisión de ofertas</a>
         </div>
     <?php else: ?>
@@ -33,7 +33,7 @@
                     <?php if ($oferta['plazas_disponibles'] === 0): ?>
                         <p class="matching-card__empty">La oferta ya no tiene plazas disponibles.</p>
                     <?php elseif ($oferta['candidatos'] === []): ?>
-                        <p class="matching-card__empty">No hay alumnos que cumplan el solapamiento mínimo, la tolerancia de fechas y la cobertura horaria configurados.</p>
+                        <p class="matching-card__empty">No hay alumnos que cumplan los mínimos de tiempo restante y cobertura horaria configurados.</p>
                     <?php else: ?>
                         <h4>Candidatos compatibles</h4>
                         <div class="matching-card__candidates">
