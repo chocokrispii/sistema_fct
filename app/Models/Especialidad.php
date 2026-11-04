@@ -18,8 +18,9 @@ class Especialidad {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function existe(int $id): bool {
-        $stmt = $this->db->prepare('SELECT 1 FROM especialidades WHERE id = :id AND activo = 1 LIMIT 1');
+    public function existe(int $id, bool $soloActivas = true): bool {
+        $where = $soloActivas ? ' AND activo = 1' : '';
+        $stmt = $this->db->prepare('SELECT 1 FROM especialidades WHERE id = :id' . $where . ' LIMIT 1');
         $stmt->execute(['id' => $id]);
         return (bool)$stmt->fetchColumn();
     }

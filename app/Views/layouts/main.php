@@ -44,7 +44,9 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
     <header class="site-header">
         <a class="site-header__brand" href="index.php" aria-label="Sistema FCT, inicio">
             <?php if (is_string($marcaPortal['logo_path'])): ?>
-                <img class="site-header__logo" src="index.php?action=branding-logo" alt="">
+                <span class="site-header__logo-frame" data-shape="<?= htmlspecialchars((string)($marcaPortal['logo_shape'] ?? 'original'), ENT_QUOTES, 'UTF-8') ?>">
+                    <img class="site-header__logo" src="index.php?action=branding-logo" alt="">
+                </span>
             <?php else: ?>
                 <span aria-hidden="true" class="site-header__brand-mark">FCT</span>
                 <span>Sistema FCT</span>
@@ -70,7 +72,10 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
             <?php if ($rolActual === 'Empresa'): ?>
                 <a class="site-navigation__company-link" href="index.php?action=mi-empresa">Mi empresa</a>
             <?php elseif (in_array($rolActual, ['Administrador', 'Coordinador'], true)): ?>
-                <a href="index.php?action=alumnos-centro">Alumnado</a>
+                <a href="index.php?action=alumnos-centro&tab=principal">Alumnado</a>
+                <span class="site-navigation__group-label">Altas</span>
+                <a href="index.php?action=alta-alumno&tab=altas">Alta de alumnado</a>
+                <a href="index.php?action=registro-empresa&tab=altas">Alta de empresas</a>
                 <?php if ($rolActual === 'Coordinador'): ?>
                     <a href="index.php?action=revisar-convenios">Revisar convenios</a>
                 <?php endif; ?>
@@ -82,6 +87,7 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                 <?php endif; ?>
                 <a href="index.php?action=calificaciones">Calificaciones</a>
                 <?php if ($rolActual === 'Administrador'): ?>
+                    <a href="index.php?action=alta-personal&tab=altas">Alta de personal del centro</a>
                     <a href="index.php?action=gestion-empresas">Gestión de empresas</a>
                     <a href="index.php?action=gestion-cuentas">
                         Cuentas y recuperación

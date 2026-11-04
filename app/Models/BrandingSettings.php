@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../Services/BrandLogoShape.php';
 
 final class BrandingSettings
 {
@@ -14,7 +15,7 @@ final class BrandingSettings
     public function get(): array
     {
         $statement = $this->db->query(
-            'SELECT primary_color, secondary_color, accent_color, logo_path, logo_mime
+            'SELECT primary_color, secondary_color, accent_color, logo_path, logo_mime, logo_shape
              FROM portal_branding
              WHERE id = 1'
         );
@@ -26,8 +27,9 @@ final class BrandingSettings
         return $settings;
     }
 
-    public function save(array $palette, ?string $logoPath, ?string $logoMime): ?string
+    public function save(array $palette, ?string $logoPath, ?string $logoMime, string $logoShape): ?string
     {
+        $logoShape = BrandLogoShape::normalize($logoShape);
         $this->db->beginTransaction();
         try {
             $statement = $this->db->prepare(
@@ -42,6 +44,7 @@ final class BrandingSettings
             $statement = $this->db->prepare(
                 'UPDATE portal_branding
                  SET primary_color = :primary, secondary_color = :secondary, accent_color = :accent,
+                     logo_shape = :logo_shape,
                      logo_path = COALESCE(:logo_path, logo_path),
                      logo_mime = COALESCE(:logo_mime, logo_mime)
                  WHERE id = 1'
@@ -50,6 +53,7 @@ final class BrandingSettings
                 'primary' => $palette['primary'],
                 'secondary' => $palette['secondary'],
                 'accent' => $palette['accent'],
+                'logo_shape' => $logoShape,
                 'logo_path' => $logoPath,
                 'logo_mime' => $logoMime,
             ]);
@@ -64,8 +68,9 @@ final class BrandingSettings
         }
     }
 
-    public function removeLogo(array $palette): ?string
+    public function removeLogo(array $palette, string $logoShape): ?string
     {
+        $logoShape = BrandLogoShape::normalize($logoShape);
         $this->db->beginTransaction();
         try {
             $statement = $this->db->prepare(
@@ -80,13 +85,14 @@ final class BrandingSettings
             $statement = $this->db->prepare(
                 'UPDATE portal_branding
                  SET primary_color = :primary, secondary_color = :secondary, accent_color = :accent,
-                     logo_path = NULL, logo_mime = NULL
+                     logo_path = NULL, logo_mime = NULL, logo_shape = :logo_shape
                  WHERE id = 1'
             );
             $statement->execute([
                 'primary' => $palette['primary'],
                 'secondary' => $palette['secondary'],
                 'accent' => $palette['accent'],
+                'logo_shape' => $logoShape,
             ]);
             $this->db->commit();
 

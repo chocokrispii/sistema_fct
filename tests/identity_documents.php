@@ -102,7 +102,7 @@ try {
             'especialidad_id' => '1', 'curso' => '1', 'observaciones_administrativas' => '',
         ];
         $before = $identityDb->cycleChecks;
-        $html = captureIdentityOutput(fn() => $identityController->gestionar());
+        $html = captureIdentityOutput(fn() => $identityController->alta());
         $case = json_encode([$type, $number], JSON_UNESCAPED_UNICODE);
         assertIdentity(
             $identityDb->cycleChecks - $before === ($valid ? 1 : 0),
@@ -116,9 +116,9 @@ try {
 
     // Se inspecciona el HTML real, incluyendo el estado tras un envío fallido.
     foreach (['NIF_NIE_DNI' => 'NIF / NIE / DNI', 'PASAPORTE' => 'Pasaporte'] as $type => $label) {
-        $html = captureIdentityOutput(fn() => View::render('admin/alumnos', [
+        $html = captureIdentityOutput(fn() => View::render('admin/alta-alumno', [
             'error' => '', 'creado' => false, 'values' => ['tipo_documento' => $type, 'dni' => 'AB1234'],
-            'especialidades' => [], 'alumnos' => [],
+            'especialidades' => [],
         ]));
         assertIdentity(
             preg_match('/<option value="' . preg_quote($type, '/') . '"\s+selected\s*>' . preg_quote($label, '/') . '<\/option>/', $html) === 1,
@@ -134,8 +134,8 @@ try {
     }
 
     $company = new EmpresaController($identityDb);
-    $staffHtml = captureIdentityOutput(fn() => View::render('admin/usuarios', [
-        'error' => '', 'eliminado' => false, 'creado' => false, 'usuarios' => [],
+    $staffHtml = captureIdentityOutput(fn() => View::render('admin/alta-personal', [
+        'error' => '', 'creado' => false, 'sentTo' => '',
     ]));
     assertIdentity(
         str_contains($staffHtml, 'NIF / NIE / DNI (identificador de acceso)')

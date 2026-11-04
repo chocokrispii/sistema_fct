@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../Models/BrandingSettings.php';
 require_once __DIR__ . '/../Services/BrandingPalette.php';
 require_once __DIR__ . '/../Services/BrandLogoProcessor.php';
+require_once __DIR__ . '/../Services/BrandLogoShape.php';
 require_once __DIR__ . '/../Core/FileScanner.php';
 require_once __DIR__ . '/../../config/storage.php';
 
@@ -25,11 +26,13 @@ final class BrandingController
             'secondary' => $settings['secondary_color'],
             'accent' => $settings['accent_color'],
         ];
+        $logoShape = BrandLogoShape::normalize($settings['logo_shape'] ?? BrandLogoShape::DEFAULT);
         $error = '';
 
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             try {
                 $palette = BrandingPalette::normalize($_POST);
+                $logoShape = BrandLogoShape::normalize($_POST['logo_shape'] ?? null);
                 $removeLogo = ($_POST['remove_logo'] ?? '') === '1';
                 $upload = $_FILES['logo'] ?? null;
                 if (array_key_exists('logo', $_FILES) && !is_array($upload)) {
@@ -41,7 +44,7 @@ final class BrandingController
                 }
 
                 if ($removeLogo) {
-                    $oldPath = $this->settings->removeLogo($palette);
+                    $oldPath = $this->settings->removeLogo($palette, $logoShape);
                     self::deleteStoredLogo($oldPath);
                 } else {
                     $processed = $hasUpload ? self::processUpload($upload) : null;
@@ -50,7 +53,8 @@ final class BrandingController
                         $oldPath = $this->settings->save(
                             $palette,
                             $newPath,
-                            $processed['mime'] ?? null
+                            $processed['mime'] ?? null,
+                            $logoShape
                         );
                     } catch (Throwable $exception) {
                         self::deleteStoredLogo($newPath);
@@ -71,6 +75,7 @@ final class BrandingController
         View::render('admin/diseno', [
             'palette' => $palette,
             'logoUrl' => $settings['logo_path'] === null ? null : 'index.php?action=branding-logo',
+            'logoShape' => $logoShape,
             'saved' => isset($_GET['guardado']),
             'error' => $error,
         ]);

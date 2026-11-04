@@ -9,6 +9,9 @@
     const logoInput = form.querySelector('[data-brand-logo]');
     const logoImage = form.querySelector('[data-brand-logo-image]');
     const logoEmpty = form.querySelector('[data-brand-logo-empty]');
+    const logoFrame = form.querySelector('[data-brand-logo-frame]');
+    const logoShape = form.querySelector('[data-brand-logo-shape]');
+    const sampleButton = form.querySelector('[data-brand-logo-sample]');
     const logoStatus = form.querySelector('[data-brand-logo-status]');
     const removeLogo = form.querySelector('[data-brand-remove]');
     let previewUrl = null;
@@ -73,6 +76,33 @@
         }
     }
 
+    function showLogoFile(file) {
+        if (!(logoImage instanceof HTMLImageElement)) {
+            return;
+        }
+        if (previewUrl !== null) {
+            URL.revokeObjectURL(previewUrl);
+        }
+        previewUrl = URL.createObjectURL(file);
+        logoImage.src = previewUrl;
+        logoImage.hidden = false;
+        if (logoEmpty instanceof HTMLElement) {
+            logoEmpty.hidden = true;
+        }
+        if (removeLogo instanceof HTMLInputElement) {
+            removeLogo.checked = false;
+        }
+        if (logoStatus instanceof HTMLElement) {
+            logoStatus.textContent = `Vista previa: ${file.name}. El logo conserva su proporción dentro de la forma seleccionada.`;
+        }
+    }
+
+    function updateLogoShape() {
+        if (logoFrame instanceof HTMLElement && logoShape instanceof HTMLSelectElement) {
+            logoFrame.dataset.shape = logoShape.value;
+        }
+    }
+
     for (const input of colorInputs) {
         input.addEventListener('input', updatePalette);
         input.addEventListener('change', updatePalette);
@@ -101,22 +131,40 @@
                 }
                 return;
             }
-            if (previewUrl !== null) {
-                URL.revokeObjectURL(previewUrl);
-            }
-            previewUrl = URL.createObjectURL(file);
-            if (logoImage instanceof HTMLImageElement) {
-                logoImage.src = previewUrl;
-                logoImage.hidden = false;
-            }
-            if (logoEmpty instanceof HTMLElement) {
-                logoEmpty.hidden = true;
-            }
-            if (removeLogo instanceof HTMLInputElement) {
-                removeLogo.checked = false;
-            }
+            showLogoFile(file);
+        });
+    }
+
+    if (logoShape instanceof HTMLSelectElement) {
+        logoShape.addEventListener('change', updateLogoShape);
+        updateLogoShape();
+    }
+
+    if (sampleButton instanceof HTMLButtonElement && logoInput instanceof HTMLInputElement) {
+        sampleButton.addEventListener('click', async () => {
+            sampleButton.disabled = true;
             if (logoStatus instanceof HTMLElement) {
-                logoStatus.textContent = `Vista previa: ${file.name}. La imagen se ajustará sin deformarse ni desbordar la cabecera.`;
+                logoStatus.textContent = 'Cargando el logo de ejemplo…';
+            }
+            try {
+                const response = await fetch('assets/images/logo-sistema-fct-ejemplo.svg', { credentials: 'same-origin' });
+                if (!response.ok) {
+                    throw new Error('No se pudo descargar el logo de ejemplo.');
+                }
+                const blob = await response.blob();
+                const file = new File([blob], 'logo-sistema-fct-ejemplo.svg', { type: 'image/svg+xml' });
+                const transfer = new DataTransfer();
+                transfer.items.add(file);
+                logoInput.files = transfer.files;
+                showLogoFile(file);
+            } catch (error) {
+                if (logoStatus instanceof HTMLElement) {
+                    logoStatus.textContent = error instanceof Error
+                        ? `${error.message} Puedes descargar el SVG y seleccionarlo manualmente.`
+                        : 'No se pudo cargar el logo de ejemplo. Descarga el SVG y selecciónalo manualmente.';
+                }
+            } finally {
+                sampleButton.disabled = false;
             }
         });
     }

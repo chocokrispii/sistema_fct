@@ -84,7 +84,7 @@ En una base ya inicializada no reimportes el esquema ni repitas migraciones indi
 
 `009_desarrollo_aplicaciones_multiplataforma.sql` y `010_detalles_ofertas.sql` son idempotentes. Trata también `012`–`019` como migraciones de aplicación única y comprueba cuáles ya están en la base antes de ejecutar nada. Los scripts de inicialización de Compose no vuelven a ejecutarse al arrancar un volumen existente.
 
-La migración `025_marca_portal.sql` habilita los ajustes de marca y se aplica automáticamente al crear una base Docker nueva. En una base existente, aplícala una vez antes de volver a abrir la aplicación; conserva los demás datos. El Administrador encontrará **Diseño** dentro de **Configuración** para previsualizar y guardar la paleta y el logo del portal.
+Las migraciones `025_marca_portal.sql` y `027_marca_forma_logo.sql` habilitan los ajustes de marca y la forma del logo; se aplican automáticamente al crear una base Docker nueva, después de la migración `026_webhook_outbox.sql`. En una base existente, aplícalas una vez antes de volver a abrir la aplicación; conservan los demás datos. El Administrador encontrará **Diseño** dentro de **Configuración** para previsualizar colores, imagen y forma del logo antes de guardar.
 
 En una base existente, aplica `012_alta_alumnos_personal.sql` una sola vez con el procedimiento `docker compose cp` descrito en el README. La migración permite que los expedientes creados por el centro no incluyan un número de Seguridad Social, y añade curso y observaciones administrativas; los expedientes existentes se conservan.
 
