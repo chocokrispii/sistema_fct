@@ -2,7 +2,26 @@
     <div class="matching-page__intro">
         <span class="student-registration__eyebrow">Gestión del centro</span>
         <h2 id="matching-title">Emparejamiento y asignación</h2>
-        <p>El sistema compara ciclo, horas de prácticas restantes y cobertura horaria. Las incorporaciones tardías viables reciben una penalización progresiva y la asignación vuelve a validar cada requisito dentro de una transacción.</p>
+        <p>El sistema compara ciclo, solapamiento de fechas, horas de prácticas restantes y cobertura horaria. Las incorporaciones tardías viables reciben una penalización progresiva, respetando la tolerancia temporal configurada; la asignación vuelve a validar cada requisito dentro de una transacción.</p>
+        <dl class="matching-card__details matching-page__criteria" aria-label="Criterios activos de emparejamiento">
+            <div>
+                <dt>Flexibilidad temporal</dt>
+                <dd>Hasta <?= (int)$criteriosMatching['toleranciaDias'] ?> días de retraso en el inicio o adelanto en el fin</dd>
+            </div>
+            <div>
+                <dt>Solapamiento mínimo</dt>
+                <dd><?= (int)$criteriosMatching['solapamientoMinimoDias'] ?> <?= (int)$criteriosMatching['solapamientoMinimoDias'] === 1 ? 'día' : 'días' ?> de coincidencia</dd>
+            </div>
+            <div>
+                <dt>Días de prácticas mínimos</dt>
+                <dd><?= (int)$criteriosMatching['diasPracticasMinimos'] ?> <?= (int)$criteriosMatching['diasPracticasMinimos'] === 1 ? 'día' : 'días' ?> con horario ofertado</dd>
+            </div>
+            <div>
+                <dt>Compatibilidad horaria mínima</dt>
+                <dd><?= rtrim(rtrim(number_format((float)$criteriosMatching['compatibilidadHorariaMinima'], 2, '.', ''), '0'), '.') ?> %</dd>
+            </div>
+        </dl>
+        <p>La asignación adapta el periodo al tramo coincidente; la opción de horario indiferente solo exime de comparar las franjas, no los mínimos de tiempo de prácticas.</p>
         <a class="student-portal__text-action" href="index.php?action=asignaciones">Consultar asignaciones activas</a>
     </div>
 

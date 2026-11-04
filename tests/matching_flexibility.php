@@ -32,7 +32,7 @@ if ($exact === null || $exact['compatibilidad_porcentaje'] !== 100 || $exact['co
 $lateButViable = $engine->evaluate(
     $offerStart,
     $offerEnd,
-    '2027-05-20',
+    '2027-05-19',
     $offerEnd,
     $offerSchedule,
     $fullSchedule,
@@ -41,7 +41,7 @@ $lateButViable = $engine->evaluate(
 $laterButViable = $engine->evaluate(
     $offerStart,
     $offerEnd,
-    '2027-05-26',
+    '2027-05-20',
     $offerEnd,
     $offerSchedule,
     $fullSchedule,
@@ -53,8 +53,72 @@ if ($lateButViable === null || $laterButViable === null
     || $lateButViable['horas_posibles'] < $lateButViable['horas_minimas_requeridas']) {
     throw new RuntimeException('La incorporación tardía viable debe conservar el match con una penalización progresiva.');
 }
+$beyondTolerance = $engine->evaluate(
+    $offerStart,
+    $offerEnd,
+    '2027-05-23',
+    $offerEnd,
+    $offerSchedule,
+    $fullSchedule,
+    false
+);
+if ($beyondTolerance !== null) {
+    throw new RuntimeException('La incorporación posterior a la tolerancia configurada debe rechazarse.');
+}
 
-if ($engine->evaluate(
+$earlyFinish = $engine->evaluate('2027-05-20', '2027-06-30', '2027-05-20', '2027-06-25', $offerSchedule, $fullSchedule, false);
+if (
+    $earlyFinish === null
+    || $earlyFinish['desfase_fin_dias'] !== 5
+    || $earlyFinish['fecha_fin_adaptada'] !== '2027-06-25'
+) {
+    throw new RuntimeException('Debe aceptarse un fin anticipado dentro de la tolerancia y adaptar el periodo.');
+}
+if ($engine->evaluate('2027-05-20', '2027-06-30', '2027-05-20', '2027-06-24', $offerSchedule, $fullSchedule, false) !== null) {
+    throw new RuntimeException('Un fin anticipado superior a la tolerancia no debe aceptarse.');
+}
+$minimumOverlap = (new MatchingService(
+    minimumPracticeDays: 1,
+    minimumSchedulePercent: 80,
+    toleranceDays: 5,
+    minimumOverlapDays: 25
+))->evaluate(
+    '2027-05-20',
+    '2027-06-30',
+    '2027-05-25',
+    '2027-06-30',
+    $offerSchedule,
+    $fullSchedule,
+    false
+);
+if ($minimumOverlap === null || $minimumOverlap['dias_solapados'] !== 37) {
+    throw new RuntimeException('El mínimo de días solapados debe ser inclusivo.');
+}
+if ((new MatchingService(
+    minimumPracticeDays: 1,
+    minimumSchedulePercent: 80,
+    toleranceDays: 5,
+    minimumOverlapDays: 38
+))->evaluate(
+    '2027-05-20',
+    '2027-06-30',
+    '2027-05-25',
+    '2027-06-30',
+    $offerSchedule,
+    $fullSchedule,
+    false
+) !== null) {
+    throw new RuntimeException('Un solapamiento menor que el mínimo configurado no debe aceptarse.');
+}
+if ($engine->evaluate('2027-05-20', '2027-06-30', '2027-05-20', '2027-06-30', $offerSchedule, [['dia_semana' => 1, 'hora_inicio' => '12:00:00', 'hora_fin' => '17:00:00']], false) !== null) {
+    throw new RuntimeException('Una cobertura horaria inferior al mínimo no debe aceptarse.');
+}
+
+$insufficientPracticeDays = (new MatchingService(
+    minimumPracticeDays: 2,
+    minimumSchedulePercent: 80,
+    toleranceDays: 30,
+))->evaluate(
     $offerStart,
     $offerEnd,
     '2027-06-29',
@@ -62,7 +126,8 @@ if ($engine->evaluate(
     $offerSchedule,
     $fullSchedule,
     false
-) !== null) {
+);
+if ($insufficientPracticeDays !== null) {
     throw new RuntimeException('Debe descartarse al alumno que no dispone del tiempo mínimo de prácticas.');
 }
 
@@ -79,4 +144,4 @@ if ($indifferent === null || $indifferent['compatibilidad_horaria'] !== 100) {
     throw new RuntimeException('El horario indiferente debe seguir siendo compatible.');
 }
 
-echo "OK: matching temporal viable, penalización progresiva y mínimo de horas de prácticas.\n";
+echo "OK: tolerancia temporal, solapamiento, penalización progresiva y mínimos de prácticas y horario.\n";

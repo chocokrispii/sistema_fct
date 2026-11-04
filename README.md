@@ -100,6 +100,10 @@ Variables incluidas en la plantilla:
 | `MARIADB_ROOT_PASSWORD` | `root_local_dev` | Contraseña administrativa de MariaDB, reservada para tareas locales de administración. |
 | `FCT_VITE_DEV_SERVER` | vacío | URL pública del servidor Vite que PHP debe incluir durante desarrollo, por ejemplo `http://localhost:5173`. |
 | `VITE_PORT` | `5173` | Puerto de Vite cuando se ejecuta desde el perfil Docker `frontend-dev`. |
+| `FCT_MATCH_DATE_TOLERANCE_DAYS` | `5` | Retraso máximo del inicio o adelanto máximo del fin de disponibilidad para admitir una coincidencia; entre `0` y `30` días. |
+| `FCT_MATCH_MIN_OVERLAP_DAYS` | `1` | Días calendario coincidentes que debe cubrir como mínimo la disponibilidad; entre `1` y `366`. |
+| `FCT_MATCH_MIN_PRACTICE_DAYS` | `1` | Días con horario de prácticas posibles que debe ofrecer como mínimo el periodo coincidente; entre `1` y `366`. |
+| `FCT_MATCH_MIN_SCHEDULE_PERCENT` | `80` | Compatibilidad horaria mínima requerida; entre `0` y `100`. |
 
 Los valores de `.env.example` son exclusivamente para desarrollo local; sustitúyelos por claves propias y no compartas ni confirmes `.env`.
 
@@ -114,6 +118,17 @@ Este modo comparte los datos de XAMPP y no importa ni borra su base de datos. El
 Compose crea automáticamente el volumen privado `fct_storage` y lo monta como `/var/lib/fct/storage`, que es el valor de `FCT_STORAGE_PATH` dentro del contenedor. El contenedor verifica y corrige al arrancar la propiedad y los permisos de los directorios de convenios, incluso si el volumen ya existía; no se debe mover a `public/`.
 
 Si ejecutas PHP directamente con XAMPP en vez de Docker, configura `FCT_STORAGE_PATH` como una ruta absoluta a un directorio existente, con permisos de escritura para Apache y separado del document root. La aplicación rechaza rutas inexistentes o dentro de `public/`.
+
+### Identidad visual del portal
+
+En **Configuración > Diseño**, un Administrador puede cambiar en vivo los colores primario, secundario y de acento y subir un logo SVG, PNG o JPG de hasta 2 MB. Los colores de texto se ajustan por tema claro/oscuro para cumplir WCAG AA (4,5:1) y la vista previa conserva la proporción. Las imágenes raster se normalizan a un máximo de 512 × 128 px; los SVG se limitan a elementos vectoriales seguros. Los logos se analizan con ClamAV y permanecen en el almacenamiento privado, fuera de `public/`.
+
+La migración `025_marca_portal.sql` se ejecuta al crear una base Docker nueva. En una base ya inicializada, aplícala una sola vez antes de abrir cualquier página de la aplicación:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\025_marca_portal.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql' | docker compose exec -T db sh -s
+```
 
 ## 4. Iniciar y detener la infraestructura
 
@@ -329,7 +344,7 @@ docker compose cp (Resolve-Path .\database\migrations\024_convenios_estado_archi
 
 ## 6. Recorrido funcional: disponibilidad, matching y seguimiento
 
-El sistema compara ofertas y expedientes del mismo ciclo formativo, por ejemplo DAW con DAW y DAM con DAM. Para que una asignación sea válida, la oferta debe estar aprobada, tener franjas semanales publicadas y plazas disponibles; el periodo de disponibilidad del alumno debe cubrir el periodo completo de la oferta. El servidor vuelve a validar todos esos criterios al asignar, aunque la pantalla ya haya mostrado candidatos.
+El sistema compara ofertas y expedientes del mismo ciclo formativo, por ejemplo DAW con DAW y DAM con DAM. Para que una asignación sea válida, la oferta debe estar aprobada, tener franjas semanales publicadas y plazas disponibles. El criterio temporal admite por defecto hasta cinco días de retraso en el inicio o de adelanto en el fin, siempre que quede al menos un día calendario coincidente; esos umbrales se configuran con `FCT_MATCH_DATE_TOLERANCE_DAYS` y `FCT_MATCH_MIN_OVERLAP_DAYS`. Además, el periodo coincidente debe ofrecer al menos un día de prácticas con horario (`FCT_MATCH_MIN_PRACTICE_DAYS`) y conservar las horas mínimas necesarias. El periodo asignado se adapta al tramo que realmente coincide. La pantalla de emparejamiento muestra los umbrales activos, y el servidor vuelve a validar todos los criterios al asignar.
 
 Los ciclos soportados incluyen **DAW** (Desarrollo de Aplicaciones Web) y **DAM** (Desarrollo de Aplicaciones Multiplataforma). La especialidad se relaciona por ID en la base de datos, y `009_desarrollo_aplicaciones_multiplataforma.sql` incorpora DAM sin duplicarlo. Una oferta guarda un único ciclo para preservar el matching actual.
 

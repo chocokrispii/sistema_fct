@@ -8,10 +8,14 @@ final class MatchingService
 
     public function __construct(
         private int $minimumPracticeDays = 1,
-        private float $minimumSchedulePercent = 80.0
+        private float $minimumSchedulePercent = 80.0,
+        private int $toleranceDays = 5,
+        private int $minimumOverlapDays = 1
     ) {
         if ($minimumPracticeDays < 1 || $minimumPracticeDays > 366
-            || $minimumSchedulePercent < 0 || $minimumSchedulePercent > 100) {
+            || $minimumSchedulePercent < 0 || $minimumSchedulePercent > 100
+            || $toleranceDays < 0 || $toleranceDays > 30
+            || $minimumOverlapDays < 1 || $minimumOverlapDays > 366) {
             throw new InvalidArgumentException('La configuración del motor de matching no es válida.');
         }
     }
@@ -19,9 +23,31 @@ final class MatchingService
     public static function fromEnvironment(): self
     {
         return new self(
-            self::environmentInt('FCT_MATCH_MIN_OVERLAP_DAYS', 1, 1, 366),
-            self::environmentFloat('FCT_MATCH_MIN_SCHEDULE_PERCENT', 80.0, 0, 100)
+            minimumPracticeDays: self::environmentInt('FCT_MATCH_MIN_PRACTICE_DAYS', 1, 1, 366),
+            minimumSchedulePercent: self::environmentFloat('FCT_MATCH_MIN_SCHEDULE_PERCENT', 80.0, 0, 100),
+            toleranceDays: self::environmentInt('FCT_MATCH_DATE_TOLERANCE_DAYS', 5, 0, 30),
+            minimumOverlapDays: self::environmentInt('FCT_MATCH_MIN_OVERLAP_DAYS', 1, 1, 366)
         );
+    }
+
+    public function toleranceDays(): int
+    {
+        return $this->toleranceDays;
+    }
+
+    public function minimumOverlapDays(): int
+    {
+        return $this->minimumOverlapDays;
+    }
+
+    public function minimumPracticeDays(): int
+    {
+        return $this->minimumPracticeDays;
+    }
+
+    public function minimumSchedulePercent(): float
+    {
+        return $this->minimumSchedulePercent;
     }
 
     public function evaluate(
@@ -43,6 +69,9 @@ final class MatchingService
 
         $lateStartDays = max(0, (int)$offerStartDate->diff($availableStartDate)->format('%r%a'));
         $earlyEndDays = max(0, (int)$availableEndDate->diff($offerEndDate)->format('%r%a'));
+        if ($lateStartDays > $this->toleranceDays || $earlyEndDays > $this->toleranceDays) {
+            return null;
+        }
 
         $adaptiveStart = $offerStartDate >= $availableStartDate ? $offerStartDate : $availableStartDate;
         $adaptiveEnd = $offerEndDate <= $availableEndDate ? $offerEndDate : $availableEndDate;
@@ -51,6 +80,9 @@ final class MatchingService
         }
         $offerDays = (int)$offerStartDate->diff($offerEndDate)->days + 1;
         $overlapDays = (int)$adaptiveStart->diff($adaptiveEnd)->days + 1;
+        if ($overlapDays < $this->minimumOverlapDays) {
+            return null;
+        }
         $offerPeriod = $this->offerPeriodStats($offerStart, $offerEnd, $offerSchedule, $offerStartDate, $offerEndDate);
         $possiblePeriod = $this->scheduledPeriodStats($adaptiveStart, $adaptiveEnd, $offerSchedule);
         $offerHours = $offerPeriod['hours'];
