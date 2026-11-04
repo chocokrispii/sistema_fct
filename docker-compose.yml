@@ -7,7 +7,7 @@ services:
     command:
       ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0 --strictPort"]
     ports:
-      - "${VITE_PORT:-5173}:5173"
+      - "127.0.0.1:${VITE_PORT:-5173}:5173"
     volumes:
       - .:/workspace
       - frontend_node_modules:/workspace/node_modules

@@ -8,7 +8,7 @@
     "node": ">=22 <25"
   },
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
@@ -29,15 +29,15 @@
     "postcss": "^8.5.31",
     "postcss-nested": "^9.0.0",
     "typescript": "^5.7.3",
-    "vite": "^6.1.0",
+    "vite": "^6.4.5",
     "vitepress": "^1.6.4",
-    "vitest": "^3.2.4",
-    "vue-tsc": "^2.2.0"
+    "vitest": "^4.1.12",
+    "vue-tsc": "^3.3.14"
   },
   "overrides": {
     "katex": "0.18.2",
     "vitepress": {
-      "vite": "6.4.4"
+      "vite": "6.4.5"
     }
   }
 }
