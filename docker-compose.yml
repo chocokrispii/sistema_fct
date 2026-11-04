@@ -58,6 +58,7 @@ services:
     volumes:
       - .:/var/www/html
       - fct_storage:/var/lib/fct/storage
+      - composer_vendor:/var/www/html/vendor
     healthcheck:
       test:
         - CMD
@@ -108,6 +109,7 @@ services:
       - ./database/migrations/022_documentacion_inicio_asignacion.sql:/docker-entrypoint-initdb.d/026-documentacion-inicio-asignacion.sql:ro
       - ./database/migrations/023_evaluacion_empresa.sql:/docker-entrypoint-initdb.d/027-evaluacion-empresa.sql:ro
       - ./database/migrations/024_convenios_estado_archivado.sql:/docker-entrypoint-initdb.d/028-convenios-estado-archivado.sql:ro
+      - ./database/migrations/025_marca_portal.sql:/docker-entrypoint-initdb.d/029-marca-portal.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -216,5 +218,6 @@ volumes:
   db_data:
   clamav_db:
   fct_storage:
+  composer_vendor:
   node_modules:
   frontend_node_modules:

@@ -23,7 +23,7 @@ const tabsByRole: Record<string, NavigationTab[]> = {
         { id: 'ofertas', label: 'Ofertas', items: [{ label: 'Ofertas', action: 'ofertas' }, { label: 'Revisar ofertas', action: 'revisar-ofertas' }] },
         { id: 'empresas', label: 'Empresas', items: [{ label: 'Gestión de empresas', action: 'gestion-empresas' }] },
         { id: 'cuentas', label: 'Cuentas', items: [{ label: 'Cuentas y recuperación', action: 'gestion-cuentas' }, { label: 'Usuarios', action: 'usuarios' }] },
-        { id: 'configuracion', label: 'Configuración', items: [{ label: 'Ciclos formativos', action: 'ciclos' }, { label: 'Integraciones', action: 'integraciones' }] },
+        { id: 'configuracion', label: 'Configuración', items: [{ label: 'Ciclos formativos', action: 'ciclos' }, { label: 'Diseño', action: 'diseno' }, { label: 'Integraciones', action: 'integraciones' }] },
     ],
     Coordinador: [
         { id: 'principal', label: 'Principal', items: [{ label: 'Inicio', action: 'inicio' }, { label: 'Alumnado', action: 'alumnos-centro' }, { label: 'Calificaciones', action: 'calificaciones' }] },
