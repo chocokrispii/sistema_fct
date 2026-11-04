@@ -130,6 +130,16 @@ docker compose cp (Resolve-Path .\database\migrations\025_marca_portal.sql).Path
 'mariadb --user="$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql' | docker compose exec -T db sh -s
 ```
 
+Las ofertas requieren una sede de trabajo activa de su empresa. La migración
+`027_ofertas_sede.sql` asigna a las ofertas existentes su dirección anterior
+como sede, completa las ofertas legadas sin dirección con una sede principal y
+añade la relación obligatoria. Compose la ejecuta al inicializar una base
+nueva; aplícala una vez en bases existentes antes de crear ofertas:
+
+```powershell
+Get-Content -Raw .\database\migrations\027_ofertas_sede.sql | docker compose exec -T db sh -lc 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE"'
+```
+
 ## 4. Iniciar y detener la infraestructura
 
 Construye la imagen de la aplicación e inicia Apache/PHP, MariaDB, ClamAV y phpMyAdmin en segundo plano:

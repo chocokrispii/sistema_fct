@@ -9,13 +9,15 @@ class Oferta {
     private PDO $db;
 
     private const SELECT_BASE =
-        'SELECT p.id, p.empresa_id, p.especialidad_id, p.plazas_cuantas, p.fecha_inicio, p.fecha_fin,
+        'SELECT p.id, p.empresa_id, p.sede_id, p.especialidad_id, p.plazas_cuantas, p.fecha_inicio, p.fecha_fin,
                 p.estado, p.turno, p.titulo, p.descripcion, p.modalidad, p.ubicacion,
                 p.requisitos, p.tecnologias, p.motivo_revision,
+                s.nombre AS sede_nombre, s.direccion AS sede_direccion, s.telefono AS sede_telefono,
                 e.nombre_empresa, es.nombre_especialidad
          FROM empresa_especialidades_plazas p
          INNER JOIN empresas e ON e.id = p.empresa_id
-         INNER JOIN especialidades es ON es.id = p.especialidad_id';
+         INNER JOIN especialidades es ON es.id = p.especialidad_id
+         INNER JOIN empresa_sedes s ON s.id = p.sede_id AND s.empresa_id = p.empresa_id';
 
     public function __construct(?PDO $db = null) {
         $this->db = $db ?? getPDOConnection();
@@ -23,6 +25,7 @@ class Oferta {
 
     public function crearOferta(
         int $empresaId,
+        int $sedeId,
         int $especialidadId,
         int $plazas,
         string $fechaInicio,
@@ -31,20 +34,23 @@ class Oferta {
         string $descripcion,
         string $turno,
         string $modalidad,
-        ?string $ubicacion,
         ?string $requisitos,
         ?string $tecnologias,
         array $horarios
     ): int {
         $stmt = $this->db->prepare(
             "INSERT INTO empresa_especialidades_plazas
-                (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin,
+                (empresa_id, sede_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin,
                  titulo, descripcion, turno, modalidad, ubicacion, requisitos, tecnologias)
-             VALUES (:empresa_id, :especialidad_id, :plazas, :fecha_inicio, :fecha_fin,
-                 :titulo, :descripcion, :turno, :modalidad, :ubicacion, :requisitos, :tecnologias)"
+             SELECT :empresa_id, s.id, :especialidad_id, :plazas, :fecha_inicio, :fecha_fin,
+                 :titulo, :descripcion, :turno, :modalidad, s.direccion, :requisitos, :tecnologias
+             FROM empresa_sedes s
+             WHERE s.id = :sede_id AND s.empresa_id = :sede_empresa_id AND s.activa = 1"
         );
         $stmt->execute([
             'empresa_id' => $empresaId,
+            'sede_id' => $sedeId,
+            'sede_empresa_id' => $empresaId,
             'especialidad_id' => $especialidadId,
             'plazas' => $plazas,
             'fecha_inicio' => $fechaInicio,
@@ -53,10 +59,12 @@ class Oferta {
             'descripcion' => $descripcion,
             'turno' => $turno,
             'modalidad' => $modalidad,
-            'ubicacion' => $ubicacion,
             'requisitos' => $requisitos,
             'tecnologias' => $tecnologias,
         ]);
+        if ($stmt->rowCount() !== 1) {
+            throw new DomainException('Selecciona una sede activa asociada a tu empresa.');
+        }
         $offerId = (int)$this->db->lastInsertId();
         $shift = $this->db->prepare(
             'INSERT INTO empresa_oferta_horarios_semanales (oferta_id, dia_semana, hora_inicio, hora_fin)

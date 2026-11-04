@@ -59,12 +59,15 @@ class ConsultaController
         $studentFields = $anonimize
             ? "'Alumno anonimizado' AS alumno_nombre, '' AS apellidos"
             : 'a.nombre AS alumno_nombre, a.apellidos';
-        $sql = "SELECT p.id, p.titulo, p.modalidad, p.ubicacion, p.estado, p.fecha_inicio, p.fecha_fin, p.plazas_cuantas, p.turno,
+        $sql = "SELECT p.id, p.titulo, p.modalidad, p.ubicacion, s.nombre AS sede_nombre,
+                       s.direccion AS sede_direccion, s.telefono AS sede_telefono,
+                       p.estado, p.fecha_inicio, p.fecha_fin, p.plazas_cuantas, p.turno,
                        e.nombre_empresa, es.nombre_especialidad,
                        $studentFields, af.estado AS estado_asignacion
                 FROM empresa_especialidades_plazas p
                 INNER JOIN empresas e ON e.id = p.empresa_id
                 INNER JOIN especialidades es ON es.id = p.especialidad_id
+                INNER JOIN empresa_sedes s ON s.id = p.sede_id AND s.empresa_id = p.empresa_id
                 LEFT JOIN asignaciones_fct af ON af.oferta_id = p.id AND af.estado <> 'Cancelada'
                 LEFT JOIN alumnos a ON a.id = af.alumno_id";
         if ($where !== []) {

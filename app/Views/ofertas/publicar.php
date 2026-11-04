@@ -1,4 +1,8 @@
-<?php $previewMode = ($previewMode ?? false) === true; ?>
+<?php
+$previewMode = ($previewMode ?? false) === true;
+$sedes = $sedes ?? [];
+$sedeError = $sedeError ?? '';
+?>
 <section class="offer-create-page" aria-labelledby="offer-create-title">
     <nav class="offer-create__breadcrumbs" aria-label="Ruta de navegación">
         <a href="index.php?action=ofertas">Ofertas</a>
@@ -142,9 +146,34 @@
                     </select>
                 </div>
                 <div class="offer-create__field offer-create__field--full">
-                    <label for="offer-location">Ubicación o dirección</label>
-                    <input id="offer-location" type="text" name="ubicacion" maxlength="255" value="<?= htmlspecialchars($formValues['ubicacion'] ?? '', ENT_QUOTES, 'UTF-8') ?>" autocomplete="street-address">
-                    <small>Obligatoria para modalidad presencial o híbrida; opcional en remoto.</small>
+                    <label for="offer-site">Sede de trabajo <span aria-hidden="true">*</span></label>
+                    <?php $newSiteError = $sedeError !== '' && !str_contains($sedeError, 'Selecciona una sede'); ?>
+                    <select id="offer-site" name="sede_id" data-offer-site-select required <?= $sedeError !== '' && !$newSiteError ? 'aria-invalid="true" aria-describedby="offer-site-error"' : '' ?>>
+                        <option value="">Selecciona la sede donde se realizarán las prácticas</option>
+                        <?php foreach ($sedes as $sede): ?>
+                            <option value="<?= (int)$sede['id'] ?>" <?= (string)($formValues['sede_id'] ?? '') === (string)$sede['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($sede['nombre'] . ' — ' . $sede['direccion'], ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                        <?php endforeach; ?>
+                        <option value="nueva" <?= ($formValues['sede_id'] ?? '') === 'nueva' ? 'selected' : '' ?>>Añadir nueva dirección de trabajo…</option>
+                    </select>
+                    <?php if ($sedeError !== '' && !$newSiteError): ?><small id="offer-site-error" class="message message-error" role="alert"><?= htmlspecialchars($sedeError, ENT_QUOTES, 'UTF-8') ?></small><?php endif; ?>
+                    <small>La sede seleccionada y su dirección completa se mostrarán al alumnado y al centro.</small>
+                </div>
+                <div class="offer-create__field offer-create__field--full">
+                    <details data-offer-new-site <?= ($formValues['sede_id'] ?? '') === 'nueva' ? 'open' : '' ?>>
+                        <summary>Añadir nueva dirección de trabajo</summary>
+                        <fieldset>
+                            <legend>Datos de la nueva sede</legend>
+                            <label for="offer-new-site-name">Nombre de la sede</label>
+                            <input id="offer-new-site-name" type="text" name="nueva_sede_nombre" maxlength="150" value="<?= htmlspecialchars($formValues['nueva_sede_nombre'] ?? '', ENT_QUOTES, 'UTF-8') ?>" autocomplete="organization" <?= $newSiteError ? 'aria-invalid="true" aria-describedby="offer-new-site-error"' : '' ?>>
+                            <label for="offer-new-site-address">Dirección completa</label>
+                            <input id="offer-new-site-address" type="text" name="nueva_sede_direccion" maxlength="255" value="<?= htmlspecialchars($formValues['nueva_sede_direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?>" autocomplete="street-address" <?= $newSiteError ? 'aria-invalid="true" aria-describedby="offer-new-site-error"' : '' ?>>
+                            <?php if ($newSiteError): ?><small id="offer-new-site-error" class="message message-error" role="alert"><?= htmlspecialchars($sedeError, ENT_QUOTES, 'UTF-8') ?></small><?php endif; ?>
+                            <label for="offer-new-site-phone">Teléfono de la sede (opcional)</label>
+                            <input id="offer-new-site-phone" type="tel" name="nueva_sede_telefono" maxlength="20" value="<?= htmlspecialchars($formValues['nueva_sede_telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>" autocomplete="tel">
+                        </fieldset>
+                    </details>
                 </div>
             </div>
         </section>
@@ -188,6 +217,7 @@
         </footer>
     </form>
 </section>
+<?php if (!$previewMode): ?><script type="module" src="assets/js/offer-site-selector.js"></script><?php endif; ?>
 
 <section class="offer-list-section" aria-labelledby="company-offers-title">
     <div class="offer-list-section__heading">
@@ -232,7 +262,7 @@
                                     <?php endforeach; ?>
                                 <?php endif; ?>
                             </td>
-                            <td><?= htmlspecialchars($turnLabel . ' · ' . $oferta['modalidad'] . (!empty($oferta['ubicacion']) ? ' · ' . $oferta['ubicacion'] : ''), ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars($turnLabel . ' · ' . $oferta['modalidad'] . ' · ' . $oferta['sede_nombre'] . ' — ' . $oferta['sede_direccion'], ENT_QUOTES, 'UTF-8') ?></td>
                             <td><span class="status-badge <?= $statusClass ?>"><?= htmlspecialchars($oferta['estado'], ENT_QUOTES, 'UTF-8') ?></span></td>
                             <td><?= htmlspecialchars($oferta['motivo_revision'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
                         </tr>

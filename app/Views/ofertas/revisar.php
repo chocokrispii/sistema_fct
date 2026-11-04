@@ -14,7 +14,7 @@
                 <?= EuropeanDate::periodBlock($oferta['fecha_inicio'], $oferta['fecha_fin']) ?> ·
                 <span class="status-badge status-badge--neutral"><?= htmlspecialchars($turnLabel, ENT_QUOTES, 'UTF-8') ?></span> ·
                 <span class="status-badge status-badge--neutral"><?= htmlspecialchars($oferta['modalidad'], ENT_QUOTES, 'UTF-8') ?></span></p>
-            <?php if (!empty($oferta['ubicacion'])): ?><p><strong>Ubicación:</strong> <?= htmlspecialchars($oferta['ubicacion'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+            <p><strong>Sede de trabajo:</strong> <?= htmlspecialchars($oferta['sede_nombre'], ENT_QUOTES, 'UTF-8') ?><br><strong>Dirección:</strong> <?= htmlspecialchars($oferta['sede_direccion'], ENT_QUOTES, 'UTF-8') ?><?php if (!empty($oferta['sede_telefono'])): ?><br><strong>Teléfono:</strong> <?= htmlspecialchars($oferta['sede_telefono'], ENT_QUOTES, 'UTF-8') ?><?php endif; ?></p>
             <?php if (!empty($oferta['requisitos'])): ?><p><strong>Requisitos:</strong> <?= nl2br(htmlspecialchars($oferta['requisitos'], ENT_QUOTES, 'UTF-8')) ?></p><?php endif; ?>
             <?php if (!empty($oferta['tecnologias'])): ?><p><strong>Tecnologías:</strong> <?= htmlspecialchars($oferta['tecnologias'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
             <ul><?php foreach ($oferta['horarios'] as $shift): ?>

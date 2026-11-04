@@ -21,7 +21,7 @@
                     <td class="offer-list-table__schedule"><?php if ($oferta['horarios'] === []): ?><span class="text-muted">Sin horario</span><?php else: ?><ul class="weekly-schedule" aria-label="Horario semanal de la oferta"><?php foreach ($oferta['horarios'] as $shift): ?><li><span class="weekly-schedule__day"><?= htmlspecialchars(['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][(int)$shift['dia_semana']], ENT_QUOTES, 'UTF-8') ?></span><time class="weekly-schedule__time"><?= htmlspecialchars(substr($shift['hora_inicio'], 0, 5) . '–' . substr($shift['hora_fin'], 0, 5), ENT_QUOTES, 'UTF-8') ?></time></li><?php endforeach; ?></ul><?php endif; ?></td>
                     <td><?= EuropeanDate::periodBlock($oferta['fecha_inicio'], $oferta['fecha_fin']) ?></td>
                     <td><span class="status-badge status-badge--neutral"><?= htmlspecialchars($oferta['modalidad'], ENT_QUOTES, 'UTF-8') ?></span></td>
-                    <td><?= htmlspecialchars($oferta['ubicacion'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>
+                    <td><?= htmlspecialchars($oferta['sede_nombre'] . ' — ' . $oferta['sede_direccion'], ENT_QUOTES, 'UTF-8') ?></td>
                 </tr>
             <?php endforeach; ?></tbody>
         </table>

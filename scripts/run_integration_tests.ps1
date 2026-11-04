@@ -7,6 +7,7 @@ $tests = @(
     'tests/company_import_db.php',
     'tests/convenios_unificado.php',
     'tests/offers_legacy_schedule.php',
+    'tests/offers_sites.php',
     'tests/matching_flexibility.php',
     'tests/api_openapi.php',
     'tests/webhooks.php'

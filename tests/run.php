@@ -900,10 +900,12 @@ try {
         'nombre' => "Sede $fixture",
         'direccion' => 'Dirección de prueba',
     ]);
+    $siteId = (int)$db->lastInsertId();
 
     $matching = new Oferta($db);
     $createdOffer = $matching->crearOferta(
         $createdCompany,
+        $siteId,
         $cycleId,
         1,
         '2027-03-15',
@@ -912,7 +914,6 @@ try {
         'Descripción de prueba de la oferta.',
         'P',
         'Híbrido',
-        'Madrid',
         'Trabajo en equipo.',
         'PHP, Vue',
         [['dia_semana' => 1, 'hora_inicio' => '09:00:00', 'hora_fin' => '13:00:00']]
@@ -927,7 +928,9 @@ try {
             && $savedOffer['descripcion'] === 'Descripción de prueba de la oferta.'
             && $savedOffer['turno'] === 'P'
             && $savedOffer['modalidad'] === 'Híbrido'
-            && $savedOffer['ubicacion'] === 'Madrid'
+            && $savedOffer['sede_nombre'] === "Sede $fixture"
+            && $savedOffer['sede_direccion'] === 'Dirección de prueba'
+            && $savedOffer['ubicacion'] === 'Dirección de prueba'
             && $savedOffer['requisitos'] === 'Trabajo en equipo.'
             && $savedOffer['tecnologias'] === 'PHP, Vue',
         'La oferta debe persistir sus detalles completos.'
@@ -1719,10 +1722,10 @@ try {
         $stmt->execute(['first' => $createdStudents[0] ?? 0, 'second' => $createdStudents[1] ?? 0]);
         $stmt = $db->prepare('DELETE FROM convenios WHERE empresa_id = :company');
         $stmt->execute(['company' => $createdCompany]);
-        $stmt = $db->prepare('DELETE FROM empresa_sedes WHERE empresa_id = :company');
-        $stmt->execute(['company' => $createdCompany]);
         $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
         $stmt->execute(['offer' => $createdOffer]);
+        $stmt = $db->prepare('DELETE FROM empresa_sedes WHERE empresa_id = :company');
+        $stmt->execute(['company' => $createdCompany]);
     }
     if ($createdAdminStudentProfileId !== null) {
         $stmt = $db->prepare('DELETE FROM auditoria WHERE entidad = :entidad AND entidad_id = :id');

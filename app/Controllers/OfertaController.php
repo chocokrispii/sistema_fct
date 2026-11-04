@@ -34,9 +34,13 @@ class OfertaController {
         $empresaId = (int)$empresa['id'];
 
         $error = '';
+        $sedeError = '';
         $formValues = $this->formValues($_POST);
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = $this->procesarPublicacion($empresaId, $_POST);
+            if ($error !== null && str_contains(mb_strtolower($error), 'sede')) {
+                $sedeError = $error;
+            }
             if ($error === null) {
                 header('Location: index.php?action=publicar-oferta&publicada=1');
                 exit;
@@ -52,6 +56,8 @@ class OfertaController {
         View::render('ofertas/publicar', [
             'empresa' => $empresa,
             'error' => $error,
+            'sedeError' => $sedeError,
+            'sedes' => $this->empresaModel->obtenerSedes($empresaId),
             'ofertas' => $this->withWeeklySchedules($this->ofertaModel->obtenerPorEmpresa($empresaId)),
             'especialidades' => $this->especialidadModel->obtenerTodas(),
             'formValues' => $formValues,
@@ -383,7 +389,10 @@ class OfertaController {
         $descripcionRaw = $request['descripcion'] ?? null;
         $turnoRaw = $request['turno'] ?? null;
         $modalidadRaw = $request['modalidad'] ?? null;
-        $ubicacionRaw = $request['ubicacion'] ?? null;
+        $sedeRaw = $request['sede_id'] ?? null;
+        $newSedeNameRaw = $request['nueva_sede_nombre'] ?? '';
+        $newSedeAddressRaw = $request['nueva_sede_direccion'] ?? '';
+        $newSedePhoneRaw = $request['nueva_sede_telefono'] ?? '';
         $requisitosRaw = $request['requisitos'] ?? '';
         $tecnologiasRaw = $request['tecnologias'] ?? '';
         if (!is_string($fechaInicioRaw) || !is_string($fechaFinRaw) || !is_array($horariosRaw)) {
@@ -394,17 +403,21 @@ class OfertaController {
             || !is_string($descripcionRaw)
             || !is_string($turnoRaw)
             || !is_string($modalidadRaw)
-            || !is_string($ubicacionRaw)
             || !is_string($requisitosRaw)
             || !is_string($tecnologiasRaw)
         ) {
             return 'Los detalles de la oferta no tienen un formato válido.';
         }
+        if (!is_string($sedeRaw)) {
+            return 'Selecciona una sede activa asociada a tu empresa.';
+        }
+        if (!is_string($newSedeNameRaw) || !is_string($newSedeAddressRaw) || !is_string($newSedePhoneRaw)) {
+            return 'Los datos de la sede no tienen un formato válido.';
+        }
         $titulo = trim($tituloRaw);
         $descripcion = trim($descripcionRaw);
         $turno = $turnoRaw;
         $modalidad = $modalidadRaw;
-        $ubicacion = trim($ubicacionRaw);
         $requisitos = trim($requisitosRaw);
         $tecnologias = $this->normalizeTechnologyTags($tecnologiasRaw);
         if (
@@ -420,11 +433,21 @@ class OfertaController {
         if (!in_array($modalidad, ['Presencial', 'Remoto', 'Híbrido'], true)) {
             return 'Selecciona una modalidad válida.';
         }
-        if (
-            ($modalidad !== 'Remoto' && $ubicacion === '')
-            || preg_match('/\A.{0,255}\z/us', $ubicacion) !== 1
-        ) {
-            return 'Indica una ubicación de hasta 255 caracteres para las modalidades presencial e híbrida.';
+        $newSedeName = trim($newSedeNameRaw);
+        $newSedeAddress = trim($newSedeAddressRaw);
+        $newSedePhone = trim($newSedePhoneRaw);
+        $crearSede = $sedeRaw === 'nueva';
+        $sedeId = $crearSede
+            ? null
+            : filter_var($sedeRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($crearSede) {
+            if (preg_match('/\A.{1,150}\z/us', $newSedeName) !== 1
+                || preg_match('/\A.{1,255}\z/us', $newSedeAddress) !== 1
+                || preg_match('/\A.{0,20}\z/us', $newSedePhone) !== 1) {
+                return 'Completa el nombre y la dirección de la nueva sede (hasta 150 y 255 caracteres) y revisa el teléfono.';
+            }
+        } elseif ($sedeId === false || $this->empresaModel->obtenerSedeActiva($empresaId, (int)$sedeId) === null) {
+            return 'Selecciona una sede activa asociada a tu empresa.';
         }
         if (preg_match('/\A.{0,2000}\z/us', $requisitos) !== 1 || $tecnologias === false) {
             return 'Los requisitos no pueden superar 2.000 caracteres y las tecnologías deben ser hasta 10 etiquetas de 50 caracteres.';
@@ -501,8 +524,20 @@ class OfertaController {
 
         $this->db->beginTransaction();
         try {
+            if ($crearSede) {
+                $sedeId = $this->empresaModel->crearSede(
+                    $empresaId,
+                    $newSedeName,
+                    $newSedeAddress,
+                    $newSedePhone
+                );
+            }
+            if (!is_int($sedeId) || $sedeId < 1) {
+                throw new DomainException('Selecciona una sede válida para la oferta.');
+            }
             $ofertaId = $this->ofertaModel->crearOferta(
                 $empresaId,
+                $sedeId,
                 $especialidadId,
                 $plazas,
                 $fechaInicio->format('Y-m-d'),
@@ -511,7 +546,6 @@ class OfertaController {
                 $descripcion,
                 $turno,
                 $modalidad,
-                $ubicacion !== '' ? $ubicacion : null,
                 $requisitos !== '' ? $requisitos : null,
                 $tecnologias !== '' ? $tecnologias : null,
                 $horarios
@@ -557,7 +591,22 @@ class OfertaController {
 
     private function formValues(array $request): array
     {
-        $fields = ['titulo', 'descripcion', 'especialidad_id', 'plazas', 'fecha_inicio', 'fecha_fin', 'turno', 'modalidad', 'ubicacion', 'requisitos', 'tecnologias'];
+        $fields = [
+            'titulo',
+            'descripcion',
+            'especialidad_id',
+            'plazas',
+            'fecha_inicio',
+            'fecha_fin',
+            'turno',
+            'modalidad',
+            'sede_id',
+            'nueva_sede_nombre',
+            'nueva_sede_direccion',
+            'nueva_sede_telefono',
+            'requisitos',
+            'tecnologias',
+        ];
         $values = [];
         foreach ($fields as $field) {
             $values[$field] = isset($request[$field]) && is_string($request[$field])

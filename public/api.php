@@ -277,11 +277,15 @@ function apiReadQuery(string $resource, string $role, ?int $companyId, ?int $stu
                 $params['id'] = $id;
             }
             return [
-                'SELECT p.id, p.empresa_id, e.nombre_empresa, p.especialidad_id,
+                'SELECT p.id, p.empresa_id, e.nombre_empresa, p.sede_id,
+                        sede.nombre AS sede_nombre, sede.direccion AS sede_direccion,
+                        sede.telefono AS sede_telefono, p.especialidad_id,
                         es.nombre_especialidad, p.plazas_cuantas, p.fecha_inicio,
                         p.fecha_fin, p.turno, p.estado
                  FROM empresa_especialidades_plazas p
                  INNER JOIN empresas e ON e.id = p.empresa_id
+                 INNER JOIN empresa_sedes sede
+                    ON sede.id = p.sede_id AND sede.empresa_id = p.empresa_id
                  INNER JOIN especialidades es ON es.id = p.especialidad_id'
                  . apiWhere($where) . ' ORDER BY p.fecha_inicio, p.id',
                 $params,
@@ -393,7 +397,7 @@ function apiCreateOffer(PDO $db, int $userId, ?int $companyId, Closure $respond,
     $title = $input['titulo'] ?? 'Oferta FCT';
     $description = $input['descripcion'] ?? '';
     $modality = $input['modalidad'] ?? 'Presencial';
-    $location = $input['ubicacion'] ?? '';
+    $siteId = filter_var($input['sede_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     $requirements = $input['requisitos_tecnologicos'] ?? $input['requisitos'] ?? '';
     $technologies = $input['tecnologias'] ?? '';
     $weeklyHoursRaw = $input['horarios'] ?? [];
@@ -403,23 +407,16 @@ function apiCreateOffer(PDO $db, int $userId, ?int $companyId, Closure $respond,
         || !is_string($title) || preg_match('/\A.{1,150}\z/us', trim($title)) !== 1
         || !is_string($description) || preg_match('/\A.{0,2000}\z/us', $description) !== 1
         || !is_string($modality) || !in_array($modality, ['Presencial', 'Remoto', 'Híbrido'], true)
-        || !is_string($location) || preg_match('/\A.{0,255}\z/us', trim($location)) !== 1
         || !is_string($requirements) || preg_match('/\A.{0,2000}\z/us', $requirements) !== 1
         || !is_string($technologies) || preg_match('/\A.{0,500}\z/us', $technologies) !== 1
         || !is_array($weeklyHoursRaw)) {
         $fail(422, 'invalid_offer', 'Ciclo, plazas, fechas o turno no válidos.');
     }
-    if (
-        array_key_exists('modalidad', $input)
-        && $modality !== 'Remoto'
-        && trim($location) === ''
-    ) {
-        $fail(422, 'invalid_offer', 'Indica la ubicación para las modalidades presencial e híbrida.');
+    if ($siteId === false) {
+        $fail(422, 'invalid_sede', 'Se requiere un valor sede_id válido perteneciente a tu empresa.');
     }
-
     $title = trim($title);
     $description = trim($description);
-    $location = trim($location);
     $requirements = trim($requirements);
     $technologyTags = [];
     if ($technologies !== '') {
@@ -489,15 +486,25 @@ function apiCreateOffer(PDO $db, int $userId, ?int $companyId, Closure $respond,
 
     $db->beginTransaction();
     try {
+        $siteStmt = $db->prepare(
+            'SELECT direccion FROM empresa_sedes
+             WHERE id = :id AND empresa_id = :empresa_id AND activa = 1 FOR UPDATE'
+        );
+        $siteStmt->execute(['id' => $siteId, 'empresa_id' => $companyId]);
+        $siteAddress = $siteStmt->fetchColumn();
+        if (!is_string($siteAddress)) {
+            throw new DomainException('Selecciona una sede activa asociada a tu empresa.');
+        }
         $stmt = $db->prepare(
             'INSERT INTO empresa_especialidades_plazas
-                (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin,
+                (empresa_id, sede_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin,
                  titulo, descripcion, turno, modalidad, ubicacion, requisitos, tecnologias)
-             VALUES (:company_id, :specialty_id, :seats, :start_date, :end_date,
+             VALUES (:company_id, :site_id, :specialty_id, :seats, :start_date, :end_date,
                  :title, :description, :shift, :modality, :location, :requirements, :technologies)'
         );
         $stmt->execute([
             'company_id' => $companyId,
+            'site_id' => $siteId,
             'specialty_id' => $specialtyId,
             'seats' => $seats,
             'start_date' => $start->format('Y-m-d'),
@@ -506,7 +513,7 @@ function apiCreateOffer(PDO $db, int $userId, ?int $companyId, Closure $respond,
             'description' => $description,
             'shift' => $shift,
             'modality' => $modality,
-            'location' => $location !== '' ? $location : null,
+            'location' => $siteAddress,
             'requirements' => $requirements !== '' ? $requirements : null,
             'technologies' => $technologies !== '' ? $technologies : null,
         ]);
