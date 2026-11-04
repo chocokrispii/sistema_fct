@@ -5,7 +5,9 @@ services:
       - frontend-dev
     working_dir: /workspace
     command:
-      ["sh", "-c", "npm ci && npm run dev -- --host 0.0.0.0 --strictPort"]
+      - sh
+      - -c
+      - npm ci && npm run dev -- --host 0.0.0.0 --strictPort
     ports:
       - "127.0.0.1:${VITE_PORT:-5173}:5173"
     volumes:
@@ -20,7 +22,10 @@ services:
     volumes:
       - .:/workspace
       - node_modules:/workspace/node_modules
-    command: ["sh", "-c", "npm ci && npm run build"]
+    command:
+      - sh
+      - -c
+      - npm ci && npm run build
 
   app:
     build:
@@ -133,6 +138,7 @@ services:
       - ./database/migrations/024_convenios_estado_archivado.sql:/docker-entrypoint-initdb.d/028-convenios-estado-archivado.sql:ro
       - ./database/migrations/025_marca_portal.sql:/docker-entrypoint-initdb.d/029-marca-portal.sql:ro
       - ./database/migrations/026_webhook_outbox.sql:/docker-entrypoint-initdb.d/030-webhook-outbox.sql:ro
+      - ./database/migrations/027_ofertas_sede.sql:/docker-entrypoint-initdb.d/031-ofertas-sede.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -167,14 +173,23 @@ services:
           AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alumnos'
           AND COLUMN_NAME = 'tipo_documento')
-            AND EXISTS (SELECT 1 FROM information_schema.TABLES
-           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documentacion_cierre_fct')
+          AND EXISTS (SELECT 1 FROM information_schema.TABLES
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documentacion_cierre_fct')
           AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asignaciones_fct' AND COLUMN_NAME = 'evaluacion_dictamen')
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asignaciones_fct' AND COLUMN_NAME = 'evaluacion_dictamen')
           AND EXISTS (SELECT 1 FROM information_schema.TABLES
-           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_subscriptions')
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_subscriptions')
           AND EXISTS (SELECT 1 FROM information_schema.TABLES
-           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_deliveries'), 1, 0)")" = "1"
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_deliveries')
+          AND EXISTS (SELECT 1 FROM information_schema.TABLES
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_sedes')
+          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_especialidades_plazas'
+          AND COLUMN_NAME = 'sede_id' AND IS_NULLABLE = 'NO')
+          AND EXISTS (SELECT 1 FROM information_schema.KEY_COLUMN_USAGE
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_especialidades_plazas'
+          AND CONSTRAINT_NAME = 'fk_oferta_sede_empresa'
+          AND REFERENCED_TABLE_NAME = 'empresa_sedes'), 1, 0)")" = "1"
       interval: 10s
       timeout: 5s
       retries: 10
