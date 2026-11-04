@@ -1,7 +1,7 @@
 <?php
 $h = static fn($v): string => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
-$st = static fn(string $d): string => '<svg class="fct-ico fct-ico--stroke" viewBox="0 0 24 24" aria-hidden="true"><path d="' . $d . '"/></svg>';
-$fl = static fn(string $d): string => '<svg class="fct-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="' . $d . '"/></svg>';
+$st = static fn(string $d): string => '<svg class="fct-ico fct-ico--stroke" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="' . $d . '"/></svg>';
+$fl = static fn(string $d): string => '<svg class="fct-ico" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="' . $d . '"/></svg>';
 $icoMail = 'M3 6h18v12H3zM3 7l9 7 9-7';
 $icoId = 'M3 5h18v14H3zM9 11.5a2 2 0 1 0 0-.01M5.8 16c.5-1.2 1.8-1.8 3.2-1.8s2.7.6 3.2 1.8M14 10h4M14 14h4';
 $icoCal = 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4';

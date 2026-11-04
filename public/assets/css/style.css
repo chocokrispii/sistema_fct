@@ -825,6 +825,387 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
     color: var(--color-primary-hover);
 }
 
+.fct-ico {
+    display: block;
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    max-width: 24px;
+}
+
+.fct-ico--stroke {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.sp {
+    display: grid;
+    gap: 20px;
+}
+
+.sp .student-portal__intro {
+    margin-bottom: 0;
+}
+
+.sp .student-portal__intro h2 {
+    margin: 8px 0;
+}
+
+.sp .student-portal__intro p {
+    margin-bottom: 0;
+}
+
+.sp-profile,
+.sp-card {
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-bg-card);
+    box-shadow: var(--shadow-card);
+}
+
+.sp-profile {
+    overflow: hidden;
+}
+
+.sp-profile__banner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 18px;
+    padding: clamp(18px, 3vw, 28px);
+    background: var(--color-home-hero-surface);
+    color: var(--color-text-light);
+}
+
+.sp-avatar {
+    display: grid;
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    place-items: center;
+    border: 2px solid rgb(255 255 255 / 70%);
+    border-radius: 50%;
+    background: rgb(255 255 255 / 16%);
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.sp-profile__id {
+    min-width: 0;
+}
+
+.sp-profile__id h3 {
+    margin: 0;
+    color: inherit;
+    font-size: clamp(1.15rem, 2.5vw, 1.5rem);
+    overflow-wrap: anywhere;
+}
+
+.sp-profile__id > p {
+    margin: 5px 0 12px;
+    color: rgb(255 255 255 / 82%);
+}
+
+.sp-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.sp-chip {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 9px;
+    border: 1px solid rgb(255 255 255 / 28%);
+    border-radius: 999px;
+    background: rgb(0 0 0 / 12%);
+    color: #fff;
+    font-size: .82rem;
+    overflow-wrap: anywhere;
+}
+
+.sp-chip .fct-ico {
+    width: 18px;
+    height: 18px;
+    max-width: 18px;
+    flex-basis: 18px;
+}
+
+.sp-profile__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.sp-btn {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    border: 1px solid #fff;
+    border-radius: var(--radius-control);
+    background: #fff;
+    color: #00366f;
+    font-size: .9rem;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+}
+
+.sp-btn:hover,
+.sp-btn:focus-visible {
+    background: #eaf4ff;
+    color: #002b59;
+}
+
+.sp-btn--ghost {
+    border-color: rgb(255 255 255 / 65%);
+    background: transparent;
+    color: #fff;
+}
+
+.sp-btn--ghost:hover,
+.sp-btn--ghost:focus-visible {
+    background: rgb(255 255 255 / 14%);
+    color: #fff;
+}
+
+.sp-details {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+    padding: 8px clamp(16px, 2vw, 24px);
+}
+
+.sp-details > div {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 11px;
+    padding: 14px 8px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sp-details > div > div {
+    min-width: 0;
+}
+
+.sp-details dt {
+    margin-bottom: 3px;
+    color: var(--color-text-muted);
+    font-size: .78rem;
+}
+
+.sp-details dd {
+    margin: 0;
+    color: var(--color-text-main);
+    font-size: .9rem;
+    font-weight: 650;
+    overflow-wrap: anywhere;
+}
+
+.sp-details__icon,
+.sp-stat__icon,
+.sp-card__icon {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 11px;
+}
+
+.sp-details__icon {
+    width: 38px;
+    height: 38px;
+}
+
+.sp-details__icon .fct-ico {
+    width: 20px;
+    height: 20px;
+    max-width: 20px;
+    flex-basis: 20px;
+}
+
+.sp-tone--blue {
+    background: #e7f1ff;
+    color: #0756a5;
+}
+
+.sp-tone--green {
+    background: #e4f5eb;
+    color: #187044;
+}
+
+.sp-tone--purple {
+    background: #f0eaff;
+    color: #6042a6;
+}
+
+.sp-tone--orange {
+    background: #fff0df;
+    color: #a64c08;
+}
+
+.sp-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.sp-stat {
+    display: flex;
+    min-width: 0;
+    min-height: 96px;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-bg-card);
+    box-shadow: var(--shadow-card);
+}
+
+.sp-stat__icon,
+.sp-card__icon {
+    width: 46px;
+    height: 46px;
+}
+
+.sp-stat__icon .fct-ico,
+.sp-card__icon .fct-ico {
+    width: 24px;
+    height: 24px;
+}
+
+.sp-stat > div {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+}
+
+.sp-stat strong {
+    color: var(--color-text-main);
+    font-size: 1.55rem;
+    line-height: 1.1;
+}
+
+.sp-stat > div > span {
+    color: var(--color-text-muted);
+    font-size: .85rem;
+    line-height: 1.35;
+}
+
+.sp-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 16px;
+}
+
+.sp-card {
+    padding: clamp(16px, 2.5vw, 22px);
+}
+
+.sp-card__head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.sp-card__head > div {
+    min-width: 0;
+}
+
+.sp-card__head h3 {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: 1.08rem;
+}
+
+.sp-card__head p {
+    margin: 4px 0 0;
+    color: var(--color-text-muted);
+    font-size: .88rem;
+    line-height: 1.4;
+}
+
+.sp-empty {
+    color: var(--color-text-muted);
+    line-height: 1.5;
+}
+
+.sp-card__sub {
+    margin: 20px 0 8px;
+    font-size: .95rem;
+}
+
+.sp-list__meta {
+    color: var(--color-text-muted);
+    font-size: .85rem;
+    overflow-wrap: anywhere;
+}
+
+.sp-card__cta {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 4px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-control);
+    background: var(--color-primary);
+    color: var(--color-primary-contrast);
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+}
+
+.sp-card__cta:hover,
+.sp-card__cta:focus-visible {
+    border-color: var(--color-primary-hover);
+    background: var(--color-primary-hover);
+    color: var(--color-primary-contrast);
+}
+
+html[data-theme="dark"] .sp-details__icon.sp-tone--blue,
+html[data-theme="dark"] .sp-stat.sp-tone--blue,
+html[data-theme="dark"] .sp-card__icon.sp-tone--blue {
+    background: #18395b;
+    color: #a8d1ff;
+}
+
+html[data-theme="dark"] .sp-details__icon.sp-tone--green,
+html[data-theme="dark"] .sp-stat.sp-tone--green,
+html[data-theme="dark"] .sp-card__icon.sp-tone--green {
+    background: #1d4431;
+    color: #a5e5bd;
+}
+
+html[data-theme="dark"] .sp-details__icon.sp-tone--purple,
+html[data-theme="dark"] .sp-stat.sp-tone--purple,
+html[data-theme="dark"] .sp-card__icon.sp-tone--purple {
+    background: #382b58;
+    color: #d0bdff;
+}
+
+html[data-theme="dark"] .sp-details__icon.sp-tone--orange,
+html[data-theme="dark"] .sp-stat.sp-tone--orange,
+html[data-theme="dark"] .sp-card__icon.sp-tone--orange {
+    background: #53351f;
+    color: #ffc58e;
+}
+
 .availability-page__current {
     width: min(100%, 760px);
     margin: 28px auto 0;
@@ -1941,6 +2322,36 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
 }
 
 @media (max-width: 600px) {
+    .sp-profile__banner {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .sp-profile__actions {
+        grid-column: 1 / -1;
+        justify-content: stretch;
+    }
+
+    .sp-profile__actions > a {
+        flex: 1 1 180px;
+    }
+
+    .sp-details {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .sp-stats {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+    }
+
+    .sp-stat {
+        min-height: 76px;
+    }
+
+    .sp-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
     .review-decision {
         grid-template-columns: minmax(0, 1fr);
     }
