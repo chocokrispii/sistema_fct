@@ -42,6 +42,7 @@ function assertTrue(bool $condition, string $message): void
 }
 
 require_once __DIR__ . '/file_security.php';
+require_once __DIR__ . '/branding.php';
 
 $db = getPDOConnection();
 $actualDatabase = $db->query('SELECT DATABASE()')->fetchColumn();

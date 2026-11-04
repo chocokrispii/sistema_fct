@@ -753,7 +753,8 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
 }
 
 .student-portal__details,
-.matching-card__details {
+.matching-card__details,
+.matching-page__criteria {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 18px;
@@ -761,20 +762,23 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
 }
 
 .student-portal__details > div,
-.matching-card__details > div {
+.matching-card__details > div,
+.matching-page__criteria > div {
     min-width: 0;
     padding-top: 12px;
     border-top: 1px solid var(--color-border);
 }
 
 .student-portal__details dt,
-.matching-card__details dt {
+.matching-card__details dt,
+.matching-page__criteria dt {
     color: var(--color-text-muted);
     font-size: 0.82rem;
 }
 
 .student-portal__details dd,
-.matching-card__details dd {
+.matching-card__details dd,
+.matching-page__criteria dd {
     margin: 5px 0 0;
     font-weight: 700;
     overflow-wrap: anywhere;
@@ -1964,7 +1968,8 @@ html[data-theme="dark"] .student-portal__card-heading h3 {
     }
 
     .student-portal__details,
-    .matching-card__details {
+    .matching-card__details,
+    .matching-page__criteria {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -3099,6 +3104,162 @@ html[data-theme="dark"] .theme-toggle {
     object-fit: contain;
 }
 
+.site-header__logo {
+    display: block;
+    flex: 0 1 auto;
+    width: auto;
+    max-width: min(220px, 42vw);
+    height: auto;
+    max-height: 48px;
+    object-fit: contain;
+    object-position: left center;
+}
+
+.branding-page {
+    width: min(100%, 900px);
+    margin: 0 auto;
+}
+
+.branding-page__intro {
+    margin-bottom: 22px;
+}
+
+.branding-page__intro h2 {
+    margin: 8px 0;
+    font-size: clamp(1.7rem, 4vw, 2.2rem);
+}
+
+.branding-page__intro p,
+.branding-form fieldset > p {
+    max-width: 760px;
+    color: var(--color-text-muted);
+    line-height: 1.55;
+}
+
+.branding-form {
+    display: grid;
+    gap: 20px;
+}
+
+.branding-form fieldset {
+    min-width: 0;
+    padding: clamp(18px, 4vw, 28px);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-bg-card);
+    box-shadow: var(--shadow-card);
+}
+
+.branding-form legend {
+    padding: 0 8px;
+    color: var(--color-primary);
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.branding-form__palette {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.branding-form__palette > legend,
+.branding-form__palette > p {
+    grid-column: 1 / -1;
+}
+
+.branding-color {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px 12px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-text-main);
+    font-weight: 700;
+}
+
+.branding-color input[type="color"] {
+    width: 52px;
+    height: 42px;
+    padding: 3px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    cursor: pointer;
+}
+
+.branding-color output {
+    grid-column: 1 / -1;
+    color: var(--color-text-muted);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.9rem;
+}
+
+.branding-form__preview-status {
+    min-height: 1.5em;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.branding-form__instructions {
+    padding: 12px;
+    border-left: 4px solid var(--color-secondary);
+    background: var(--color-bg-subtle);
+    color: var(--color-text-main) !important;
+}
+
+.branding-logo-preview {
+    display: grid;
+    min-height: 112px;
+    place-items: center;
+    overflow: hidden;
+    padding: 18px;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: 8px;
+    background-color: var(--color-bg-subtle);
+    background-image: linear-gradient(45deg, var(--color-border) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--color-border) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--color-border) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--color-border) 75%);
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    background-size: 16px 16px;
+}
+
+.branding-logo-preview img {
+    display: block;
+    width: auto;
+    max-width: min(100%, 512px);
+    height: auto;
+    max-height: 128px;
+    object-fit: contain;
+    object-position: center;
+}
+
+.branding-logo-preview span {
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.branding-form__remove {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.branding-form__remove input {
+    width: auto;
+}
+
+.branding-form__actions {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
 .site-navigation__disclosure {
     flex: 1 1 auto;
     min-width: 0;
@@ -3190,12 +3351,12 @@ html[data-theme="dark"] .theme-toggle {
     text-decoration: none;
 }
 
-.tab-navigation__tab:hover,
-.tab-navigation__tab:focus-visible,
-.tab-navigation__tab--active {
+.site-navigation .tab-navigation__tab:hover,
+.site-navigation .tab-navigation__tab:focus-visible,
+.site-navigation .tab-navigation__tab--active {
     background: transparent;
-    border-bottom-color: var(--color-primary);
-    color: var(--color-primary);
+    border-bottom-color: var(--color-accent);
+    color: var(--color-accent);
 }
 
 .tab-navigation__items {
@@ -3213,11 +3374,11 @@ html[data-theme="dark"] .theme-toggle {
     text-decoration: none;
 }
 
-.tab-navigation__items a:hover,
-.tab-navigation__items a:focus-visible,
-.tab-navigation__items a[aria-current="page"] {
+.site-navigation .tab-navigation__items a:hover,
+.site-navigation .tab-navigation__items a:focus-visible,
+.site-navigation .tab-navigation__items a[aria-current="page"] {
     background: var(--color-bg-subtle);
-    color: var(--color-primary);
+    color: var(--color-accent);
 }
 
 html.vue-tabs-ready .site-navigation__links--fallback {
@@ -3522,6 +3683,11 @@ html.vue-tabs-ready .site-navigation__links--fallback {
         height: 38px;
     }
 
+    .site-header__logo {
+        max-width: min(180px, 42vw);
+        max-height: 40px;
+    }
+
     .site-navigation__disclosure {
         flex: 0 0 auto;
         margin-left: auto;
@@ -3621,6 +3787,15 @@ html.vue-tabs-ready .site-navigation__links--fallback {
 
     .company-hub__grid {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .branding-form__palette {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .branding-form__actions {
+        align-items: stretch;
+        flex-direction: column;
     }
 
     .company-evaluation-card {

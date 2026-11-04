@@ -34,6 +34,11 @@ final class MatchingService
         return $this->minimumOverlapDays;
     }
 
+    public function minimumSchedulePercent(): float
+    {
+        return $this->minimumSchedulePercent;
+    }
+
     public function evaluate(
         string $offerStart,
         string $offerEnd,

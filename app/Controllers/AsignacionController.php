@@ -109,9 +109,15 @@ class AsignacionController
         }
         unset($oferta);
 
+        $criteriosMatching = MatchingService::fromEnvironment();
         View::render('asignaciones/matching', [
             'ofertas' => $ofertas,
             'paginacionOfertas' => $resultado,
+            'criteriosMatching' => [
+                'toleranciaDias' => $criteriosMatching->toleranceDays(),
+                'solapamientoMinimoDias' => $criteriosMatching->minimumOverlapDays(),
+                'compatibilidadHorariaMinima' => $criteriosMatching->minimumSchedulePercent(),
+            ],
             'error' => $error,
         ]);
     }

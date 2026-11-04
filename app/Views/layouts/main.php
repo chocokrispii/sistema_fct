@@ -1,7 +1,9 @@
 <?php
 /** @var string $contenido HTML generado por el controlador */
+require_once __DIR__ . '/../../Models/BrandingSettings.php';
 $rolActual = $_SESSION['rol'] ?? null;
 $usuarioAutenticado = $rolActual !== null;
+$marcaPortal = (new BrandingSettings())->get();
 $pendientesReenvioActivacion = 0;
 if ($rolActual === 'Administrador') {
     $pendientesReenvioActivacion = (int)getPDOConnection()->query(
@@ -28,14 +30,22 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
     <?php endif; ?>
     <script src="assets/js/password-toggle.js" defer></script>
     <?= FrontendAssets::render($contenido . $themeIsland) ?>
+    <link id="brand-theme-styles" rel="stylesheet" href="index.php?action=branding-styles">
+    <?php if (str_contains($contenido, 'data-brand-design')): ?>
+        <script src="assets/js/brand-design.js" defer></script>
+    <?php endif; ?>
 </head>
 
 <body>
 
     <header class="site-header">
         <a class="site-header__brand" href="index.php" aria-label="Sistema FCT, inicio">
-            <span aria-hidden="true" class="site-header__brand-mark">FCT</span>
-            <span>Sistema FCT</span>
+            <?php if (is_string($marcaPortal['logo_path'])): ?>
+                <img class="site-header__logo" src="index.php?action=branding-logo" alt="">
+            <?php else: ?>
+                <span aria-hidden="true" class="site-header__brand-mark">FCT</span>
+                <span>Sistema FCT</span>
+            <?php endif; ?>
         </a>
 
         <details class="site-navigation__disclosure" open>
@@ -77,6 +87,7 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                         <?php endif; ?>
                     </a>
                     <a href="index.php?action=ciclos">Ciclos formativos</a>
+                    <a href="index.php?action=diseno">Diseño</a>
                     <a href="index.php?action=integraciones">Integraciones</a>
                 <?php endif; ?>
             <?php elseif ($rolActual === 'Observador'): ?>
