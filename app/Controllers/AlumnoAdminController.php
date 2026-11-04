@@ -26,6 +26,59 @@ class AlumnoAdminController
 
     public function gestionar(): void
     {
+        $error = is_string($_SESSION['alumno_admin_error'] ?? null)
+            ? $_SESSION['alumno_admin_error']
+            : '';
+        unset($_SESSION['alumno_admin_error']);
+        $search = $_GET['q'] ?? '';
+        $cycleRaw = $_GET['ciclo'] ?? '';
+        $statusRaw = $_GET['estado'] ?? '';
+        if (!is_string($search) || !is_string($cycleRaw) || !is_string($statusRaw)) {
+            $error = 'Los filtros de búsqueda no tienen un formato válido.';
+            $search = '';
+            $cycleRaw = '';
+            $statusRaw = '';
+        }
+        $search = trim($search);
+        if (
+            mb_strlen($search) > 100
+            || preg_match('/[\p{Cc}]/u', $search) === 1
+            || preg_match('//u', $search) !== 1
+        ) {
+            $error = 'La búsqueda debe tener como máximo 100 caracteres válidos.';
+            $search = '';
+        }
+        $cycleId = null;
+        if ($cycleRaw !== '') {
+            $validatedCycle = filter_var($cycleRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($validatedCycle === false) {
+                $error = 'Selecciona un ciclo formativo válido.';
+            } else {
+                $cycleId = (int)$validatedCycle;
+            }
+        }
+        $active = null;
+        if ($statusRaw !== '') {
+            if (!in_array($statusRaw, ['0', '1'], true)) {
+                $error = 'Selecciona un estado válido.';
+            } else {
+                $active = $statusRaw === '1';
+            }
+        }
+
+        View::render('admin/alumnos', [
+            'error' => $error,
+            'actualizado' => isset($_GET['actualizado']),
+            'search' => $search,
+            'cycleId' => $cycleId,
+            'status' => $statusRaw,
+            'especialidades' => $this->especialidadModel->obtenerTodas(false),
+            'alumnos' => $this->alumnoModel->obtenerTodosParaCentro($search, $cycleId, $active),
+        ]);
+    }
+
+    public function alta(): void
+    {
         $error = '';
         $values = [];
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -121,7 +174,7 @@ class AlumnoAdminController
                         $this->db->commit();
 
                         $_SESSION['alumno_creado_email'] = $email;
-                        header('Location: index.php?action=alumnos-centro&creado=1');
+                        header('Location: index.php?action=alta-alumno&tab=altas&creado=1');
                         exit;
                     } catch (Throwable $exception) {
                         if ($this->db->inTransaction()) {
@@ -146,13 +199,108 @@ class AlumnoAdminController
 
         $sentTo = $_SESSION['alumno_creado_email'] ?? null;
         unset($_SESSION['alumno_creado_email']);
-        View::render('admin/alumnos', [
+        View::render('admin/alta-alumno', [
             'error' => $error,
             'values' => $values,
             'especialidades' => $this->especialidadModel->obtenerTodas(),
-            'alumnos' => $this->alumnoModel->obtenerTodosParaCentro(),
             'creado' => isset($_GET['creado']) && is_string($sentTo),
             'sentTo' => is_string($sentTo) ? $sentTo : '',
         ]);
+    }
+
+    public function actualizar(): void
+    {
+        $studentId = filter_var($_POST['alumno_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $fields = ['tipo_documento', 'dni', 'nombre', 'apellidos', 'email', 'especialidad_id', 'curso', 'observaciones_administrativas'];
+        $values = [];
+        if ($studentId === false) {
+            $this->redirectWithError('Selecciona un expediente de alumno válido.');
+        }
+        foreach ($fields as $field) {
+            $value = $_POST[$field] ?? '';
+            if (!is_string($value)) {
+                $this->redirectWithError('Los datos del alumno no tienen un formato válido.');
+            }
+            $values[$field] = trim($value);
+        }
+
+        $documentType = $values['tipo_documento'];
+        $dni = $documentType === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
+            ? strtoupper($values['dni'])
+            : SpanishDataValidator::normalizeDniNie($values['dni']);
+        $cycleId = filter_var($values['especialidad_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if (
+            !SpanishDataValidator::isStudentDocumentType($documentType)
+            || ($documentType === SpanishDataValidator::DOCUMENT_TYPE_PASSPORT
+                ? !SpanishDataValidator::isPassport($dni)
+                : !SpanishDataValidator::isDniNie($dni))
+            || !SpanishDataValidator::isPersonName($values['nombre'], 50)
+            || !SpanishDataValidator::isPersonName($values['apellidos'], 100)
+            || !SpanishDataValidator::isEmail($values['email'])
+            || $cycleId === false
+            || !in_array($values['curso'], ['1', '2'], true)
+            || mb_strlen($values['observaciones_administrativas']) > 2000
+            || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $values['observaciones_administrativas']) === 1
+        ) {
+            $this->redirectWithError('Revisa el tipo y número de documento, nombre, apellidos, correo, ciclo, curso y observaciones.');
+        }
+        if (!$this->especialidadModel->existe((int)$cycleId, false)) {
+            $this->redirectWithError('Selecciona un ciclo formativo existente.');
+        }
+
+        try {
+            $this->db->beginTransaction();
+            $userId = $this->alumnoModel->obtenerUsuarioIdParaCentro((int)$studentId, true);
+            if ($userId === null) {
+                throw new DomainException('No se encontró el expediente del alumno.');
+            }
+            $this->usuarioModel->assertIdentificadorFiscalDisponible($dni, $userId);
+            $this->alumnoModel->actualizarDesdePersonal(
+                (int)$studentId,
+                $values['nombre'],
+                $values['apellidos'],
+                $dni,
+                $documentType,
+                $values['email'],
+                (int)$cycleId,
+                (int)$values['curso'],
+                $values['observaciones_administrativas']
+            );
+            (new Auditoria($this->db))->registrar(
+                (int)$_SESSION['usuario_id'],
+                'alumno.actualizado_por_personal',
+                'alumnos',
+                (int)$studentId,
+                'ciclo_id=' . (int)$cycleId . '; curso=' . (int)$values['curso']
+            );
+            $this->db->commit();
+        } catch (DomainException $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            $this->redirectWithError($exception->getMessage());
+        } catch (PDOException $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Error al actualizar alumno desde el centro: ' . $exception->getMessage());
+            $this->redirectWithError('No se pudo actualizar el expediente. Comprueba que el correo o documento no pertenezcan a otra cuenta.');
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Error inesperado al actualizar alumno desde el centro: ' . $exception->getMessage());
+            $this->redirectWithError('No se pudo actualizar el expediente.');
+        }
+
+        header('Location: index.php?action=alumnos-centro&tab=principal&actualizado=1');
+        exit;
+    }
+
+    private function redirectWithError(string $message): never
+    {
+        $_SESSION['alumno_admin_error'] = $message;
+        header('Location: index.php?action=alumnos-centro&tab=principal');
+        exit;
     }
 }

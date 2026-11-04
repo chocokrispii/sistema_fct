@@ -1,71 +1,43 @@
 <?php
 $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 ?>
-<h2>Alta de alumnado por el centro</h2>
-<p>Solo el personal autorizado puede crear estas cuentas. El alumnado no dispone de un formulario público de alta; al guardar, recibirá un enlace de activación por correo.</p>
+<h2>Alumnado</h2>
+<p>Consulta, filtra y edita los expedientes existentes. Para crear una cuenta, utiliza <a href="index.php?action=alta-alumno&tab=altas">Altas &gt; Alumnado</a>.</p>
 
 <?php if ($error !== ''): ?>
     <p class="message message-error" role="alert"><?= $escape($error) ?></p>
 <?php endif; ?>
-
-<?php if ($creado): ?>
-    <section class="message message-success" role="status">
-        <h3>Cuenta creada y correo enviado</h3>
-        <p>Se ha enviado a <strong><?= $escape($sentTo) ?></strong> un enlace seguro para elegir contraseña y activar la cuenta.</p>
-        <p>El enlace caduca en 24 horas y solo se puede utilizar una vez.</p>
-    </section>
+<?php if ($actualizado): ?>
+    <p class="message message-success" role="status">El expediente se ha actualizado correctamente.</p>
 <?php endif; ?>
 
-<form class="page-form page-form--narrow" method="POST" action="index.php?action=alumnos-centro">
-    <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">
-    <div data-vue-island="StudentEnrollmentValidation"></div>
-
-    <label for="student-document-type">Tipo de documento</label>
-    <select id="student-document-type" name="tipo_documento" aria-describedby="student-document-help" required>
-        <option value="NIF_NIE_DNI" <?= ($values['tipo_documento'] ?? 'NIF_NIE_DNI') === 'NIF_NIE_DNI' ? 'selected' : '' ?>>NIF / NIE / DNI</option>
-        <option value="PASAPORTE" <?= ($values['tipo_documento'] ?? '') === 'PASAPORTE' ? 'selected' : '' ?>>Pasaporte</option>
-    </select>
-    <label for="student-dni">Número de documento</label>
-    <input id="student-dni" type="text" name="dni" maxlength="<?= ($values['tipo_documento'] ?? 'NIF_NIE_DNI') === 'PASAPORTE' ? 15 : 20 ?>" autocomplete="off" required value="<?= $escape($values['dni'] ?? '') ?>">
-    <small id="student-document-help">Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional. El pasaporte debe tener entre 6 y 15 caracteres alfanuméricos; el NIF/NIE/DNI se valida con su letra de control.</small>
-
-    <label for="student-name">Nombre</label>
-    <input id="student-name" type="text" name="nombre" maxlength="50" autocomplete="given-name" required value="<?= $escape($values['nombre'] ?? '') ?>">
-
-    <label for="student-surname">Apellidos</label>
-    <input id="student-surname" type="text" name="apellidos" maxlength="100" autocomplete="family-name" required value="<?= $escape($values['apellidos'] ?? '') ?>">
-
-    <label for="student-email">Correo electrónico</label>
-    <input id="student-email" type="email" name="email" maxlength="100" autocomplete="email" required value="<?= $escape($values['email'] ?? '') ?>">
-
-    <label for="student-cycle">Ciclo formativo</label>
-    <select id="student-cycle" name="especialidad_id" required>
-        <option value="">Selecciona un ciclo</option>
+<form class="page-form" method="GET" action="index.php">
+    <input type="hidden" name="action" value="alumnos-centro">
+    <input type="hidden" name="tab" value="principal">
+    <label for="student-search">Buscar por documento, nombre, correo o ciclo</label>
+    <input id="student-search" type="search" name="q" value="<?= $escape($search) ?>" maxlength="100">
+    <label for="student-cycle-filter">Ciclo formativo</label>
+    <select id="student-cycle-filter" name="ciclo">
+        <option value="">Todos los ciclos</option>
         <?php foreach ($especialidades as $especialidad): ?>
-            <option
-                value="<?= (int)$especialidad['id'] ?>"
-                <?= (string)($values['especialidad_id'] ?? '') === (string)$especialidad['id'] ? 'selected' : '' ?>
-            ><?= $escape($especialidad['nombre_especialidad']) ?></option>
+            <option value="<?= (int)$especialidad['id'] ?>" <?= (string)$cycleId === (string)$especialidad['id'] ? 'selected' : '' ?>>
+                <?= $escape($especialidad['nombre_especialidad']) ?><?= (int)$especialidad['activo'] === 1 ? '' : ' (inactivo)' ?>
+            </option>
         <?php endforeach; ?>
     </select>
-
-    <label for="student-course">Curso</label>
-    <select id="student-course" name="curso" required>
-        <option value="">Selecciona el curso</option>
-        <option value="1" <?= ($values['curso'] ?? '') === '1' ? 'selected' : '' ?>>1.º</option>
-        <option value="2" <?= ($values['curso'] ?? '') === '2' ? 'selected' : '' ?>>2.º</option>
+    <label for="student-status-filter">Estado de la cuenta</label>
+    <select id="student-status-filter" name="estado">
+        <option value="">Todos los estados</option>
+        <option value="1" <?= $status === '1' ? 'selected' : '' ?>>Activo</option>
+        <option value="0" <?= $status === '0' ? 'selected' : '' ?>>Desactivado</option>
     </select>
-
-    <label for="student-notes">Observaciones administrativas</label>
-    <textarea id="student-notes" name="observaciones_administrativas" maxlength="2000" rows="4"><?= $escape($values['observaciones_administrativas'] ?? '') ?></textarea>
-
-    <button type="submit">Crear cuenta de alumno</button>
+    <button type="submit">Aplicar filtros</button>
+    <a href="index.php?action=alumnos-centro&tab=principal">Limpiar filtros</a>
 </form>
 
-<h3>Alumnado registrado</h3>
 <table>
     <thead>
-        <tr><th>Tipo y número de documento</th><th>Nombre</th><th>Correo</th><th>Ciclo</th><th>Curso</th><th>Observaciones administrativas</th><th>Estado</th></tr>
+        <tr><th>Documento</th><th>Nombre</th><th>Correo</th><th>Ciclo</th><th>Curso</th><th>Estado</th><th>Expediente</th></tr>
     </thead>
     <tbody>
         <?php foreach ($alumnos as $alumno): ?>
@@ -75,9 +47,83 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
                 <td><?= $escape($alumno['correo']) ?></td>
                 <td><?= $escape($alumno['nombre_especialidad'] ?? '—') ?></td>
                 <td><?= $alumno['curso'] === null ? '—' : (int)$alumno['curso'] . '.º' ?></td>
-                <td><?= $escape($alumno['observaciones_administrativas'] ?? '—') ?></td>
                 <td><?= (int)$alumno['activo'] === 1 ? 'Activo' : 'Desactivado' ?></td>
+                <td>
+                    <button
+                        class="student-edit-trigger"
+                        type="button"
+                        data-edit-student="<?= (int)$alumno['id'] ?>"
+                        aria-haspopup="dialog"
+                        aria-controls="student-edit-dialog-<?= (int)$alumno['id'] ?>"
+                    >Editar</button>
+                </td>
             </tr>
         <?php endforeach; ?>
+        <?php if ($alumnos === []): ?>
+            <tr><td colspan="7">No hay expedientes que coincidan con los filtros.</td></tr>
+        <?php endif; ?>
     </tbody>
 </table>
+
+<?php foreach ($alumnos as $alumno): ?>
+    <?php $studentId = (int)$alumno['id']; ?>
+    <dialog
+        class="student-edit-dialog"
+        id="student-edit-dialog-<?= $studentId ?>"
+        aria-labelledby="student-edit-title-<?= $studentId ?>"
+        data-student-edit-dialog
+    >
+        <div class="student-edit-dialog__header">
+            <div>
+                <h3 id="student-edit-title-<?= $studentId ?>">Editar expediente</h3>
+                <p><?= $escape($alumno['nombre'] . ' ' . $alumno['apellidos']) ?></p>
+            </div>
+            <button class="student-edit-dialog__close" type="button" data-close-student-dialog aria-label="Cerrar">×</button>
+        </div>
+        <form class="student-edit-form" method="POST" action="index.php?action=actualizar-alumno-centro">
+            <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">
+            <input type="hidden" name="alumno_id" value="<?= $studentId ?>">
+            <label for="student-document-type-<?= $studentId ?>">Tipo de documento
+                <select id="student-document-type-<?= $studentId ?>" name="tipo_documento" required>
+                    <option value="NIF_NIE_DNI" <?= $alumno['tipo_documento'] === 'NIF_NIE_DNI' ? 'selected' : '' ?>>NIF / NIE / DNI</option>
+                    <option value="PASAPORTE" <?= $alumno['tipo_documento'] === 'PASAPORTE' ? 'selected' : '' ?>>Pasaporte</option>
+                </select>
+            </label>
+            <label for="student-document-<?= $studentId ?>">Número de documento
+                <input id="student-document-<?= $studentId ?>" type="text" name="dni" maxlength="20" value="<?= $escape($alumno['dni']) ?>" required>
+            </label>
+            <label for="student-name-<?= $studentId ?>">Nombre
+                <input id="student-name-<?= $studentId ?>" type="text" name="nombre" maxlength="50" value="<?= $escape($alumno['nombre']) ?>" required>
+            </label>
+            <label for="student-surname-<?= $studentId ?>">Apellidos
+                <input id="student-surname-<?= $studentId ?>" type="text" name="apellidos" maxlength="100" value="<?= $escape($alumno['apellidos']) ?>" required>
+            </label>
+            <label for="student-email-<?= $studentId ?>">Correo electrónico
+                <input id="student-email-<?= $studentId ?>" type="email" name="email" maxlength="100" value="<?= $escape($alumno['correo']) ?>" required>
+            </label>
+            <label for="student-cycle-<?= $studentId ?>">Ciclo formativo
+                <select id="student-cycle-<?= $studentId ?>" name="especialidad_id" required>
+                    <?php foreach ($especialidades as $especialidad): ?>
+                        <option value="<?= (int)$especialidad['id'] ?>" <?= (string)$alumno['especialidad_id'] === (string)$especialidad['id'] ? 'selected' : '' ?>>
+                            <?= $escape($especialidad['nombre_especialidad']) ?><?= (int)$especialidad['activo'] === 1 ? '' : ' (inactivo)' ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label for="student-course-<?= $studentId ?>">Curso
+                <select id="student-course-<?= $studentId ?>" name="curso" required>
+                    <option value="1" <?= (string)$alumno['curso'] === '1' ? 'selected' : '' ?>>1.º</option>
+                    <option value="2" <?= (string)$alumno['curso'] === '2' ? 'selected' : '' ?>>2.º</option>
+                </select>
+            </label>
+            <label class="student-edit-form__notes" for="student-notes-<?= $studentId ?>">Observaciones administrativas
+                <textarea id="student-notes-<?= $studentId ?>" name="observaciones_administrativas" maxlength="2000" rows="4"><?= $escape($alumno['observaciones_administrativas'] ?? '') ?></textarea>
+            </label>
+            <div class="student-edit-form__actions">
+                <button class="student-edit-form__cancel" type="button" data-close-student-dialog>Cancelar</button>
+                <button type="submit">Guardar cambios</button>
+            </div>
+        </form>
+    </dialog>
+<?php endforeach; ?>
+<script src="assets/js/admin-students.js" defer></script>

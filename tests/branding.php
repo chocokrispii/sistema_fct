@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../app/Services/BrandingPalette.php';
 require_once __DIR__ . '/../app/Services/BrandLogoProcessor.php';
+require_once __DIR__ . '/../app/Services/BrandLogoShape.php';
 
 function assertBranding(bool $condition, string $message): void
 {
@@ -60,6 +61,17 @@ try {
 }
 assertBranding($invalidPaletteRejected, 'Se deben rechazar colores que no sean hexadecimales.');
 
+foreach (BrandLogoShape::OPTIONS as $shape) {
+    assertBranding(BrandLogoShape::normalize($shape) === $shape, 'Debe aceptarse la forma válida ' . $shape . '.');
+}
+$invalidShapeRejected = false;
+try {
+    BrandLogoShape::normalize('triangle');
+} catch (InvalidArgumentException) {
+    $invalidShapeRejected = true;
+}
+assertBranding($invalidShapeRejected, 'Se deben rechazar formas de logo no permitidas.');
+
 foreach ([[4000, 100], [600, 600], [100, 4000]] as [$sourceWidth, $sourceHeight]) {
     $source = imagecreatetruecolor($sourceWidth, $sourceHeight);
     imagealphablending($source, false);
@@ -105,6 +117,14 @@ assertBranding(
         && (int)$svgDimensions[1] <= 512
         && (int)$svgDimensions[2] <= 128,
     'Los SVG también deben limitarse al marco máximo del logo.'
+);
+$exampleSvg = file_get_contents(__DIR__ . '/../public/assets/images/logo-sistema-fct-ejemplo.svg');
+assertBranding(is_string($exampleSvg), 'Debe estar disponible el SVG de ejemplo de Sistema FCT.');
+$processedExampleSvg = BrandLogoProcessor::process($exampleSvg, 'image/svg+xml');
+assertBranding(
+    str_contains($processedExampleSvg['bytes'], '<svg')
+        && str_contains($processedExampleSvg['bytes'], 'preserveAspectRatio="xMidYMid meet"'),
+    'El SVG de ejemplo debe superar el saneamiento y conservar su proporción.'
 );
 
 $unsafeSvgRejected = false;

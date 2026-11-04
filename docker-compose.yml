@@ -138,7 +138,8 @@ services:
       - ./database/migrations/024_convenios_estado_archivado.sql:/docker-entrypoint-initdb.d/028-convenios-estado-archivado.sql:ro
       - ./database/migrations/025_marca_portal.sql:/docker-entrypoint-initdb.d/029-marca-portal.sql:ro
       - ./database/migrations/026_webhook_outbox.sql:/docker-entrypoint-initdb.d/030-webhook-outbox.sql:ro
-      - ./database/migrations/027_ofertas_sede.sql:/docker-entrypoint-initdb.d/031-ofertas-sede.sql:ro
+      - ./database/migrations/027_marca_forma_logo.sql:/docker-entrypoint-initdb.d/031-marca-forma-logo.sql:ro
+      - ./database/migrations/027_ofertas_sede.sql:/docker-entrypoint-initdb.d/032-ofertas-sede.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -189,7 +190,10 @@ services:
           AND EXISTS (SELECT 1 FROM information_schema.KEY_COLUMN_USAGE
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_especialidades_plazas'
           AND CONSTRAINT_NAME = 'fk_oferta_sede_empresa'
-          AND REFERENCED_TABLE_NAME = 'empresa_sedes'), 1, 0)")" = "1"
+          AND REFERENCED_TABLE_NAME = 'empresa_sedes')
+          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'portal_branding'
+          AND COLUMN_NAME = 'logo_shape'), 1, 0)")" = "1"
       interval: 10s
       timeout: 5s
       retries: 10

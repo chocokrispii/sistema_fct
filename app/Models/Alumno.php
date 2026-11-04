@@ -260,17 +260,102 @@ class Alumno {
         return (int)$this->db->lastInsertId();
     }
 
-    public function obtenerTodosParaCentro(): array
+    public function obtenerUsuarioIdParaCentro(int $alumnoId, bool $bloquear = false): ?int
     {
-        $stmt = $this->db->query(
-            'SELECT a.id, a.dni, a.tipo_documento, a.nombre, a.apellidos, a.correo, a.curso,
-                    a.observaciones_administrativas,
+        $stmt = $this->db->prepare(
+            "SELECT a.usuario_id
+             FROM alumnos a
+             INNER JOIN usuarios u ON u.id = a.usuario_id AND u.rol = 'Alumno'
+             WHERE a.id = :id
+             LIMIT 1" . ($bloquear ? ' FOR UPDATE' : '')
+        );
+        $stmt->execute(['id' => $alumnoId]);
+        $usuarioId = $stmt->fetchColumn();
+
+        return $usuarioId === false ? null : (int)$usuarioId;
+    }
+
+    public function actualizarDesdePersonal(
+        int $alumnoId,
+        string $nombre,
+        string $apellidos,
+        string $dni,
+        string $tipoDocumento,
+        string $email,
+        int $especialidadId,
+        int $curso,
+        string $observacionesAdministrativas
+    ): void {
+        $usuarioId = $this->obtenerUsuarioIdParaCentro($alumnoId, true);
+        if ($usuarioId === null) {
+            throw new DomainException('No se encontró el expediente del alumno.');
+        }
+
+        $updateUser = $this->db->prepare(
+            "UPDATE usuarios SET email = :email WHERE id = :id AND rol = 'Alumno'"
+        );
+        $updateUser->execute(['email' => $email, 'id' => $usuarioId]);
+
+        $updateStudent = $this->db->prepare(
+            'UPDATE alumnos
+             SET nombre = :nombre, apellidos = :apellidos, dni = :dni,
+                 tipo_documento = :tipo_documento, correo = :email,
+                 especialidad_id = :especialidad_id, curso = :curso,
+                 observaciones_administrativas = :observaciones
+             WHERE id = :id AND usuario_id = :usuario_id'
+        );
+        $updateStudent->execute([
+            'nombre' => $nombre,
+            'apellidos' => $apellidos,
+            'dni' => $dni,
+            'tipo_documento' => $tipoDocumento,
+            'email' => $email,
+            'especialidad_id' => $especialidadId,
+            'curso' => $curso,
+            'observaciones' => $observacionesAdministrativas !== '' ? $observacionesAdministrativas : null,
+            'id' => $alumnoId,
+            'usuario_id' => $usuarioId,
+        ]);
+    }
+
+    public function obtenerTodosParaCentro(
+        string $search = '',
+        ?int $especialidadId = null,
+        ?bool $activo = null
+    ): array {
+        $where = [];
+        $params = [];
+        if ($search !== '') {
+            $where[] = '(a.dni LIKE :document_search OR a.nombre LIKE :name_search
+                         OR a.apellidos LIKE :surname_search OR u.email LIKE :email_search
+                         OR e.nombre_especialidad LIKE :cycle_search)';
+            $pattern = '%' . $search . '%';
+            $params['document_search'] = $pattern;
+            $params['name_search'] = $pattern;
+            $params['surname_search'] = $pattern;
+            $params['email_search'] = $pattern;
+            $params['cycle_search'] = $pattern;
+        }
+        if ($especialidadId !== null) {
+            $where[] = 'a.especialidad_id = :especialidad_id';
+            $params['especialidad_id'] = $especialidadId;
+        }
+        if ($activo !== null) {
+            $where[] = 'u.activo = :activo';
+            $params['activo'] = $activo ? 1 : 0;
+        }
+        $whereSql = $where === [] ? '' : ' WHERE ' . implode(' AND ', $where);
+        $stmt = $this->db->prepare(
+            'SELECT a.id, a.usuario_id, a.dni, a.tipo_documento, a.nombre, a.apellidos,
+                    a.correo, a.curso, a.especialidad_id, a.observaciones_administrativas,
                     e.nombre_especialidad, u.activo
              FROM alumnos a
              INNER JOIN usuarios u ON u.id = a.usuario_id AND u.rol = \'Alumno\'
-             LEFT JOIN especialidades e ON e.id = a.especialidad_id
-             ORDER BY a.apellidos, a.nombre, a.id'
+             LEFT JOIN especialidades e ON e.id = a.especialidad_id'
+             . $whereSql .
+             ' ORDER BY a.apellidos, a.nombre, a.id'
         );
+        $stmt->execute($params);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
