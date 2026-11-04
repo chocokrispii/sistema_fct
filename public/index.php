@@ -63,10 +63,10 @@ header('X-Frame-Options: DENY');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Cache-Control: no-store');
 $viteOrigin = FrontendAssets::developmentOrigin();
-$contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
+$contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
 if ($viteOrigin !== null) {
     $viteWebSocketOrigin = 'ws://' . substr($viteOrigin, strlen('http://'));
-    $contentSecurityPolicy = "default-src 'self'; script-src 'self' $viteOrigin; style-src 'self' $viteOrigin 'unsafe-inline'; connect-src 'self' $viteOrigin $viteWebSocketOrigin; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
+    $contentSecurityPolicy = "default-src 'self'; script-src 'self' $viteOrigin; style-src 'self' $viteOrigin 'unsafe-inline'; connect-src 'self' $viteOrigin $viteWebSocketOrigin; img-src 'self' data: blob:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
 }
 header('Content-Security-Policy: ' . $contentSecurityPolicy);
 

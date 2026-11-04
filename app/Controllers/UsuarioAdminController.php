@@ -19,6 +19,15 @@ class UsuarioAdminController
 
     public function gestionar(): void
     {
+        View::render('admin/usuarios', [
+            'usuarios' => $this->model->obtenerTodos(),
+            'error' => is_string($_GET['error'] ?? null) ? $_GET['error'] : '',
+            'eliminado' => isset($_GET['eliminado']),
+        ]);
+    }
+
+    public function alta(): void
+    {
         $error = '';
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $emailRaw = $_POST['email'] ?? '';
@@ -76,7 +85,7 @@ class UsuarioAdminController
                     $this->audit('usuario.creado', $id, 'rol=' . $role);
                     $this->db->commit();
                     $_SESSION['usuario_creado_email'] = $email;
-                    header('Location: index.php?action=usuarios&creado=1');
+                    header('Location: index.php?action=alta-personal&tab=altas&creado=1');
                     exit;
                 } catch (Throwable $e) {
                     if ($this->db->inTransaction()) {
@@ -98,10 +107,8 @@ class UsuarioAdminController
 
         $sentTo = $_SESSION['usuario_creado_email'] ?? null;
         unset($_SESSION['usuario_creado_email']);
-        View::render('admin/usuarios', [
-            'usuarios' => $this->model->obtenerTodos(),
+        View::render('admin/alta-personal', [
             'error' => $error !== '' ? $error : (is_string($_GET['error'] ?? null) ? $_GET['error'] : ''),
-            'eliminado' => isset($_GET['eliminado']),
             'creado' => isset($_GET['creado']) && is_string($sentTo),
             'sentTo' => is_string($sentTo) ? $sentTo : '',
         ]);

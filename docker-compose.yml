@@ -133,6 +133,7 @@ services:
       - ./database/migrations/024_convenios_estado_archivado.sql:/docker-entrypoint-initdb.d/028-convenios-estado-archivado.sql:ro
       - ./database/migrations/025_marca_portal.sql:/docker-entrypoint-initdb.d/029-marca-portal.sql:ro
       - ./database/migrations/026_webhook_outbox.sql:/docker-entrypoint-initdb.d/030-webhook-outbox.sql:ro
+      - ./database/migrations/027_marca_forma_logo.sql:/docker-entrypoint-initdb.d/031-marca-forma-logo.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
