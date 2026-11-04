@@ -10,6 +10,7 @@ RUN npm ci
 COPY tsconfig.json vite.config.ts postcss.config.cjs ./
 COPY frontend ./frontend
 COPY public/assets/css ./public/assets/css
+COPY public/assets/js/api-response.js public/assets/js/api-response.d.ts ./public/assets/js/
 RUN npm run build
 
 FROM php:8.2-apache
