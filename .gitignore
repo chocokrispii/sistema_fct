@@ -4,5 +4,6 @@
 node_modules/
 vendor/
 public/build/
+public/assets/swagger-ui/
 docs_md/.vitepress/cache/
 docs_md/.vitepress/dist/

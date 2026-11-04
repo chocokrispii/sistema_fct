@@ -1,0 +1,430 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "API REST del Sistema FCT",
+    "version": "1.0.0",
+    "description": "API autenticada para consultar y gestionar recursos del Sistema FCT. Usa un token de cuenta en el botón Authorize. Los tokens heredan los permisos de su cuenta y no deben compartirse. Las operaciones POST y PATCH pueden modificar datos permanentemente."
+  },
+  "servers": [
+    {
+      "url": "./api/v1",
+      "description": "API de esta instalación"
+    }
+  ],
+  "security": [
+    {
+      "BearerToken": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Alumnos"
+    },
+    {
+      "name": "Empresas"
+    },
+    {
+      "name": "Ofertas"
+    },
+    {
+      "name": "Convenios"
+    },
+    {
+      "name": "Asignaciones"
+    }
+  ],
+  "paths": {
+    "/alumnos": {
+      "get": {
+        "tags": ["Alumnos"],
+        "summary": "Consultar alumnos",
+        "description": "Consulta una lista paginada. El acceso a los datos depende del rol del token.",
+        "parameters": [
+          {"$ref": "#/components/parameters/Page"},
+          {"$ref": "#/components/parameters/PerPage"}
+        ],
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"}
+        }
+      },
+      "post": {
+        "tags": ["Alumnos"],
+        "summary": "Crear un alumno",
+        "description": "Disponible para Administrador y Coordinador. El cuerpo debe incluir los campos requeridos para crear la cuenta y el expediente.",
+        "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
+        "responses": {
+          "201": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "422": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    },
+    "/alumnos/{id}": {
+      "parameters": [{"$ref": "#/components/parameters/Id"}],
+      "get": {
+        "tags": ["Alumnos"],
+        "summary": "Consultar un alumno",
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      },
+      "patch": {
+        "tags": ["Alumnos"],
+        "summary": "Actualizar datos de alumno",
+        "description": "El alumno puede modificar los campos permitidos de su propio expediente.",
+        "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "422": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    },
+    "/empresas": {
+      "get": {
+        "tags": ["Empresas"],
+        "summary": "Consultar empresas",
+        "parameters": [
+          {"$ref": "#/components/parameters/Page"},
+          {"$ref": "#/components/parameters/PerPage"}
+        ],
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"}
+        }
+      },
+      "post": {
+        "tags": ["Empresas"],
+        "summary": "Crear una empresa",
+        "description": "Disponible para Administrador y Coordinador.",
+        "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
+        "responses": {
+          "201": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "422": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    },
+    "/empresas/{id}": {
+      "parameters": [{"$ref": "#/components/parameters/Id"}],
+      "get": {
+        "tags": ["Empresas"],
+        "summary": "Consultar una empresa",
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      },
+      "patch": {
+        "tags": ["Empresas"],
+        "summary": "Actualizar una empresa",
+        "description": "Disponible para una Empresa sobre su propio perfil.",
+        "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "422": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    },
+    "/ofertas": {
+      "get": {
+        "tags": ["Ofertas"],
+        "summary": "Consultar ofertas",
+        "parameters": [
+          {"$ref": "#/components/parameters/Page"},
+          {"$ref": "#/components/parameters/PerPage"}
+        ],
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"}
+        }
+      },
+      "post": {
+        "tags": ["Ofertas"],
+        "summary": "Crear una oferta",
+        "description": "Disponible para Empresa y requiere un convenio aprobado.",
+        "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
+        "responses": {
+          "201": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "422": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    },
+    "/ofertas/{id}": {
+      "parameters": [{"$ref": "#/components/parameters/Id"}],
+      "get": {
+        "tags": ["Ofertas"],
+        "summary": "Consultar una oferta",
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      },
+      "patch": {
+        "tags": ["Ofertas"],
+        "summary": "Revisar una oferta",
+        "description": "Revisa una oferta pendiente según los permisos API configurados.",
+        "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "422": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    },
+    "/convenios": {
+      "get": {
+        "tags": ["Convenios"],
+        "summary": "Consultar convenios",
+        "parameters": [
+          {"$ref": "#/components/parameters/Page"},
+          {"$ref": "#/components/parameters/PerPage"}
+        ],
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"}
+        }
+      },
+      "post": {
+        "tags": ["Convenios"],
+        "summary": "Registrar un convenio",
+        "description": "Disponible para Empresa. El archivo PDF se valida, analiza con ClamAV y almacena fuera de la carpeta pública.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "422": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    },
+    "/convenios/{id}": {
+      "parameters": [{"$ref": "#/components/parameters/Id"}],
+      "get": {
+        "tags": ["Convenios"],
+        "summary": "Consultar un convenio",
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      },
+      "patch": {
+        "tags": ["Convenios"],
+        "summary": "Revisar un convenio",
+        "description": "Revisa un convenio pendiente según los permisos API configurados.",
+        "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "422": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    },
+    "/asignaciones": {
+      "get": {
+        "tags": ["Asignaciones"],
+        "summary": "Consultar asignaciones",
+        "parameters": [
+          {"$ref": "#/components/parameters/Page"},
+          {"$ref": "#/components/parameters/PerPage"}
+        ],
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"}
+        }
+      },
+      "post": {
+        "tags": ["Asignaciones"],
+        "summary": "Crear una asignación",
+        "description": "Disponible para Administrador y Coordinador. El alumno debe cumplir las reglas de ciclo, disponibilidad y plazas.",
+        "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
+        "responses": {
+          "201": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "422": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    },
+    "/asignaciones/{id}": {
+      "parameters": [{"$ref": "#/components/parameters/Id"}],
+      "get": {
+        "tags": ["Asignaciones"],
+        "summary": "Consultar una asignación",
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      },
+      "patch": {
+        "tags": ["Asignaciones"],
+        "summary": "Cerrar una asignación",
+        "description": "Disponible para Administrador y Coordinador.",
+        "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
+        "responses": {
+          "200": {"$ref": "#/components/responses/Success"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "422": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token API creado desde Configuración > Tokens API."
+      }
+    },
+    "parameters": {
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Identificador numérico del recurso.",
+        "schema": {"type": "integer", "minimum": 1}
+      },
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "description": "Número de página (predeterminado: 1).",
+        "schema": {"type": "integer", "minimum": 1, "default": 1}
+      },
+      "PerPage": {
+        "name": "per_page",
+        "in": "query",
+        "description": "Registros por página (predeterminado: 50, máximo: 100).",
+        "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}
+      }
+    },
+    "requestBodies": {
+      "JsonObject": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "Success": {
+        "description": "Solicitud completada correctamente.",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/SuccessResponse"}
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Solicitud o paginación no válida.",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Token ausente, inválido o revocado.",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "El rol del token no permite esta operación.",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+          }
+        }
+      },
+      "NotFound": {
+        "description": "El recurso solicitado no existe.",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Los datos enviados no cumplen las reglas del recurso.",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+          }
+        }
+      }
+    },
+    "schemas": {
+      "SuccessResponse": {
+        "type": "object",
+        "required": ["success", "data"],
+        "properties": {
+          "success": {"type": "boolean", "enum": [true]},
+          "data": {"type": "object", "description": "Datos del recurso; las listas incluyen items y meta."}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["success", "error"],
+        "properties": {
+          "success": {"type": "boolean", "enum": [false]},
+          "error": {"type": "string"}
+        }
+      }
+    }
+  }
+}

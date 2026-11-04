@@ -1,6 +1,14 @@
 <?php if ($error !== ''): ?><p class="message message-error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <h2>Tokens de API</h2>
 <p>Los tokens heredan el rol de la cuenta seleccionada. El secreto completo se muestra una sola vez al crearlo.</p>
+<?php
+$infoBannerTitle = 'Usa credenciales específicas para cada integración';
+$infoBannerText = 'El token autoriza las solicitudes con los permisos de la cuenta elegida. Guárdalo en un gestor seguro: el valor completo solo se muestra al crearlo y puedes revocarlo cuando deje de ser necesario.';
+$infoBannerLinks = [
+    ['href' => 'api-docs.html', 'label' => 'Abrir documentación interactiva (Swagger UI)'],
+];
+require __DIR__ . '/../components/info_banner.php';
+?>
 <?php if (is_string($plainTextToken)): ?>
     <p class="message message-success" role="status">Copia y guarda este token ahora. No volverá a mostrarse.</p>
     <pre><?= htmlspecialchars($plainTextToken, ENT_QUOTES, 'UTF-8') ?></pre>
@@ -8,8 +16,20 @@
 <form class="page-form page-form--narrow" method="POST" action="index.php?action=api-tokens">
     <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
     <input type="hidden" name="token_action" value="create">
-    <label>Nombre para identificar el uso <input type="text" name="name" maxlength="100" required></label>
+    <label>Nombre para identificar el uso
+        <?php
+        $tooltipId = 'api-token-name-help';
+        $tooltipText = 'Etiqueta interna para reconocer qué sistema o proceso utiliza este token. No modifica sus permisos.';
+        require __DIR__ . '/../components/tooltip.php';
+        ?>
+        <input type="text" name="name" maxlength="100" required>
+    </label>
     <label>Cuenta y permisos
+        <?php
+        $tooltipId = 'api-token-account-help';
+        $tooltipText = 'El token hereda el rol y el alcance de esta cuenta. Selecciona la cuenta con los permisos mínimos necesarios para la integración.';
+        require __DIR__ . '/../components/tooltip.php';
+        ?>
         <select name="user_id" required>
             <?php foreach ($users as $user): ?>
                 <option value="<?= (int)$user['id'] ?>"><?= htmlspecialchars($user['email'] . ' — ' . $user['rol'], ENT_QUOTES, 'UTF-8') ?></option>

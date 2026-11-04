@@ -5,6 +5,7 @@
 node_modules
 vendor
 public/build
+public/assets/swagger-ui/
 storage/*
 !storage/.htaccess
 tests

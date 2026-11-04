@@ -8,6 +8,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY tsconfig.json vite.config.ts postcss.config.cjs ./
+COPY scripts/copy-swagger-ui.mjs ./scripts/copy-swagger-ui.mjs
 COPY frontend ./frontend
 COPY public/assets/css ./public/assets/css
 COPY public/assets/js ./public/assets/js
@@ -30,6 +31,7 @@ RUN sed -i 's/\r$//' /usr/local/bin/fct-storage-entrypoint
 COPY . /var/www/html
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 COPY --from=frontend-build /app/public/build /var/www/html/public/build
+COPY --from=frontend-build /app/public/assets/swagger-ui /var/www/html/public/assets/swagger-ui
 
 RUN mkdir -p /var/lib/fct/storage \
     && chmod 755 /usr/local/bin/fct-storage-entrypoint \

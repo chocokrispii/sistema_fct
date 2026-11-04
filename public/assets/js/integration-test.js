@@ -72,7 +72,7 @@ import { isApiResponse } from './api-response.js';
         const token = tokenInput.value;
         tokenInput.value = '';
         const path = resource + (resourceId === '' ? '' : '/' + resourceId);
-        const url = new URL('/api/v1/' + path, window.location.origin);
+        const url = new URL('api/v1/' + path, document.baseURI);
         if (method === 'GET' && resourceId === '') {
             url.searchParams.set('page', pageInput.value);
             url.searchParams.set('per_page', perPageInput.value);

@@ -8,4 +8,5 @@ php_value max_input_time 60
 php_flag display_errors Off
 
 RewriteEngine On
+RewriteRule ^api/v1(?:/(.*))?$ api.php?path=$1 [B,QSA,L]
 RewriteRule ^dev/preview-publicar-oferta/?$ index.php?action=preview-publicar-oferta [QSA,L]
