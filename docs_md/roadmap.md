@@ -93,8 +93,8 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    review["gestionar-convenios · aprobar/rechazar/archivar-convenio<br/>COMPLETED"]:::completed
-    file["convenios · descargar-convenio<br/>COMPLETED: almacenamiento privado y auditoría"]:::completed
+    review["gestionar-convenios · revisar-firmar/rechazar/archivar-convenio<br/>COMPLETED: aprobación con sello electrónico y auditoría"]:::completed
+    file["convenios · descargar-convenio / descargar-convenio-firmado<br/>COMPLETED: almacenamiento privado y descarga autenticada"]:::completed
     audit["auditar-convenios<br/>COMPLETED: lectura PHP"]:::completed
     review --> file --> audit
     classDef completed fill:#e8f7ee,stroke:#29804b,color:#174b2b,stroke-width:2px
@@ -175,8 +175,8 @@ flowchart TB
 | Asignaciones | `POST cerrar-practica` | PENDING | Formulario PHP síncrono | Isla JSON/Pinia manteniendo formulario fallback | Sólo asignaciones activas; debe preceder a la calificación | P1 — siguiente |
 | Convenios | `GET, POST convenios` | PENDING | Formulario multipart PHP | Mantener flujo multipart PHP; no convertir el pipeline a JSON sin necesidad | Validación MIME/extensión/tamaño, ClamAV fail-closed y almacenamiento privado | P3 — seguridad |
 | Convenios | `GET gestionar-convenios` (aliases `revisar-convenios`, `archivo-convenios`) | COMPLETED | Vista PHP unificada con pestañas, filtros parametrizados y paginación | Mantener formularios/fallback HTML y permisos | Coordinador consulta pendientes; Administrador consulta todos los estados | P3 |
-| Convenios | `POST aprobar-convenio`, `POST rechazar-convenio`, `POST archivar-convenio` (alias `resolver-convenio`) | COMPLETED | Formularios HTML con CSRF | Mantener transacciones y auditoría de estado anterior/nuevo | Administrador; sólo transiciones de estado permitidas | P3 |
-| Convenios | `GET descargar-convenio` | COMPLETED | Descarga PHP protegida, flujo binario no JSON | Mantener descarga en servidor; no exponer documentos a Vue/public | Sólo Administrador; almacenamiento privado y auditoría | P3 — no convertir a JSON |
+| Convenios | `POST aprobar-convenio`, `POST rechazar-convenio`, `POST archivar-convenio` (alias `resolver-convenio`) | COMPLETED | Formularios HTML con CSRF; la aprobación requiere generar el documento sellado | Mantener transacción, bloqueo de concurrencia y auditoría de hashes/estado anterior/nuevo | Administrador; no permitir aprobación directa sin sello | P3 |
+| Convenios | `GET descargar-convenio`, `GET descargar-convenio-firmado` | COMPLETED | Descarga PHP protegida, flujo binario no JSON | Mantener archivos en almacenamiento privado; comprobar titularidad e integridad antes de servirlos | Administrador descarga originales; sólo la empresa titular descarga el convenio aprobado | P3 — no convertir a JSON |
 | Convenios | `GET auditar-convenios` | COMPLETED | Vista PHP `convenios/observador` con `Convenio::listarParaObservador`; sin isla | Mantener lectura PHP | Sólo rol Observador; metadatos anonimizados, sin enlaces ni descargas de PDF | P3 |
 | Administración | `GET, POST usuarios` | PENDING | Gestión PHP síncrona | Isla JSON/Pinia para creación/cambios con fallback | Rol Administrador; integridad referencial | P2 |
 | Administración | `POST estado-usuario` | PENDING | Formulario PHP síncrono | Isla JSON/Pinia y fallback | Rol Administrador; no permitir desactivar cuenta protegida | P2 |

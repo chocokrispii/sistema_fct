@@ -310,6 +310,11 @@ fieldset {
     background: var(--color-success-bg);
 }
 
+.message-warning {
+    color: var(--color-warning-text);
+    background: var(--color-warning-bg);
+}
+
 .inline-form {
     display: inline;
     width: fit-content;
@@ -678,6 +683,11 @@ html[data-theme="dark"] .message-error {
 html[data-theme="dark"] .message-success {
     color: var(--color-success-text);
     background: var(--color-success-bg);
+}
+
+html[data-theme="dark"] .message-warning {
+    color: var(--color-warning-text);
+    background: var(--color-warning-bg);
 }
 
 html[data-theme="dark"] .site-home__feature h3,

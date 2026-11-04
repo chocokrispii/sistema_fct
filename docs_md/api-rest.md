@@ -100,7 +100,7 @@ Ejemplo de error:
 | PATCH | `/ofertas/{id}` | Administrador aprueba o rechaza una oferta pendiente. |
 | GET | `/convenios` y `/convenios/{id}` | Administrador, Coordinador y Observador consultan; Empresa solo sus convenios. No expone la ruta del PDF. |
 | POST | `/convenios` | Empresa registra un convenio mediante `multipart/form-data`; el PDF se analiza con ClamAV y se almacena fuera de la carpeta pública. |
-| PATCH | `/convenios/{id}` | Administrador revisa un convenio pendiente. |
+| PATCH | `/convenios/{id}` | Administrador puede rechazar un convenio pendiente; la aprobación debe hacerse desde el flujo MVC con firma electrónica. |
 | GET | `/asignaciones` y `/asignaciones/{id}` | Administrador, Coordinador y Observador consultan; Alumno ve sus asignaciones y Empresa las de sus ofertas. |
 | POST | `/asignaciones` | Administrador o Coordinador asigna un alumno que cumpla las reglas actuales de disponibilidad, ciclo y cupo. |
 | PATCH | `/asignaciones/{id}` | Administrador o Coordinador cierra una asignación activa. |
@@ -109,8 +109,10 @@ Ejemplo de error:
 
 `public/api.php` y `routes/web.php` aplican sus permisos por separado. En la
 implementación actual, tanto las rutas API `PATCH /ofertas/{id}` y
-`PATCH /convenios/{id}` como las acciones MVC `POST revisar-oferta` y
-`POST resolver-convenio` reservan la revisión a Administrador.
+`PATCH /convenios/{id}` como las acciones MVC de revisión reservan la revisión
+a Administrador. La API solo permite rechazar convenios; una aprobación por API
+responde `409 electronic_signature_required` porque exige crear y auditar la
+copia PDF sellada desde el panel de firma electrónica.
 
 El Observador recibe vistas anonimizadas en las pantallas MVC, pero las
 respuestas REST actuales de `GET /alumnos` incluyen nombre, apellidos y correo,
@@ -231,9 +233,12 @@ Invoke-RestMethod -Method Patch `
     -Headers $headers -ContentType 'application/json' -Body $companyUpdate
 ```
 
-Para aprobar una oferta o convenio, usa `PATCH` sobre su ruta de detalle con
-`{"estado":"Aprobada"}` o `{"estado":"Aprobado"}`. Para rechazar, el estado
-debe ser `Rechazada` o `Rechazado` y debe incluir `motivo`.
+Para aprobar una oferta, usa `PATCH` sobre su ruta de detalle con
+`{"estado":"Aprobada"}`. Los convenios se rechazan con
+`{"estado":"Rechazado","motivo":"..."}`; la aprobación de un convenio requiere
+el flujo MVC `POST firmar-convenio` para generar la copia sellada, actualizar
+el estado y registrar la auditoría. La aprobación de convenio por API responde
+`409 electronic_signature_required`.
 
 ## Códigos de respuesta y despliegue
 

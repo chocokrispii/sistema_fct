@@ -268,10 +268,110 @@ class Convenio
         return $row ?: null;
     }
 
+    public function obtenerPendienteParaFirma(int $id): ?array
+    {
+        if (!$this->db->inTransaction()) {
+            throw new LogicException('La revisión del convenio debe ejecutarse dentro de una transacción.');
+        }
+        $stmt = $this->db->prepare(
+            "SELECT c.*, e.nombre_empresa, u.email AS empresa_email
+             FROM convenios c
+             INNER JOIN empresas e ON e.id = c.empresa_id
+             INNER JOIN usuarios u ON u.id = e.usuario_id AND u.rol = 'Empresa'
+             WHERE c.id = :id
+             FOR UPDATE"
+        );
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function obtenerFirmadoParaEmpresa(int $id, int $usuarioId): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT c.*
+             FROM convenios c
+             INNER JOIN empresas e ON e.id = c.empresa_id
+             WHERE c.id = :id
+               AND e.usuario_id = :usuario
+               AND c.estado = 'Aprobado'
+               AND c.documento_firmado_path IS NOT NULL
+               AND c.hash_documento_firmado IS NOT NULL"
+        );
+        $stmt->execute(['id' => $id, 'usuario' => $usuarioId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function registrarFirma(
+        int $id,
+        string $storedName,
+        string $originalHash,
+        string $signedHash,
+        int $administratorId,
+        DateTimeImmutable $signedAtUtc
+    ): string {
+        if (!$this->db->inTransaction()) {
+            throw new LogicException('La firma del convenio debe ejecutarse dentro de una transacción.');
+        }
+        if (
+            preg_match('/\A[a-f0-9]{48}\.pdf\z/', $storedName) !== 1
+            || preg_match('/\A[a-f0-9]{64}\z/', $originalHash) !== 1
+            || preg_match('/\A[a-f0-9]{64}\z/', $signedHash) !== 1
+        ) {
+            throw new InvalidArgumentException('Los metadatos de firma del convenio no son válidos.');
+        }
+
+        $lock = $this->db->prepare(
+            'SELECT estado, documento_firmado_path FROM convenios WHERE id = :id FOR UPDATE'
+        );
+        $lock->execute(['id' => $id]);
+        $current = $lock->fetch(PDO::FETCH_ASSOC);
+        if (
+            !is_array($current)
+            || $current['estado'] !== 'Pendiente'
+            || $current['documento_firmado_path'] !== null
+        ) {
+            throw new DomainException('El convenio no existe o ya no está pendiente de aprobación.');
+        }
+
+        $update = $this->db->prepare(
+            "UPDATE convenios
+             SET estado = 'Aprobado',
+                 documento_firmado_path = :archivo,
+                 hash_documento_original = :hash_original,
+                 hash_documento_firmado = :hash_firmado,
+                 firma_aprobada_por = :administrador,
+                 firmada_en_utc = :firmada_en,
+                 revisado_por = :administrador_revision,
+                 revisado_en = UTC_TIMESTAMP()
+             WHERE id = :id
+               AND estado = 'Pendiente'
+               AND documento_firmado_path IS NULL"
+        );
+        $update->execute([
+            'archivo' => $storedName,
+            'hash_original' => $originalHash,
+            'hash_firmado' => $signedHash,
+            'administrador' => $administratorId,
+            'firmada_en' => $signedAtUtc->format('Y-m-d H:i:s.u'),
+            'administrador_revision' => $administratorId,
+            'id' => $id,
+        ]);
+        if ($update->rowCount() !== 1) {
+            throw new DomainException('No se pudo completar la firma; el convenio permanece pendiente.');
+        }
+
+        return (string)$current['estado'];
+    }
+
     public function resolver(int $id, string $estado, string $motivo, int $usuarioId): bool
     {
         if (!in_array($estado, ['Aprobado', 'Rechazado'], true)) {
             throw new InvalidArgumentException('Estado de revisión de convenio no válido.');
+        }
+        if ($estado === 'Aprobado') {
+            throw new LogicException('Un convenio solo puede aprobarse mediante el flujo de firma electrónica.');
         }
         $stmt = $this->db->prepare(
             "UPDATE convenios SET estado = :estado, motivo_revision = :motivo,
@@ -300,11 +400,25 @@ class Convenio
         if (!isset($permitidos[$estado])) {
             throw new InvalidArgumentException('La transición de estado no es válida.');
         }
-        $stmt = $this->db->prepare('SELECT estado FROM convenios WHERE id = :id FOR UPDATE');
+        $stmt = $this->db->prepare(
+            'SELECT estado, documento_firmado_path, hash_documento_firmado
+             FROM convenios WHERE id = :id FOR UPDATE'
+        );
         $stmt->execute(['id' => $id]);
-        $anterior = $stmt->fetchColumn();
-        if (!is_string($anterior) || !in_array($anterior, $permitidos[$estado], true)) {
+        $current = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($current) || !in_array($current['estado'], $permitidos[$estado], true)) {
             throw new DomainException('El convenio no existe o su estado ya no permite esta acción.');
+        }
+        if (
+            $estado === 'Aprobado'
+            && (
+                !is_string($current['documento_firmado_path'])
+                || preg_match('/\A[a-f0-9]{48}\.pdf\z/', $current['documento_firmado_path']) !== 1
+                || !is_string($current['hash_documento_firmado'])
+                || preg_match('/\A[a-f0-9]{64}\z/', $current['hash_documento_firmado']) !== 1
+            )
+        ) {
+            throw new LogicException('Un convenio solo puede aprobarse mediante el flujo de firma electrónica.');
         }
         $update = $this->db->prepare(
             'UPDATE convenios
@@ -321,7 +435,7 @@ class Convenio
         if ($update->rowCount() !== 1) {
             throw new DomainException('No se pudo actualizar el estado del convenio.');
         }
-        return $anterior;
+        return (string)$current['estado'];
     }
 
     private static function esFechaValida(string $value): bool

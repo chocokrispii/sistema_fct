@@ -329,11 +329,11 @@ Si el entorno existente no encuentra las clases de Excel o PDF, instala las depe
 docker compose exec -T app composer install --no-interaction --prefer-dist --no-dev
 ```
 
-En desarrollo, con el transporte Mailpit configurado, consulta los correos de activación en <http://localhost:8025>. Estos mensajes quedan en el buzón local; no se entregan a los destinatarios externos. La excepción de activación por HTTP requiere `APP_ENV=development`, `FCT_APP_URL=http://localhost:8080`, `FCT_MAIL_TRANSPORT=mailpit`, `FCT_MAIL_HOST=mailpit`, `FCT_MAIL_PORT=1025`, `FCT_MAIL_ENCRYPTION=none` y un `FCT_MAIL_FROM` válido. Tras modificar `.env`, recrea `app` para cargar los valores nuevos.
+En desarrollo, con el transporte Mailpit configurado, consulta los correos de activación y aprobación de convenios en <http://localhost:8025>. Estos mensajes quedan en el buzón local; no se entregan a los destinatarios externos. La excepción de activación por HTTP requiere `APP_ENV=development`, `FCT_APP_URL=http://localhost:8080`, `FCT_MAIL_TRANSPORT=mailpit`, `FCT_MAIL_HOST=mailpit`, `FCT_MAIL_PORT=1025`, `FCT_MAIL_ENCRYPTION=none` y un `FCT_MAIL_FROM` válido. Tras modificar `.env`, recrea `app` para cargar los valores nuevos.
 
 ### Habilitar el archivo de convenios en una base existente
 
-La vista unificada `index.php?action=gestionar-convenios` reúne pendientes, aprobados, rechazados y archivados, con filtros por NIF, estado y fecha de registro, y paginación. Las rutas `revisar-convenios` y `archivo-convenios` acceden a la misma vista. Las descargas siguen pasando por la ruta autorizada y el almacenamiento privado.
+La vista unificada `index.php?action=gestionar-convenios` reúne pendientes, aprobados, rechazados y archivados, con filtros por NIF, estado y fecha de registro, y paginación. La aprobación crea una copia PDF con una hoja de aprobación electrónica simple que identifica al administrador, fecha UTC y hashes SHA-256; conserva el original, no afirma ser una firma cualificada y rechaza PDFs con firmas digitales previas detectables. La empresa recibe un enlace privado autenticado para descargar la copia desde su cuenta. Ambos documentos permanecen fuera de `public/`.
 
 En instalaciones existentes aplica `024_convenios_estado_archivado.sql` para añadir `Archivado` sin eliminar los estados ni los datos anteriores. Reiniciar los servicios no aplica migraciones a un volumen ya inicializado:
 
@@ -341,6 +341,15 @@ En instalaciones existentes aplica `024_convenios_estado_archivado.sql` para añ
 docker compose cp (Resolve-Path .\database\migrations\024_convenios_estado_archivado.sql).Path db:/tmp/migracion.sql
 'mariadb --user="$MARIADB_USER" --password="$MARIADB_PASSWORD" "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
 ```
+
+Después de migraciones hasta la 025, aplica `026_firma_electronica_convenios.sql` una vez para guardar el PDF sellado, hashes, administrador y fecha UTC:
+
+```powershell
+docker compose cp (Resolve-Path .\database\migrations\026_firma_electronica_convenios.sql).Path db:/tmp/migracion.sql
+'mariadb --user="$MARIADB_USER" --****** "$MARIADB_DATABASE" < /tmp/migracion.sql #' | docker compose exec -T db sh -s
+```
+
+La copia sellada incorpora una página de aprobación simple, no una firma electrónica cualificada ni un certificado digital. La auditoría registra el administrador, la IP y los hashes del archivo original y de la copia. Si el envío del correo falla tras confirmar la transacción, el convenio sigue aprobado y la empresa puede obtener el documento autenticándose en el portal.
 
 ## 6. Recorrido funcional: disponibilidad, matching y seguimiento
 
@@ -368,16 +377,18 @@ Administrador y Coordinador registran calificaciones de prácticas cerradas; se 
 | Coordinador | Seguimiento, asignaciones, cierre de prácticas, calificaciones y consultas; no aprueba ofertas o convenios mediante las rutas MVC. |
 | Observador | Sólo lectura, con datos anonimizados y sin documentos privados; `POST /logout` sólo invalida su sesión. |
 | Alumno | Su perfil, disponibilidad, asignaciones y calificaciones, más información de su empresa asignada. |
-| Empresa | Sus convenios, sedes y ofertas; no decide sus revisiones. |
+| Empresa | Sus convenios, sedes y ofertas; puede descargar desde su cuenta los convenios aprobados y sellados. No decide sus revisiones. |
 | Invitado | Inicio, registro, autenticación y recuperación; las áreas protegidas requieren sesión. |
 
 La revisión y el histórico de convenios se consultan desde una vista unificada
 (`index.php?action=gestionar-convenios`) con pestañas para pendientes,
 aprobados, rechazados y archivados, filtros por NIF y fecha de registro, y
 paginación. `revisar-convenios` y `archivo-convenios` siguen disponibles como
-accesos compatibles a esa vista. Solo Administrador puede aprobar, rechazar,
-archivar o descargar PDFs; cada transición queda auditada con estado anterior
-y nuevo. Los PDFs se conservan en almacenamiento privado fuera de `public/`.
+accesos compatibles a esa vista. Solo Administrador puede aprobar, rechazar o
+archivar; aprobar genera una copia con sello electrónico simple, registra en la
+auditoría la IP y los hashes SHA-256, y notifica a la empresa mediante un enlace
+autenticado. La empresa solo descarga copias de sus propios convenios aprobados.
+El original y la copia se conservan en almacenamiento privado fuera de `public/`.
 
 El botón de tema claro/oscuro sigue la preferencia del sistema si todavía no hay una elección guardada; al cambiarlo manualmente, la elección queda en el almacenamiento local del navegador.
 

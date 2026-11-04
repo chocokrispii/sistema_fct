@@ -31,7 +31,7 @@ El único POST disponible es `logout`, para invalidar la propia sesión; es una 
 |---|---|
 | Invitado | Inicio, registro, login y recuperación. El catálogo de ofertas requiere sesión y responde 403 a visitantes sin autenticar. |
 | Alumno | Expediente propio, edición de perfil, disponibilidad, asignaciones propias, calificaciones propias y datos de interés de su empresa asignada. No ve el catálogo general de ofertas ni expedientes de terceros. |
-| Empresa | Sus ofertas, convenios y sedes; puede consultar ofertas aprobadas. No decide sus revisiones. |
+| Empresa | Sus ofertas, convenios y sedes; puede descargar sus convenios aprobados y sellados desde una ruta autenticada. No decide sus revisiones. |
 | Coordinador | Consulta y seguimiento de ofertas/convenios, asignación y cierre de prácticas, calificaciones y consultas. No puede aprobar o rechazar ofertas ni convenios. |
 | Administrador | Gestión de usuarios y decisiones sobre ofertas/convenios; comparte la gestión de asignaciones y calificaciones. Es el único rol con acceso a la administración de integraciones: `integraciones` (consola API) y `api-tokens` (emisión y revocación de tokens). |
 | Observador | Solo lectura, con anonimización y sin acceso a documentos privados, según el alcance anterior. |
@@ -44,16 +44,20 @@ El listado general `GET ofertas` está limitado a cuentas autenticadas de empres
 
 ## Revisión y responsabilidades
 
-La lista `GET revisar-ofertas` permanece disponible para Administración y Coordinación. La gestión unificada de convenios (`GET gestionar-convenios`, y los accesos compatibles `GET revisar-convenios` / `GET archivo-convenios`) permite a Coordinación consultar solo la cola pendiente; Administración puede filtrar todos los estados. Las mutaciones `POST revisar-oferta`, `POST resolver-convenio` y `POST archivar-convenio` son exclusivas de Administrador; los controladores vuelven a comprobar el rol para evitar decisiones fuera de la política aunque se invoquen directamente.
+La lista `GET revisar-ofertas` permanece disponible para Administración y Coordinación. La gestión unificada de convenios (`GET gestionar-convenios`, y los accesos compatibles `GET revisar-convenios` / `GET archivo-convenios`) permite a Coordinación consultar solo la cola pendiente; Administración puede filtrar todos los estados. Las mutaciones `POST firmar-convenio`, `POST resolver-convenio` y `POST archivar-convenio` son exclusivas de Administrador; los controladores vuelven a comprobar el rol para evitar decisiones fuera de la política aunque se invoquen directamente.
 
 La política de roles usa los nombres reales del esquema (`Administrador`, `Coordinador`, `Observador`, `Empresa`, `Alumno`). No se inventan roles `Director` ni `Guest` en la base de datos.
 
 El acceso `GET archivo-convenios` está reservado a Administrador y conserva
 compatibilidad con la vista unificada de cola e histórico. La vista filtra por
 estado, NIF y fechas de registro, pagina los resultados y muestra los eventos
-de auditoría. La descarga `GET descargar-convenio` también es exclusiva de
-Administrador; los PDF permanecen en almacenamiento privado. Las transiciones
-permitidas son Pendiente → Aprobado/Rechazado y Aprobado/Rechazado → Archivado.
+de auditoría. La aprobación genera una copia PDF con sello electrónico simple;
+no representa una firma cualificada. La descarga `GET descargar-convenio`
+permanece reservada a Administración y `GET descargar-convenio-firmado` permite
+a cada Empresa acceder únicamente a sus propias copias aprobadas. Los PDF se
+mantienen en almacenamiento privado. Las transiciones permitidas son Pendiente
+→ Aprobado/Rechazado y Aprobado/Rechazado → Archivado; aprobar exige generar
+el documento sellado y registrar hashes y auditoría.
 
 ## API tokenizada
 

@@ -9,6 +9,8 @@ require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/FileScanner.php';
 require_once __DIR__ . '/../Core/JsonResponse.php';
 require_once __DIR__ . '/../Core/PhpIni.php';
+require_once __DIR__ . '/../Core/ConvenioApprovalMailer.php';
+require_once __DIR__ . '/../Services/SimplePdfApprovalStampProvider.php';
 require_once __DIR__ . '/../../config/storage.php';
 
 class ConvenioController
@@ -245,6 +247,11 @@ class ConvenioController
         $this->ejecutarTransicion(['Aprobado']);
     }
 
+    public function firmar(): void
+    {
+        $this->ejecutarTransicion(['Aprobado']);
+    }
+
     public function rechazar(): void
     {
         $this->ejecutarTransicion(['Rechazado']);
@@ -318,6 +325,11 @@ class ConvenioController
             }
             throw new InvalidArgumentException('El motivo de revisión no puede superar los 500 caracteres.');
         }
+        if ($decision === 'Aprobado') {
+            $this->firmarConvenio((int)$id, $jsonRequest);
+            return;
+        }
+
         $this->db->beginTransaction();
         try {
             $estadoAnterior = $this->convenioModel->transicionar(
@@ -366,6 +378,229 @@ class ConvenioController
             $decision === 'Archivado' ? 'archivado' : 'pendiente_revision'
         ));
         exit;
+    }
+
+    private function firmarConvenio(int $id, bool $jsonRequest): void
+    {
+        $administratorId = filter_var(
+            $_SESSION['usuario_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        if ($administratorId === false) {
+            http_response_code(403);
+            if ($jsonRequest) {
+                JsonResponse::failure('La sesión de administrador no es válida.', 403);
+                return;
+            }
+            throw new RuntimeException('La sesión de administrador no es válida.');
+        }
+
+        $temporaryPath = null;
+        $signedPath = null;
+        $commitAttempted = false;
+        try {
+            $this->db->beginTransaction();
+            $convenio = $this->convenioModel->obtenerPendienteParaFirma($id);
+            if ($convenio === null || $convenio['estado'] !== 'Pendiente') {
+                throw new DomainException('El convenio no existe o ya no está pendiente de aprobación.');
+            }
+            if (!is_string($convenio['empresa_email']) || !filter_var($convenio['empresa_email'], FILTER_VALIDATE_EMAIL)) {
+                throw new DomainException('La empresa no tiene un correo válido para recibir el enlace privado. El convenio sigue pendiente.');
+            }
+
+            $sourcePath = $this->resolverRutaConvenioPrivada((string)$convenio['archivo_path']);
+            $originalHash = hash_file('sha256', $sourcePath);
+            if (!is_string($originalHash)) {
+                throw new RuntimeException('No se pudo calcular el hash del documento original.');
+            }
+            $administratorName = $this->obtenerNombreAdministrador((int)$administratorId);
+            $signedAtUtc = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+            $storageDirectory = dirname($sourcePath);
+            $temporaryPath = tempnam($storageDirectory, '.firma-convenio-');
+            if (!is_string($temporaryPath)) {
+                throw new RuntimeException('No se pudo crear el archivo temporal de la firma.');
+            }
+            $resolvedTemporaryPath = realpath($temporaryPath);
+            if ($resolvedTemporaryPath === false || dirname($resolvedTemporaryPath) !== $storageDirectory) {
+                if (is_file($temporaryPath) && !unlink($temporaryPath)) {
+                    error_log('No se pudo retirar un archivo temporal de firma fuera del almacenamiento privado.');
+                }
+                throw new RuntimeException('El archivo temporal de la firma quedó fuera del almacenamiento privado.');
+            }
+            $temporaryPath = $resolvedTemporaryPath;
+
+            (new SimplePdfApprovalStampProvider())->stampApproval(
+                $sourcePath,
+                $temporaryPath,
+                (string)$convenio['numero_convenio'],
+                (int)$administratorId,
+                $administratorName,
+                $signedAtUtc,
+                $originalHash
+            );
+            $signedHash = hash_file('sha256', $temporaryPath);
+            $size = filesize($temporaryPath);
+            $handle = fopen($temporaryPath, 'rb');
+            $signature = $handle === false ? false : fread($handle, 5);
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            if (
+                !is_string($signedHash)
+                || $size === false
+                || $size < 1
+                || $signature !== '%PDF-'
+            ) {
+                throw new RuntimeException('El PDF sellado no pasó la validación de integridad.');
+            }
+
+            $storedName = bin2hex(random_bytes(24)) . '.pdf';
+            $signedPath = $storageDirectory . DIRECTORY_SEPARATOR . $storedName;
+            if (
+                file_exists($signedPath)
+                || !rename($temporaryPath, $signedPath)
+                || !chmod($signedPath, 0600)
+            ) {
+                throw new RuntimeException('No se pudo guardar el PDF sellado en el almacenamiento privado.');
+            }
+            $temporaryPath = null;
+
+            $estadoAnterior = $this->convenioModel->registrarFirma(
+                $id,
+                $storedName,
+                $originalHash,
+                $signedHash,
+                (int)$administratorId,
+                $signedAtUtc
+            );
+            (new Auditoria($this->db))->registrar(
+                (int)$administratorId,
+                'convenio.firmado.aprobado',
+                'convenios',
+                $id,
+                'admin_id=' . (int)$administratorId
+                    . ';timestamp_utc=' . $signedAtUtc->format('Y-m-d\TH:i:s\Z')
+                    . ';document_hash_pre_signature=' . $originalHash
+                    . ';document_hash_post_signature=' . $signedHash
+                    . ';estado_anterior=' . $estadoAnterior
+                    . ';estado_nuevo=Aprobado'
+            );
+
+            $commitAttempted = true;
+            $this->db->commit();
+        } catch (DomainException $exception) {
+            $transactionActive = $this->db->inTransaction();
+            $this->rollbackFirma($temporaryPath, $signedPath, $transactionActive || !$commitAttempted);
+            if ($jsonRequest) {
+                JsonResponse::failure($exception->getMessage(), 409);
+                return;
+            }
+            header('Location: index.php?action=revisar-convenios&firma=error');
+            exit;
+        } catch (Throwable $exception) {
+            $transactionActive = $this->db->inTransaction();
+            $this->rollbackFirma($temporaryPath, $signedPath, $transactionActive || !$commitAttempted);
+            error_log('Error al firmar convenio #' . $id . ': ' . $exception->getMessage());
+            if ($jsonRequest) {
+                JsonResponse::failure(
+                    'No se pudo completar la firma. El convenio permanece pendiente y el documento original se conserva.',
+                    500
+                );
+                return;
+            }
+            header('Location: index.php?action=revisar-convenios&firma=error');
+            exit;
+        }
+
+        $notificationSent = true;
+        try {
+            $appUrl = rtrim(getenv('FCT_APP_URL') ?: '', '/');
+            $downloadUrl = $appUrl . '/index.php?action=descargar-convenio-firmado&id=' . $id;
+            (new ConvenioApprovalMailer())->send(
+                (string)$convenio['empresa_email'],
+                (string)$convenio['nombre_empresa'],
+                (string)$convenio['numero_convenio'],
+                $downloadUrl
+            );
+        } catch (Throwable $exception) {
+            $notificationSent = false;
+            error_log('No se pudo notificar la aprobación del convenio #' . $id . ': ' . $exception->getMessage());
+        }
+
+        $message = $notificationSent
+            ? 'El convenio se ha aprobado y sellado. Se envió a la empresa un enlace privado para descargarlo.'
+            : 'El convenio se ha aprobado y sellado, pero no se pudo enviar el correo. La empresa puede descargarlo desde su cuenta.';
+        if ($jsonRequest) {
+            JsonResponse::success([
+                'message' => $message,
+                'estado' => 'Aprobado',
+                'notificacion_enviada' => $notificationSent,
+            ]);
+            return;
+        }
+        header(
+            'Location: index.php?action=revisar-convenios&firma='
+            . ($notificationSent ? 'completada' : 'correo_pendiente')
+        );
+        exit;
+    }
+
+    private function rollbackFirma(?string $temporaryPath, ?string $signedPath, bool $removeSignedFile): void
+    {
+        if ($this->db->inTransaction()) {
+            $this->db->rollBack();
+        }
+        $paths = $removeSignedFile ? [$temporaryPath, $signedPath] : [$temporaryPath];
+        foreach ($paths as $path) {
+            if (is_string($path) && is_file($path) && !unlink($path)) {
+                error_log('No se pudo retirar un archivo de firma de convenio tras una reversión.');
+            }
+        }
+    }
+
+    private function obtenerNombreAdministrador(int $administratorId): string
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COALESCE(
+                NULLIF(TRIM(CONCAT_WS(' ', NULLIF(nombre, ''), NULLIF(apellidos, ''))), ''),
+                email
+             )
+             FROM usuarios
+             WHERE id = :id AND rol = 'Administrador'
+             LIMIT 1"
+        );
+        $stmt->execute(['id' => $administratorId]);
+        $name = $stmt->fetchColumn();
+        if (!is_string($name) || trim($name) === '') {
+            throw new RuntimeException('No se pudo identificar al administrador que firma el convenio.');
+        }
+        return trim($name);
+    }
+
+    private function resolverRutaConvenioPrivada(string $storedName): string
+    {
+        if (preg_match('/\A[a-f0-9]{48}\.pdf\z/', $storedName) !== 1) {
+            throw new RuntimeException('La ruta almacenada del convenio no es válida.');
+        }
+        $storageRoot = realpath(fctStoragePath());
+        $base = $storageRoot === false
+            ? false
+            : realpath($storageRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'convenios');
+        $candidate = $base === false ? false : $base . DIRECTORY_SEPARATOR . $storedName;
+        $file = $candidate === false ? false : realpath($candidate);
+        if (
+            $base === false
+            || $candidate === false
+            || is_link($candidate)
+            || $file === false
+            || dirname($file) !== $base
+            || !is_file($file)
+            || !is_readable($file)
+        ) {
+            throw new RuntimeException('No se encontró el PDF original del convenio en el almacenamiento privado.');
+        }
+        return $file;
     }
 
     public function descargar(): void
@@ -468,6 +703,99 @@ class ConvenioController
         exit;
     }
 
+    public function descargarFirmado(): void
+    {
+        $userId = filter_var(
+            $_SESSION['usuario_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        if (($_SESSION['rol'] ?? null) !== 'Empresa' || $userId === false) {
+            $auditUserId = $userId === false ? null : (int)$userId;
+            (new Auditoria($this->db))->registrar(
+                $auditUserId,
+                'convenio.descarga_firmada.denegada',
+                'convenios',
+                null,
+                'motivo=rol_no_autorizado'
+            );
+            http_response_code(403);
+            throw new RuntimeException('Solo la empresa titular puede descargar el convenio aprobado.');
+        }
+        $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($id === false) {
+            http_response_code(400);
+            throw new InvalidArgumentException('El identificador del convenio no es válido.');
+        }
+        $convenio = $this->convenioModel->obtenerFirmadoParaEmpresa((int)$id, (int)$userId);
+        if ($convenio === null) {
+            (new Auditoria($this->db))->registrar(
+                (int)$userId,
+                'convenio.descarga_firmada.denegada',
+                'convenios',
+                (int)$id,
+                'motivo=no_disponible_o_no_autorizado'
+            );
+            http_response_code(404);
+            throw new RuntimeException('No se encontró un convenio aprobado disponible para esta cuenta.');
+        }
+
+        $file = $this->resolverRutaConvenioPrivada((string)$convenio['documento_firmado_path']);
+        $handle = fopen($file, 'rb');
+        if ($handle === false) {
+            http_response_code(500);
+            throw new RuntimeException('No se pudo abrir el convenio aprobado.');
+        }
+        $hashContext = hash_init('sha256');
+        $hashedBytes = hash_update_stream($hashContext, $handle);
+        $actualHash = hash_final($hashContext);
+        $fileMetadata = fstat($handle);
+        $size = is_array($fileMetadata) ? ($fileMetadata['size'] ?? false) : false;
+        $expectedHash = $convenio['hash_documento_firmado'] ?? null;
+        if (
+            !is_string($expectedHash)
+            || preg_match('/\A[a-f0-9]{64}\z/', $expectedHash) !== 1
+            || !hash_equals($expectedHash, $actualHash)
+            || !is_int($size)
+            || $hashedBytes !== $size
+            || $size < 1
+            || !rewind($handle)
+        ) {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            (new Auditoria($this->db))->registrar(
+                (int)$userId,
+                'convenio.integridad_firma.fallida',
+                'convenios',
+                (int)$id,
+                'motivo=hash_no_coincide'
+            );
+            http_response_code(500);
+            throw new RuntimeException('No se pudo verificar la integridad del convenio aprobado.');
+        }
+        (new Auditoria($this->db))->registrar(
+            (int)$userId,
+            'convenio.descarga_firmada',
+            'convenios',
+            (int)$id,
+            'resultado=autorizada'
+        );
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/pdf');
+        header('Content-Length: ' . $size);
+        header('Content-Disposition: attachment; filename="convenio-aprobado-' . (int)$id . '.pdf"');
+        header('Cache-Control: private, no-store, max-age=0');
+        header('Pragma: no-cache');
+        header('X-Content-Type-Options: nosniff');
+        fpassthru($handle);
+        fclose($handle);
+        exit;
+    }
+
     private function renderListado(string $estadoPredeterminado): void
     {
         $rol = $_SESSION['rol'] ?? null;
@@ -518,6 +846,17 @@ class ConvenioController
             'error' => $error,
             'puedeResolver' => $rol === 'Administrador',
             'esAdministrador' => $rol === 'Administrador',
+            'firmaResultado' => match ($_GET['firma'] ?? '') {
+                'completada' => 'El convenio se aprobó y selló; se envió el enlace privado a la empresa.',
+                'correo_pendiente' => 'El convenio se aprobó y selló, pero el correo no pudo enviarse. La empresa puede descargarlo desde su cuenta.',
+                'error' => 'No se pudo completar la firma. El convenio permanece pendiente y el documento original se conserva.',
+                default => '',
+            },
+            'firmaResultadoTipo' => match ($_GET['firma'] ?? '') {
+                'correo_pendiente' => 'warning',
+                'error' => 'error',
+                default => 'success',
+            },
         ]);
     }
 

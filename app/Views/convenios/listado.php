@@ -60,6 +60,11 @@ $tabs = [
         <a class="agreement-filters__reset" href="<?= $escape($tabAction . '&estado=' . rawurlencode($filtros['estado'])) ?>">Limpiar</a>
     </form>
 
+    <?php if (($firmaResultado ?? '') !== ''): ?>
+        <p class="message message-<?= $escape($firmaResultadoTipo ?? 'success') ?>" role="<?= ($firmaResultadoTipo ?? '') === 'error' ? 'alert' : 'status' ?>">
+            <?= $escape($firmaResultado) ?>
+        </p>
+    <?php endif; ?>
     <?php if ($error !== ''): ?>
         <p class="message message-error" role="alert"><?= $escape($error) ?></p>
     <?php elseif ($convenios === []): ?>
@@ -120,10 +125,11 @@ $tabs = [
                                     <span>Descarga reservada a administración</span>
                                 <?php endif; ?>
                                 <?php if ($puedeResolver && $item['estado'] === 'Pendiente'): ?>
-                                    <form method="POST" action="index.php?action=aprobar-convenio">
+                                    <form method="POST" action="index.php?action=firmar-convenio">
                                         <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">
                                         <input type="hidden" name="convenio_id" value="<?= $convenioId ?>">
-                                        <button type="submit">Aprobar</button>
+                                        <p>Se añadirá una hoja de aprobación electrónica simple. El original se conserva; el sello no es una firma cualificada.</p>
+                                        <button type="submit">Revisar y Firmar Convenio</button>
                                     </form>
                                     <form method="POST" action="index.php?action=rechazar-convenio">
                                         <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">

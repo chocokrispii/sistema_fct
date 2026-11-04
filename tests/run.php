@@ -43,6 +43,7 @@ function assertTrue(bool $condition, string $message): void
 }
 
 require_once __DIR__ . '/file_security.php';
+require_once __DIR__ . '/convenio_firma_pdf.php';
 require_once __DIR__ . '/branding.php';
 
 $db = getPDOConnection();
@@ -83,6 +84,11 @@ $required = [
     'fecha_nacimiento' => ['table' => 'alumnos', 'column' => 'fecha_nacimiento'],
     'turno' => ['table' => 'empresa_especialidades_plazas', 'column' => 'turno'],
     'especialidad_id' => ['table' => 'convenios', 'column' => 'especialidad_id'],
+    'convenio_pdf_firmado' => ['table' => 'convenios', 'column' => 'documento_firmado_path'],
+    'convenio_hash_original' => ['table' => 'convenios', 'column' => 'hash_documento_original'],
+    'convenio_hash_firmado' => ['table' => 'convenios', 'column' => 'hash_documento_firmado'],
+    'convenio_actor_firma' => ['table' => 'convenios', 'column' => 'firma_aprobada_por'],
+    'convenio_fecha_firma_utc' => ['table' => 'convenios', 'column' => 'firmada_en_utc'],
     'curso_alumno' => ['table' => 'alumnos', 'column' => 'curso'],
     'tipo_documento_alumno' => ['table' => 'alumnos', 'column' => 'tipo_documento'],
     'observaciones_administrativas_alumno' => ['table' => 'alumnos', 'column' => 'observaciones_administrativas'],
@@ -772,18 +778,36 @@ try {
     ]);
     $agreementId = (int)$db->lastInsertId();
     $createdAgreementId = $agreementId;
-    assertTrue(
-        (new Convenio($db))->resolver($agreementId, 'Aprobado', '', $createdUsers[3]),
-        'Un convenio pendiente debe poder aprobarse.'
-    );
-    (new Auditoria($db))->registrar(
-        $createdUsers[3],
-        'convenio.revisado',
-        'convenios',
-        $agreementId,
-        'estado=Aprobado'
-    );
     $agreementModel = new Convenio($db);
+    $signedAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    $db->beginTransaction();
+    try {
+        $previousState = $agreementModel->registrarFirma(
+            $agreementId,
+            str_repeat('a', 48) . '.pdf',
+            str_repeat('b', 64),
+            str_repeat('c', 64),
+            $createdUsers[4],
+            $signedAt
+        );
+        (new Auditoria($db))->registrar(
+            $createdUsers[4],
+            'convenio.firmado.aprobado',
+            'convenios',
+            $agreementId,
+            'estado_anterior=' . $previousState . ';estado_nuevo=Aprobado'
+        );
+        $db->commit();
+    } catch (Throwable $exception) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        throw $exception;
+    }
+    assertTrue(
+        $agreementModel->obtener($agreementId)['estado'] === 'Aprobado',
+        'Un convenio pendiente debe quedar aprobado tras registrar su firma y documento sellado.'
+    );
     $archivedAgreement = array_values(array_filter(
         $agreementModel->listarArchivo(),
         static fn(array $item): bool => (int)$item['id'] === $agreementId
@@ -791,7 +815,7 @@ try {
     assertTrue(
         $archivedAgreement !== null
             && $archivedAgreement['estado'] === 'Aprobado'
-            && $archivedAgreement['nombre_revisor'] === "Coordinadora Álvarez O'Connor",
+            && $archivedAgreement['nombre_revisor'] === $emails[4],
         'El archivo debe mostrar el convenio aprobado y su revisor.'
     );
     assertTrue(

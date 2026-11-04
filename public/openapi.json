@@ -249,13 +249,14 @@
       },
       "patch": {
         "tags": ["Convenios"],
-        "summary": "Revisar un convenio",
-        "description": "Revisa un convenio pendiente según los permisos API configurados.",
+        "summary": "Rechazar un convenio pendiente",
+        "description": "La API permite rechazar un convenio pendiente. La aprobación requiere el flujo MVC de firma electrónica del Administrador.",
         "requestBody": {"$ref": "#/components/requestBodies/JsonObject"},
         "responses": {
           "200": {"$ref": "#/components/responses/Success"},
           "401": {"$ref": "#/components/responses/Unauthorized"},
           "403": {"$ref": "#/components/responses/Forbidden"},
+          "409": {"$ref": "#/components/responses/Conflict"},
           "404": {"$ref": "#/components/responses/NotFound"},
           "422": {"$ref": "#/components/responses/ValidationError"}
         }
@@ -385,6 +386,14 @@
       },
       "Forbidden": {
         "description": "El rol del token no permite esta operación.",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+          }
+        }
+      },
+      "Conflict": {
+        "description": "La aprobación requiere firma electrónica desde el panel MVC.",
         "content": {
           "application/json": {
             "schema": {"$ref": "#/components/schemas/ErrorResponse"}

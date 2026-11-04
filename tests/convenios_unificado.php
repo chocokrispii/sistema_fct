@@ -30,10 +30,13 @@ $routes = require __DIR__ . '/../routes/web.php';
 assertConvenios(
     ($routes['aprobar-convenio']['method'] ?? null) === 'POST'
         && ($routes['aprobar-convenio']['roles'] ?? null) === ['Administrador']
+        && ($routes['firmar-convenio']['method'] ?? null) === 'POST'
+        && ($routes['firmar-convenio']['roles'] ?? null) === ['Administrador']
         && ($routes['rechazar-convenio']['roles'] ?? null) === ['Administrador']
         && ($routes['archivar-convenio']['roles'] ?? null) === ['Administrador']
-        && ($routes['descargar-convenio']['roles'] ?? null) === ['Administrador'],
-    'Las transiciones y descargas deben estar limitadas a Administrador mediante POST/GET según corresponda.'
+        && ($routes['descargar-convenio']['roles'] ?? null) === ['Administrador']
+        && ($routes['descargar-convenio-firmado']['roles'] ?? null) === ['Empresa'],
+    'La firma debe ser POST de Administrador y la descarga firmada debe quedar limitada a Empresa.'
 );
 $cycleId = (int)$db->query('SELECT id FROM especialidades WHERE activo = 1 ORDER BY id LIMIT 1')->fetchColumn();
 if ($cycleId < 1) {
@@ -48,7 +51,7 @@ try {
     $createUser = $db->prepare(
         'INSERT INTO usuarios (email, password_hash, rol) VALUES (:email, :password, :rol)'
     );
-    foreach (['Empresa', 'Coordinador'] as $role) {
+    foreach (['Empresa', 'Coordinador', 'Administrador'] as $role) {
         $createUser->execute([
             'email' => strtolower($role) . "-$fixture@example.test",
             'password' => password_hash('TestPassword123!', PASSWORD_DEFAULT),
@@ -97,14 +100,43 @@ try {
     );
 
     $db->beginTransaction();
+    $approvalBlockedWithoutSignature = false;
     try {
-        $previousState = $model->transicionar($agreementId, 'Aprobado', '', $userIds['Coordinador']);
+        $model->transicionar($agreementId, 'Aprobado', '', $userIds['Administrador']);
+    } catch (LogicException) {
+        $approvalBlockedWithoutSignature = true;
+    } finally {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+    }
+    assertConvenios(
+        $approvalBlockedWithoutSignature,
+        'Un convenio no debe aprobarse si no existe un documento sellado y su hash.'
+    );
+
+    $db->beginTransaction();
+    try {
+        $signedAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $previousState = $model->registrarFirma(
+            $agreementId,
+            str_repeat('a', 48) . '.pdf',
+            str_repeat('b', 64),
+            str_repeat('c', 64),
+            $userIds['Administrador'],
+            $signedAt
+        );
         (new Auditoria($db))->registrar(
-            $userIds['Coordinador'],
-            'convenio.revisado',
+            $userIds['Administrador'],
+            'convenio.firmado.aprobado',
             'convenios',
             $agreementId,
-            'estado_anterior=' . $previousState . ';estado_nuevo=Aprobado'
+            'admin_id=' . $userIds['Administrador']
+                . ';timestamp_utc=' . $signedAt->format('Y-m-d\TH:i:s\Z')
+                . ';document_hash_pre_signature=' . str_repeat('b', 64)
+                . ';document_hash_post_signature=' . str_repeat('c', 64)
+                . ';estado_anterior=' . $previousState
+                . ';estado_nuevo=Aprobado'
         );
         $db->commit();
     } catch (Throwable $exception) {
@@ -113,6 +145,18 @@ try {
         }
         throw $exception;
     }
+    $signed = $model->obtenerFirmadoParaEmpresa($agreementId, $userIds['Empresa']);
+    $notOwnedSigned = $model->obtenerFirmadoParaEmpresa($agreementId, $userIds['Administrador']);
+    assertConvenios(
+        is_array($signed)
+            && $signed['estado'] === 'Aprobado'
+            && $signed['hash_documento_original'] === str_repeat('b', 64)
+            && $signed['hash_documento_firmado'] === str_repeat('c', 64)
+            && (int)$signed['firma_aprobada_por'] === $userIds['Administrador']
+            && $signed['firmada_en_utc'] !== null
+            && $notOwnedSigned === null,
+        'El documento sellado debe registrar hashes/actor/UTC y limitarse a la empresa titular.'
+    );
 
     $db->beginTransaction();
     try {
