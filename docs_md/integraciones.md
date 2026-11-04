@@ -16,11 +16,17 @@ npm run docs:build
 
 ## Acceso a Integraciones
 
+La función está desactivada por defecto para la entrega al cliente. Con
+`FCT_INTEGRATIONS_ENABLED=false` no aparece en los menús, sus rutas de
+administración no están disponibles y la API REST tokenizada responde 404.
+
 - Aplicación local XAMPP: `http://127.0.0.1:8002/index.php?action=integraciones`
 - Aplicación Docker: `http://localhost:8080/index.php?action=integraciones`
 
-La pestaña está reservada para el rol Administrador. La autorización se
-comprueba también en el servidor.
+Una persona técnica puede activarla en `.env` con
+`FCT_INTEGRATIONS_ENABLED=true` y recrear el servicio `app`. Cuando está
+habilitada, la pestaña queda reservada al rol Administrador y el servidor
+vuelve a comprobar la autorización.
 
 **Importante:** `GET` consulta datos. `POST` y `PATCH` pueden guardar cambios permanentes en la base de datos compartida; comprueba el JSON y marca la confirmación antes de enviarlos. No introduzcas datos personales ni uses escrituras como si fueran pruebas reversibles.
 

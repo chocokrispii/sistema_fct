@@ -13,7 +13,7 @@ interface NavigationTab {
     items: NavigationItem[];
 }
 
-const props = defineProps<{ role?: string }>();
+const props = defineProps<{ role?: string; integrationsEnabled?: string }>();
 const navigation = useNavigationStore();
 
 const tabsByRole: Record<string, NavigationTab[]> = {
@@ -42,7 +42,15 @@ const tabsByRole: Record<string, NavigationTab[]> = {
     ],
 };
 
-const tabs = computed(() => tabsByRole[props.role || ''] || []);
+const tabs = computed(() => {
+    const roleTabs = tabsByRole[props.role || ''] || [];
+    if (props.role !== 'Administrador' || props.integrationsEnabled === 'true') {
+        return roleTabs;
+    }
+    return roleTabs.map((tab) => tab.id === 'configuracion'
+        ? { ...tab, items: tab.items.filter((item) => item.action !== 'integraciones') }
+        : tab);
+});
 const selectedTab = computed(() => tabs.value.find((tab) => tab.id === navigation.activeTab) || tabs.value[0]);
 
 const currentAction = new URLSearchParams(window.location.search).get('action') || 'inicio';

@@ -1,9 +1,11 @@
 <?php
 /** @var string $contenido HTML generado por el controlador */
 require_once __DIR__ . '/../../Models/BrandingSettings.php';
+require_once __DIR__ . '/../../Core/IntegrationFeature.php';
 $rolActual = $_SESSION['rol'] ?? null;
 $usuarioAutenticado = $rolActual !== null;
 $marcaPortal = (new BrandingSettings())->get();
+$integrationsEnabled = IntegrationFeature::isEnabled();
 $pendientesReenvioActivacion = 0;
 if ($rolActual === 'Administrador') {
     $pendientesReenvioActivacion = (int)getPDOConnection()->query(
@@ -58,7 +60,7 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
             </summary>
             <nav class="site-navigation" aria-label="Navegación principal">
                 <?php if ($usuarioAutenticado): ?>
-                    <div data-vue-island="TabNavigation" data-prop-role="<?= htmlspecialchars((string)$rolActual, ENT_QUOTES, 'UTF-8') ?>"></div>
+                    <div data-vue-island="TabNavigation" data-prop-role="<?= htmlspecialchars((string)$rolActual, ENT_QUOTES, 'UTF-8') ?>" data-prop-integrations-enabled="<?= $integrationsEnabled ? 'true' : 'false' ?>"></div>
                 <?php endif; ?>
                 <div class="site-navigation__links site-navigation__links--fallback">
             <a href="index.php">Inicio</a>
@@ -89,7 +91,7 @@ $themeIsland = '<div data-vue-island="ThemeToggle"></div>';
                     </a>
                     <a href="index.php?action=ciclos">Ciclos formativos</a>
                     <a href="index.php?action=diseno">Diseño</a>
-                    <a href="index.php?action=integraciones">Integraciones</a>
+                    <?php if ($integrationsEnabled): ?><a href="index.php?action=integraciones">Integraciones</a><?php endif; ?>
                 <?php endif; ?>
             <?php elseif ($rolActual === 'Observador'): ?>
                 <a href="index.php?action=asignaciones">Consulta de asignaciones</a>

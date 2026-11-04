@@ -23,4 +23,6 @@ SOURCE /fct-database/migrations/021_documentacion_cierre_alumno.sql;
 SOURCE /fct-database/migrations/022_documentacion_inicio_asignacion.sql;
 SOURCE /fct-database/migrations/023_evaluacion_empresa.sql;
 SOURCE /fct-database/migrations/024_convenios_estado_archivado.sql;
+SOURCE /fct-database/migrations/025_marca_portal.sql;
+SOURCE /fct-database/migrations/026_webhook_outbox.sql;
 SOURCE /fct-database/seeds/001_sample_data.sql;

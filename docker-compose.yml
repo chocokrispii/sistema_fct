@@ -43,6 +43,8 @@ services:
       FCT_CLAMD_PORT: 3310
       FCT_VITE_DEV_SERVER: ${FCT_VITE_DEV_SERVER:-}
       FCT_APP_URL: ${FCT_APP_URL:-}
+      FCT_WEBHOOK_ENCRYPTION_KEY: ${FCT_WEBHOOK_ENCRYPTION_KEY:-}
+      FCT_INTEGRATIONS_ENABLED: ${FCT_INTEGRATIONS_ENABLED:-false}
       FCT_MATCH_MIN_OVERLAP_DAYS: ${FCT_MATCH_MIN_OVERLAP_DAYS:-1}
       FCT_MATCH_MIN_SCHEDULE_PERCENT: ${FCT_MATCH_MIN_SCHEDULE_PERCENT:-80}
       FCT_MAIL_HOST: ${FCT_MAIL_HOST:-smtp.gmail.com}
@@ -69,6 +71,26 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
+
+  webhook-worker:
+    profiles:
+      - webhooks
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["php", "bin/webhook-worker.php"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FCT_DB_HOST: db
+      FCT_DB_NAME: ${FCT_DB_NAME:-sistema_fct}
+      FCT_DB_USER: ${FCT_DB_USER:-fct}
+      FCT_DB_PASS: ${FCT_DB_PASS:-fct_local_dev}
+      FCT_WEBHOOK_ENCRYPTION_KEY: ${FCT_WEBHOOK_ENCRYPTION_KEY:-}
+    volumes:
+      - .:/var/www/html
     restart: unless-stopped
 
   db:
@@ -110,6 +132,7 @@ services:
       - ./database/migrations/023_evaluacion_empresa.sql:/docker-entrypoint-initdb.d/027-evaluacion-empresa.sql:ro
       - ./database/migrations/024_convenios_estado_archivado.sql:/docker-entrypoint-initdb.d/028-convenios-estado-archivado.sql:ro
       - ./database/migrations/025_marca_portal.sql:/docker-entrypoint-initdb.d/029-marca-portal.sql:ro
+      - ./database/migrations/026_webhook_outbox.sql:/docker-entrypoint-initdb.d/030-webhook-outbox.sql:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -146,8 +169,12 @@ services:
           AND COLUMN_NAME = 'tipo_documento')
             AND EXISTS (SELECT 1 FROM information_schema.TABLES
            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documentacion_cierre_fct')
-            AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
-           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asignaciones_fct' AND COLUMN_NAME = 'evaluacion_dictamen'), 1, 0)")" = "1"
+          AND EXISTS (SELECT 1 FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asignaciones_fct' AND COLUMN_NAME = 'evaluacion_dictamen')
+          AND EXISTS (SELECT 1 FROM information_schema.TABLES
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_subscriptions')
+          AND EXISTS (SELECT 1 FROM information_schema.TABLES
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_deliveries'), 1, 0)")" = "1"
       interval: 10s
       timeout: 5s
       retries: 10

@@ -7,6 +7,7 @@ require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/SpanishDataValidator.php';
 require_once __DIR__ . '/../Core/AccountActivationMailer.php';
 require_once __DIR__ . '/../Core/ActivationUrl.php';
+require_once __DIR__ . '/../Services/WebhookPublisher.php';
 
 class AlumnoAdminController
 {
@@ -95,6 +96,7 @@ class AlumnoAdminController
                             $observations,
                             $documentType
                         );
+                        WebhookPublisher::publish($this->db, 'alumno.alta', ['alumno_id' => $studentId]);
                         (new Auditoria($this->db))->registrar(
                             (int)$_SESSION['usuario_id'],
                             'alumno.creado_por_personal',
