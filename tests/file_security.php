@@ -36,7 +36,16 @@ assertFileSecurity(
 );
 $routes = require __DIR__ . '/../routes/web.php';
 assertFileSecurity(
-    $routes['descargar-convenio']['roles'] === ['Administrador'],
+    $routes['descargar-convenio']['roles'] === ['Administrador']
+        && $routes['firmar-convenio']['method'] === 'POST'
+        && $routes['firmar-convenio']['roles'] === ['Administrador']
+        && $routes['preparar-firma-autofirma']['roles'] === ['Administrador']
+        && $routes['completar-firma-autofirma']['roles'] === ['Administrador']
+        && $routes['firmar-convenio-mock']['roles'] === ['Administrador']
+        && $routes['verificar-prueba-autofirma']['method'] === 'POST'
+        && $routes['verificar-prueba-autofirma']['roles'] === ['Administrador']
+        && $routes['descargar-convenio-firmado']['method'] === 'GET'
+        && $routes['descargar-convenio-firmado']['roles'] === ['Administrador', 'Empresa'],
     'La matriz de acceso a convenios concede acceso a un rol no autorizado.'
 );
 assertFileSecurity(

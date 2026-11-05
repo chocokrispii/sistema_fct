@@ -28,5 +28,9 @@
     <td><?= EuropeanDate::periodBlock($item['fecha_inicio'], $item['fecha_fin']) ?></td>
     <td><?= htmlspecialchars($item['estado'], ENT_QUOTES, 'UTF-8') ?></td>
     <td><?= htmlspecialchars($item['motivo_revision'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-    <td><span>Descarga reservada a administración</span></td>
+    <td><?php if (($item['estado'] ?? '') === 'Aprobado' && ($item['firma_estado'] ?? '') === 'FIRMADO_Y_APROBADO' && !empty($item['documento_firmado_path'])): ?>
+        <a href="index.php?action=descargar-convenio-firmado&amp;id=<?= (int)$item['id'] ?>">Descargar convenio aprobado</a>
+        <?php elseif (($item['estado'] ?? '') === 'Aprobado'): ?><span>Firma PAdES pendiente de revalidación; contacta con administración.</span>
+        <?php else: ?><span>Descarga reservada a administración</span><?php endif; ?>
+    </td>
 </tr><?php endforeach; ?></tbody></table><?php endif; ?>

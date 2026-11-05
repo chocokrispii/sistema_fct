@@ -268,10 +268,185 @@ class Convenio
         return $row ?: null;
     }
 
+    public function obtenerPendienteParaFirma(int $id): ?array
+    {
+        if (!$this->db->inTransaction()) {
+            throw new LogicException('La revisión del convenio debe ejecutarse dentro de una transacción.');
+        }
+        $stmt = $this->db->prepare(
+            "SELECT c.*, e.nombre_empresa, u.email AS empresa_email
+             FROM convenios c
+             INNER JOIN empresas e ON e.id = c.empresa_id
+             INNER JOIN usuarios u ON u.id = e.usuario_id AND u.rol = 'Empresa'
+             WHERE c.id = :id
+             FOR UPDATE"
+        );
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function reservarFirma(int $id, int $usuarioId, string $token, DateTimeImmutable $expiresAt): bool
+    {
+        if (!$this->db->inTransaction()) {
+            throw new LogicException('La reserva de firma debe ejecutarse dentro de una transacción.');
+        }
+        if (preg_match('/\A[a-f0-9]{64}\z/', $token) !== 1) {
+            throw new InvalidArgumentException('El token de reserva de firma no es válido.');
+        }
+        $stmt = $this->db->prepare(
+            "UPDATE convenios
+             SET firma_estado = 'EN_PROCESO_FIRMA',
+                 firma_lease_token_hash = :token_hash,
+                 firma_lease_usuario_id = :usuario,
+                 firma_lease_expira_en = :expira
+             WHERE id = :id
+               AND estado = 'Pendiente'
+               AND (
+                    firma_estado = 'PENDIENTE_APROBACION'
+                    OR (firma_estado = 'EN_PROCESO_FIRMA' AND firma_lease_expira_en < UTC_TIMESTAMP(6))
+               )"
+        );
+        $stmt->execute([
+            'token_hash' => hash('sha256', $token),
+            'usuario' => $usuarioId,
+            'expira' => $expiresAt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s.u'),
+            'id' => $id,
+        ]);
+        if ($stmt->rowCount() !== 1) {
+            return false;
+        }
+        $audit = $this->db->prepare(
+            "INSERT INTO convenio_audit_logs (convenio_id, usuario_id, evento, detalle)
+             VALUES (:convenio, :usuario, 'EN_PROCESO_FIRMA', :detalle)"
+        );
+        $audit->execute([
+            'convenio' => $id,
+            'usuario' => $usuarioId,
+            'detalle' => json_encode([
+                'lease_expira_en_utc' => $expiresAt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.u\Z'),
+            ], JSON_THROW_ON_ERROR),
+        ]);
+        return true;
+    }
+
+    public function obtenerFirmadoParaEmpresa(int $id, int $usuarioId): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT c.*
+             FROM convenios c
+             INNER JOIN empresas e ON e.id = c.empresa_id
+             WHERE c.id = :id
+               AND e.usuario_id = :usuario
+               AND c.estado = 'Aprobado'
+               AND c.firma_estado = 'FIRMADO_Y_APROBADO'
+               AND c.documento_firmado_path IS NOT NULL
+               AND c.hash_documento_firmado IS NOT NULL"
+        );
+        $stmt->execute(['id' => $id, 'usuario' => $usuarioId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function obtenerFirmadoParaAdministrador(int $id): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT *
+             FROM convenios
+             WHERE id = :id
+               AND estado = 'Aprobado'
+               AND firma_estado = 'FIRMADO_Y_APROBADO'
+               AND documento_firmado_path IS NOT NULL
+               AND hash_documento_firmado IS NOT NULL"
+        );
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function registrarFirma(
+        int $id,
+        string $storedName,
+        string $originalHash,
+        string $signedHash,
+        int $administratorId,
+        DateTimeImmutable $signedAtUtc,
+        string $leaseToken
+    ): string {
+        if (!$this->db->inTransaction()) {
+            throw new LogicException('La firma del convenio debe ejecutarse dentro de una transacción.');
+        }
+        if (
+            preg_match('/\A[a-f0-9]{48}\.pdf\z/', $storedName) !== 1
+            || preg_match('/\A[a-f0-9]{64}\z/', $originalHash) !== 1
+            || preg_match('/\A[a-f0-9]{64}\z/', $signedHash) !== 1
+            || preg_match('/\A[a-f0-9]{64}\z/', $leaseToken) !== 1
+        ) {
+            throw new InvalidArgumentException('Los metadatos de firma del convenio no son válidos.');
+        }
+
+        $lock = $this->db->prepare(
+            'SELECT estado, documento_firmado_path, firma_estado, firma_lease_token_hash,
+                    firma_lease_usuario_id, firma_lease_expira_en
+             FROM convenios WHERE id = :id FOR UPDATE'
+        );
+        $lock->execute(['id' => $id]);
+        $current = $lock->fetch(PDO::FETCH_ASSOC);
+        if (
+            !is_array($current)
+            || $current['estado'] !== 'Pendiente'
+            || $current['documento_firmado_path'] !== null
+            || $current['firma_estado'] !== 'EN_PROCESO_FIRMA'
+            || !is_string($current['firma_lease_token_hash'])
+            || !hash_equals($current['firma_lease_token_hash'], hash('sha256', $leaseToken))
+            || (int)$current['firma_lease_usuario_id'] !== $administratorId
+            || !is_string($current['firma_lease_expira_en'])
+            || strtotime($current['firma_lease_expira_en'] . ' UTC') <= time()
+        ) {
+            throw new DomainException('El convenio no existe o ya no está pendiente de aprobación.');
+        }
+
+        $update = $this->db->prepare(
+            "UPDATE convenios
+             SET estado = 'Aprobado',
+                 firma_estado = 'FIRMADO_Y_APROBADO',
+                 firma_lease_token_hash = NULL,
+                 firma_lease_usuario_id = NULL,
+                 firma_lease_expira_en = NULL,
+                 documento_firmado_path = :archivo,
+                 hash_documento_original = :hash_original,
+                 hash_documento_firmado = :hash_firmado,
+                 firma_aprobada_por = :administrador,
+                 firmada_en_utc = :firmada_en,
+                 revisado_por = :administrador_revision,
+                 revisado_en = UTC_TIMESTAMP()
+             WHERE id = :id
+               AND estado = 'Pendiente'
+               AND documento_firmado_path IS NULL"
+        );
+        $update->execute([
+            'archivo' => $storedName,
+            'hash_original' => $originalHash,
+            'hash_firmado' => $signedHash,
+            'administrador' => $administratorId,
+            'firmada_en' => $signedAtUtc->format('Y-m-d H:i:s.u'),
+            'administrador_revision' => $administratorId,
+            'id' => $id,
+        ]);
+        if ($update->rowCount() !== 1) {
+            throw new DomainException('No se pudo completar la firma; el convenio permanece pendiente.');
+        }
+
+        return (string)$current['estado'];
+    }
+
     public function resolver(int $id, string $estado, string $motivo, int $usuarioId): bool
     {
         if (!in_array($estado, ['Aprobado', 'Rechazado'], true)) {
             throw new InvalidArgumentException('Estado de revisión de convenio no válido.');
+        }
+        if ($estado === 'Aprobado') {
+            throw new LogicException('Un convenio solo puede aprobarse mediante el flujo de firma electrónica.');
         }
         $stmt = $this->db->prepare(
             "UPDATE convenios SET estado = :estado, motivo_revision = :motivo,
@@ -300,11 +475,34 @@ class Convenio
         if (!isset($permitidos[$estado])) {
             throw new InvalidArgumentException('La transición de estado no es válida.');
         }
-        $stmt = $this->db->prepare('SELECT estado FROM convenios WHERE id = :id FOR UPDATE');
+        $stmt = $this->db->prepare(
+            'SELECT estado, documento_firmado_path, hash_documento_firmado,
+                    firma_estado, firma_lease_expira_en
+             FROM convenios WHERE id = :id FOR UPDATE'
+        );
         $stmt->execute(['id' => $id]);
-        $anterior = $stmt->fetchColumn();
-        if (!is_string($anterior) || !in_array($anterior, $permitidos[$estado], true)) {
+        $current = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($current) || !in_array($current['estado'], $permitidos[$estado], true)) {
             throw new DomainException('El convenio no existe o su estado ya no permite esta acción.');
+        }
+        if (
+            $estado === 'Rechazado'
+            && $current['firma_estado'] === 'EN_PROCESO_FIRMA'
+            && is_string($current['firma_lease_expira_en'])
+            && strtotime($current['firma_lease_expira_en'] . ' UTC') > time()
+        ) {
+            throw new DomainException('No se puede rechazar el convenio mientras haya una firma en curso.');
+        }
+        if (
+            $estado === 'Aprobado'
+            && (
+                !is_string($current['documento_firmado_path'])
+                || preg_match('/\A[a-f0-9]{48}\.pdf\z/', $current['documento_firmado_path']) !== 1
+                || !is_string($current['hash_documento_firmado'])
+                || preg_match('/\A[a-f0-9]{64}\z/', $current['hash_documento_firmado']) !== 1
+            )
+        ) {
+            throw new LogicException('Un convenio solo puede aprobarse mediante el flujo de firma electrónica.');
         }
         $update = $this->db->prepare(
             'UPDATE convenios
@@ -321,7 +519,7 @@ class Convenio
         if ($update->rowCount() !== 1) {
             throw new DomainException('No se pudo actualizar el estado del convenio.');
         }
-        return $anterior;
+        return (string)$current['estado'];
     }
 
     private static function esFechaValida(string $value): bool

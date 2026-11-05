@@ -36,6 +36,8 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      clamav:
+        condition: service_healthy
     environment:
       APP_ENV: ${APP_ENV:-production}
       FCT_DB_HOST: db
@@ -48,9 +50,16 @@ services:
       FCT_CLAMD_PORT: 3310
       FCT_VITE_DEV_SERVER: ${FCT_VITE_DEV_SERVER:-}
       FCT_APP_URL: ${FCT_APP_URL:-}
+      FCT_CONVENIO_SIGNATURE_MODE: ${FCT_CONVENIO_SIGNATURE_MODE:-}
+      FCT_AUTOFIRMA_NSS_DIR: /var/lib/fct/autofirma-nssdb
+      FCT_CONVENIO_MOCK_P12_PATH: /var/lib/fct/storage/autofirma-dev/firmante.p12
+      FCT_CONVENIO_MOCK_NSS_DIR: /var/lib/fct/storage/autofirma-dev/nssdb
+      FCT_CONVENIO_MOCK_P12_PASSWORD: ${FCT_CONVENIO_MOCK_P12_PASSWORD:-}
       FCT_WEBHOOK_ENCRYPTION_KEY: ${FCT_WEBHOOK_ENCRYPTION_KEY:-}
       FCT_INTEGRATIONS_ENABLED: ${FCT_INTEGRATIONS_ENABLED:-false}
+      FCT_MATCH_DATE_TOLERANCE_DAYS: ${FCT_MATCH_DATE_TOLERANCE_DAYS:-5}
       FCT_MATCH_MIN_OVERLAP_DAYS: ${FCT_MATCH_MIN_OVERLAP_DAYS:-1}
+      FCT_MATCH_MIN_PRACTICE_DAYS: ${FCT_MATCH_MIN_PRACTICE_DAYS:-1}
       FCT_MATCH_MIN_SCHEDULE_PERCENT: ${FCT_MATCH_MIN_SCHEDULE_PERCENT:-80}
       FCT_MAIL_HOST: ${FCT_MAIL_HOST:-smtp.gmail.com}
       FCT_MAIL_PORT: ${FCT_MAIL_PORT:-587}
@@ -61,11 +70,12 @@ services:
       FCT_MAIL_FROM: ${FCT_MAIL_FROM:-}
       FCT_MAIL_FROM_NAME: ${FCT_MAIL_FROM_NAME:-Sistema FCT}
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "127.0.0.1:${APP_PORT:-8080}:80"
     volumes:
       - .:/var/www/html
       - fct_storage:/var/lib/fct/storage
       - composer_vendor:/var/www/html/vendor
+      - ${FCT_AUTOFIRMA_NSS_PATH:-./storage/autofirma-nssdb}:/var/lib/fct/autofirma-nssdb:ro
     healthcheck:
       test:
         - CMD
@@ -137,9 +147,11 @@ services:
       - ./database/migrations/023_evaluacion_empresa.sql:/docker-entrypoint-initdb.d/027-evaluacion-empresa.sql:ro
       - ./database/migrations/024_convenios_estado_archivado.sql:/docker-entrypoint-initdb.d/028-convenios-estado-archivado.sql:ro
       - ./database/migrations/025_marca_portal.sql:/docker-entrypoint-initdb.d/029-marca-portal.sql:ro
-      - ./database/migrations/026_webhook_outbox.sql:/docker-entrypoint-initdb.d/030-webhook-outbox.sql:ro
-      - ./database/migrations/027_marca_forma_logo.sql:/docker-entrypoint-initdb.d/031-marca-forma-logo.sql:ro
-      - ./database/migrations/027_ofertas_sede.sql:/docker-entrypoint-initdb.d/032-ofertas-sede.sql:ro
+      - ./database/migrations/026_firma_electronica_convenios.sql:/docker-entrypoint-initdb.d/030-firma-electronica-convenios.sql:ro
+      - ./database/migrations/026_webhook_outbox.sql:/docker-entrypoint-initdb.d/031-webhook-outbox.sql:ro
+      - ./database/migrations/027_marca_forma_logo.sql:/docker-entrypoint-initdb.d/032-marca-forma-logo.sql:ro
+      - ./database/migrations/027_ofertas_sede.sql:/docker-entrypoint-initdb.d/033-ofertas-sede.sql:ro
+      - ./database/migrations/027_convenio_firma_concurrencia_auditoria.sql:/docker-entrypoint-initdb.d/034-convenio-firma-concurrencia-auditoria.sql:ro
     healthcheck:
       test:
         - CMD-SHELL

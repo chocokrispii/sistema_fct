@@ -62,6 +62,16 @@ if ($esAdministrador) {
         <a class="agreement-filters__reset" href="<?= $escape($tabAction . '&estado=' . rawurlencode($filtros['estado'])) ?>">Limpiar</a>
     </form>
 
+    <?php if (($firmaResultado ?? '') !== ''): ?>
+        <p class="message message-<?= $escape($firmaResultadoTipo ?? 'success') ?>" role="<?= ($firmaResultadoTipo ?? '') === 'error' ? 'alert' : 'status' ?>">
+            <?= $escape($firmaResultado) ?>
+        </p>
+    <?php endif; ?>
+    <?php if ($signatureMode === 'test'): ?>
+        <p>La firma real está desactivada en este entorno. <a href="index.php?action=probar-autofirma">Probar AutoFirma sin aprobar convenios</a>.</p>
+    <?php elseif ($signatureMode === 'disabled'): ?>
+        <p>La firma de convenios está desactivada en este entorno.</p>
+    <?php endif; ?>
     <?php if ($error !== ''): ?>
         <p class="message message-error" role="alert"><?= $escape($error) ?></p>
     <?php elseif ($convenios === []): ?>
@@ -117,16 +127,42 @@ if ($esAdministrador) {
                             </td>
                             <td class="agreement-actions">
                                 <?php if ($esAdministrador): ?>
-                                    <a href="index.php?action=descargar-convenio&amp;id=<?= $convenioId ?>">Descargar PDF</a>
-                                <?php else: ?>
+                                    <a href="index.php?action=descargar-convenio&amp;id=<?= $convenioId ?>">Descargar PDF original</a>
+                                    <?php if (
+                                        $item['estado'] === 'Aprobado'
+                                        && ($item['firma_estado'] ?? '') === 'FIRMADO_Y_APROBADO'
+                                        && !empty($item['documento_firmado_path'])
+                                    ): ?>
+                                        <a href="index.php?action=descargar-convenio-firmado&amp;id=<?= $convenioId ?>">Descargar PDF firmado</a>
+                                    <?php endif; ?>
+                                <?php elseif (!$puedeFirmar): ?>
                                     <span>Descarga reservada a administración</span>
                                 <?php endif; ?>
-                                <?php if ($puedeResolver && $item['estado'] === 'Pendiente'): ?>
-                                    <form method="POST" action="index.php?action=aprobar-convenio">
+                                <?php if ($puedeFirmar && $item['estado'] === 'Pendiente' && in_array($signatureMode, ['autofirma', 'mock'], true)): ?>
+                                    <form method="POST" enctype="multipart/form-data" action="index.php?action=<?= $signatureMode === 'mock' ? 'firmar-convenio-mock' : 'firmar-convenio' ?>">
                                         <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">
                                         <input type="hidden" name="convenio_id" value="<?= $convenioId ?>">
-                                        <button type="submit">Aprobar</button>
+                                        <?php if ($signatureMode === 'autofirma'): ?>
+                                            <label>Si la firma automática no está disponible, adjunta el PDF firmado con AutoFirma
+                                                <input name="documento_firmado" type="file" accept="application/pdf,.pdf">
+                                            </label>
+                                        <?php else: ?>
+                                            <p>Firma local de desarrollo con certificado de prueba. No tiene validez contractual.</p>
+                                        <?php endif; ?>
+                                        <div data-autofirma-island
+                                             data-vue-island="AutoFirmaAgreementSignature"
+                                             data-prop-csrf="<?= $escape(CsrfMiddleware::token()) ?>"
+                                             data-prop-convenio-id="<?= $convenioId ?>"
+                                             data-prop-mode="<?= $escape($signatureMode) ?>"></div>
+                                        <button type="submit" value="autofirma"><?= $signatureMode === 'mock' ? 'Firmar con certificado local de prueba' : 'Revisar y firmar con AutoFirma' ?></button>
+                                        <?php if ($signatureMode === 'autofirma'): ?>
+                                            <button class="button-secondary" type="submit" name="modo_firma" value="manual">Enviar PDF firmado manualmente</button>
+                                        <?php endif; ?>
                                     </form>
+                                <?php elseif ($puedeFirmar && $item['estado'] === 'Pendiente' && $signatureMode === 'test'): ?>
+                                    <p>Usa la prueba de AutoFirma; no aprobará este convenio.</p>
+                                <?php endif; ?>
+                                <?php if ($puedeResolver && $item['estado'] === 'Pendiente'): ?>
                                     <form method="POST" action="index.php?action=rechazar-convenio">
                                         <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">
                                         <input type="hidden" name="convenio_id" value="<?= $convenioId ?>">

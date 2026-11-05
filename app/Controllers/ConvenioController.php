@@ -9,6 +9,12 @@ require_once __DIR__ . '/../Models/Auditoria.php';
 require_once __DIR__ . '/../Core/FileScanner.php';
 require_once __DIR__ . '/../Core/JsonResponse.php';
 require_once __DIR__ . '/../Core/PhpIni.php';
+require_once __DIR__ . '/../Core/ConvenioApprovalMailer.php';
+require_once __DIR__ . '/../Core/ConvenioSignatureMode.php';
+require_once __DIR__ . '/../Services/PadesSignatureVerifier.php';
+require_once __DIR__ . '/../Services/AutoFirmaNativeStrategy.php';
+require_once __DIR__ . '/../Services/AutoFirmaMockStrategy.php';
+require_once __DIR__ . '/../Services/SignatureProviderFactory.php';
 require_once __DIR__ . '/../Services/WebhookPublisher.php';
 require_once __DIR__ . '/../../config/storage.php';
 
@@ -246,6 +252,637 @@ class ConvenioController
         $this->ejecutarTransicion(['Aprobado']);
     }
 
+    public function firmar(): void
+    {
+        if (!ConvenioSignatureMode::canUseAutoFirma()) {
+            $this->responderFirmaError(
+                'La aprobación solo puede completarse en modo AutoFirma nativo.',
+                409
+            );
+            return;
+        }
+
+        $id = filter_var($_POST['convenio_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $upload = $_FILES['documento_firmado'] ?? null;
+        if ($id === false || !is_array($upload)) {
+            $this->responderFirmaError(
+                'Firma el PDF original con AutoFirma y adjunta el PDF firmado para completar la aprobación.',
+                422
+            );
+            return;
+        }
+
+        try {
+            $leaseToken = bin2hex(random_bytes(32));
+            $this->db->beginTransaction();
+            $agreement = $this->convenioModel->obtenerPendienteParaFirma((int)$id);
+            if (
+                !is_array($agreement)
+                || $agreement['estado'] !== 'Pendiente'
+                || !$this->convenioModel->reservarFirma(
+                    (int)$id,
+                    (int)$_SESSION['usuario_id'],
+                    $leaseToken,
+                    new DateTimeImmutable('+10 minutes', new DateTimeZone('UTC'))
+                )
+            ) {
+                throw new DomainException('El convenio ya está siendo firmado o ya no está pendiente de aprobación.');
+            }
+            $this->db->commit();
+            $result = $this->finalizarFirmaAutofirma(
+                (int)$id,
+                (int)$_SESSION['usuario_id'],
+                $upload,
+                null,
+                $leaseToken
+            );
+            header(
+                'Location: index.php?action=revisar-convenios&firma='
+                . ($result['notificacion_enviada'] ? 'completada' : 'correo_pendiente')
+            );
+            exit;
+        } catch (DomainException $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            $this->responderFirmaError($exception->getMessage(), 409);
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Error al validar firma AutoFirma del convenio #' . (int)$id . ': ' . $exception->getMessage());
+            $this->responderFirmaError(
+                'No se pudo validar la firma PAdES. El convenio sigue pendiente y no se guardaron cambios.',
+                422
+            );
+        }
+    }
+
+    public function prepararFirmaAutofirma(): void
+    {
+        if (!ConvenioSignatureMode::canUseAutoFirma() || !$this->esFirmanteConvenio()) {
+            JsonResponse::failure('La firma AutoFirma no está habilitada para esta cuenta.', 403);
+            return;
+        }
+        if (JsonResponse::wantsJson()) {
+            $payload = $this->leerObjetoJson();
+            if ($payload === null) {
+                return;
+            }
+            $rawId = $payload->convenio_id ?? null;
+        } else {
+            $rawId = $_POST['convenio_id'] ?? null;
+        }
+        $id = filter_var($rawId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($id === false) {
+            JsonResponse::failure('El identificador del convenio no es válido.', 422);
+            return;
+        }
+
+        try {
+            $this->db->beginTransaction();
+            $convenio = $this->convenioModel->obtenerPendienteParaFirma((int)$id);
+            if ($convenio === null || $convenio['estado'] !== 'Pendiente') {
+                throw new DomainException('El convenio no existe o ya no está pendiente de aprobación.');
+            }
+            $challengeToken = bin2hex(random_bytes(32));
+            if (!$this->convenioModel->reservarFirma(
+                (int)$id,
+                (int)$_SESSION['usuario_id'],
+                $challengeToken,
+                new DateTimeImmutable('+10 minutes', new DateTimeZone('UTC'))
+            )) {
+                throw new DomainException('El convenio ya está siendo firmado por otra persona.');
+            }
+            $sourcePath = $this->resolverRutaConvenioPrivada((string)$convenio['archivo_path']);
+            $size = filesize($sourcePath);
+            $originalHash = hash_file('sha256', $sourcePath);
+            $document = file_get_contents($sourcePath);
+            if (
+                !is_int($size)
+                || $size < 1
+                || $size > 10 * 1024 * 1024
+                || !is_string($originalHash)
+                || !is_string($document)
+            ) {
+                throw new RuntimeException('El PDF original no está disponible para firmar.');
+            }
+            $this->db->commit();
+        } catch (DomainException $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            JsonResponse::failure($exception->getMessage(), 409);
+            return;
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('No se pudo preparar la firma AutoFirma del convenio #' . (int)$id . ': ' . $exception->getMessage());
+            JsonResponse::failure('No se pudo preparar el PDF para AutoFirma.', 500);
+            return;
+        }
+
+        $challenges = $_SESSION['autofirma_convenios'] ?? [];
+        if (!is_array($challenges)) {
+            $challenges = [];
+        }
+        $now = time();
+        foreach ($challenges as $token => $challenge) {
+            if (!is_array($challenge) || (int)($challenge['expires_at'] ?? 0) < $now) {
+                unset($challenges[$token]);
+            }
+        }
+        if (count($challenges) >= 5) {
+            array_shift($challenges);
+        }
+        $challenges[$challengeToken] = [
+            'convenio_id' => (int)$id,
+            'usuario_id' => (int)$_SESSION['usuario_id'],
+            'hash_original' => $originalHash,
+            'expires_at' => $now + 600,
+            'lease_token' => $challengeToken,
+        ];
+        $_SESSION['autofirma_convenios'] = $challenges;
+        JsonResponse::success([
+            'challenge' => $challengeToken,
+            'pdf_base64' => base64_encode($document),
+            'filename' => 'convenio-' . (int)$id . '.pdf',
+        ]);
+    }
+
+    public function completarFirmaAutofirma(): void
+    {
+        if (!ConvenioSignatureMode::canUseAutoFirma() || !$this->esFirmanteConvenio()) {
+            JsonResponse::failure('La firma AutoFirma no está habilitada para esta cuenta.', 403);
+            return;
+        }
+        $token = $_POST['challenge'] ?? null;
+        $challenges = $_SESSION['autofirma_convenios'] ?? [];
+        if (
+            !is_string($token)
+            || preg_match('/\A[a-f0-9]{64}\z/', $token) !== 1
+            || !is_array($challenges)
+            || !isset($challenges[$token])
+            || !is_array($challenges[$token])
+        ) {
+            JsonResponse::failure('La solicitud de firma ha caducado o no es válida. Vuelve a iniciar la firma.', 409);
+            return;
+        }
+        $challenge = $challenges[$token];
+        unset($challenges[$token]);
+        $_SESSION['autofirma_convenios'] = $challenges;
+        if (
+            (int)($challenge['usuario_id'] ?? 0) !== (int)$_SESSION['usuario_id']
+            || (int)($challenge['expires_at'] ?? 0) < time()
+            || !is_string($challenge['hash_original'] ?? null)
+        ) {
+            JsonResponse::failure('La solicitud de firma ha caducado o no es válida. Vuelve a iniciar la firma.', 409);
+            return;
+        }
+        $upload = $_FILES['documento_firmado'] ?? null;
+        if (!is_array($upload)) {
+            JsonResponse::failure('AutoFirma no devolvió un documento firmado.', 422);
+            return;
+        }
+
+        try {
+            $result = $this->finalizarFirmaAutofirma(
+                (int)$challenge['convenio_id'],
+                (int)$_SESSION['usuario_id'],
+                $upload,
+                $challenge['hash_original'],
+                $challenge['lease_token']
+            );
+            JsonResponse::success($result);
+        } catch (DomainException $exception) {
+            JsonResponse::failure($exception->getMessage(), 409);
+        } catch (Throwable $exception) {
+            error_log('Error al completar firma AutoFirma del convenio #' . (int)$challenge['convenio_id'] . ': ' . $exception->getMessage());
+            JsonResponse::failure(
+                'No se pudo validar la firma PAdES. El convenio sigue pendiente y no se guardaron cambios.',
+                422
+            );
+        }
+    }
+
+    public function firmarMock(): void
+    {
+        if (!ConvenioSignatureMode::canUseMockSignature() || !$this->esFirmanteConvenio()) {
+            JsonResponse::failure('La firma mock solo está habilitada en desarrollo o pruebas.', 403);
+            return;
+        }
+        if (JsonResponse::wantsJson()) {
+            $payload = $this->leerObjetoJson();
+            if ($payload === null) {
+                return;
+            }
+            $rawId = $payload->convenio_id ?? null;
+        } else {
+            $rawId = $_POST['convenio_id'] ?? null;
+        }
+        $id = filter_var($rawId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($id === false) {
+            JsonResponse::failure('El identificador del convenio no es válido.', 422);
+            return;
+        }
+
+        $temporaryPath = null;
+        try {
+            $leaseToken = bin2hex(random_bytes(32));
+            $this->db->beginTransaction();
+            $agreement = $this->convenioModel->obtenerPendienteParaFirma((int)$id);
+            if (
+                !is_array($agreement)
+                || $agreement['estado'] !== 'Pendiente'
+                || !$this->convenioModel->reservarFirma(
+                    (int)$id,
+                    (int)$_SESSION['usuario_id'],
+                    $leaseToken,
+                    new DateTimeImmutable('+10 minutes', new DateTimeZone('UTC'))
+                )
+            ) {
+                throw new DomainException('El convenio ya está siendo firmado o ya no está pendiente de aprobación.');
+            }
+            $sourcePath = $this->resolverRutaConvenioPrivada((string)$agreement['archivo_path']);
+            $originalHash = hash_file('sha256', $sourcePath);
+            if (!is_string($originalHash)) {
+                throw new RuntimeException('No se pudo calcular el hash del documento original.');
+            }
+            $this->db->commit();
+
+            $temporaryPath = tempnam(dirname($sourcePath), '.mock-firma-');
+            if (!is_string($temporaryPath)) {
+                throw new RuntimeException('No se pudo preparar el archivo temporal de la firma mock.');
+            }
+            (new AutoFirmaMockStrategy())->sign($sourcePath, $temporaryPath);
+            $size = filesize($temporaryPath);
+            if (!is_int($size) || $size < 1 || $size > 20 * 1024 * 1024) {
+                throw new RuntimeException('El PDF firmado de desarrollo supera el tamaño permitido.');
+            }
+            $result = $this->finalizarFirmaAutofirma(
+                (int)$id,
+                (int)$_SESSION['usuario_id'],
+                [
+                    'error' => UPLOAD_ERR_OK,
+                    'tmp_name' => $temporaryPath,
+                    'size' => $size,
+                    'name' => 'convenio-firmado.pdf',
+                ],
+                $originalHash,
+                $leaseToken,
+                true
+            );
+            if (JsonResponse::wantsJson()) {
+                JsonResponse::success($result);
+                return;
+            }
+            header('Location: index.php?action=revisar-convenios&firma='
+                . ($result['notificacion_enviada'] ? 'mock_completada' : 'mock_correo_pendiente'));
+        } catch (DomainException $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            if (JsonResponse::wantsJson()) {
+                JsonResponse::failure($exception->getMessage(), 409);
+                return;
+            }
+            $this->responderFirmaError($exception->getMessage(), 409);
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Error en firma mock del convenio #' . (int)$id . ': ' . $exception->getMessage());
+            if (JsonResponse::wantsJson()) {
+                JsonResponse::failure('No se pudo firmar el convenio con el certificado local de desarrollo.', 422);
+                return;
+            }
+            $this->responderFirmaError('No se pudo firmar el convenio con el certificado local de desarrollo.', 422);
+        } finally {
+            if (is_string($temporaryPath) && is_file($temporaryPath) && !unlink($temporaryPath)) {
+                error_log('No se pudo retirar el archivo temporal de una firma mock.');
+            }
+        }
+    }
+
+    public function probarAutoFirma(): void
+    {
+        if (
+            (getenv('APP_ENV') ?: 'production') !== 'development'
+            || ConvenioSignatureMode::current() !== 'test'
+            || !$this->esFirmanteConvenio()
+        ) {
+            http_response_code(404);
+            throw new RuntimeException('La prueba de AutoFirma solo está disponible en desarrollo.');
+        }
+
+        $pdf = new \setasign\Fpdi\Fpdi();
+        $pdf->AddPage();
+        $pdf->SetFont('Arial', '', 12);
+        $pdf->Cell(0, 10, 'Documento de prueba AutoFirma - no tiene validez contractual.', 0, 1);
+        $pdf->Cell(0, 10, 'La firma de esta prueba no modifica ningun convenio.', 0, 1);
+        $document = $pdf->Output('S');
+        if (!is_string($document) || !str_starts_with($document, '%PDF-')) {
+            throw new RuntimeException('No se pudo generar el PDF de prueba para AutoFirma.');
+        }
+        $_SESSION['autofirma_test_challenge'] = [
+            'token' => bin2hex(random_bytes(32)),
+            'pdf' => $document,
+            'expires_at' => time() + 600,
+        ];
+        View::render('convenios/probar-autofirma', [
+            'pdfBase64' => base64_encode($document),
+            'challenge' => $_SESSION['autofirma_test_challenge']['token'],
+            'csrfToken' => CsrfMiddleware::token(),
+        ]);
+    }
+
+    public function verificarPruebaAutoFirma(): void
+    {
+        if (
+            (getenv('APP_ENV') ?: 'production') !== 'development'
+            || ConvenioSignatureMode::current() !== 'test'
+            || !$this->esFirmanteConvenio()
+        ) {
+            JsonResponse::failure('La verificación de prueba solo está disponible en desarrollo.', 403);
+            return;
+        }
+
+        $challenge = $_POST['challenge'] ?? null;
+        $expected = $_SESSION['autofirma_test_challenge'] ?? null;
+        unset($_SESSION['autofirma_test_challenge']);
+        if (
+            !is_string($challenge)
+            || !is_array($expected)
+            || !is_string($expected['token'] ?? null)
+            || !hash_equals($expected['token'], $challenge)
+            || !is_string($expected['pdf'] ?? null)
+            || (int)($expected['expires_at'] ?? 0) < time()
+        ) {
+            JsonResponse::failure('La prueba ha caducado o no es válida. Recarga la página para intentarlo de nuevo.', 409);
+            return;
+        }
+
+        $upload = $_FILES['documento_firmado'] ?? null;
+        if (
+            !is_array($upload)
+            || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
+            || !is_string($upload['tmp_name'] ?? null)
+            || !is_int($upload['size'] ?? null)
+            || $upload['size'] < 1
+            || $upload['size'] > 20 * 1024 * 1024
+            || !is_uploaded_file($upload['tmp_name'])
+        ) {
+            JsonResponse::failure('Adjunta el PDF de prueba firmado con AutoFirma (máximo 20 MB).', 422);
+            return;
+        }
+
+        try {
+            $mime = (new finfo(FILEINFO_MIME_TYPE))->file($upload['tmp_name']);
+            if (
+                $mime !== 'application/pdf'
+                || strtolower(pathinfo((string)($upload['name'] ?? ''), PATHINFO_EXTENSION)) !== 'pdf'
+            ) {
+                throw new InvalidArgumentException('El resultado de AutoFirma no es un PDF válido.');
+            }
+            FileScanner::scan($upload['tmp_name']);
+
+            $signedPdf = file_get_contents($upload['tmp_name']);
+            if (!is_string($signedPdf) || !str_starts_with($signedPdf, $expected['pdf'])) {
+                throw new DomainException('El PDF firmado no corresponde al documento ficticio de esta prueba.');
+            }
+
+            $nssDirectory = getenv('FCT_AUTOFIRMA_NSS_DIR') ?: '/var/lib/fct/autofirma-nssdb';
+            $validation = (new PadesSignatureVerifier())->verify($upload['tmp_name'], $nssDirectory, true);
+            JsonResponse::success([
+                'signer' => $validation['signer'],
+                'signature_count' => $validation['signature_count'],
+                'persisted' => false,
+                'approved' => false,
+            ]);
+        } catch (DomainException | InvalidArgumentException $exception) {
+            JsonResponse::failure($exception->getMessage(), 422);
+        } catch (Throwable $exception) {
+            error_log('No se pudo verificar el PDF de prueba AutoFirma: ' . $exception->getMessage());
+            JsonResponse::failure('No se pudo verificar la firma de prueba. No se guardó ningún documento.', 422);
+        }
+    }
+
+    private function finalizarFirmaAutofirma(
+        int $id,
+        int $signatoryId,
+        array $upload,
+        ?string $expectedOriginalHash = null,
+        ?string $leaseToken = null,
+        bool $mockGenerated = false
+    ): array {
+        if (!$this->esFirmanteConvenio()) {
+            throw new DomainException('Solo Administración puede firmar convenios.');
+        }
+        if (!is_string($leaseToken) || preg_match('/\A[a-f0-9]{64}\z/', $leaseToken) !== 1) {
+            throw new DomainException('La reserva de firma ha caducado o no es válida.');
+        }
+        if (
+            ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
+            || !is_string($upload['tmp_name'] ?? null)
+            || !is_int($upload['size'] ?? null)
+            || $upload['size'] < 1
+            || $upload['size'] > 20 * 1024 * 1024
+            || (!$mockGenerated && !is_uploaded_file($upload['tmp_name']))
+        ) {
+            throw new InvalidArgumentException('Adjunta un PDF firmado con AutoFirma de hasta 20 MB.');
+        }
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($upload['tmp_name']);
+        if ($mime !== 'application/pdf' || strtolower(pathinfo((string)($upload['name'] ?? ''), PATHINFO_EXTENSION)) !== 'pdf') {
+            throw new InvalidArgumentException('El documento devuelto por AutoFirma debe ser un archivo PDF.');
+        }
+        FileScanner::scan($upload['tmp_name']);
+
+        $convenio = $this->convenioModel->obtener($id);
+        if (!is_array($convenio) || $convenio['estado'] !== 'Pendiente') {
+            throw new DomainException('El convenio no existe o ya no está pendiente de aprobación.');
+        }
+        $sourcePath = $this->resolverRutaConvenioPrivada((string)$convenio['archivo_path']);
+        $originalHash = hash_file('sha256', $sourcePath);
+        $sourceContents = file_get_contents($sourcePath);
+        if (
+            !is_string($originalHash)
+            || !is_string($sourceContents)
+            || ($expectedOriginalHash !== null && !hash_equals($expectedOriginalHash, $originalHash))
+        ) {
+            throw new DomainException('El PDF original ha cambiado. Inicia de nuevo el proceso de firma.');
+        }
+
+        $storageDirectory = dirname($sourcePath);
+        $temporaryPath = tempnam($storageDirectory, '.autofirma-convenio-');
+        if (!is_string($temporaryPath)) {
+            throw new RuntimeException('No se pudo preparar el archivo temporal de la firma.');
+        }
+        $signedPath = null;
+        try {
+            if (!copy($upload['tmp_name'], $temporaryPath) || !chmod($temporaryPath, 0600)) {
+                throw new RuntimeException('No se pudo copiar el documento firmado al almacenamiento privado.');
+            }
+            $resolvedTemporaryPath = realpath($temporaryPath);
+            if ($resolvedTemporaryPath === false || dirname($resolvedTemporaryPath) !== $storageDirectory) {
+                throw new RuntimeException('El documento firmado quedó fuera del almacenamiento privado.');
+            }
+            $temporaryPath = $resolvedTemporaryPath;
+            $signedContents = file_get_contents($temporaryPath);
+            if (
+                !is_string($signedContents)
+                || (!$mockGenerated && !str_starts_with($signedContents, $sourceContents))
+            ) {
+                throw new DomainException(
+                    'El PDF firmado no corresponde al documento original. Firma el archivo descargado desde el sistema sin modificarlo.'
+                );
+            }
+            $validation = SignatureProviderFactory::create()->verify($temporaryPath);
+            $signedHash = hash_file('sha256', $temporaryPath);
+            if (!is_string($signedHash)) {
+                throw new RuntimeException('No se pudo calcular el hash del documento firmado.');
+            }
+
+            $storedName = bin2hex(random_bytes(24)) . '.pdf';
+            $signedPath = $storageDirectory . DIRECTORY_SEPARATOR . $storedName;
+            $this->db->beginTransaction();
+            $lockedAgreement = $this->convenioModel->obtenerPendienteParaFirma($id);
+            if (
+                !is_array($lockedAgreement)
+                || $lockedAgreement['estado'] !== 'Pendiente'
+            ) {
+                throw new DomainException('El convenio ya se ha firmado o ya no está pendiente de aprobación.');
+            }
+            $lockedSourcePath = $this->resolverRutaConvenioPrivada((string)$lockedAgreement['archivo_path']);
+            $lockedOriginalHash = hash_file('sha256', $lockedSourcePath);
+            if (!is_string($lockedOriginalHash) || !hash_equals($originalHash, $lockedOriginalHash)) {
+                throw new DomainException('El documento original ha cambiado. Inicia de nuevo el proceso de firma.');
+            }
+            if (!rename($temporaryPath, $signedPath) || !chmod($signedPath, 0600)) {
+                throw new RuntimeException('No se pudo guardar el PDF firmado en el almacenamiento privado.');
+            }
+            $temporaryPath = null;
+            $signedAtUtc = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+            $previousState = $this->convenioModel->registrarFirma(
+                $id,
+                $storedName,
+                $originalHash,
+                $signedHash,
+                $signatoryId,
+                $signedAtUtc,
+                $leaseToken
+            );
+            $signerDetail = $validation['signer'] !== ''
+                ? ';cert_subject=' . rawurlencode($validation['signer'])
+                : '';
+            (new Auditoria($this->db))->registrar(
+                $signatoryId,
+                'convenio.firmado.aprobado',
+                'convenios',
+                $id,
+                'signatory_id=' . $signatoryId
+                    . ';timestamp_utc=' . $signedAtUtc->format('Y-m-d\TH:i:s\Z')
+                    . ';document_hash_pre_signature=' . $originalHash
+                    . ';document_hash_post_signature=' . $signedHash
+                    . ';estado_anterior=' . $previousState
+                    . ';estado_nuevo=Aprobado'
+                    . ';firma=PAdES'
+                    . $signerDetail
+            );
+            $signatureAudit = $this->db->prepare(
+                'INSERT INTO convenio_audit_logs
+                    (convenio_id, usuario_id, evento, hash_documento_original, hash_documento_firmado, detalle)
+                 VALUES
+                    (:convenio, :usuario, :evento, :hash_original, :hash_firmado, :detalle)'
+            );
+            $signatureAudit->execute([
+                'convenio' => $id,
+                'usuario' => $signatoryId,
+                'evento' => 'FIRMADO_Y_APROBADO',
+                'hash_original' => $originalHash,
+                'hash_firmado' => $signedHash,
+                'detalle' => json_encode([
+                    'proveedor' => $mockGenerated ? 'mock' : 'autofirma',
+                    'firmante_certificado' => $validation['signer'],
+                    'firma_count' => $validation['signature_count'],
+                    'certificado_confiable' => $validation['certificate_trusted'],
+                    'estado_anterior' => $previousState,
+                    'estado_nuevo' => 'Aprobado',
+                    'timestamp_utc' => $signedAtUtc->format('Y-m-d\TH:i:s\Z'),
+                ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+            ]);
+            WebhookPublisher::publish($this->db, 'convenio.aprobado_firmado', ['convenio_id' => $id]);
+            $this->db->commit();
+        } catch (Throwable $exception) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            foreach ([$temporaryPath, $signedPath] as $path) {
+                if (is_string($path) && is_file($path) && !unlink($path)) {
+                    error_log('No se pudo retirar un PDF de firma tras una reversión.');
+                }
+            }
+            throw $exception;
+        }
+
+        $notificationSent = true;
+        try {
+            $appUrl = rtrim(getenv('FCT_APP_URL') ?: '', '/');
+            $downloadUrl = $appUrl . '/index.php?action=descargar-convenio-firmado&id=' . $id;
+            (new ConvenioApprovalMailer())->send(
+                (string)$lockedAgreement['empresa_email'],
+                (string)$lockedAgreement['nombre_empresa'],
+                (string)$lockedAgreement['numero_convenio'],
+                $downloadUrl,
+                $signedPath
+            );
+        } catch (Throwable $exception) {
+            $notificationSent = false;
+            error_log('No se pudo notificar la aprobación del convenio #' . $id . ': ' . $exception->getMessage());
+        }
+
+        $message = $mockGenerated
+            ? ($notificationSent
+                ? 'Firma PAdES local de desarrollo completada; el certificado de prueba no tiene validez contractual.'
+                : 'Firma PAdES local de desarrollo completada; el certificado de prueba no tiene validez contractual y el correo está pendiente.')
+            : ($notificationSent
+                ? 'El convenio se firmó digitalmente y se envió el PDF a la empresa.'
+                : 'El convenio se firmó digitalmente, pero no se pudo enviar el correo. La empresa puede descargarlo desde su cuenta.');
+
+        return [
+            'message' => $message,
+            'estado' => 'Aprobado',
+            'notificacion_enviada' => $notificationSent,
+        ];
+    }
+
+    private function leerObjetoJson(): ?stdClass
+    {
+        try {
+            $payload = json_decode((string)file_get_contents('php://input'), false, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            JsonResponse::failure('El cuerpo JSON no es válido.', 400);
+            return null;
+        }
+        if (!$payload instanceof stdClass) {
+            JsonResponse::failure('El cuerpo JSON debe ser un objeto de datos.', 400);
+            return null;
+        }
+        return $payload;
+    }
+
+    private function responderFirmaError(string $message, int $status): void
+    {
+        http_response_code($status);
+        if (JsonResponse::wantsJson()) {
+            JsonResponse::failure($message, $status);
+            return;
+        }
+        $_SESSION['convenio_firma_error'] = $message;
+        http_response_code(303);
+        header('Location: index.php?action=revisar-convenios&firma=error');
+    }
+
     public function rechazar(): void
     {
         $this->ejecutarTransicion(['Rechazado']);
@@ -258,13 +895,13 @@ class ConvenioController
 
     private function ejecutarTransicion(array $estadosPermitidos): void
     {
-        if (!$this->esAdministrador()) {
+        if (!$this->esFirmanteConvenio()) {
             http_response_code(403);
             if (JsonResponse::wantsJson()) {
-                JsonResponse::failure('Solo un administrador puede cambiar el estado de los convenios.', 403);
+                JsonResponse::failure('Solo Administración o Coordinación puede revisar convenios.', 403);
                 return;
             }
-            throw new RuntimeException('Solo un administrador puede cambiar el estado de los convenios.');
+            throw new RuntimeException('Solo Administración o Coordinación puede revisar convenios.');
         }
         $jsonRequest = JsonResponse::wantsJson();
         $requestValues = $_POST;
@@ -319,6 +956,14 @@ class ConvenioController
             }
             throw new InvalidArgumentException('El motivo de revisión no puede superar los 500 caracteres.');
         }
+        if ($decision === 'Aprobado') {
+            $this->responderFirmaError(
+                'La aprobación debe completarse mediante una firma PAdES verificada.',
+                409
+            );
+            return;
+        }
+
         $this->db->beginTransaction();
         try {
             $estadoAnterior = $this->convenioModel->transicionar(
@@ -372,6 +1017,63 @@ class ConvenioController
         exit;
     }
 
+    private function rollbackFirma(?string $temporaryPath, ?string $signedPath, bool $removeSignedFile): void
+    {
+        if ($this->db->inTransaction()) {
+            $this->db->rollBack();
+        }
+        $paths = $removeSignedFile ? [$temporaryPath, $signedPath] : [$temporaryPath];
+        foreach ($paths as $path) {
+            if (is_string($path) && is_file($path) && !unlink($path)) {
+                error_log('No se pudo retirar un archivo de firma de convenio tras una reversión.');
+            }
+        }
+    }
+
+    private function obtenerNombreAdministrador(int $administratorId): string
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COALESCE(
+                NULLIF(TRIM(CONCAT_WS(' ', NULLIF(nombre, ''), NULLIF(apellidos, ''))), ''),
+                email
+             )
+             FROM usuarios
+             WHERE id = :id AND rol = 'Administrador'
+             LIMIT 1"
+        );
+        $stmt->execute(['id' => $administratorId]);
+        $name = $stmt->fetchColumn();
+        if (!is_string($name) || trim($name) === '') {
+            throw new RuntimeException('No se pudo identificar al administrador que firma el convenio.');
+        }
+        return trim($name);
+    }
+
+    private function resolverRutaConvenioPrivada(string $storedName): string
+    {
+        if (preg_match('/\A[a-f0-9]{48}\.pdf\z/', $storedName) !== 1) {
+            throw new RuntimeException('La ruta almacenada del convenio no es válida.');
+        }
+        $storageRoot = realpath(fctStoragePath());
+        $base = $storageRoot === false
+            ? false
+            : realpath($storageRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'convenios');
+        $candidate = $base === false ? false : $base . DIRECTORY_SEPARATOR . $storedName;
+        $file = $candidate === false ? false : realpath($candidate);
+        if (
+            $base === false
+            || $candidate === false
+            || is_link($candidate)
+            || $file === false
+            || dirname($file) !== $base
+            || !is_file($file)
+            || !is_readable($file)
+        ) {
+            throw new RuntimeException('No se encontró el PDF original del convenio en el almacenamiento privado.');
+        }
+        return $file;
+    }
+
     public function descargar(): void
     {
         $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
@@ -397,7 +1099,7 @@ class ConvenioController
                 'motivo=rol_no_autorizado'
             );
             http_response_code(403);
-            throw new RuntimeException('Solo un administrador puede descargar documentos de convenios.');
+            throw new RuntimeException('Solo Administración puede descargar documentos de convenios.');
         }
 
         $convenio = $id > 0 ? $this->convenioModel->obtener($id) : null;
@@ -472,6 +1174,102 @@ class ConvenioController
         exit;
     }
 
+    public function descargarFirmado(): void
+    {
+        $userId = filter_var(
+            $_SESSION['usuario_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $role = $_SESSION['rol'] ?? null;
+        if (!in_array($role, ['Administrador', 'Empresa'], true) || $userId === false) {
+            $auditUserId = $userId === false ? null : (int)$userId;
+            (new Auditoria($this->db))->registrar(
+                $auditUserId,
+                'convenio.descarga_firmada.denegada',
+                'convenios',
+                null,
+                'motivo=rol_no_autorizado'
+            );
+            http_response_code(403);
+            throw new RuntimeException('No tienes permiso para descargar el convenio aprobado.');
+        }
+        $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($id === false) {
+            http_response_code(400);
+            throw new InvalidArgumentException('El identificador del convenio no es válido.');
+        }
+        $convenio = $role === 'Administrador'
+            ? $this->convenioModel->obtenerFirmadoParaAdministrador((int)$id)
+            : $this->convenioModel->obtenerFirmadoParaEmpresa((int)$id, (int)$userId);
+        if ($convenio === null) {
+            (new Auditoria($this->db))->registrar(
+                (int)$userId,
+                'convenio.descarga_firmada.denegada',
+                'convenios',
+                (int)$id,
+                'motivo=no_disponible_o_no_autorizado'
+            );
+            http_response_code(404);
+            throw new RuntimeException('No se encontró un convenio aprobado disponible para esta cuenta.');
+        }
+
+        $file = $this->resolverRutaConvenioPrivada((string)$convenio['documento_firmado_path']);
+        $handle = fopen($file, 'rb');
+        if ($handle === false) {
+            http_response_code(500);
+            throw new RuntimeException('No se pudo abrir el convenio aprobado.');
+        }
+        $hashContext = hash_init('sha256');
+        $hashedBytes = hash_update_stream($hashContext, $handle);
+        $actualHash = hash_final($hashContext);
+        $fileMetadata = fstat($handle);
+        $size = is_array($fileMetadata) ? ($fileMetadata['size'] ?? false) : false;
+        $expectedHash = $convenio['hash_documento_firmado'] ?? null;
+        if (
+            !is_string($expectedHash)
+            || preg_match('/\A[a-f0-9]{64}\z/', $expectedHash) !== 1
+            || !hash_equals($expectedHash, $actualHash)
+            || !is_int($size)
+            || $hashedBytes !== $size
+            || $size < 1
+            || !rewind($handle)
+        ) {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            (new Auditoria($this->db))->registrar(
+                (int)$userId,
+                'convenio.integridad_firma.fallida',
+                'convenios',
+                (int)$id,
+                'motivo=hash_no_coincide'
+            );
+            http_response_code(500);
+            throw new RuntimeException('No se pudo verificar la integridad del convenio aprobado.');
+        }
+        (new Auditoria($this->db))->registrar(
+            (int)$userId,
+            'convenio.descarga_firmada',
+            'convenios',
+            (int)$id,
+            'resultado=autorizada;rol=' . $role
+        );
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/pdf');
+        header('Content-Length: ' . $size);
+        header('Content-Disposition: attachment; filename="convenio-aprobado-' . (int)$id . '.pdf"');
+        header('Cache-Control: private, no-store, max-age=0');
+        header('Pragma: no-cache');
+        header('X-Content-Type-Options: nosniff');
+        fpassthru($handle);
+        fclose($handle);
+        exit;
+    }
+
     private function renderListado(string $estadoPredeterminado): void
     {
         $rol = $_SESSION['rol'] ?? null;
@@ -520,6 +1318,9 @@ class ConvenioController
         foreach ($this->convenioModel->listarEventos($ids) as $evento) {
             $eventosPorConvenio[(int)$evento['convenio_id']][] = $evento;
         }
+        $signatureMode = ConvenioSignatureMode::current();
+        $firmaError = $_SESSION['convenio_firma_error'] ?? '';
+        unset($_SESSION['convenio_firma_error']);
         View::render('convenios/listado', [
             'convenios' => $resultado['items'],
             'eventosPorConvenio' => $eventosPorConvenio,
@@ -527,7 +1328,24 @@ class ConvenioController
             'paginacion' => $resultado,
             'error' => $error,
             'puedeResolver' => $rol === 'Administrador',
+            'puedeFirmar' => $rol === 'Administrador',
             'esAdministrador' => $rol === 'Administrador',
+            'signatureMode' => $signatureMode,
+            'firmaResultado' => match ($_GET['firma'] ?? '') {
+                'completada' => 'El convenio se firmó digitalmente y se envió el PDF a la empresa.',
+                'correo_pendiente' => 'El convenio se firmó digitalmente, pero el correo no pudo enviarse. La empresa puede descargarlo desde su cuenta.',
+                'mock_completada' => 'Firma PAdES local de desarrollo completada; el certificado de prueba no tiene validez contractual. El PDF se envió a Mailpit.',
+                'mock_correo_pendiente' => 'Firma PAdES local de desarrollo completada; el certificado de prueba no tiene validez contractual. El correo está pendiente.',
+                'error' => is_string($firmaError) && $firmaError !== ''
+                    ? $firmaError
+                    : 'No se pudo completar la firma. El convenio permanece pendiente y el documento original se conserva.',
+                default => '',
+            },
+            'firmaResultadoTipo' => match ($_GET['firma'] ?? '') {
+                'correo_pendiente' => 'warning',
+                'error' => 'error',
+                default => 'success',
+            },
         ]);
     }
 
@@ -547,6 +1365,11 @@ class ConvenioController
     }
 
     private function esAdministrador(): bool
+    {
+        return ($_SESSION['rol'] ?? null) === 'Administrador';
+    }
+
+    private function esFirmanteConvenio(): bool
     {
         return ($_SESSION['rol'] ?? null) === 'Administrador';
     }

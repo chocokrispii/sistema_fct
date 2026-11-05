@@ -936,6 +936,13 @@ function apiReviewAgreement(PDO $db, int $id, int $userId, Closure $respond, Clo
         || ($decision === 'Rechazado' && trim($reason) === '')) {
         $fail(422, 'invalid_review', 'Indica estado Aprobado o Rechazado y un motivo si rechazas.');
     }
+    if ($decision === 'Aprobado') {
+        $fail(
+            409,
+            'electronic_signature_required',
+            'La aprobación de convenios requiere el flujo de firma electrónica del panel de administración.'
+        );
+    }
     $db->beginTransaction();
     try {
         if (!(new Convenio($db))->resolver($id, $decision, trim($reason), $userId)) {

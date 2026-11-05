@@ -7,3 +7,6 @@ public/build/
 public/assets/swagger-ui/
 docs_md/.vitepress/cache/
 docs_md/.vitepress/dist/
+storage/autofirma-nssdb/*
+!storage/autofirma-nssdb/.gitkeep
+storage/autofirma-test-certs/
