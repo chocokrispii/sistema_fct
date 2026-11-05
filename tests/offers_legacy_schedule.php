@@ -77,14 +77,25 @@ try {
     ]);
     $agreementId = (int)$db->lastInsertId();
 
+    $insertSite = $db->prepare(
+        'INSERT INTO empresa_sedes (empresa_id, nombre, direccion)
+         VALUES (:empresa, :nombre, :direccion)'
+    );
+    $insertSite->execute([
+        'empresa' => $companyId,
+        'nombre' => "Sede oferta histórica $fixture",
+        'direccion' => 'Calle de pruebas 1, Madrid',
+    ]);
+    $siteId = (int)$db->lastInsertId();
+
     $insertOffer = $db->prepare(
         "INSERT INTO empresa_especialidades_plazas
-            (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin,
+            (empresa_id, sede_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin,
              titulo, descripcion, turno, modalidad, ubicacion)
-         VALUES (:empresa, :especialidad, 2, '2027-03-01', '2027-06-30',
+         VALUES (:empresa, :sede, :especialidad, 2, '2027-03-01', '2027-06-30',
              'Oferta histórica test', 'Prueba', 'Indiferente', 'Presencial', 'Centro')"
     );
-    $insertOffer->execute(['empresa' => $companyId, 'especialidad' => $specialtyId]);
+    $insertOffer->execute(['empresa' => $companyId, 'sede' => $siteId, 'especialidad' => $specialtyId]);
     $offerId = (int)$db->lastInsertId();
     assertLegacyOffer((new Oferta($db))->obtenerHorarioSemanal($offerId) === [], 'La fixture debe comenzar sin horario.');
 

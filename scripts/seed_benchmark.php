@@ -62,8 +62,8 @@ try {
     );
     $insertarOferta = $db->prepare(
         "INSERT INTO empresa_especialidades_plazas
-            (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, estado, turno, revisado_por, revisado_en)
-         VALUES (:empresa_id, :especialidad_id, 2, :fecha_inicio, :fecha_fin, 'Aprobada', 'Indiferente', :revisor, NOW())"
+            (empresa_id, sede_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin, estado, turno, revisado_por, revisado_en)
+         VALUES (:empresa_id, :sede_id, :especialidad_id, 2, :fecha_inicio, :fecha_fin, 'Aprobada', 'Indiferente', :revisor, NOW())"
     );
     $insertarConvenio = $db->prepare(
         "INSERT INTO convenios
@@ -89,6 +89,7 @@ try {
     );
 
     $empresaIds = [];
+    $sedeIds = [];
     for ($indice = 1; $indice <= 10; $indice++) {
         $correo = sprintf('bench.company.%02d@bench.invalid', $indice);
         $insertarUsuario->execute(['email' => $correo, 'hash' => $hash, 'rol' => 'Empresa']);
@@ -100,7 +101,18 @@ try {
             'categoria' => 'Desarrollo de software',
             'contacto' => 'Contacto de pruebas',
         ]);
-        $empresaIds[] = (int)$db->lastInsertId();
+        $companyId = (int)$db->lastInsertId();
+        $empresaIds[] = $companyId;
+        $insertSite = $db->prepare(
+            'INSERT INTO empresa_sedes (empresa_id, nombre, direccion)
+             VALUES (:empresa_id, :nombre, :direccion)'
+        );
+        $insertSite->execute([
+            'empresa_id' => $companyId,
+            'nombre' => sprintf('Sede Benchmark %02d', $indice),
+            'direccion' => sprintf('Calle Benchmark %d, Madrid', $indice),
+        ]);
+        $sedeIds[$companyId] = (int)$db->lastInsertId();
     }
 
     $convenioNumero = 0;
@@ -138,6 +150,7 @@ try {
     for ($indice = 0; $indice < 250; $indice++) {
         $insertarOferta->execute([
             'empresa_id' => $empresaIds[$indice % count($empresaIds)],
+            'sede_id' => $sedeIds[$empresaIds[$indice % count($empresaIds)]],
             'especialidad_id' => $especialidad,
             'fecha_inicio' => $fechas['inicio'],
             'fecha_fin' => $fechas['fin'],

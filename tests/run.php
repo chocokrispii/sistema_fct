@@ -29,6 +29,7 @@ require_once __DIR__ . '/../app/Models/Alumno.php';
 require_once __DIR__ . '/../app/Models/Disponibilidad.php';
 require_once __DIR__ . '/../app/Models/Calificacion.php';
 require_once __DIR__ . '/../app/Models/Convenio.php';
+require_once __DIR__ . '/../app/Models/BrandingSettings.php';
 require_once __DIR__ . '/../app/Models/Empresa.php';
 require_once __DIR__ . '/../app/Models/Usuario.php';
 require_once __DIR__ . '/../app/Models/Especialidad.php';
@@ -49,6 +50,20 @@ require_once __DIR__ . '/branding.php';
 $db = getPDOConnection();
 $actualDatabase = $db->query('SELECT DATABASE()')->fetchColumn();
 assertTrue($actualDatabase === $testDatabase, 'La conexión no apunta a la base de prueba.');
+$brandingSettings = new BrandingSettings($db);
+$originalBranding = $brandingSettings->get();
+$originalLogoShape = $originalBranding['logo_shape'];
+$brandingPalette = [
+    'primary' => $originalBranding['primary_color'],
+    'secondary' => $originalBranding['secondary_color'],
+    'accent' => $originalBranding['accent_color'],
+];
+$brandingSettings->save($brandingPalette, null, null, 'circle');
+assertTrue(
+    $brandingSettings->get()['logo_shape'] === 'circle',
+    'La forma seleccionada del logo debe persistir en la configuración de marca.'
+);
+$brandingSettings->save($brandingPalette, null, null, (string)$originalLogoShape);
 $cycles = (new Especialidad($db))->obtenerTodas();
 $dam = array_values(array_filter(
     $cycles,
@@ -106,6 +121,7 @@ $required = [
     'ubicacion_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'ubicacion'],
     'requisitos_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'requisitos'],
     'tecnologias_oferta' => ['table' => 'empresa_especialidades_plazas', 'column' => 'tecnologias'],
+    'forma_logo_marca' => ['table' => 'portal_branding', 'column' => 'logo_shape'],
 ];
 foreach ($required as $name => $definition) {
     $stmt = $db->prepare(
@@ -434,6 +450,46 @@ try {
         (int)($userModel->obtenerPorIdentificador(strtolower($createdStudentByCenterRow['dni']))['id'] ?? 0)
             === $createdAdminStudentUserId,
         'El acceso debe permitir localizar al alumnado con su pasaporte guardado.'
+    );
+    $filteredStudents = $studentModel->obtenerTodosParaCentro(
+        'D' . $fixture,
+        $cycleId,
+        true
+    );
+    assertTrue(
+        count(array_filter(
+            $filteredStudents,
+            static fn(array $student): bool => (int)$student['id'] === $createdAdminStudentProfileId
+        )) === 1,
+        'La consulta de alumnado debe combinar búsqueda, ciclo y estado con parámetros preparados.'
+    );
+    $db->beginTransaction();
+    $userModel->assertIdentificadorFiscalDisponible('D' . $fixture, $createdAdminStudentUserId);
+    $studentModel->actualizarDesdePersonal(
+        $createdAdminStudentProfileId,
+        'Alumno Editado',
+        "Centro $fixture",
+        'D' . $fixture,
+        SpanishDataValidator::DOCUMENT_TYPE_PASSPORT,
+        "edited-center-student-$fixture@example.test",
+        $cycleId,
+        1,
+        'Expediente editado'
+    );
+    $db->commit();
+    $updatedCenterStudent = $db->prepare(
+        'SELECT a.nombre, a.curso, a.observaciones_administrativas, u.email
+         FROM alumnos a INNER JOIN usuarios u ON u.id = a.usuario_id WHERE a.id = :id'
+    );
+    $updatedCenterStudent->execute(['id' => $createdAdminStudentProfileId]);
+    $updatedCenterStudentRow = $updatedCenterStudent->fetch(PDO::FETCH_ASSOC);
+    assertTrue(
+        is_array($updatedCenterStudentRow)
+            && $updatedCenterStudentRow['nombre'] === 'Alumno Editado'
+            && (int)$updatedCenterStudentRow['curso'] === 1
+            && $updatedCenterStudentRow['observaciones_administrativas'] === 'Expediente editado'
+            && $updatedCenterStudentRow['email'] === "edited-center-student-$fixture@example.test",
+        'La edición administrativa debe actualizar en conjunto el expediente y el correo de la cuenta.'
     );
     $studentModel->actualizarPerfil(
         $createdUsers[1],
@@ -882,10 +938,12 @@ try {
         'nombre' => "Sede $fixture",
         'direccion' => 'Dirección de prueba',
     ]);
+    $siteId = (int)$db->lastInsertId();
 
     $matching = new Oferta($db);
     $createdOffer = $matching->crearOferta(
         $createdCompany,
+        $siteId,
         $cycleId,
         1,
         '2027-03-15',
@@ -894,7 +952,6 @@ try {
         'Descripción de prueba de la oferta.',
         'P',
         'Híbrido',
-        'Madrid',
         'Trabajo en equipo.',
         'PHP, Vue',
         [['dia_semana' => 1, 'hora_inicio' => '09:00:00', 'hora_fin' => '13:00:00']]
@@ -909,7 +966,9 @@ try {
             && $savedOffer['descripcion'] === 'Descripción de prueba de la oferta.'
             && $savedOffer['turno'] === 'P'
             && $savedOffer['modalidad'] === 'Híbrido'
-            && $savedOffer['ubicacion'] === 'Madrid'
+            && $savedOffer['sede_nombre'] === "Sede $fixture"
+            && $savedOffer['sede_direccion'] === 'Dirección de prueba'
+            && $savedOffer['ubicacion'] === 'Dirección de prueba'
             && $savedOffer['requisitos'] === 'Trabajo en equipo.'
             && $savedOffer['tecnologias'] === 'PHP, Vue',
         'La oferta debe persistir sus detalles completos.'
@@ -1103,12 +1162,9 @@ try {
     assertTrue(
         str_contains($adminViewHtml, 'Coordinadora Álvarez O&#039;Connor')
             && str_contains($adminViewHtml, 'name="identificador_fiscal"')
-            && str_contains($adminViewHtml, 'name="nombre"')
-            && str_contains($adminViewHtml, 'name="apellidos"')
+            && str_contains($adminViewHtml, 'alta-personal')
+            && !str_contains($adminViewHtml, 'name="email"')
             && !str_contains($adminViewHtml, 'name="password"')
-            && str_contains($adminViewHtml, 'value="Coordinador"')
-            && str_contains($adminViewHtml, 'value="Observador"')
-            && str_contains($adminViewHtml, 'value="Administrador"')
             && str_contains($adminViewHtml, 'actualizar-identificador-fiscal-usuario')
             && str_contains($adminViewHtml, 'data-delete-user=')
             && (
@@ -1122,6 +1178,20 @@ try {
                         && str_contains($adminViewHtml, 'assets/js/admin-users.js')
             ),
         'La administración debe mostrar los usuarios y habilitar el diálogo Vue o su fallback PHP.'
+    );
+
+    $_SESSION = ['usuario_id' => $adminId, 'rol' => 'Administrador'];
+    $_GET = [];
+    ob_start();
+    (new AlumnoAdminController($db))->gestionar();
+    $studentAdminHtml = (string)ob_get_clean();
+    assertTrue(
+        str_contains($studentAdminHtml, 'data-edit-student=')
+            && str_contains($studentAdminHtml, '<dialog')
+            && str_contains($studentAdminHtml, 'student-edit-form')
+            && str_contains($studentAdminHtml, 'admin-students.js')
+            && !str_contains($studentAdminHtml, '<details>'),
+        'La edición administrativa del alumno debe abrir un diálogo superpuesto y no expandir la fila.'
     );
 
     $staffRoles = ['Administrador', 'Coordinador', 'Observador'];
@@ -1649,8 +1719,22 @@ try {
     assertTrue(!isset($routes['registro-alumno']), 'No debe existir una ruta pública de alta de alumnos.');
     assertTrue(
         ($routes['alumnos-centro']['roles'] ?? null) === ['Administrador', 'Coordinador']
-            && ($routes['alumnos-centro']['method'] ?? null) === ['GET', 'POST'],
-        'La creación de alumnos debe quedar limitada al personal autorizado.'
+            && ($routes['alumnos-centro']['method'] ?? null) === 'GET'
+            && ($routes['alta-alumno']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['alta-alumno']['method'] ?? null) === ['GET', 'POST']
+            && ($routes['importar-alumnos']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['importar-alumnos']['method'] ?? null) === ['GET', 'POST']
+            && ($routes['plantilla-importacion-alumnos']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['plantilla-importacion-alumnos']['method'] ?? null) === 'GET'
+            && ($routes['verificacion-importacion-alumnos']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['verificacion-importacion-alumnos']['method'] ?? null) === 'GET'
+            && ($routes['informe-importacion-alumnos']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['informe-importacion-alumnos']['method'] ?? null) === 'GET'
+            && ($routes['actualizar-alumno-centro']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['actualizar-alumno-centro']['method'] ?? null) === 'POST'
+            && ($routes['alta-personal']['roles'] ?? null) === ['Administrador']
+            && ($routes['usuarios']['method'] ?? null) === 'GET',
+        'Las altas y la consulta de alumnado deben ser rutas separadas con permisos restringidos.'
     );
     assertTrue(
         ($routes['activar-cuenta']['roles'] ?? null) === []
@@ -1684,10 +1768,10 @@ try {
         $stmt->execute(['first' => $createdStudents[0] ?? 0, 'second' => $createdStudents[1] ?? 0]);
         $stmt = $db->prepare('DELETE FROM convenios WHERE empresa_id = :company');
         $stmt->execute(['company' => $createdCompany]);
-        $stmt = $db->prepare('DELETE FROM empresa_sedes WHERE empresa_id = :company');
-        $stmt->execute(['company' => $createdCompany]);
         $stmt = $db->prepare('DELETE FROM empresa_especialidades_plazas WHERE id = :offer');
         $stmt->execute(['offer' => $createdOffer]);
+        $stmt = $db->prepare('DELETE FROM empresa_sedes WHERE empresa_id = :company');
+        $stmt->execute(['company' => $createdCompany]);
     }
     if ($createdAdminStudentProfileId !== null) {
         $stmt = $db->prepare('DELETE FROM auditoria WHERE entidad = :entidad AND entidad_id = :id');

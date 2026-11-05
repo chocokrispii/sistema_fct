@@ -20,10 +20,13 @@ INSERT INTO coordinadores (usuario_id, nombre, apellidos) VALUES
 INSERT INTO empresas (id, usuario_id, nombre_empresa, cif_empresa, pagina_web, categoria) VALUES
 (1, 3, 'Tech Solutions S.L.', 'B12345678', 'https://techsolutions.com', 'Desarrollo de Software');
 
--- 5. INSERTAR OFERTA DE PLAZAS
-INSERT INTO empresa_especialidades_plazas (empresa_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin) VALUES
-(1, 1, 2, '2027-03-01', '2027-06-15'),
-(1, 2, 1, '2027-03-01', '2027-06-15');
+-- 5. CREAR LA SEDE DE TRABAJO E INSERTAR OFERTAS
+INSERT INTO empresa_sedes (id, empresa_id, nombre, direccion, telefono) VALUES
+(1, 1, 'Sede principal', 'Avenida de la Industry 45, Planta 2, Madrid', '910111213');
+
+INSERT INTO empresa_especialidades_plazas (empresa_id, sede_id, especialidad_id, plazas_cuantas, fecha_inicio, fecha_fin) VALUES
+(1, 1, 1, 2, '2027-03-01', '2027-06-15'),
+(1, 1, 2, 1, '2027-03-01', '2027-06-15');
 
 -- 6. INSERTAR ALUMNOS (Aquí se corrigió la coma de la línea 35)
 INSERT INTO alumnos (id, usuario_id, nombre, apellidos, fecha_nacimiento, dni, numero_seguridad_social, correo, especialidad_id) VALUES

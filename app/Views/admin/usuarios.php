@@ -4,32 +4,8 @@ $vueEnabled = FrontendAssets::isEnabled();
 ?>
 <?php if ($error !== ''): ?><p class="message message-error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
 <?php if ($eliminado): ?><p class="message message-success" role="status">Usuario eliminado permanentemente.</p><?php endif; ?>
-<?php if ($creado): ?>
-    <section class="message message-success" role="status">
-        <h3>Cuenta creada y correo enviado</h3>
-        <p>Se ha enviado a <strong><?= htmlspecialchars($sentTo, ENT_QUOTES, 'UTF-8') ?></strong> un enlace seguro para elegir contraseña y activar la cuenta.</p>
-        <p>El enlace caduca en 24 horas y solo se puede utilizar una vez.</p>
-    </section>
-<?php endif; ?>
 <h2>Gestión de cuentas</h2>
-<p>El alumnado y personal acceden con NIF / NIE / DNI (o pasaporte para el alumnado); las empresas, con NIF (Persona Jurídica). Desde esta tabla puedes corregir el identificador del personal o de una empresa existente.</p>
-<form class="page-form page-form--narrow" method="POST" action="index.php?action=usuarios">
-    <input type="hidden" name="_csrf" value="<?= htmlspecialchars(CsrfMiddleware::token(), ENT_QUOTES, 'UTF-8') ?>">
-    <label>Correo <input type="email" name="email" required></label>
-    <label>NIF / NIE / DNI (identificador de acceso) <input type="text" name="identificador_fiscal" maxlength="20" autocomplete="off" required></label>
-    <small>Debe tener una letra de control válida y no puede estar asignado a otra cuenta.</small>
-    <label>Nombre <input type="text" name="nombre" maxlength="50" autocomplete="given-name" required></label>
-    <label>Apellidos <input type="text" name="apellidos" maxlength="100" autocomplete="family-name" required></label>
-    <label>Rol
-        <select name="rol" required>
-            <option value="Coordinador">Coordinador</option>
-            <option value="Observador">Observador</option>
-            <option value="Administrador">Administrador</option>
-        </select>
-    </label>
-    <p>Se enviará un enlace de un solo uso y válido durante 24 horas para que la persona establezca su contraseña y active la cuenta.</p>
-    <button type="submit">Crear cuenta del centro</button>
-</form>
+<p>Consulta y gestiona las cuentas existentes. El alta de personal del centro está disponible en <a href="index.php?action=alta-personal&tab=altas">Altas &gt; Personal del Centro</a>. Desde esta tabla puedes corregir el identificador del personal o de una empresa existente.</p>
 <table>
     <thead><tr><th>Correo</th><th>Identificador fiscal de acceso</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
     <tbody><?php foreach ($usuarios as $usuario): ?>

@@ -186,7 +186,10 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 |  | `recuperaciones` | GET | Administrador, Coordinador |
 |  | `verificar-recuperacion` | POST | Administrador, Coordinador |
 | Registro y catálogo autenticado | `registro-empresa` | GET, POST | Público |
-|  | `alumnos-centro` | GET, POST | Administrador, Coordinador; alta de alumnos con NIF, datos de contacto y ciclo/curso |
+|  | `alumnos-centro` | GET | Administrador, Coordinador; consulta, filtros y edición del expediente |
+|  | `alta-alumno` | GET, POST | Administrador, Coordinador; alta y activación por correo |
+|  | `actualizar-alumno-centro` | POST | Administrador, Coordinador; edición validada y auditada |
+|  | `alta-personal` | GET, POST | Administrador; aprovisionamiento y activación por correo |
 |  | `activar-cuenta` | GET, POST | Público con token de un solo uso; elección de contraseña y activación de cuentas de alumno o personal |
 |  | `solicitar-reenvio-activacion` | POST | Público; verifica correo + NIF/NIE/DNI o pasaporte del alumnado y registra una solicitud con respuesta genérica |
 | Administración | `solicitudes-activacion` | GET | Administrador; bandeja de reenvíos pendientes |
@@ -211,7 +214,7 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 | Calificaciones | `calificaciones` | GET | Administrador, Coordinador, Observador |
 |  | `guardar-calificacion` | POST | Administrador, Coordinador |
 | Consultas y administración | `consultas` | GET | Administrador, Coordinador, Observador |
-|  | `usuarios` | GET, POST | Administrador; aprovisiona Administrador, Coordinador y Observador con NIF, nombre, apellidos y activación por correo |
+|  | `usuarios` | GET | Administrador; consulta y gestión de cuentas existentes |
 |  | `estado-usuario`, `eliminar-usuario` | POST | Administrador |
 | Integraciones | `api-tokens` | GET, POST | Administrador; emite (el valor en claro se muestra una vez) y revoca tokens de la API |
 
@@ -228,8 +231,8 @@ La definición completa del rol de auditoría y sus límites está en [Roles y p
 | Cargar el login | `AuthLoginEnhancement` se monta junto al formulario PHP | `GET login` | `AuthController::login` | Genera/reutiliza token CSRF de sesión | HTML; isla Vue mejora el envío si Vite está habilitado |
 | Consultar sesión | `RoleDashboard` / Pinia `session` | `GET session`, `Accept: application/json` | `AuthController::session` | Consulta `usuarios` por ID de sesión y verifica `activo` | `{ success: true, data: { user, csrfToken } }`; `user` es `null` si no está autenticado |
 | Iniciar sesión | `AuthLoginEnhancement` → `api/client.ts` → Pinia | `POST login`, JSON `{ identifier, password }`, `X-CSRF-Token` | `AuthController::login` | `IntentoLogin` + `Usuario`; NIF/NIE/DNI para personal, pasaporte o NIF/NIE/DNI para alumnado y NIF de persona jurídica para empresas; verificación de hash; `session_regenerate_id` | JSON de éxito con usuario/rol y nuevo token; errores JSON con status HTTP; sin JSON sigue formulario/redirección |
-| Enviar activación al alumno | `AlumnoAdminController` | `POST alumnos-centro` | `AuthMiddleware` (Administrador/Coordinador) + `CsrfMiddleware` | Cuenta inactiva, hash de token de 256 bits y expiración de 24 horas; PHPMailer por SMTP TLS | Enlace de un solo uso para elegir contraseña; si SMTP falla, se revierte la creación |
-| Aprovisionar personal del centro | `UsuarioAdminController` | `POST usuarios` | `AuthMiddleware` (Administrador) + `CsrfMiddleware` | Valida NIF, correo, nombre, apellidos y rol; guarda la cuenta inactiva y el hash del token por 24 horas; envía correo y registra auditoría en la transacción | Enlace de un solo uso para elegir contraseña; si el correo falla, se revierte el alta |
+| Enviar activación al alumno | `AlumnoAdminController` | `POST alta-alumno` | `AuthMiddleware` (Administrador/Coordinador) + `CsrfMiddleware` | Cuenta inactiva, hash de token de 256 bits y expiración de 24 horas; PHPMailer por SMTP TLS | Enlace de un solo uso para elegir contraseña; si SMTP falla, se revierte la creación |
+| Aprovisionar personal del centro | `UsuarioAdminController` | `POST alta-personal` | `AuthMiddleware` (Administrador) + `CsrfMiddleware` | Valida NIF, correo, nombre, apellidos y rol; guarda la cuenta inactiva y el hash del token por 24 horas; envía correo y registra auditoría en la transacción | Enlace de un solo uso para elegir contraseña; si el correo falla, se revierte el alta |
 | Activar una cuenta | Formulario PHP de activación | `GET, POST activar-cuenta` | `ActivacionController` | Comprueba token de alumno o personal, expiración y uso; guarda hash de contraseña y consume el token en una transacción | Mensaje de activación; la cuenta queda activa y el enlace no se puede reutilizar |
 | Solicitar un nuevo enlace | Formulario de activación caducada | `POST solicitar-reenvio-activacion` | Ruta pública + CSRF → `SolicitudReenvioActivacionController` | Coincidencia de correo, identificador fiscal y cuenta inactiva; una solicitud pendiente por cuenta y ventana de 24 horas; respuesta genérica para no revelar cuentas | Solicitud registrada como `Pendiente de Reenvío` o respuesta pública idéntica si los datos no coinciden |
 | Aprobar reenvío | Bandeja administrativa de activación | `POST aprobar-reenvio-activacion` | `AuthMiddleware` (Administrador) + CSRF → `SolicitudReenvioActivacionController` | Transacción; invalida tokens anteriores, emite uno de 24 horas, envía correo, actualiza estado y registra auditoría; si falla el correo se revierte la transacción | Mensaje de éxito o error; la solicitud sigue pendiente si no se pudo enviar |
@@ -260,6 +263,7 @@ La definición completa del rol de auditoría y sus límites está en [Roles y p
 - La revisión usa `OfferReviewPayload` y `OfferReviewResult` en `frontend/src/types/offerReview.ts`; `ReviewOfferDecision` presenta carga, confirmación y errores del servidor sin estado compartido entre ofertas.
 - `frontend/src/api/client.ts` fuerza `Accept: application/json`, establece `Content-Type` cuando hay cuerpo y usa `credentials: same-origin`. Para acciones protegidas añade la cabecera CSRF explícita.
 - Los modelos usan PDO y consultas preparadas. El esquema base vive en `database/sistema_fct.sql`, las transformaciones secuenciales en `database/migrations/` y los datos de ejemplo en `database/seeds/`.
+- El logo de marca se valida en cliente, se sanea y analiza mediante `FileScanner` antes de almacenarse en `FCT_STORAGE_PATH`; la forma elegida (`original`, redondeada, cuadrada o circular) se persiste en `portal_branding.logo_shape` y se aplica a la cabecera y a la vista previa.
 - `FrontendAssets` agrega `@vite/client` y el entrypoint en desarrollo; fuera de desarrollo lee `public/build/.vite/manifest.json`. La falta de Vue conserva los formularios/fallback PHP donde están definidos.
 
 ## Guía de extensibilidad

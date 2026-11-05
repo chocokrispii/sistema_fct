@@ -1,6 +1,8 @@
 <?php
 $previewMode = true;
 $error = '';
+$sedeError = '';
+$sedes = [['id' => 0, 'nombre' => 'Sede de demostración', 'direccion' => 'Madrid · Centro tecnológico']];
 $ofertas = [];
 $formValues = [
     'titulo' => 'Prácticas de desarrollo web',
@@ -11,7 +13,10 @@ $formValues = [
     'fecha_fin' => $fechaFin,
     'turno' => 'M',
     'modalidad' => 'Híbrido',
-    'ubicacion' => 'Madrid · Centro tecnológico',
+    'sede_id' => '0',
+    'nueva_sede_nombre' => '',
+    'nueva_sede_direccion' => '',
+    'nueva_sede_telefono' => '',
     'requisitos' => 'Conocimientos básicos de programación y trabajo en equipo.',
     'tecnologias' => 'PHP, Vue, MySQL',
 ];

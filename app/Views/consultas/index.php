@@ -47,8 +47,10 @@
                 $studentName = trim(($row['alumno_nombre'] ?? '') . ' ' . ($row['apellidos'] ?? ''));
                 $offerTitle = trim((string)($row['titulo'] ?? '')) ?: 'Oferta FCT';
                 $offerSubtitle = trim((string)($row['modalidad'] ?? ''));
-                if (!empty($row['ubicacion'])) {
-                    $offerSubtitle = trim($offerSubtitle . ' · ' . (string)$row['ubicacion']);
+                if (!empty($row['sede_nombre']) || !empty($row['sede_direccion'])) {
+                    $offerSubtitle = trim(
+                        $offerSubtitle . ' · ' . trim((string)($row['sede_nombre'] ?? '') . ' — ' . (string)($row['sede_direccion'] ?? ''), ' —')
+                    );
                 }
                 $offerSubtitle = $offerSubtitle ?: 'Modalidad y ubicación no especificadas';
                 ?>

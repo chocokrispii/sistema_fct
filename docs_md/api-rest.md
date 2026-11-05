@@ -156,6 +156,11 @@ Ejemplo de error:
 | GET | `/ofertas` y `/ofertas/{id}` | Consulta; Alumno ve ofertas aprobadas vigentes y Empresa solo sus ofertas. |
 | POST | `/ofertas` | Empresa crea una oferta pendiente asociada a un convenio aprobado. |
 | PATCH | `/ofertas/{id}` | Administrador aprueba o rechaza una oferta pendiente. |
+
+Al crear una oferta, `POST /ofertas` requiere `sede_id` de una sede activa
+perteneciente a la empresa del token. Si falta o corresponde a otra empresa,
+la API responde `422`. Las consultas de ofertas incluyen `sede_id`,
+`sede_nombre`, `sede_direccion` y `sede_telefono`.
 | GET | `/convenios` y `/convenios/{id}` | Administrador, Coordinador y Observador consultan; Empresa solo sus convenios. No expone la ruta del PDF. |
 | POST | `/convenios` | Empresa registra un convenio mediante `multipart/form-data`; el PDF se analiza con ClamAV y se almacena fuera de la carpeta pública. |
 | PATCH | `/convenios/{id}` | Administrador puede rechazar un convenio pendiente; la aprobación debe hacerse desde el flujo MVC con firma electrónica. |

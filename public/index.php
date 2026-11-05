@@ -64,10 +64,10 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Cache-Control: no-store');
 $viteOrigin = FrontendAssets::developmentOrigin();
 $autoFirmaConnectSources = "connect-src 'self' http://127.0.0.1:* https://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:*";
-$contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; $autoFirmaConnectSources; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
+$contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; $autoFirmaConnectSources; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
 if ($viteOrigin !== null) {
     $viteWebSocketOrigin = 'ws://' . substr($viteOrigin, strlen('http://'));
-    $contentSecurityPolicy = "default-src 'self'; script-src 'self' $viteOrigin; style-src 'self' $viteOrigin 'unsafe-inline'; $autoFirmaConnectSources $viteOrigin $viteWebSocketOrigin; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
+    $contentSecurityPolicy = "default-src 'self'; script-src 'self' $viteOrigin; style-src 'self' $viteOrigin 'unsafe-inline'; $autoFirmaConnectSources $viteOrigin $viteWebSocketOrigin; img-src 'self' data: blob:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
 }
 header('Content-Security-Policy: ' . $contentSecurityPolicy);
 

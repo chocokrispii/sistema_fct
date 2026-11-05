@@ -102,7 +102,7 @@ try {
             'especialidad_id' => '1', 'curso' => '1', 'observaciones_administrativas' => '',
         ];
         $before = $identityDb->cycleChecks;
-        $html = captureIdentityOutput(fn() => $identityController->gestionar());
+        $html = captureIdentityOutput(fn() => $identityController->alta());
         $case = json_encode([$type, $number], JSON_UNESCAPED_UNICODE);
         assertIdentity(
             $identityDb->cycleChecks - $before === ($valid ? 1 : 0),
@@ -116,9 +116,9 @@ try {
 
     // Se inspecciona el HTML real, incluyendo el estado tras un envío fallido.
     foreach (['NIF_NIE_DNI' => 'NIF / NIE / DNI', 'PASAPORTE' => 'Pasaporte'] as $type => $label) {
-        $html = captureIdentityOutput(fn() => View::render('admin/alumnos', [
+        $html = captureIdentityOutput(fn() => View::render('admin/alta-alumno', [
             'error' => '', 'creado' => false, 'values' => ['tipo_documento' => $type, 'dni' => 'AB1234'],
-            'especialidades' => [], 'alumnos' => [],
+            'especialidades' => [],
         ]));
         assertIdentity(
             preg_match('/<option value="' . preg_quote($type, '/') . '"\s+selected\s*>' . preg_quote($label, '/') . '<\/option>/', $html) === 1,
@@ -127,15 +127,16 @@ try {
         assertIdentity(
             str_contains($html, 'Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional')
                 && str_contains($html, 'aria-describedby="student-document-help"')
-                && str_contains($html, 'id="student-document-help"'),
-            'La nota del pasaporte debe estar visible y asociada al selector.'
+                && str_contains($html, 'id="student-document-help"')
+                && str_contains($html, 'action=importar-alumnos'),
+            'El alta individual debe conservar la ayuda del documento y ofrecer importación masiva.'
         );
         assertIdentity(preg_match('/\bCIF\b/i', $html) === 0, 'El alta de alumnado no debe mostrar CIF.');
     }
 
     $company = new EmpresaController($identityDb);
-    $staffHtml = captureIdentityOutput(fn() => View::render('admin/usuarios', [
-        'error' => '', 'eliminado' => false, 'creado' => false, 'usuarios' => [],
+    $staffHtml = captureIdentityOutput(fn() => View::render('admin/alta-personal', [
+        'error' => '', 'creado' => false, 'sentTo' => '',
     ]));
     assertIdentity(
         str_contains($staffHtml, 'NIF / NIE / DNI (identificador de acceso)')

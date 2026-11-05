@@ -19,6 +19,7 @@ const navigation = useNavigationStore();
 const tabsByRole: Record<string, NavigationTab[]> = {
     Administrador: [
         { id: 'principal', label: 'Principal', items: [{ label: 'Inicio', action: 'inicio' }, { label: 'Alumnado', action: 'alumnos-centro' }, { label: 'Calificaciones', action: 'calificaciones' }] },
+        { id: 'altas', label: 'Altas', items: [{ label: 'Alumnado', action: 'alta-alumno' }, { label: 'Personal del Centro', action: 'alta-personal' }, { label: 'Empresas', action: 'registro-empresa' }] },
         { id: 'gestion', label: 'Gestión', items: [{ label: 'Emparejar alumnos', action: 'emparejar' }, { label: 'Asignaciones', action: 'asignaciones' }, { label: 'Consultas', action: 'consultas' }] },
         { id: 'ofertas', label: 'Ofertas', items: [{ label: 'Ofertas', action: 'ofertas' }, { label: 'Revisar ofertas', action: 'revisar-ofertas' }] },
         { id: 'empresas', label: 'Empresas', items: [{ label: 'Gestión de empresas', action: 'gestion-empresas' }] },
@@ -27,6 +28,7 @@ const tabsByRole: Record<string, NavigationTab[]> = {
     ],
     Coordinador: [
         { id: 'principal', label: 'Principal', items: [{ label: 'Inicio', action: 'inicio' }, { label: 'Alumnado', action: 'alumnos-centro' }, { label: 'Calificaciones', action: 'calificaciones' }] },
+        { id: 'altas', label: 'Altas', items: [{ label: 'Alumnado', action: 'alta-alumno' }, { label: 'Empresas', action: 'registro-empresa' }] },
         { id: 'gestion', label: 'Gestión', items: [{ label: 'Emparejar alumnos', action: 'emparejar' }, { label: 'Asignaciones', action: 'asignaciones' }, { label: 'Consultas', action: 'consultas' }] },
         { id: 'ofertas', label: 'Ofertas y convenios', items: [{ label: 'Ofertas', action: 'ofertas' }, { label: 'Revisar ofertas', action: 'revisar-ofertas' }, { label: 'Revisar convenios', action: 'revisar-convenios' }] },
     ],
