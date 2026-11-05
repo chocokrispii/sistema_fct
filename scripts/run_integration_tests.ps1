@@ -4,6 +4,8 @@ $databaseService = 'integration-db'
 $integrationDatabase = 'fct_test_integration'
 $tests = @(
     'tests/run.php',
+    'tests/student_import.php',
+    'tests/student_import_db.php',
     'tests/company_import_db.php',
     'tests/convenios_unificado.php',
     'tests/offers_legacy_schedule.php',

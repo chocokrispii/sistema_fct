@@ -3,6 +3,7 @@ $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTE
 ?>
 <h2>Alta de alumnado por el centro</h2>
 <p>Solo el personal autorizado puede crear estas cuentas. El alumnado no dispone de un formulario público de alta; al guardar, recibirá un enlace de activación por correo.</p>
+<p><a class="student-bulk-import-link" href="index.php?action=importar-alumnos&tab=altas">Importación masiva de alumnado (.xlsx)</a></p>
 <p><a href="index.php?action=alumnos-centro&tab=principal">Volver a consultar alumnado</a></p>
 
 <?php if ($error !== ''): ?>

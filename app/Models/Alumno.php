@@ -360,6 +360,23 @@ class Alumno {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * @return list<array{correo:string,dni:string,tipo_documento:?string,nombre:string,apellidos:string,nombre_especialidad:?string,curso:string|int}>
+     */
+    public function obtenerTodosParaExportacion(): array
+    {
+        $stmt = $this->db->query(
+            'SELECT u.email AS correo, a.dni, a.tipo_documento, a.nombre, a.apellidos,
+                    e.nombre_especialidad, a.curso
+             FROM alumnos a
+             INNER JOIN usuarios u ON u.id = a.usuario_id AND u.rol = \'Alumno\'
+             LEFT JOIN especialidades e ON e.id = a.especialidad_id
+             ORDER BY a.apellidos, a.nombre, a.id'
+        );
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function registrarTutor(
         int $alumnoId,
         string $nombreTutor,
