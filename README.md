@@ -10,7 +10,7 @@
 
 Guía de incorporación y operaciones de desarrollo para el Sistema FCT, una aplicación web híbrida que gestiona prácticas de Formación en Centros de Trabajo (FCT).
 
-> Docker Compose es el entorno de desarrollo recomendado. Esta configuración no es un despliegue de producción: los puertos y secretos de ejemplo son locales y deben cambiarse antes de compartir el entorno.
+> Docker Compose es el entorno de desarrollo recomendado, no una receta de producción. Antes de entregar el sistema a otra organización, sigue la [guía de puesta en producción](#puesta-en-producción): incluye requisitos de infraestructura, secretos, migraciones y, especialmente, la configuración real de AutoFirma y su almacén de confianza.
 
 ## Inicio rápido
 
@@ -30,6 +30,7 @@ Después, opcionalmente, crea cuentas demo (ver [sección 5](#5-base-de-datos-cu
 1. [Tecnologías](#1-tecnologías)
 2. [Requisitos previos](#2-requisitos-previos)
 3. [Preparar el entorno](#3-preparar-el-entorno)
+   - [Puesta en producción](#puesta-en-producción)
 4. [Iniciar y detener la infraestructura](#4-iniciar-y-detener-la-infraestructura)
 5. [Base de datos, cuentas de desarrollo y phpMyAdmin](#5-base-de-datos-cuentas-de-desarrollo-y-phpmyadmin)
 6. [Recorrido funcional](#6-recorrido-funcional-disponibilidad-matching-y-seguimiento)
@@ -118,6 +119,71 @@ Este modo comparte los datos de XAMPP y no importa ni borra su base de datos. El
 Compose crea automáticamente el volumen privado `fct_storage` y lo monta como `/var/lib/fct/storage`, que es el valor de `FCT_STORAGE_PATH` dentro del contenedor. El contenedor verifica y corrige al arrancar la propiedad y los permisos de los directorios de convenios, incluso si el volumen ya existía; no se debe mover a `public/`.
 
 Si ejecutas PHP directamente con XAMPP en vez de Docker, configura `FCT_STORAGE_PATH` como una ruta absoluta a un directorio existente, con permisos de escritura para Apache y separado del document root. La aplicación rechaza rutas inexistentes o dentro de `public/`.
+
+### Puesta en producción
+
+Esta guía sirve para entregar y preparar el sistema en una organización; no convierte el `docker-compose.yml` de desarrollo en una configuración de producción certificada. El repositorio no incluye un archivo Compose de producción listo para desplegar. El Compose disponible monta el código del host, inicia servicios de desarrollo como Mailpit y phpMyAdmin y publica puertos locales. Prepara y revisa una configuración de producción específica antes de exponer la aplicación.
+
+#### 1. Definir alojamiento, acceso y requisitos de firma
+
+- Decide quién administra el sistema, quién puede firmar y qué nivel de firma exige la organización. Una firma PAdES técnicamente válida no es automáticamente una firma cualificada eIDAS. Si se requiere ese nivel, define la política y el prestador cualificado con asesoramiento jurídico antes de desplegar.
+- Usa un servidor mantenido, un dominio propio, HTTPS válido y un proxy inverso/firewall configurados para publicar únicamente HTTPS. Restringe el acceso administrativo y aplica las políticas de retención y protección de datos de la organización.
+- Usa una versión revisada e identificable del código e imagen; valida primero el despliegue y las migraciones en preproducción con una copia protegida de los datos. No publiques una rama de trabajo directamente.
+
+#### 2. Endurecer el despliegue
+
+Construye una imagen inmutable a partir de la versión elegida y usa una configuración Compose de producción revisada. No montes el repositorio del host sobre `/var/www/html` ni uses los volúmenes locales de `vendor` como sustituto de la imagen. Excluye del despliegue público `frontend-dev`, phpMyAdmin, Mailpit y los servicios de pruebas; el Compose actual hace que `app` dependa de Mailpit, por lo que la configuración de producción debe retirar también esa dependencia. No expongas MariaDB ni ClamAV a Internet. Mantén ClamAV en una red privada y habilitado.
+
+El puerto de `app` en el Compose actual está enlazado a `127.0.0.1`; sirve detrás de un proxy inverso en el mismo host. Si el proxy está en otro contenedor o servidor, configura una red privada y un enlace de servicio apropiados, sin publicar el puerto de aplicación directamente a Internet. Conserva únicamente el acceso HTTPS público y limita los puertos de administración a una VPN o red autorizada.
+
+#### 3. Inyectar configuración y secretos de producción
+
+No reutilices `.env.example`: contiene credenciales locales, HTTP, Mailpit y una configuración mock. Inyecta los valores desde el gestor de secretos de la plataforma. Si el despliegue usa un archivo `.env`, créalo en el servidor con acceso restringido, exclúyelo del repositorio y de las copias no cifradas, y no lo pegues en incidencias, registros o comandos compartidos.
+
+Configura como mínimo:
+
+| Variable | Configuración de producción |
+|---|---|
+| `APP_ENV` | `production`. |
+| `FCT_APP_URL` | URL canónica pública, por ejemplo `https://fct.ejemplo.es`, sin barra final. |
+| `FCT_CONVENIO_SIGNATURE_MODE` | `autofirma`. Es necesario indicarlo explícitamente; el modo predeterminado en producción es `disabled`. `mock` y `test` se rechazan fuera de desarrollo/pruebas. |
+| `FCT_CLAMAV_ENABLED` | `true`. No habilites el bypass de análisis en producción. |
+| `FCT_VITE_DEV_SERVER` | Vacío; sirve los assets compilados de la imagen, no Vite HMR. |
+| `FCT_DB_NAME`, `FCT_DB_USER`, `FCT_DB_PASS` | Base y usuario exclusivos de la aplicación, con una contraseña aleatoria y permisos mínimos sobre esa base. |
+| `MARIADB_ROOT_PASSWORD` | Secreto administrativo distinto del usuario de aplicación; no lo uses desde la aplicación. |
+| `FCT_MAIL_TRANSPORT`, `FCT_MAIL_HOST`, `FCT_MAIL_PORT`, `FCT_MAIL_ENCRYPTION` | SMTP real de la organización (`smtp`, puerto 587 con `tls` o 465 con `ssl`), nunca Mailpit. |
+| `FCT_MAIL_USERNAME`, `FCT_MAIL_PASSWORD`, `FCT_MAIL_FROM` | Credenciales SMTP y remitente autorizado por el proveedor de correo. Comprueba también la entregabilidad del dominio. |
+| `FCT_AUTOFIRMA_NSS_PATH` | Ruta del servidor que contiene la base NSS de confianza preparada para la verificación PAdES; se monta como solo lectura en el contenedor. |
+| `FCT_INTEGRATIONS_ENABLED` | `false`, salvo que se haya aprobado y configurado expresamente el uso de la API de integraciones. |
+| `FCT_WEBHOOK_ENCRYPTION_KEY` | Clave aleatoria generada y custodiada por la organización si se habilitan webhooks; no dejes el valor vacío ni reutilices claves entre entornos. |
+
+Deja en blanco `FCT_CONVENIO_MOCK_P12_PASSWORD` y no copies al servidor el PKCS#12, la clave privada ni el NSS de desarrollo que genera `scripts/setup-autofirma-dev.js`. La ruta de `FCT_STORAGE_PATH` en la imagen es `/var/lib/fct/storage`; no la cambies por `public/`.
+
+#### 4. Preparar base de datos, migraciones y almacenamiento
+
+Usa una base dedicada, con acceso de red privado y credenciales distintas por entorno. Antes de migrar una base existente, realiza y comprueba una copia de seguridad recuperable. Las migraciones automáticas del Compose de desarrollo sólo se ejecutan al inicializar un volumen MariaDB vacío; no se vuelven a aplicar al arrancar sobre una base existente.
+
+En una base existente, identifica primero qué migraciones ya se ejecutaron y aplica sólo las pendientes, en el orden documentado en esta guía. Para la firma de convenios, `026_firma_electronica_convenios.sql` debe preceder a `027_convenio_firma_concurrencia_auditoria.sql`. **La 027 vuelve a poner en revisión convenios aprobados heredados cuya firma no acredita una PAdES verificable**; revisa ese efecto con la organización y valida el resultado en preproducción antes de ejecutarla. No importes de nuevo `database/sistema_fct.sql` ni ejecutes todas las migraciones indiscriminadamente. Consulta [Base de datos, cuentas y migraciones](#5-base-de-datos-cuentas-de-desarrollo-y-phpmyadmin) y la [guía de firma de convenios](docs_md/integraciones.md#firma-de-convenios-con-autofirma).
+
+Monta `FCT_STORAGE_PATH` como almacenamiento persistente, privado y con permisos mínimos. Incluye los PDF originales y firmados en copias cifradas, restringe quién puede restaurarlas y prueba periódicamente una restauración. Mantén también las copias de seguridad de la base de datos coordinadas con el almacenamiento para poder recuperar metadatos y documentos en conjunto. Nunca publiques ni sirvas esos archivos desde `public/`.
+
+#### 5. Preparar la firma PAdES de producción
+
+La firma nativa se realiza en el equipo del Administrador, no con una clave privada instalada en el servidor:
+
+1. Instala y mantén AutoFirma oficial en cada equipo autorizado para firmar. Comprueba que el navegador permitido puede abrir el protocolo `afirma://` y que el equipo tiene acceso al certificado del firmante (almacén del sistema, tarjeta o dispositivo correspondiente).
+2. Usa un certificado vigente y apropiado para la identidad y facultades del firmante. Define quién lo emite y custodia, cómo se renueva o revoca y qué hacer si se pierde o queda comprometido. No copies su clave privada al servidor.
+3. En el servidor, prepara mediante el procedimiento de la organización una base NSS SQL en la ruta indicada por `FCT_AUTOFIRMA_NSS_PATH`. Añade únicamente las autoridades raíz e intermedias que la política haya aprobado como confiables. No importes el certificado autofirmado del modo mock ni marques certificados como confiables para hacer pasar una prueba.
+4. Monta esa base en `/var/lib/fct/autofirma-nssdb` con lectura para el proceso de PHP y solo lectura desde el contenedor. El verificador `pdfsig` exige que la firma sea íntegra, que el certificado resulte confiable y que el documento completo esté firmado; además consulta OCSP. Permite desde el servidor la salida de red estrictamente necesaria para AIA/OCSP y supervisa su disponibilidad. Una incidencia de confianza, revocación o conectividad debe impedir la aprobación, no relajarse.
+5. Prueba el flujo en preproducción con el certificado y la política reales del entorno. Comprueba la salida de validación PAdES, la descarga del PDF, sus hashes y el registro en `convenio_audit_logs`. El modo `test` omite OCSP y el `mock` usa una identidad local sin validez contractual: ninguno es una prueba de aceptación para producción.
+
+La instalación de AutoFirma y el certificado del firmante son requisitos de cada equipo cliente; el almacén NSS y el acceso de validación OCSP/AIA son requisitos del servidor. Ambos lados deben estar preparados. Revisa la [guía de firma de convenios](docs_md/integraciones.md#firma-de-convenios-con-autofirma) para el comportamiento y las limitaciones de la implementación.
+
+#### 6. Puesta en servicio y operación
+
+Antes de habilitar usuarios, verifica en el entorno de producción que la URL redirige/protege correctamente mediante HTTPS, que el inicio de sesión y los permisos funcionan, que ClamAV está saludable y que una carga se rechaza si el escáner no está disponible. Prueba el correo SMTP de extremo a extremo y confirma que no llega a Mailpit. Completa una firma PAdES controlada con un Administrador autorizado, valida el documento descargado con un lector de PDF compatible y confirma que el destinatario autorizado puede descargarlo y que otros usuarios no pueden hacerlo.
+
+Supervisa salud y registros de PHP/Apache, MariaDB, ClamAV, SMTP y espacio/errores del almacenamiento. Establece responsables para parches de sistema e imágenes, rotación de secretos, renovación/revocación de certificados, renovación de CA confiables, copias de seguridad y respuesta ante incidentes. Antes de cada actualización, repite la validación en preproducción y prepara una recuperación probada; no uses `docker compose down -v` en producción.
 
 ### Identidad visual del portal
 
