@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { requestApi } from '../api/client';
 import { base64PdfBlob, signPdfWithAutoFirma } from '../lib/autoFirmaClient';
 
-const props = defineProps<{ csrf: string; convenioId: string }>();
+const props = defineProps<{ csrf: string; convenioId: string; mode: 'autofirma' | 'mock' }>();
 const root = ref<HTMLElement | null>(null);
 const status = ref<'idle' | 'preparing' | 'ready' | 'signing' | 'success' | 'error'>('idle');
 const message = ref('');
@@ -28,6 +28,30 @@ async function submitAutoFirma(event: SubmitEvent): Promise<void> {
     }
     event.preventDefault();
     if (status.value === 'preparing' || status.value === 'signing' || !/^[1-9]\d*$/.test(props.convenioId)) {
+        return;
+    }
+    if (props.mode === 'mock') {
+        status.value = 'signing';
+        message.value = 'Firmando con el certificado local de desarrollo…';
+        try {
+            const result = await requestApi<CompletionResult>('index.php?action=firmar-convenio-mock', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': props.csrf },
+                body: JSON.stringify({ convenio_id: Number(props.convenioId) }),
+            });
+            status.value = 'success';
+            message.value = result.notificacion_enviada
+                ? 'Firma PAdES de prueba validada; la empresa recibió el PDF.'
+                : 'Firma PAdES de prueba validada; el correo a la empresa está pendiente.';
+            window.setTimeout(() => {
+                window.location.assign(
+                    `index.php?action=revisar-convenios&firma=${result.notificacion_enviada ? 'completada' : 'correo_pendiente'}`,
+                );
+            }, 1200);
+        } catch (cause) {
+            status.value = 'error';
+            message.value = cause instanceof Error ? cause.message : 'No se pudo completar la firma mock.';
+        }
         return;
     }
     status.value = 'preparing';

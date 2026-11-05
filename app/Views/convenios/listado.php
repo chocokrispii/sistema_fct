@@ -125,33 +125,38 @@ $tabs = [
                             </td>
                             <td class="agreement-actions">
                                 <?php if ($esAdministrador): ?>
-                                    <a href="index.php?action=descargar-convenio&amp;id=<?= $convenioId ?>">Descargar PDF</a>
+                                    <a href="index.php?action=descargar-convenio&amp;id=<?= $convenioId ?>">Descargar PDF original</a>
+                                    <?php if (
+                                        $item['estado'] === 'Aprobado'
+                                        && ($item['firma_estado'] ?? '') === 'FIRMADO_Y_APROBADO'
+                                        && !empty($item['documento_firmado_path'])
+                                    ): ?>
+                                        <a href="index.php?action=descargar-convenio-firmado&amp;id=<?= $convenioId ?>">Descargar PDF firmado</a>
+                                    <?php endif; ?>
                                 <?php elseif (!$puedeFirmar): ?>
                                     <span>Descarga reservada a administración</span>
                                 <?php endif; ?>
-                                <?php if ($puedeFirmar && $item['estado'] === 'Pendiente' && $signatureMode === 'autofirma'): ?>
-                                    <form method="POST" enctype="multipart/form-data" action="index.php?action=firmar-convenio">
+                                <?php if ($puedeFirmar && $item['estado'] === 'Pendiente' && in_array($signatureMode, ['autofirma', 'mock'], true)): ?>
+                                    <form method="POST" enctype="multipart/form-data" action="index.php?action=<?= $signatureMode === 'mock' ? 'firmar-convenio-mock' : 'firmar-convenio' ?>">
                                         <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">
                                         <input type="hidden" name="convenio_id" value="<?= $convenioId ?>">
-                                        <label>Si la firma automática no está disponible, adjunta el PDF firmado con AutoFirma
-                                            <input name="documento_firmado" type="file" accept="application/pdf,.pdf">
-                                        </label>
+                                        <?php if ($signatureMode === 'autofirma'): ?>
+                                            <label>Si la firma automática no está disponible, adjunta el PDF firmado con AutoFirma
+                                                <input name="documento_firmado" type="file" accept="application/pdf,.pdf">
+                                            </label>
+                                        <?php else: ?>
+                                            <p>Firma local de desarrollo con certificado de prueba. No tiene validez contractual.</p>
+                                        <?php endif; ?>
                                         <div data-autofirma-island
                                              data-vue-island="AutoFirmaAgreementSignature"
                                              data-prop-csrf="<?= $escape(CsrfMiddleware::token()) ?>"
-                                             data-prop-convenio-id="<?= $convenioId ?>"></div>
-                                        <button type="submit" value="autofirma">Revisar y firmar con AutoFirma</button>
-                                        <button class="button-secondary" type="submit" name="modo_firma" value="manual">Enviar PDF firmado manualmente</button>
+                                             data-prop-convenio-id="<?= $convenioId ?>"
+                                             data-prop-mode="<?= $escape($signatureMode) ?>"></div>
+                                        <button type="submit" value="autofirma"><?= $signatureMode === 'mock' ? 'Firmar con certificado local de prueba' : 'Revisar y firmar con AutoFirma' ?></button>
+                                        <?php if ($signatureMode === 'autofirma'): ?>
+                                            <button class="button-secondary" type="submit" name="modo_firma" value="manual">Enviar PDF firmado manualmente</button>
+                                        <?php endif; ?>
                                     </form>
-                                <?php elseif ($puedeFirmar && $item['estado'] === 'Pendiente' && $signatureMode === 'simple' && $esAdministrador): ?>
-                                    <form method="POST" action="index.php?action=firmar-convenio">
-                                        <input type="hidden" name="_csrf" value="<?= $escape(CsrfMiddleware::token()) ?>">
-                                        <input type="hidden" name="convenio_id" value="<?= $convenioId ?>">
-                                        <p>Modo heredado de desarrollo: el sello simple no es una firma PAdES ni debe utilizarse en producción.</p>
-                                        <button type="submit">Aprobar con sello simple (solo desarrollo)</button>
-                                    </form>
-                                <?php elseif ($puedeFirmar && $item['estado'] === 'Pendiente' && $signatureMode === 'autofirma'): ?>
-                                    <p>El convenio requiere firma PAdES con AutoFirma.</p>
                                 <?php elseif ($puedeFirmar && $item['estado'] === 'Pendiente' && $signatureMode === 'test'): ?>
                                     <p>Usa la prueba de AutoFirma; no aprobará este convenio.</p>
                                 <?php endif; ?>

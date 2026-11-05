@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/ActivationUrl.php';
+require_once __DIR__ . '/ConvenioSignatureMode.php';
 
 use PHPMailer\PHPMailer\Exception as MailException;
 use PHPMailer\PHPMailer\PHPMailer;
@@ -15,7 +16,7 @@ final class ConvenioApprovalMailer
         string $companyName,
         string $agreementNumber,
         string $downloadUrl,
-        bool $padesVerified = true
+        string $signedPdfPath
     ): void
     {
         $host = getenv('FCT_MAIL_HOST') ?: '';
@@ -29,10 +30,12 @@ final class ConvenioApprovalMailer
         $port = filter_var($portRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 65535]]);
         $appUrl = rtrim(getenv('FCT_APP_URL') ?: '', '/');
         $localMailpit = $transport === 'mailpit'
-            && (getenv('APP_ENV') ?: '') === 'development'
+            && in_array(getenv('APP_ENV') ?: '', ['development', 'testing'], true)
             && $host === 'mailpit'
             && $port === 1025
             && $encryption === 'none';
+        $developmentMock = ConvenioSignatureMode::canUseMockSignature()
+            && in_array(getenv('APP_ENV') ?: '', ['development', 'testing'], true);
 
         if (
             !filter_var($recipient, FILTER_VALIDATE_EMAIL)
@@ -40,11 +43,21 @@ final class ConvenioApprovalMailer
             || !in_array($transport, ['smtp', 'mailpit'], true)
             || ($transport === 'smtp' && ($host === '' || $username === '' || $password === '' || !in_array($encryption, ['tls', 'ssl'], true)))
             || ($transport === 'mailpit' && !$localMailpit)
+            || ($developmentMock && !$localMailpit)
             || $port === false
             || !ActivationUrl::isAllowedBaseUrl($appUrl)
             || preg_match('/[\r\n]/', $fromName) === 1
         ) {
             throw new RuntimeException('La configuración SMTP o la URL pública no es válida para notificar la aprobación.');
+        }
+        $attachmentPath = realpath($signedPdfPath);
+        if (
+            $attachmentPath === false
+            || !is_file($attachmentPath)
+            || !is_readable($attachmentPath)
+            || filesize($attachmentPath) < 1
+        ) {
+            throw new RuntimeException('No se pudo validar el PDF firmado para adjuntarlo al correo.');
         }
 
         $mail = new PHPMailer(true);
@@ -72,17 +85,20 @@ final class ConvenioApprovalMailer
             $mail->CharSet = PHPMailer::CHARSET_UTF8;
             $mail->setFrom($from, $fromName);
             $mail->addAddress($recipient, $displayName);
+            $mail->addAttachment($attachmentPath, 'convenio-aprobado.pdf', PHPMailer::ENCODING_BASE64, 'application/pdf');
             $mail->isHTML(true);
             $mail->Subject = 'Convenio aprobado en Sistema FCT';
-            $approvalDescription = $padesVerified
-                ? 'ha sido aprobado tras validar su firma electrónica PAdES.'
-                : 'ha sido aprobado con un sello electrónico simple de desarrollo.';
+            $approvalDescription = ConvenioSignatureMode::canUseMockSignature()
+                ? 'se ha firmado con un certificado local de prueba PAdES, sin validez contractual.'
+                : 'ha sido aprobado tras validar su firma electrónica PAdES.';
             $mail->Body = '<p>Hola ' . $safeName . ':</p>'
                 . '<p>El convenio ' . $safeNumber . ' ' . $approvalDescription . '</p>'
+                . '<p>Adjuntamos el PDF firmado. También puedes consultarlo desde tu cuenta:</p>'
                 . '<p><a href="' . $safeUrl . '">Acceder al convenio aprobado</a></p>'
                 . '<p>El enlace requiere iniciar sesión con la cuenta de empresa asociada.</p>';
             $mail->AltBody = "Hola $displayName:\n\n"
                 . "El convenio $agreementNumber $approvalDescription\n"
+                . "El PDF firmado se adjunta a este correo.\n"
                 . "Accede al documento iniciando sesión con la cuenta de empresa asociada:\n$downloadUrl";
             $mail->send();
         } catch (MailException $exception) {

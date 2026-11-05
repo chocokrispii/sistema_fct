@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 final class PadesSignatureVerifier
 {
-    public function verify(string $pdfPath, string $nssDirectory, bool $skipOcsp = false): array
+    public function verify(
+        string $pdfPath,
+        string $nssDirectory,
+        bool $skipOcsp = false,
+        bool $allowLocalSelfSigned = false
+    ): array
     {
+        $localEnvironment = in_array(getenv('APP_ENV') ?: 'production', ['development', 'testing'], true);
+        $mode = ConvenioSignatureMode::current();
         if (
-            $skipOcsp
-            && ((getenv('APP_ENV') ?: 'production') !== 'development'
-                || ConvenioSignatureMode::current() !== 'test')
+            ($skipOcsp && (!$localEnvironment || !in_array($mode, ['test', 'mock'], true)))
+            || ($allowLocalSelfSigned && (!$localEnvironment || $mode !== 'mock'))
         ) {
-            throw new RuntimeException('La omisión OCSP solo se permite para la prueba local de AutoFirma.');
+            throw new RuntimeException('La validación relajada solo se permite para los modos locales de prueba.');
         }
 
         $resolvedPdf = realpath($pdfPath);
@@ -81,10 +87,10 @@ final class PadesSignatureVerifier
             throw new DomainException('No se pudo validar la firma PAdES con el almacén de confianza configurado.');
         }
 
-        return self::parseOutput($output);
+        return self::parseOutput($output, $allowLocalSelfSigned);
     }
 
-    public static function parseOutput(string $output): array
+    public static function parseOutput(string $output, bool $allowLocalSelfSigned = false): array
     {
         preg_match_all(
             '/^Signature #\d+:\s*(.*?)(?=^Signature #\d+:|\z)/ms',
@@ -97,9 +103,12 @@ final class PadesSignatureVerifier
         }
 
         $latest = (string)end($signatures);
+        $certificateTrusted = preg_match('/Certificate Validation:\s*Certificate is Trusted\./i', $latest) === 1;
+        $localCertificateUntrusted = $allowLocalSelfSigned
+            && preg_match('/Certificate Validation:\s*Unknown issue with Certificate or corrupted data\./i', $latest) === 1;
         if (
             preg_match('/Signature Validation:\s*Signature is Valid\./i', $latest) !== 1
-            || preg_match('/Certificate Validation:\s*Certificate is Trusted\./i', $latest) !== 1
+            || (!$certificateTrusted && !$localCertificateUntrusted)
             || preg_match('/Signature Type:\s*(?:ETSI\.CAdES\.detached|adbe\.pkcs7\.detached)\b/i', $latest) !== 1
             || preg_match('/Signing Hash Algorithm:\s*SHA-(?:256|384|512)\b/i', $latest) !== 1
             || preg_match('/Not total document signed/i', $latest) === 1
@@ -116,6 +125,7 @@ final class PadesSignatureVerifier
         return [
             'signer' => mb_substr($signer, 0, 200),
             'signature_count' => count($signatures),
+            'certificate_trusted' => $certificateTrusted,
         ];
     }
 }

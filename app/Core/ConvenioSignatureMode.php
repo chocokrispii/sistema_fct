@@ -12,11 +12,11 @@ final class ConvenioSignatureMode
             ? $configured
             : (in_array($environment, ['development', 'testing'], true) ? 'test' : 'disabled');
 
-        if (!in_array($mode, ['autofirma', 'test', 'simple', 'disabled'], true)) {
-            throw new RuntimeException('FCT_CONVENIO_SIGNATURE_MODE debe ser autofirma, test, simple o disabled.');
+        if (!in_array($mode, ['autofirma', 'mock', 'test', 'disabled'], true)) {
+            throw new RuntimeException('FCT_CONVENIO_SIGNATURE_MODE debe ser autofirma, mock, test o disabled.');
         }
-        if (in_array($mode, ['test', 'simple'], true) && !in_array($environment, ['development', 'testing'], true)) {
-            throw new RuntimeException('Los modos de prueba y sello simple solo se permiten en desarrollo o pruebas.');
+        if (in_array($mode, ['mock', 'test'], true) && !in_array($environment, ['development', 'testing'], true)) {
+            throw new RuntimeException('Los modos mock y test solo se permiten en desarrollo o pruebas.');
         }
 
         return $mode;
@@ -27,8 +27,8 @@ final class ConvenioSignatureMode
         return self::current() === 'autofirma';
     }
 
-    public static function canUseSimpleStamp(): bool
+    public static function canUseMockSignature(): bool
     {
-        return self::current() === 'simple';
+        return self::current() === 'mock';
     }
 }

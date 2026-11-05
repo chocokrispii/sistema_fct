@@ -93,7 +93,7 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    review["gestionar-convenios · revisar-firmar/rechazar/archivar-convenio<br/>COMPLETED: aprobación con sello electrónico y auditoría"]:::completed
+    review["gestionar-convenios · revisar-firmar/rechazar/archivar-convenio<br/>COMPLETED: firma PAdES, control de concurrencia y auditoría"]:::completed
     file["convenios · descargar-convenio / descargar-convenio-firmado<br/>COMPLETED: almacenamiento privado y descarga autenticada"]:::completed
     audit["auditar-convenios<br/>COMPLETED: lectura PHP"]:::completed
     review --> file --> audit

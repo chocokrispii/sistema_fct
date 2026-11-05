@@ -34,26 +34,28 @@ La especificación completa de rutas, permisos y formatos está en [API REST](./
 
 ## Firma de convenios con AutoFirma
 
-Administradores y Coordinadores pueden firmar los convenios pendientes con el
-cliente de escritorio AutoFirma. El navegador envía el PDF original a AutoFirma
-para una firma PAdES; el backend comprueba que el PDF corresponde al original y
-valida la integridad de la firma, la cadena de confianza y la revocación OCSP
-antes de aprobarlo. Una cancelación, un certificado no confiable o un fallo de
-validación deja el convenio pendiente.
+Solo Administradores pueden firmar los convenios pendientes. En modo nativo,
+el navegador envía el PDF original a AutoFirma para una firma PAdES; el backend
+comprueba el documento, la integridad de la firma, la cadena de confianza y la
+revocación OCSP antes de aprobarlo. AutoFirma muestra el bloque de firma en la
+última página. Una cancelación, un certificado no confiable o un fallo de
+validación deja el convenio sin aprobar.
 
 El modo se configura con `FCT_CONVENIO_SIGNATURE_MODE`:
 
-- `test` es el valor predeterminado en desarrollo. La ruta
+- `test` habilita una prueba no persistente de AutoFirma, sin aprobar convenios.
+  La ruta
   `index.php?action=probar-autofirma` firma un PDF ficticio y valida el PAdES
   contra el almacén de confianza local configurado, sin consulta OCSP. No guarda
-  el resultado ni cambia convenios. Para pruebas reproducibles puede instalarse
-  un certificado y una CA autofirmados exclusivamente de prueba; no son
-  certificados cualificados ni deben usarse para documentos reales.
+  el resultado ni cambia convenios.
+- `mock` usa un certificado PKCS#12 local para producir y validar una firma
+  PAdES de prueba. Solo se permite en `development` o `testing`; no es una firma
+  con identidad verificada ni tiene validez contractual. Ejecuta
+  `node scripts/setup-autofirma-dev.js` para preparar el certificado, el
+  almacén NSS y un PDF ficticio.
 - `autofirma` habilita las aprobaciones PAdES. El cliente AutoFirma debe estar
-  instalado en el equipo del firmante.
+  instalado en el equipo del Administrador firmante.
 - `disabled` deshabilita la firma.
-- `simple` conserva el sello visual heredado únicamente para desarrollo y
-  pruebas; está rechazado en producción.
 
 Para habilitar `autofirma`, el servidor Docker necesita `pdfsig`, un almacén NSS
 con las CA que deban considerarse confiables y acceso a los servicios OCSP/AIA
@@ -65,10 +67,11 @@ con el procedimiento de confianza de la organización antes de habilitar firmas.
 Si el almacén falta o no confía en el certificado, el backend no aprueba el
 convenio.
 
-En un convenio pendiente, el firmante puede usar el flujo automático del
-navegador o descargar el original, firmarlo desde AutoFirma y subir el PDF
-resultante. Ambos flujos pasan por la misma validación del servidor. La
-notificación a la empresa contiene un enlace de descarga privado.
+La reserva de firma usa un lease con expiración para impedir aprobaciones
+simultáneas sin mantener una transacción abierta durante AutoFirma. La auditoría
+específica conserva hashes pre/post firma, proveedor, firmante y fecha UTC. Al
+aprobar, el correo incluye el PDF firmado adjunto y un enlace de descarga
+autenticado.
 
 El cliente `AutoScript` se distribuye desde el repositorio oficial
 [ctt-gob-es/clienteafirma](https://github.com/ctt-gob-es/clienteafirma), fijado

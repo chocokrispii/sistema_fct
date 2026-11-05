@@ -43,7 +43,6 @@ function assertTrue(bool $condition, string $message): void
 }
 
 require_once __DIR__ . '/file_security.php';
-require_once __DIR__ . '/convenio_firma_pdf.php';
 require_once __DIR__ . '/autofirma_signature.php';
 require_once __DIR__ . '/branding.php';
 
@@ -90,6 +89,8 @@ $required = [
     'convenio_hash_firmado' => ['table' => 'convenios', 'column' => 'hash_documento_firmado'],
     'convenio_actor_firma' => ['table' => 'convenios', 'column' => 'firma_aprobada_por'],
     'convenio_fecha_firma_utc' => ['table' => 'convenios', 'column' => 'firmada_en_utc'],
+    'convenio_firma_estado' => ['table' => 'convenios', 'column' => 'firma_estado'],
+    'convenio_firma_lease' => ['table' => 'convenios', 'column' => 'firma_lease_token_hash'],
     'curso_alumno' => ['table' => 'alumnos', 'column' => 'curso'],
     'tipo_documento_alumno' => ['table' => 'alumnos', 'column' => 'tipo_documento'],
     'observaciones_administrativas_alumno' => ['table' => 'alumnos', 'column' => 'observaciones_administrativas'],
@@ -132,6 +133,8 @@ $activationTable->execute(['schema' => $testDatabase, 'table' => 'activation_res
 assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de solicitudes de reenvío de activación.');
 $activationTable->execute(['schema' => $testDatabase, 'table' => 'audit_logs']);
 assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la tabla de trazabilidad administrativa.');
+$activationTable->execute(['schema' => $testDatabase, 'table' => 'convenio_audit_logs']);
+assertTrue((int)$activationTable->fetchColumn() === 1, 'Falta la auditoría específica de firmas de convenio.');
 $auditColumns = $db->query(
     "SELECT COUNT(*) FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audit_logs'
@@ -783,13 +786,23 @@ try {
     $signedAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
     $db->beginTransaction();
     try {
+        $leaseToken = bin2hex(random_bytes(32));
+        if (!$agreementModel->reservarFirma(
+            $agreementId,
+            $createdUsers[4],
+            $leaseToken,
+            $signedAt->modify('+10 minutes')
+        )) {
+            throw new RuntimeException('No se pudo reservar el convenio para la prueba de firma.');
+        }
         $previousState = $agreementModel->registrarFirma(
             $agreementId,
             str_repeat('a', 48) . '.pdf',
             str_repeat('b', 64),
             str_repeat('c', 64),
             $createdUsers[4],
-            $signedAt
+            $signedAt,
+            $leaseToken
         );
         (new Auditoria($db))->registrar(
             $createdUsers[4],

@@ -8,7 +8,9 @@
         "phpoffice/phpspreadsheet": "^5.10",
         "setasign/fpdf": "^1.8.6",
         "setasign/fpdi": "^2.6.4",
-        "smalot/pdfparser": "^2.13"
+        "setasign/fpdi-tcpdf": "^2.3",
+        "smalot/pdfparser": "^2.13",
+        "tecnickcom/tcpdf": "^6.11"
     },
     "config": {
         "sort-packages": true

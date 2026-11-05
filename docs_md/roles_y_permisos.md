@@ -31,7 +31,7 @@ El único POST disponible es `logout`, para invalidar la propia sesión; es una 
 |---|---|
 | Invitado | Inicio, registro, login y recuperación. El catálogo de ofertas requiere sesión y responde 403 a visitantes sin autenticar. |
 | Alumno | Expediente propio, edición de perfil, disponibilidad, asignaciones propias, calificaciones propias y datos de interés de su empresa asignada. No ve el catálogo general de ofertas ni expedientes de terceros. |
-| Empresa | Sus ofertas, convenios y sedes; puede descargar sus convenios aprobados y sellados desde una ruta autenticada. No decide sus revisiones. |
+| Empresa | Sus ofertas, convenios y sedes; puede descargar sus convenios aprobados y firmados digitalmente desde una ruta autenticada. No decide sus revisiones. |
 | Coordinador | Consulta y seguimiento de ofertas/convenios, asignación y cierre de prácticas, calificaciones y consultas. No puede aprobar o rechazar ofertas ni convenios. |
 | Administrador | Gestión de usuarios y decisiones sobre ofertas/convenios; comparte la gestión de asignaciones y calificaciones. Si `FCT_INTEGRATIONS_ENABLED=true`, es el único rol con acceso a `integraciones` y `api-tokens`; por defecto esas rutas y la API están desactivadas. |
 | Observador | Solo lectura, con anonimización y sin acceso a documentos privados, según el alcance anterior. |

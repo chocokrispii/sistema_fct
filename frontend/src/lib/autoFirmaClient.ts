@@ -30,11 +30,23 @@ export function signPdfWithAutoFirma(pdfBase64: string): Promise<string> {
             client.setAppName('Sistema FCT');
             client.setServiceTimeout(120_000);
             client.cargarAppAfirma();
+            const visibleSignatureParams = [
+                'signaturePage=-1',
+                'signaturePositionOnPageLowerLeftX=40',
+                'signaturePositionOnPageLowerLeftY=40',
+                'signaturePositionOnPageUpperRightX=300',
+                'signaturePositionOnPageUpperRightY=95',
+                'layer2Text=Firmado digitalmente por $$SUBJECTCN$$',
+                'layer2FontFamily=1',
+                'layer2FontSize=8',
+                'layer2FontStyle=2',
+                'layer2FontColor=gray',
+            ].join('\n');
             client.sign(
                 pdfBase64,
                 'SHA256withRSA',
                 'PAdES',
-                '',
+                visibleSignatureParams,
                 (signature) => {
                     if (typeof signature !== 'string' || signature === '') {
                         reject(new Error('AutoFirma no devolvió el documento firmado.'));

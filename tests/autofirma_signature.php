@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../app/Core/ConvenioSignatureMode.php';
 require_once __DIR__ . '/../app/Services/PadesSignatureVerifier.php';
+require_once __DIR__ . '/../app/Services/SignatureProviderFactory.php';
 
 function assertAutoFirma(bool $condition, string $message): void
 {
@@ -49,15 +50,22 @@ try {
     putenv('FCT_CONVENIO_SIGNATURE_MODE=');
     assertAutoFirma(ConvenioSignatureMode::current() === 'test', 'Desarrollo debe usar por defecto el modo de prueba.');
 
+    putenv('FCT_CONVENIO_SIGNATURE_MODE=mock');
+    assertAutoFirma(
+        ConvenioSignatureMode::canUseMockSignature()
+            && SignatureProviderFactory::create() instanceof AutoFirmaMockStrategy,
+        'El modo mock de desarrollo debe seleccionar la estrategia PAdES local.'
+    );
+
     putenv('APP_ENV=production');
-    putenv('FCT_CONVENIO_SIGNATURE_MODE=test');
-    $productionTestRejected = false;
+    putenv('FCT_CONVENIO_SIGNATURE_MODE=mock');
+    $productionMockRejected = false;
     try {
         ConvenioSignatureMode::current();
     } catch (RuntimeException) {
-        $productionTestRejected = true;
+        $productionMockRejected = true;
     }
-    assertAutoFirma($productionTestRejected, 'Producción debe rechazar el modo de prueba.');
+    assertAutoFirma($productionMockRejected, 'Producción debe rechazar el modo mock.');
 } finally {
     $testEnvironment === false ? putenv('APP_ENV') : putenv('APP_ENV=' . $testEnvironment);
     $testMode === false ? putenv('FCT_CONVENIO_SIGNATURE_MODE') : putenv('FCT_CONVENIO_SIGNATURE_MODE=' . $testMode);
