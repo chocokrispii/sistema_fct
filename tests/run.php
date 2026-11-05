@@ -1681,6 +1681,14 @@ try {
             && ($routes['alumnos-centro']['method'] ?? null) === 'GET'
             && ($routes['alta-alumno']['roles'] ?? null) === ['Administrador', 'Coordinador']
             && ($routes['alta-alumno']['method'] ?? null) === ['GET', 'POST']
+            && ($routes['importar-alumnos']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['importar-alumnos']['method'] ?? null) === ['GET', 'POST']
+            && ($routes['plantilla-importacion-alumnos']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['plantilla-importacion-alumnos']['method'] ?? null) === 'GET'
+            && ($routes['verificacion-importacion-alumnos']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['verificacion-importacion-alumnos']['method'] ?? null) === 'GET'
+            && ($routes['informe-importacion-alumnos']['roles'] ?? null) === ['Administrador', 'Coordinador']
+            && ($routes['informe-importacion-alumnos']['method'] ?? null) === 'GET'
             && ($routes['actualizar-alumno-centro']['roles'] ?? null) === ['Administrador', 'Coordinador']
             && ($routes['actualizar-alumno-centro']['method'] ?? null) === 'POST'
             && ($routes['alta-personal']['roles'] ?? null) === ['Administrador']

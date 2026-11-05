@@ -127,8 +127,9 @@ try {
         assertIdentity(
             str_contains($html, 'Opción destinada a casos especiales de alumnado no residente según la normativa de Formación Profesional')
                 && str_contains($html, 'aria-describedby="student-document-help"')
-                && str_contains($html, 'id="student-document-help"'),
-            'La nota del pasaporte debe estar visible y asociada al selector.'
+                && str_contains($html, 'id="student-document-help"')
+                && str_contains($html, 'action=importar-alumnos'),
+            'El alta individual debe conservar la ayuda del documento y ofrecer importación masiva.'
         );
         assertIdentity(preg_match('/\bCIF\b/i', $html) === 0, 'El alta de alumnado no debe mostrar CIF.');
     }
