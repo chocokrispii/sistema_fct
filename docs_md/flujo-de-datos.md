@@ -198,7 +198,8 @@ Las acciones son valores de `index.php?action=...`. Los métodos y roles se obti
 | Empresa | `publicar-oferta`, `sedes`, `convenios` | GET, POST | Empresa |
 | Convenios | `gestionar-convenios` | GET | Administrador, Coordinador; Coordinador limitado a pendientes |
 |  | `revisar-convenios`, `archivo-convenios` | GET | Administrador, Coordinador / Administrador; alias compatibles de la vista unificada |
-|  | `firmar-convenio`, `aprobar-convenio`, `rechazar-convenio`, `resolver-convenio`, `archivar-convenio` | POST | Administrador |
+|  | `firmar-convenio`, `preparar-firma-autofirma`, `completar-firma-autofirma` | POST | Administrador, Coordinador |
+|  | `aprobar-convenio`, `rechazar-convenio`, `resolver-convenio`, `archivar-convenio` | POST | Administrador |
 |  | `descargar-convenio` | GET | Administrador |
 |  | `descargar-convenio-firmado` | GET | Empresa; solo documentos aprobados de su propia empresa |
 | Gestión de ofertas | `revisar-ofertas` | GET | Administrador, Coordinador |

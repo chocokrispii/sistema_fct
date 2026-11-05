@@ -10,7 +10,13 @@ use PHPMailer\PHPMailer\PHPMailer;
 
 final class ConvenioApprovalMailer
 {
-    public function send(string $recipient, string $companyName, string $agreementNumber, string $downloadUrl): void
+    public function send(
+        string $recipient,
+        string $companyName,
+        string $agreementNumber,
+        string $downloadUrl,
+        bool $padesVerified = true
+    ): void
     {
         $host = getenv('FCT_MAIL_HOST') ?: '';
         $portRaw = getenv('FCT_MAIL_PORT') ?: '587';
@@ -68,14 +74,16 @@ final class ConvenioApprovalMailer
             $mail->addAddress($recipient, $displayName);
             $mail->isHTML(true);
             $mail->Subject = 'Convenio aprobado en Sistema FCT';
+            $approvalDescription = $padesVerified
+                ? 'ha sido aprobado tras validar su firma electrónica PAdES.'
+                : 'ha sido aprobado con un sello electrónico simple de desarrollo.';
             $mail->Body = '<p>Hola ' . $safeName . ':</p>'
-                . '<p>El convenio ' . $safeNumber . ' ha sido aprobado mediante un sello electrónico simple.</p>'
+                . '<p>El convenio ' . $safeNumber . ' ' . $approvalDescription . '</p>'
                 . '<p><a href="' . $safeUrl . '">Acceder al convenio aprobado</a></p>'
-                . '<p>El enlace requiere iniciar sesión con la cuenta de empresa asociada. El sello no es una firma digital cualificada.</p>';
+                . '<p>El enlace requiere iniciar sesión con la cuenta de empresa asociada.</p>';
             $mail->AltBody = "Hola $displayName:\n\n"
-                . "El convenio $agreementNumber ha sido aprobado mediante un sello electrónico simple.\n"
-                . "Accede al documento iniciando sesión con la cuenta de empresa asociada:\n$downloadUrl\n\n"
-                . 'El sello no es una firma digital cualificada.';
+                . "El convenio $agreementNumber $approvalDescription\n"
+                . "Accede al documento iniciando sesión con la cuenta de empresa asociada:\n$downloadUrl";
             $mail->send();
         } catch (MailException $exception) {
             throw new RuntimeException('No se pudo enviar el aviso de aprobación a la empresa.', 0, $exception);

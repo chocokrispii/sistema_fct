@@ -32,6 +32,51 @@ vuelve a comprobar la autorización.
 
 La especificación completa de rutas, permisos y formatos está en [API REST](./api-rest.md).
 
+## Firma de convenios con AutoFirma
+
+Administradores y Coordinadores pueden firmar los convenios pendientes con el
+cliente de escritorio AutoFirma. El navegador envía el PDF original a AutoFirma
+para una firma PAdES; el backend comprueba que el PDF corresponde al original y
+valida la integridad de la firma, la cadena de confianza y la revocación OCSP
+antes de aprobarlo. Una cancelación, un certificado no confiable o un fallo de
+validación deja el convenio pendiente.
+
+El modo se configura con `FCT_CONVENIO_SIGNATURE_MODE`:
+
+- `test` es el valor predeterminado en desarrollo. La ruta
+  `index.php?action=probar-autofirma` firma un PDF ficticio y valida el PAdES
+  contra el almacén de confianza local configurado, sin consulta OCSP. No guarda
+  el resultado ni cambia convenios. Para pruebas reproducibles puede instalarse
+  un certificado y una CA autofirmados exclusivamente de prueba; no son
+  certificados cualificados ni deben usarse para documentos reales.
+- `autofirma` habilita las aprobaciones PAdES. El cliente AutoFirma debe estar
+  instalado en el equipo del firmante.
+- `disabled` deshabilita la firma.
+- `simple` conserva el sello visual heredado únicamente para desarrollo y
+  pruebas; está rechazado en producción.
+
+Para habilitar `autofirma`, el servidor Docker necesita `pdfsig`, un almacén NSS
+con las CA que deban considerarse confiables y acceso a los servicios OCSP/AIA
+necesarios. Por defecto, la carpeta del host
+`storage/autofirma-nssdb` se monta como solo lectura en
+`/var/lib/fct/autofirma-nssdb`; se puede cambiar el origen con
+`FCT_AUTOFIRMA_NSS_PATH`. Prepara allí la base NSS y sus CA raíz/intermedias
+con el procedimiento de confianza de la organización antes de habilitar firmas.
+Si el almacén falta o no confía en el certificado, el backend no aprueba el
+convenio.
+
+En un convenio pendiente, el firmante puede usar el flujo automático del
+navegador o descargar el original, firmarlo desde AutoFirma y subir el PDF
+resultante. Ambos flujos pasan por la misma validación del servidor. La
+notificación a la empresa contiene un enlace de descarga privado.
+
+El cliente `AutoScript` se distribuye desde el repositorio oficial
+[ctt-gob-es/clienteafirma](https://github.com/ctt-gob-es/clienteafirma), fijado
+al commit `bd9254be70004be095b1251b5a4af15b9d392dd9`, bajo sus licencias
+incluidas junto al asset. Una firma PAdES verificada no implica por sí sola que
+sea una firma cualificada eIDAS; esa exigencia requiere una política y un
+prestador cualificado definidos por la organización.
+
 ## Seguridad y resolución de problemas
 
 - No incluyas tokens o secretos en URLs, capturas, archivos versionados ni mensajes.

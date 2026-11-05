@@ -31,12 +31,18 @@ assertConvenios(
     ($routes['aprobar-convenio']['method'] ?? null) === 'POST'
         && ($routes['aprobar-convenio']['roles'] ?? null) === ['Administrador']
         && ($routes['firmar-convenio']['method'] ?? null) === 'POST'
-        && ($routes['firmar-convenio']['roles'] ?? null) === ['Administrador']
+        && ($routes['firmar-convenio']['roles'] ?? null) === ['Administrador', 'Coordinador']
+        && ($routes['preparar-firma-autofirma']['method'] ?? null) === 'POST'
+        && ($routes['preparar-firma-autofirma']['roles'] ?? null) === ['Administrador', 'Coordinador']
+        && ($routes['completar-firma-autofirma']['method'] ?? null) === 'POST'
+        && ($routes['completar-firma-autofirma']['roles'] ?? null) === ['Administrador', 'Coordinador']
+        && ($routes['verificar-prueba-autofirma']['method'] ?? null) === 'POST'
+        && ($routes['verificar-prueba-autofirma']['roles'] ?? null) === ['Administrador', 'Coordinador']
         && ($routes['rechazar-convenio']['roles'] ?? null) === ['Administrador']
         && ($routes['archivar-convenio']['roles'] ?? null) === ['Administrador']
         && ($routes['descargar-convenio']['roles'] ?? null) === ['Administrador']
         && ($routes['descargar-convenio-firmado']['roles'] ?? null) === ['Empresa'],
-    'La firma debe ser POST de Administrador y la descarga firmada debe quedar limitada a Empresa.'
+    'La firma AutoFirma debe permitir Administrador y Coordinador; la descarga original queda reservada a Administración.'
 );
 $cycleId = (int)$db->query('SELECT id FROM especialidades WHERE activo = 1 ORDER BY id LIMIT 1')->fetchColumn();
 if ($cycleId < 1) {

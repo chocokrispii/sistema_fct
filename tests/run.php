@@ -44,6 +44,7 @@ function assertTrue(bool $condition, string $message): void
 
 require_once __DIR__ . '/file_security.php';
 require_once __DIR__ . '/convenio_firma_pdf.php';
+require_once __DIR__ . '/autofirma_signature.php';
 require_once __DIR__ . '/branding.php';
 
 $db = getPDOConnection();
@@ -822,9 +823,9 @@ try {
         count(array_filter(
             $agreementModel->listarEventosArchivo(),
             static fn(array $event): bool => (int)$event['convenio_id'] === $agreementId
-                && $event['evento'] === 'convenio.revisado'
+                && $event['evento'] === 'convenio.firmado.aprobado'
         )) === 1,
-        'El archivo debe incluir los eventos de auditoría del convenio.'
+        'El archivo debe incluir el evento de firma y aprobación del convenio.'
     );
     $companyModel = new Empresa($db);
     assertTrue(
