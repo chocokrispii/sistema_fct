@@ -5,11 +5,13 @@ declare(strict_types=1);
 $escape = static fn(mixed $value): string => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 $tabAction = 'index.php?action=gestionar-convenios';
 $tabs = [
-    'pendiente_revision' => 'Cola de revisión',
-    'aprobado' => 'Aprobados',
-    'rechazado' => 'Rechazados',
-    'archivado' => 'Archivados',
+    'pendiente_revision' => 'En Revisión',
+    'aprobado' => 'Aprobadas',
+    'rechazado' => 'Rechazadas',
 ];
+if ($esAdministrador) {
+    $tabs['archivado'] = 'Archivados';
+}
 ?>
 <section class="agreement-management" aria-labelledby="agreement-management-title">
     <header class="agreement-management__intro">
@@ -64,7 +66,7 @@ $tabs = [
         <p class="message message-error" role="alert"><?= $escape($error) ?></p>
     <?php elseif ($convenios === []): ?>
         <p class="agreement-results" role="status">0 convenios encontrados</p>
-        <p class="agreement-empty">No hay convenios que coincidan con los filtros seleccionados.</p>
+        <p class="agreement-empty">No hay convenios en este estado</p>
     <?php else: ?>
         <p class="agreement-results" role="status">
             <?= (int)$paginacion['total'] ?> <?= (int)$paginacion['total'] === 1 ? 'convenio encontrado' : 'convenios encontrados' ?>
