@@ -44,7 +44,7 @@ El listado general `GET ofertas` está limitado a cuentas autenticadas de empres
 
 ## Revisión y responsabilidades
 
-La lista `GET revisar-ofertas` permanece disponible para Administración y Coordinación. La gestión unificada de convenios (`GET gestionar-convenios`, y los accesos compatibles `GET revisar-convenios` / `GET archivo-convenios`) permite a Coordinación consultar solo la cola pendiente; Administración puede filtrar todos los estados. `POST firmar-convenio` y sus pasos de preparación/finalización están disponibles para Administrador y Coordinador; rechazar y archivar siguen reservados a Administrador. Los controladores vuelven a comprobar el rol para evitar decisiones fuera de la política aunque se invoquen directamente.
+La lista `GET revisar-ofertas` permanece disponible para Administración y Coordinación. La gestión unificada de convenios (`GET gestionar-convenios`, y los accesos compatibles `GET revisar-convenios` / `GET archivo-convenios`) permite a Coordinación consultar revisión, aprobados y rechazados; los archivados quedan reservados a Administración. La firma PAdES, el rechazo y el archivo son acciones exclusivas de Administrador; la descarga del PDF original también se reserva a Administración, mientras el PDF firmado sólo está disponible para Administración y la empresa titular. Los controladores vuelven a comprobar los permisos y la integridad aunque se invoquen directamente.
 
 La política de roles usa los nombres reales del esquema (`Administrador`, `Coordinador`, `Observador`, `Empresa`, `Alumno`). No se inventan roles `Director` ni `Guest` en la base de datos.
 

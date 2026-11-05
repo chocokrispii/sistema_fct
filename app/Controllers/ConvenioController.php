@@ -1287,9 +1287,15 @@ class ConvenioController
         ];
         $error = '';
         try {
-            $filtros['estado'] = $rol === 'Coordinador'
-                ? 'pendiente_revision'
-                : $this->leerFiltro('estado', $estadoPredeterminado);
+            $estadoSolicitado = $this->leerFiltro('estado', $estadoPredeterminado);
+            if ($rol === 'Coordinador') {
+                $estadosVisiblesCoordinador = ['pendiente_revision', 'aprobado', 'rechazado'];
+                $filtros['estado'] = in_array($estadoSolicitado, $estadosVisiblesCoordinador, true)
+                    ? $estadoSolicitado
+                    : 'pendiente_revision';
+            } else {
+                $filtros['estado'] = $estadoSolicitado;
+            }
             $filtros['nif'] = $this->leerFiltro('nif', '');
             $filtros['fecha_desde'] = $this->leerFiltro('fecha_desde', '');
             $filtros['fecha_hasta'] = $this->leerFiltro('fecha_hasta', '');

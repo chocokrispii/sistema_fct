@@ -255,6 +255,62 @@ try {
     $deniedAudit->execute(['usuario' => $userIds['Coordinador'], 'id' => $agreementId]);
     assertConvenios((int)$deniedAudit->fetchColumn() === 1, 'La denegación de descarga debe quedar auditada.');
 
+    $_SESSION = ['usuario_id' => $userIds['Coordinador'], 'rol' => 'Coordinador'];
+    $renderAgreementState = static function (string $state) use ($db): string {
+        $_GET = ['estado' => $state];
+        ob_start();
+        try {
+            (new ConvenioController($db))->index();
+            return (string)ob_get_clean();
+        } catch (Throwable $exception) {
+            ob_end_clean();
+            throw $exception;
+        }
+    };
+    $hasActiveTab = static function (string $html, string $state, string $label): bool {
+        if (preg_match(
+            '/<a href="([^"]+)"\s+aria-current="page">\s*' . preg_quote($label, '/') . '\s*<\/a>/',
+            $html,
+            $matches
+        ) !== 1) {
+            return false;
+        }
+        return str_contains(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'estado=' . $state);
+    };
+    foreach ([
+        'pendiente_revision' => ['Pendiente', 'En Revisión', 'pending'],
+        'aprobado' => ['Aprobado', 'Aprobadas', 'approved'],
+        'rechazado' => ['Rechazado', 'Rechazadas', 'rejected'],
+    ] as $state => [$dbState, $tabLabel, $stateClass]) {
+        $setState = $db->prepare('UPDATE convenios SET estado = :estado WHERE id = :id');
+        $setState->execute(['estado' => $dbState, 'id' => $agreementId]);
+        $html = $renderAgreementState($state);
+        assertConvenios(
+            $hasActiveTab($html, $state, $tabLabel)
+                && str_contains($html, 'UNIFICADO-' . $fixture)
+                && str_contains($html, 'agreement-status--' . $stateClass),
+            'La pestaña ' . $tabLabel . ' debe seleccionar el estado solicitado y mostrar sus convenios.'
+        );
+        assertConvenios(
+            !str_contains($html, '>Archivados</a>'),
+            'Coordinación no debe obtener acceso a la pestaña de convenios archivados.'
+        );
+    }
+
+    $setState->execute(['estado' => 'Rechazado', 'id' => $agreementId]);
+    $emptyHtml = $renderAgreementState('aprobado');
+    assertConvenios(
+        str_contains($emptyHtml, 'No hay convenios en este estado')
+            && !str_contains($emptyHtml, 'UNIFICADO-' . $fixture),
+        'Una pestaña sin convenios debe mostrar el estado vacío y no incluir filas de otros estados.'
+    );
+
+    $invalidStateHtml = $renderAgreementState('archivado');
+    assertConvenios(
+        $hasActiveTab($invalidStateHtml, 'pendiente_revision', 'En Revisión'),
+        'Un estado no permitido para Coordinación debe volver a la cola de revisión.'
+    );
+
     echo "convenios_unificado: OK\n";
 } finally {
     if ($agreementId !== null) {
